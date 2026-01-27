@@ -1,0 +1,29 @@
+{
+  "name": "Q1 2025 Brand Awareness Campaign",
+  "objectives": [
+    "brand awareness",
+    "reach",
+    "video views"
+  ],
+  "budget": 75000,
+  "start_date": "2025-02-01",
+  "end_date": "2025-03-31",
+  "target_audience": {
+    "age": "25-54",
+    "gender": "all",
+    "geo": ["US"],
+    "interests": ["technology", "business", "finance"],
+    "income": "top 30%"
+  },
+  "kpis": {
+    "viewability": 70,
+    "video_completion_rate": 75,
+    "brand_safety": true,
+    "frequency_cap": 3
+  },
+  "channels": ["branding", "ctv", "performance"],
+  "constraints": {
+    "exclude_publishers": [],
+    "required_brand_safety_vendors": ["IAS", "DoubleVerify"]
+  }
+}

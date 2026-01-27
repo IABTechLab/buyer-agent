@@ -1,0 +1,30 @@
+{
+  "name": "My Campaign",
+  "objectives": [
+    "brand awareness",
+    "reach"
+  ],
+  "budget": 50000,
+  "start_date": "2025-02-01",
+  "end_date": "2025-02-28",
+  "target_audience": {
+    "age": "25-54",
+    "gender": "all",
+    "geo": [
+      "US"
+    ],
+    "interests": [
+      "technology",
+      "business"
+    ]
+  },
+  "kpis": {
+    "viewability": 70,
+    "brand_safety": true
+  },
+  "channels": [
+    "branding",
+    "ctv",
+    "performance"
+  ]
+}
