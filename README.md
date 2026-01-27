@@ -745,8 +745,3 @@ A2A involves an LLM on the server side, so responses take longer than MCP. Use M
 - [MCP SSE](https://agentic-direct-server-hwgrypmndq-uk.a.run.app/mcp/sse) - MCP server-sent events endpoint
 - [UCP Specification](https://iabtechlab.com/standards/user-context-protocol/) - User Context Protocol documentation
 
----
-
-## License
-
-MIT
