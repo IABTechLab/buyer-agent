@@ -738,10 +738,5 @@ A2A involves an LLM on the server side, so responses take longer than MCP. Use M
 
 ### IAB Tech Lab Resources
 
-- [agentic-direct](https://github.com/InteractiveAdvertisingBureau/agentic-direct) - IAB Tech Lab reference implementation
-- [Demo Client](https://agentic-direct-client-hwgrypmndq-uk.a.run.app/) - Hosted web client
-- [A2A Server](https://agentic-direct-server-hwgrypmndq-uk.a.run.app/) - Agent-to-Agent protocol endpoint
-- [MCP Info](https://agentic-direct-server-hwgrypmndq-uk.a.run.app/mcp/info) - MCP server metadata
-- [MCP SSE](https://agentic-direct-server-hwgrypmndq-uk.a.run.app/mcp/sse) - MCP server-sent events endpoint
-- [UCP Specification](https://iabtechlab.com/standards/user-context-protocol/) - User Context Protocol documentation
-
+- [Agentic Direct](https://github.com/InteractiveAdvertisingBureau/agentic-direct) - IAB Tech Lab agentic direct (OpenDirect) MCP server example implementation
+- [Agentic Audience Specification](https://iabtechlab.com/standards/agentic-audiences/) - Agentic Audience documentation
