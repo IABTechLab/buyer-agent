@@ -7,7 +7,7 @@ An AI-powered media buying system for **DSPs, agencies, and advertisers** to aut
 The Ad Buyer System lets you:
 
 - **Automate media buying** with AI agents that understand your campaign goals and budget
-- **Plan audiences** using IAB Tech Lab UCP (User Context Protocol) for real-time matching
+- **Plan audiences** using IAB Tech Lab Agentic Audience for real-time matching
 - **Search and discover inventory** across publishers using natural language or structured queries
 - **Book deals programmatically** via IAB OpenDirect 2.1 protocol
 - **Obtain Deal IDs for DSP activation** - present buyer identity (agency, advertiser) to unlock tiered pricing, then get Deal IDs for activation in The Trade Desk, DV360, Amazon DSP, and other platforms
@@ -73,7 +73,7 @@ The Ad Buyer System lets you:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  PROTOCOLS                                                                  │
 │  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐  │
-│  │ MCP (33 OpenDirect   │  │ A2A (Natural Language│  │ UCP (Audience    │  │
+│  │ MCP (33 OpenDirect   │  │ A2A (Natural Language│  │ AA (Agentic Audience    │  │
 │  │      Tools)          │  │      Queries)        │  │    Embeddings)   │  │
 │  └──────────────────────┘  └──────────────────────┘  └──────────────────┘  │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -95,17 +95,17 @@ The Ad Buyer System lets you:
 | **3** | Research Agent | Claude Sonnet | 0.2 | Inventory search, availability checking |
 | **3** | Execution Agent | Claude Sonnet | 0.2 | Order creation, line booking |
 | **3** | Reporting Agent | Claude Sonnet | 0.3 | Performance reporting, analytics |
-| **3** | Audience Planner | Claude Sonnet | 0.3 | UCP-based audience planning, coverage estimation |
+| **3** | Audience Planner | Claude Sonnet | 0.3 | Agentic Audience based audience planning, coverage estimation |
 
 ---
 
-## UCP: User Context Protocol
+## Agentic Audience: User Context Protocol
 
-The Ad Buyer System integrates with the **IAB Tech Lab User Context Protocol (UCP)** for intelligent audience planning and matching.
+The Ad Buyer System integrates with the **IAB Tech Lab Agentic Audience (AA)** for intelligent audience planning and matching.
 
-### What UCP Does
+### What Agentic Audience Does
 
-UCP enables real-time audience matching between buyer and seller agents by exchanging embeddings (256-1024 dimension vectors) that encode:
+Agentic Audience enables real-time audience matching between buyer and seller agents by exchanging embeddings (256-1024 dimension vectors) that encode:
 
 - **Identity Signals** - Hashed user IDs, device graphs
 - **Contextual Signals** - Page content, keywords, categories
@@ -113,9 +113,9 @@ UCP enables real-time audience matching between buyer and seller agents by excha
 
 ### Audience Planner Agent
 
-The **Audience Planner Agent** (Level 3) uses UCP to:
+The **Audience Planner Agent** (Level 3) uses Agentic Audience to:
 
-1. **Discover Capabilities** - Query seller audience capabilities via UCP
+1. **Discover Capabilities** - Query seller audience capabilities via Agentic Audience
 2. **Match Requirements** - Align campaign audience requirements to inventory
 3. **Estimate Coverage** - Calculate what percentage of inventory matches the audience
 4. **Identify Gaps** - Find audience requirements the seller cannot support
@@ -125,16 +125,16 @@ The **Audience Planner Agent** (Level 3) uses UCP to:
 
 | Tool | Purpose |
 |------|---------|
-| `AudienceDiscoveryTool` | Discover available audience signals from sellers via UCP |
+| `AudienceDiscoveryTool` | Discover available audience signals from sellers via Agentic Audience |
 | `AudienceMatchingTool` | Match campaign audiences to inventory capabilities |
 | `CoverageEstimationTool` | Estimate audience coverage for targeting combinations |
 
 ### Audience Planning Flow
 
 ```
-Campaign Brief → Audience Planner Agent → UCP Discovery → Coverage Estimates → Budget Allocation
+Campaign Brief → Audience Planner Agent → Agentic Audience Discovery → Coverage Estimates → Budget Allocation
                         │
-                        ├─ Discover seller capabilities via UCP
+                        ├─ Discover seller capabilities via Agentic Audience
                         ├─ Match audience requirements to inventory
                         ├─ Estimate coverage per channel
                         └─ Identify gaps and alternatives
@@ -159,13 +159,13 @@ campaign_brief = {
 
 # The flow will:
 # 1. Analyze target_audience via Audience Planner Agent
-# 2. Discover seller capabilities using UCP
+# 2. Discover seller capabilities using Agentic Audience
 # 3. Estimate coverage: {"branding": 75%, "ctv": 55%, ...}
 # 4. Identify gaps: ["behavioral_targeting: coverage limited to 35-45%"]
 # 5. Adjust budget allocation based on coverage
 ```
 
-### UCP Technical Details
+### Agentic Audience Technical Details
 
 | Property | Value |
 |----------|-------|
@@ -459,13 +459,13 @@ The system supports multiple protocols for communicating with OpenDirect servers
 |----------|----------|-------|-------------|
 | **MCP** | Structured operations (create, update, list) | Fast | Deterministic, 33 tools |
 | **A2A** | Natural language queries and discovery | Moderate | Flexible, conversational |
-| **UCP** | Audience embedding exchange | Fast | Privacy-preserving matching |
+| **Agentic Audience** | Audience embedding exchange | Fast | Privacy-preserving matching |
 
 ### When to Use Each
 
 - **MCP**: Booking deals, creating orders, listing inventory, automated workflows
 - **A2A**: Discovery queries, recommendations, complex questions, conversational interfaces
-- **UCP**: Audience planning, coverage estimation, capability discovery
+- **Agentic Audience**: Audience planning, coverage estimation, capability discovery
 
 ---
 
@@ -507,7 +507,7 @@ python -m ad_buyer.interfaces.api.main
 | `POST` | `/lines` | Create a line item |
 | `POST` | `/search` | Search inventory |
 | `POST` | `/chat` | Natural language query |
-| `POST` | `/audience/plan` | Plan audience targeting (UCP) |
+| `POST` | `/audience/plan` | Plan audience targeting (AA) |
 
 ### Example: Search Products via API
 
@@ -597,7 +597,7 @@ DATABASE_URL=sqlite:///./ad_buyer.db
 # REDIS_URL=redis://localhost:6379/0
 
 # ─────────────────────────────────────────────────────────────────
-# UCP (User Context Protocol)
+# Agentic Audience
 # ─────────────────────────────────────────────────────────────────
 UCP_ENABLED=true
 UCP_EMBEDDING_DIMENSION=512
@@ -640,7 +640,7 @@ ad_buyer_system/
 │   │   ├── unified_client.py    # Unified MCP + A2A + DSP methods
 │   │   ├── mcp_client.py        # Direct MCP access
 │   │   ├── a2a_client.py        # Natural language
-│   │   └── ucp_client.py        # UCP embedding exchange
+│   │   └── ucp_client.py        # Agentic Audience embedding exchange
 │   ├── crews/             # CrewAI crews
 │   ├── flows/             # Workflow orchestration
 │   │   ├── deal_booking_flow.py # Campaign booking flow (with audience planning)
@@ -652,7 +652,7 @@ ad_buyer_system/
 │   │   ├── opendirect.py        # OpenDirect entities
 │   │   ├── flow_state.py        # Flow state models
 │   │   ├── buyer_identity.py    # DSP buyer identity models
-│   │   └── ucp.py               # UCP models (embeddings, capabilities)
+│   │   └── ucp.py               # Agentic Audience models (embeddings, capabilities)
 │   └── tools/             # CrewAI tools
 │       ├── research/      # Research tools
 │       ├── execution/     # Booking tools
