@@ -1,3 +1,7 @@
+> **V2 — Active Development**
+> This is the next-generation buyer agent, under active development.
+> See [PROGRESS.md](.beads/PROGRESS.md) for the current roadmap and status.
+
 # Ad Buyer System
 
 An AI-powered media buying system for **DSPs, agencies, and advertisers** to automate programmatic direct purchases using IAB OpenDirect standards.
