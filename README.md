@@ -193,7 +193,7 @@ campaign_brief = {
 ### Step 1: Clone and Install
 
 ```bash
-git clone https://github.com/mobtownlabs/ad_buyer_system.git
+git clone https://github.com/IABTechLab/buyer-agent.git
 cd ad_buyer_system
 
 # Install the package
@@ -738,7 +738,7 @@ A2A involves an LLM on the server side, so responses take longer than MCP. Use M
 
 ## Related Projects
 
-- [ad-seller-system](https://github.com/mobtownlabs/ad-seller-system) - Publisher/SSP-side agent system
+- [seller-agent](https://github.com/IABTechLab/seller-agent) - Publisher/SSP-side agent system
 
 ### IAB Tech Lab Resources
 
