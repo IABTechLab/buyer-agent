@@ -3,13 +3,13 @@
 
 """Availability check tool for inventory pricing."""
 
-import asyncio
 from datetime import datetime
 from typing import Any, Optional
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 from ...models.opendirect import AvailsRequest
 
@@ -74,7 +74,7 @@ Returns:
         budget: Optional[float] = None,
     ) -> str:
         """Synchronous wrapper for async avails check."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 product_id=product_id,
                 start_date=start_date,

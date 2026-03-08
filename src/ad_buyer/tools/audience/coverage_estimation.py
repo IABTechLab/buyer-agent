@@ -3,12 +3,12 @@
 
 """Coverage Estimation Tool - Estimate audience coverage for targeting."""
 
-import asyncio
 from typing import Any, Optional, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...models.ucp import CoverageEstimate
 
 
@@ -50,7 +50,7 @@ class CoverageEstimationTool(BaseTool):
         total_impressions: Optional[int] = 10000000,
     ) -> str:
         """Execute the coverage estimation."""
-        return asyncio.run(
+        return run_async(
             self._arun(targeting, channel, total_impressions)
         )
 

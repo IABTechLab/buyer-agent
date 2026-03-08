@@ -3,13 +3,13 @@
 
 """Line item management tools for booking inventory."""
 
-import asyncio
 from datetime import datetime
 from typing import Any, Optional
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 from ...models.opendirect import Line, RateType
 
@@ -80,7 +80,7 @@ Returns:
         targeting: Optional[dict[str, Any]] = None,
     ) -> str:
         """Synchronous wrapper for async line creation."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 account_id=account_id,
                 order_id=order_id,
@@ -207,7 +207,7 @@ Returns:
         line_id: str,
     ) -> str:
         """Synchronous wrapper for async reserve."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 account_id=account_id,
                 order_id=order_id,
@@ -278,7 +278,7 @@ Returns:
         line_id: str,
     ) -> str:
         """Synchronous wrapper for async book."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 account_id=account_id,
                 order_id=order_id,

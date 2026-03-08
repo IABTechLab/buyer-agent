@@ -3,12 +3,12 @@
 
 """Audience Matching Tool - Match campaign audiences to inventory via UCP."""
 
-import asyncio
 from typing import Any, Optional, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.ucp_client import UCPClient
 from ...models.ucp import UCPConsent
 
@@ -66,7 +66,7 @@ class AudienceMatchingTool(BaseTool):
         exclusions: Optional[list[str]] = None,
     ) -> str:
         """Execute the audience matching."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 seller_endpoint,
                 demographics,

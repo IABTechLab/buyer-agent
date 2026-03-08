@@ -3,12 +3,12 @@
 
 """Product search tool for inventory discovery."""
 
-import asyncio
 from typing import Any, Optional
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 
 
@@ -92,7 +92,7 @@ Returns:
         limit: int = 10,
     ) -> str:
         """Synchronous wrapper for async search."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 channel=channel,
                 format=format,

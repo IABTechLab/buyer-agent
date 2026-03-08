@@ -3,12 +3,12 @@
 
 """Audience Discovery Tool - Discover available audience signals from sellers."""
 
-import asyncio
 from typing import Any, Optional, Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.ucp_client import UCPClient
 from ...models.ucp import AudienceCapability, SignalType
 
@@ -52,7 +52,7 @@ class AudienceDiscoveryTool(BaseTool):
         min_coverage: Optional[float] = None,
     ) -> str:
         """Execute the audience discovery."""
-        return asyncio.run(
+        return run_async(
             self._arun(seller_endpoint, signal_types, min_coverage)
         )
 

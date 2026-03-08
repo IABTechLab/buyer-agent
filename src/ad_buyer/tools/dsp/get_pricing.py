@@ -3,12 +3,12 @@
 
 """Tiered pricing tool for DSP workflows."""
 
-import asyncio
 from typing import Any, Optional
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.unified_client import Protocol, UnifiedClient
 from ...models.buyer_identity import AccessTier, BuyerContext, DealType
 
@@ -96,7 +96,7 @@ Returns:
         flight_end: Optional[str] = None,
     ) -> str:
         """Synchronous wrapper for async pricing."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 product_id=product_id,
                 volume=volume,

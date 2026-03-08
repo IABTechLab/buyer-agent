@@ -3,12 +3,12 @@
 
 """Inventory discovery tool for DSP workflows."""
 
-import asyncio
 from typing import Any, Optional
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.unified_client import Protocol, UnifiedClient
 from ...models.buyer_identity import BuyerContext
 
@@ -102,7 +102,7 @@ Returns:
         publisher: Optional[str] = None,
     ) -> str:
         """Synchronous wrapper for async discovery."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 query=query,
                 channel=channel,

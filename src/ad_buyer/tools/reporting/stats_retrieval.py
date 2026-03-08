@@ -3,12 +3,12 @@
 
 """Stats retrieval tool for performance reporting."""
 
-import asyncio
 from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 
 
@@ -50,7 +50,7 @@ Returns:
         line_id: str,
     ) -> str:
         """Synchronous wrapper for async stats retrieval."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 account_id=account_id,
                 order_id=order_id,

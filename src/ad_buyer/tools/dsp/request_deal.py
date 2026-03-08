@@ -3,7 +3,6 @@
 
 """Deal ID request tool for DSP workflows."""
 
-import asyncio
 import hashlib
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -11,6 +10,7 @@ from typing import Any, Optional
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.unified_client import Protocol, UnifiedClient
 from ...models.buyer_identity import (
     AccessTier,
@@ -112,7 +112,7 @@ Returns:
         target_cpm: Optional[float] = None,
     ) -> str:
         """Synchronous wrapper for async deal request."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 product_id=product_id,
                 deal_type=deal_type,

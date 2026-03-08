@@ -3,13 +3,13 @@
 
 """Order management tool for creating advertising orders."""
 
-import asyncio
 from datetime import datetime
 from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 from ...models.opendirect import Order
 
@@ -93,7 +93,7 @@ Returns:
         publisher_id: str | None = None,
     ) -> str:
         """Synchronous wrapper for async order creation."""
-        return asyncio.run(
+        return run_async(
             self._arun(
                 account_id=account_id,
                 order_name=order_name,
