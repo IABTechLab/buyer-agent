@@ -65,13 +65,13 @@ class TestSettingsHasIABServerURL:
         fields = Settings.model_fields
         assert "iab_server_url" in fields, "Settings missing iab_server_url field"
 
-    def test_settings_requires_iab_server_url(self) -> None:
-        """Settings must require iab_server_url (no default value)."""
+    def test_settings_has_local_default(self) -> None:
+        """Settings iab_server_url should default to localhost (not a remote URL)."""
         from ad_buyer.config.settings import Settings
 
         field_info = Settings.model_fields["iab_server_url"]
-        assert field_info.is_required(), (
-            "iab_server_url should be required (no default)"
+        assert field_info.default == "http://localhost:8001", (
+            "iab_server_url should default to localhost:8001"
         )
 
     def test_settings_loads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
