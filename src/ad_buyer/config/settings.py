@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # API Keys
     anthropic_api_key: str = ""
 
+    # IAB agentic-direct server URL
+    # Override via IAB_SERVER_URL env var or .env file
+    iab_server_url: str = "http://localhost:8001"
+
     # Seller Agent Endpoints (comma-separated list of MCP/A2A server URLs)
     # Each endpoint should implement IAB Tech Lab OpenDirect/AdCOM standards
     seller_endpoints: str = ""

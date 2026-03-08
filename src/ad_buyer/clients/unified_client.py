@@ -86,7 +86,7 @@ class UnifiedClient:
 
     def __init__(
         self,
-        base_url: str = "https://agentic-direct-server-hwgrypmndq-uk.a.run.app",
+        base_url: str,
         protocol: Protocol = Protocol.MCP,
         a2a_agent_type: str = "buyer",
         buyer_identity: "Optional[BuyerIdentity]" = None,

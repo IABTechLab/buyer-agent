@@ -64,7 +64,7 @@ class A2AClient:
 
     def __init__(
         self,
-        base_url: str = "https://agentic-direct-server-hwgrypmndq-uk.a.run.app",
+        base_url: str,
         agent_type: str = "buyer",
         timeout: float = 60.0,
     ):

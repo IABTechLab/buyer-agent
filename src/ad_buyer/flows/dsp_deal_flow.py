@@ -375,7 +375,7 @@ async def run_dsp_deal_flow(
     max_cpm: Optional[float] = None,
     flight_start: Optional[str] = None,
     flight_end: Optional[str] = None,
-    base_url: str = "https://agentic-direct-server-hwgrypmndq-uk.a.run.app",
+    base_url: Optional[str] = None,
 ) -> dict[str, Any]:
     """Convenience function to run the DSP deal flow.
 
@@ -387,11 +387,16 @@ async def run_dsp_deal_flow(
         max_cpm: Maximum CPM budget
         flight_start: Deal start date
         flight_end: Deal end date
-        base_url: Server URL
+        base_url: Server URL (defaults to Settings.iab_server_url)
 
     Returns:
         Flow result with Deal ID and activation instructions
     """
+    # Resolve server URL from Settings if not provided
+    if base_url is None:
+        from ..config.settings import get_settings
+        base_url = get_settings().iab_server_url
+
     # Create buyer context
     buyer_context = BuyerContext(
         identity=buyer_identity,
