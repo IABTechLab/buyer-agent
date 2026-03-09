@@ -73,6 +73,7 @@ CROSS_REPO_BLOCKERS = {
     "buyer-hu7": ["seller-a3k"],   # Needs Brian's quote/deal endpoints
     "buyer-4bg": ["seller-dcd"],   # Needs Brian's FreeWheel seller support
     "buyer-kyo": ["seller-awh"],   # Needs Brian's order lifecycle seller support
+    "buyer-6io": ["ar-v2f"],       # Needs research: does quote-then-book work for linear TV?
 }
 
 
