@@ -7,14 +7,26 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+import sys
 
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
+
+
+def _current_settings():
+    """Get the current settings from this module's namespace.
+
+    Uses sys.modules lookup so that test patches to the module-level
+    ``settings`` attribute are visible to the middleware at request time.
+    """
+    return sys.modules[__name__].settings
 
 app = FastAPI(
     title="Ad Buyer Agent API",
@@ -28,6 +40,38 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Paths that never require authentication
+_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+
+
+@app.middleware("http")
+async def api_key_auth_middleware(request: Request, call_next):
+    """Validate X-API-Key header on all non-public endpoints.
+
+    Authentication is skipped entirely when settings.api_key is empty,
+    allowing easy local development without configuring a key.
+    """
+    current = _current_settings()
+
+    # Skip auth if no api_key is configured (dev mode)
+    if not current.api_key:
+        return await call_next(request)
+
+    # Skip auth for public/health endpoints
+    if request.url.path in _PUBLIC_PATHS:
+        return await call_next(request)
+
+    # Validate the API key
+    provided_key = request.headers.get("X-API-Key", "")
+    if not provided_key or provided_key != current.api_key:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid or missing API key"},
+        )
+
+    return await call_next(request)
+
 
 # In-memory job storage (use Redis/DB in production)
 jobs: dict[str, dict[str, Any]] = {}

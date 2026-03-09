@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # API Keys
     anthropic_api_key: str = ""
 
+    # Inbound API key for authenticating requests to this service.
+    # When empty/not set, authentication is disabled (development mode).
+    api_key: str = ""
+
     # IAB agentic-direct server URL
     # Override via IAB_SERVER_URL env var or .env file
     iab_server_url: str = "http://localhost:8001"
