@@ -66,20 +66,39 @@ def get_sort_key(title):
     return (99, title, 0)
 
 
+# Cross-repo blockers that can't be tracked as formal bd dependencies.
+# These are seller-side beads owned by Brian that block buyer work.
+# Update this map when cross-repo dependencies change.
+CROSS_REPO_BLOCKERS = {
+    "buyer-hu7": ["seller-a3k"],   # Needs Brian's quote/deal endpoints
+    "buyer-4bg": ["seller-dcd"],   # Needs Brian's FreeWheel seller support
+    "buyer-kyo": ["seller-awh"],   # Needs Brian's order lifecycle seller support
+}
+
+
+def get_cross_repo_blockers(issue):
+    """Get cross-repo blockers for an issue from the static map."""
+    return CROSS_REPO_BLOCKERS.get(issue.get("id", ""), [])
+
+
 def is_blocked(issue, closed_ids):
-    """Check if issue has unresolved blockers."""
+    """Check if issue has unresolved blockers (in-repo deps or cross-repo annotations)."""
     deps = issue.get("dependencies") or []
     for dep in deps:
         blocker_id = dep.get("depends_on_id", "")
         if blocker_id not in closed_ids:
             return True
+    if get_cross_repo_blockers(issue):
+        return True
     return False
 
 
 def get_blocker_ids(issue):
-    """Get list of depends_on_id values."""
+    """Get list of depends_on_id values plus cross-repo blockers from notes."""
     deps = issue.get("dependencies") or []
-    return [dep.get("depends_on_id", "") for dep in deps]
+    blockers = [dep.get("depends_on_id", "") for dep in deps]
+    blockers.extend(get_cross_repo_blockers(issue))
+    return blockers
 
 
 def progress_bar(done, total, width=20):
