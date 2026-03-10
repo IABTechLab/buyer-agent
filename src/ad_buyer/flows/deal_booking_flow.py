@@ -4,9 +4,10 @@
 """Deal Booking Flow - main workflow for booking advertising deals."""
 
 import json
+import logging
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from crewai.flow.flow import Flow, listen, or_, start
 
@@ -28,6 +29,11 @@ from ..models.flow_state import (
 )
 from ..models.ucp import AudiencePlan, SignalType, UCPConsent
 
+if TYPE_CHECKING:
+    from ..storage.deal_store import DealStore
+
+logger = logging.getLogger(__name__)
+
 
 class DealBookingFlow(Flow[BookingState]):
     """Event-driven flow for end-to-end deal booking workflow.
@@ -42,14 +48,22 @@ class DealBookingFlow(Flow[BookingState]):
     7. Confirm and report
     """
 
-    def __init__(self, client: OpenDirectClient):
+    def __init__(
+        self,
+        client: OpenDirectClient,
+        store: Optional["DealStore"] = None,
+    ):
         """Initialize the flow with OpenDirect client.
 
         Args:
             client: OpenDirect API client for publisher interactions
+            store: Optional DealStore for persistence. When provided,
+                state mutations are dual-written to SQLite. When None,
+                behavior is unchanged (in-memory only).
         """
         super().__init__()
         self._client = client
+        self._store = store
 
     @start()
     def receive_campaign_brief(self) -> dict[str, Any]:
@@ -505,6 +519,23 @@ class DealBookingFlow(Flow[BookingState]):
         all_ids = [rec.product_id for rec in self.state.pending_approvals]
         return self.approve_recommendations(all_ids)
 
+    def _persist_booking(self, deal_id: str, booked: Any) -> None:
+        """Best-effort persistence of a booking record to the store."""
+        if self._store is None:
+            return
+        try:
+            self._store.save_booking_record(
+                deal_id=deal_id,
+                order_id=booked.order_id,
+                line_id=booked.line_id,
+                channel=booked.channel,
+                impressions=booked.impressions,
+                cost=booked.cost,
+                booking_status=booked.booking_status,
+            )
+        except Exception:
+            logger.exception("Failed to persist booking %s", booked.line_id)
+
     def _execute_bookings(self) -> dict[str, Any]:
         """Execute bookings for all approved recommendations."""
         from ..models.flow_state import BookedLine
@@ -517,6 +548,9 @@ class DealBookingFlow(Flow[BookingState]):
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
             return {"status": "success", "booked": 0, "message": "No recommendations approved"}
+
+        # Generate a deal_id for persistence grouping
+        deal_id = str(uuid.uuid4())
 
         # In a full implementation, this would use the Execution Agent
         # to create orders and book lines. For now, we track the approvals.
@@ -533,6 +567,7 @@ class DealBookingFlow(Flow[BookingState]):
                 booked_at=datetime.utcnow(),
             )
             self.state.booked_lines.append(booked)
+            self._persist_booking(deal_id, booked)
 
         self.state.execution_status = ExecutionStatus.COMPLETED
         self.state.updated_at = datetime.utcnow()

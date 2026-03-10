@@ -3,6 +3,7 @@
 
 """FastAPI server for the Ad Buyer System."""
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Optional
@@ -18,6 +19,9 @@ from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
+from ...storage import DealStore
+
+logger = logging.getLogger(__name__)
 
 
 def _current_settings():
@@ -73,8 +77,40 @@ async def api_key_auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# In-memory job storage (use Redis/DB in production)
+# In-memory job storage (primary read path during Phase 1)
 jobs: dict[str, dict[str, Any]] = {}
+
+# SQLite-backed store for dual-write persistence.
+# Initialized lazily on first use to avoid startup failures.
+_deal_store: Optional[DealStore] = None
+
+
+def _get_store() -> Optional[DealStore]:
+    """Return the module-level DealStore, creating it on first call.
+
+    Returns None (and logs a warning) if initialization fails,
+    allowing the API to continue operating in memory-only mode.
+    """
+    global _deal_store
+    if _deal_store is None:
+        try:
+            _deal_store = DealStore(settings.database_url)
+            _deal_store.connect()
+        except Exception:
+            logger.exception("Failed to initialize DealStore; running in memory-only mode")
+            return None
+    return _deal_store
+
+
+def _persist_job(job_id: str, data: dict[str, Any]) -> None:
+    """Best-effort dual-write of job data to SQLite."""
+    store = _get_store()
+    if store is None:
+        return
+    try:
+        store.save_job(job_id, data)
+    except Exception:
+        logger.exception("Failed to persist job %s to SQLite", job_id)
 
 
 # Request/Response Models
@@ -172,7 +208,7 @@ async def create_booking(
     job_id = str(uuid.uuid4())
     now = datetime.utcnow().isoformat()
 
-    jobs[job_id] = {
+    job_data = {
         "status": "pending",
         "progress": 0.0,
         "brief": request.brief.model_dump(),
@@ -184,6 +220,8 @@ async def create_booking(
         "created_at": now,
         "updated_at": now,
     }
+    jobs[job_id] = job_data
+    _persist_job(job_id, job_data)
 
     # Run booking flow in background
     background_tasks.add_task(_run_booking_flow, job_id, request)
@@ -251,6 +289,7 @@ async def approve_recommendations(
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
     job["updated_at"] = datetime.utcnow().isoformat()
     job["progress"] = 1.0
+    _persist_job(job_id, job)
 
     return {
         "status": result.get("status"),
@@ -286,6 +325,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
     job["updated_at"] = datetime.utcnow().isoformat()
     job["progress"] = 1.0
+    _persist_job(job_id, job)
 
     return result
 
@@ -341,9 +381,10 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["status"] = "running"
         job["progress"] = 0.1
         job["updated_at"] = datetime.utcnow().isoformat()
+        _persist_job(job_id, job)
 
         client = _create_client()
-        flow = DealBookingFlow(client)
+        flow = DealBookingFlow(client, store=_get_store())
         flow.state = BookingState(campaign_brief=request.brief.model_dump())
 
         # Store flow reference for approval
@@ -369,11 +410,13 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
 
         job["progress"] = 1.0 if job["status"] == "completed" else 0.9
         job["updated_at"] = datetime.utcnow().isoformat()
+        _persist_job(job_id, job)
 
     except Exception as e:
         job["status"] = "failed"
         job["errors"].append(str(e))
         job["updated_at"] = datetime.utcnow().isoformat()
+        _persist_job(job_id, job)
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
