@@ -74,6 +74,7 @@ nav:
   - Guides:
       - Negotiation: guides/negotiation.md
       - Identity Strategy: guides/identity.md
+      - Multi-Seller Discovery: guides/multi-seller.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
