@@ -64,6 +64,7 @@ nav:
       - Media Kit: api/media-kit.md
       - Deals: api/deals.md
       - Bookings: api/bookings.md
+      - Seller Discovery: api/seller-discovery.md
       - Products: api/products.md
   - Architecture:
       - Overview: architecture/overview.md
