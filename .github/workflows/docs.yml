@@ -1,0 +1,33 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'src/ad_buyer/interfaces/api/main.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e ".[docs]"
+
+      - name: Generate OpenAPI JSON
+        run: python scripts/generate_openapi.py
+
+      - name: Deploy to GitHub Pages
+        run: mkdocs gh-deploy --force

@@ -1,0 +1,52 @@
+# Products API
+
+The products endpoint lets you search the seller agent's product catalog directly, outside of a booking workflow.
+
+## POST /products/search
+
+Search available advertising products from connected seller agents.
+
+### Request Body -- `ProductSearchRequest`
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `channel` | `string` | no | `null` | Filter by channel (e.g. `display`, `video`, `ctv`) |
+| `format` | `string` | no | `null` | Filter by ad format (e.g. `banner`, `pre-roll`) |
+| `min_price` | `float` | no | `null` | Minimum base price |
+| `max_price` | `float` | no | `null` | Maximum base price |
+| `limit` | `int` | no | `10` | Number of results (1-50) |
+
+### Response
+
+```json
+{
+  "results": [ ... ]
+}
+```
+
+The `results` array contains product data returned by the seller agent's product catalog, filtered according to the search parameters.
+
+### How It Works
+
+The endpoint creates an `OpenDirectClient` using the configured seller connection (`OPENDIRECT_BASE_URL`, `OPENDIRECT_TOKEN`, `OPENDIRECT_API_KEY`) and delegates to the `ProductSearchTool`. The tool calls the seller agent's `/products/search` endpoint (or `/products` with filter parameters) and returns matching products.
+
+### Example
+
+```bash
+curl -X POST http://localhost:8001/products/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "channel": "display",
+    "max_price": 15.0,
+    "limit": 5
+  }'
+```
+
+### Connection to Seller Agent
+
+The product search connects to the seller agent's OpenDirect API. Make sure:
+
+1. The seller agent is running and accessible at the configured `OPENDIRECT_BASE_URL`.
+2. Authentication credentials (`OPENDIRECT_TOKEN` or `OPENDIRECT_API_KEY`) are set if the seller requires them.
+
+See [Seller Agent Integration](../integration/seller-agent.md) for details.

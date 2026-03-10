@@ -92,3 +92,6 @@ Thumbs.db
 # Project specific
 ad_buyer.db
 *.pid
+
+# mkdocs build output
+site/

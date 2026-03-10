@@ -30,8 +30,19 @@ def _current_settings():
 
 app = FastAPI(
     title="Ad Buyer Agent API",
-    description="API for automated advertising buying using CrewAI agents and IAB OpenDirect",
+    description=(
+        "Automated advertising buyer agent using CrewAI and IAB OpenDirect 2.1. "
+        "Orchestrates budget allocation, inventory research, recommendation "
+        "consolidation, and deal booking against seller agent APIs."
+    ),
     version="1.0.0",
+    contact={"name": "IAB Tech Lab", "url": "https://iabtechlab.com"},
+    license_info={"name": "Apache 2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0"},
+    openapi_tags=[
+        {"name": "Health", "description": "Service health and readiness"},
+        {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
+        {"name": "Products", "description": "Seller inventory product search"},
+    ],
 )
 
 app.add_middleware(
@@ -148,13 +159,13 @@ def _create_client() -> OpenDirectClient:
     )
 
 
-@app.get("/health")
+@app.get("/health", tags=["Health"])
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "healthy", "version": "1.0.0"}
 
 
-@app.post("/bookings", response_model=BookingResponse)
+@app.post("/bookings", response_model=BookingResponse, tags=["Bookings"])
 async def create_booking(
     request: BookingRequest,
     background_tasks: BackgroundTasks,
@@ -195,7 +206,7 @@ async def create_booking(
     )
 
 
-@app.get("/bookings/{job_id}", response_model=BookingStatus)
+@app.get("/bookings/{job_id}", response_model=BookingStatus, tags=["Bookings"])
 async def get_booking_status(job_id: str) -> BookingStatus:
     """Get status of a booking workflow."""
     if job_id not in jobs:
@@ -215,7 +226,7 @@ async def get_booking_status(job_id: str) -> BookingStatus:
     )
 
 
-@app.post("/bookings/{job_id}/approve")
+@app.post("/bookings/{job_id}/approve", tags=["Bookings"])
 async def approve_recommendations(
     job_id: str,
     request: ApprovalRequest,
@@ -260,7 +271,7 @@ async def approve_recommendations(
     }
 
 
-@app.post("/bookings/{job_id}/approve-all")
+@app.post("/bookings/{job_id}/approve-all", tags=["Bookings"])
 async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
     """Approve all recommendations for booking."""
     if job_id not in jobs:
@@ -290,7 +301,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
     return result
 
 
-@app.get("/bookings")
+@app.get("/bookings", tags=["Bookings"])
 async def list_bookings(
     status: Optional[str] = None,
     limit: int = 20,
@@ -314,7 +325,7 @@ async def list_bookings(
     return {"jobs": job_list[:limit], "total": len(job_list)}
 
 
-@app.post("/products/search")
+@app.post("/products/search", tags=["Products"])
 async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
     """Search available advertising products."""
     from ...tools.research.product_search import ProductSearchTool
