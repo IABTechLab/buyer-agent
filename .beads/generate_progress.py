@@ -69,11 +69,12 @@ def get_sort_key(title):
 # Cross-repo blockers that can't be tracked as formal bd dependencies.
 # These are seller-side beads owned by Brian that block buyer work.
 # Update this map when cross-repo dependencies change.
+# Cross-repo blockers: remove entries once the blocker is resolved.
 CROSS_REPO_BLOCKERS = {
-    "buyer-hu7": ["seller-a3k"],   # Needs Brian's quote/deal endpoints
     "buyer-4bg": ["seller-dcd"],   # Needs Brian's FreeWheel seller support
     "buyer-kyo": ["seller-awh"],   # Needs Brian's order lifecycle seller support
     "buyer-6io": ["ar-v2f"],       # Needs research: does quote-then-book work for linear TV?
+    # buyer-hu7: seller-a3k — RESOLVED 2026-03-10
 }
 
 
@@ -84,6 +85,9 @@ def get_cross_repo_blockers(issue):
 
 def is_blocked(issue, closed_ids):
     """Check if issue has unresolved blockers (in-repo deps or cross-repo annotations)."""
+    # Closed issues are never blocked
+    if issue.get("status") == "closed":
+        return False
     deps = issue.get("dependencies") or []
     for dep in deps:
         blocker_id = dep.get("depends_on_id", "")
