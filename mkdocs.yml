@@ -62,6 +62,7 @@ nav:
       - A2A Client: api/a2a-client.md
       - Authentication: api/authentication.md
       - Media Kit: api/media-kit.md
+      - Deals: api/deals.md
       - Bookings: api/bookings.md
       - Products: api/products.md
   - Architecture:
