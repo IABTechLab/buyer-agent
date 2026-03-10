@@ -66,6 +66,7 @@ nav:
       - Bookings: api/bookings.md
       - Seller Discovery: api/seller-discovery.md
       - Products: api/products.md
+      - Sessions: api/sessions.md
   - Architecture:
       - Overview: architecture/overview.md
       - Booking Flow: architecture/booking-flow.md
