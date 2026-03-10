@@ -75,6 +75,7 @@ nav:
       - Negotiation: guides/negotiation.md
       - Media Kit Browsing: guides/media-kit.md
       - Identity Strategy: guides/identity.md
+      - Sessions: guides/sessions.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
