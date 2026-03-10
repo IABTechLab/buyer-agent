@@ -72,6 +72,7 @@ nav:
       - Booking Flow: architecture/booking-flow.md
       - Models: architecture/models.md
   - Guides:
+      - Deal Booking: guides/deal-booking.md
       - Negotiation: guides/negotiation.md
       - Identity Strategy: guides/identity.md
   - Integration:
