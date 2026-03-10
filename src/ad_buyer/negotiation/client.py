@@ -69,6 +69,7 @@ class NegotiationClient:
         proposal_id: str,
         initial_price: float,
         strategy: NegotiationStrategy,
+        negotiation_enabled: bool = True,
     ) -> NegotiationSession:
         """Start a negotiation by sending the first counter-offer.
 
@@ -80,10 +81,21 @@ class NegotiationClient:
             proposal_id: The proposal to negotiate.
             initial_price: Our opening offer.
             strategy: The negotiation strategy (stored for reference).
+            negotiation_enabled: Whether the seller's package allows
+                negotiation.  When False, raises ValueError.
 
         Returns:
             A NegotiationSession tracking the negotiation state.
+
+        Raises:
+            ValueError: If negotiation is not enabled on the package.
         """
+        if not negotiation_enabled:
+            raise ValueError(
+                f"Negotiation is not enabled on package for proposal "
+                f"{proposal_id}. Book at the listed price instead."
+            )
+
         url = f"{seller_url}/proposals/{proposal_id}/counter"
         payload = {"price": initial_price}
 
@@ -222,6 +234,7 @@ class NegotiationClient:
         seller_url: str,
         proposal_id: str,
         strategy: NegotiationStrategy,
+        negotiation_enabled: bool = True,
     ) -> NegotiationResult:
         """Run a full negotiation loop automatically using the strategy.
 
@@ -237,10 +250,26 @@ class NegotiationClient:
             seller_url: Base URL of the seller API.
             proposal_id: The proposal to negotiate.
             strategy: The negotiation strategy to use.
+            negotiation_enabled: Whether the seller's package allows
+                negotiation.  When False, returns DECLINED immediately.
 
         Returns:
             NegotiationResult with the outcome and history.
         """
+        # Guard: reject negotiation when the seller has disabled it (ar-9xi)
+        if not negotiation_enabled:
+            logger.info(
+                "Negotiation not enabled for proposal %s; declining.",
+                proposal_id,
+            )
+            return NegotiationResult(
+                proposal_id=proposal_id,
+                outcome=NegotiationOutcome.DECLINED,
+                final_price=None,
+                rounds_count=0,
+                rounds=[],
+            )
+
         # Build initial context (no prior rounds)
         initial_context = NegotiationContext(
             rounds_completed=0,

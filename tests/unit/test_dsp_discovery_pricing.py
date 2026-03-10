@@ -519,7 +519,7 @@ class TestGetPricingNegotiationDisplay:
     async def test_agency_sees_negotiation_available(self, mock_client, agency_context):
         """Agency tier should see negotiation as available."""
         mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
+            success=True, data=_product(negotiation_enabled=True)
         )
         tool = GetPricingTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
@@ -678,7 +678,7 @@ class TestRequestDealNegotiation:
     async def test_agency_can_negotiate_above_floor(self, mock_client, agency_context):
         """Agency negotiating above floor should get their target price."""
         mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product(base_price=20.0)
+            success=True, data=_product(base_price=20.0, negotiation_enabled=True)
         )
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         # Agency tier: $20 * 0.90 = $18.00 tiered price
@@ -694,7 +694,7 @@ class TestRequestDealNegotiation:
     ):
         """Negotiating below floor should result in floor price counter."""
         mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product(base_price=20.0)
+            success=True, data=_product(base_price=20.0, negotiation_enabled=True)
         )
         tool = RequestDealTool(client=mock_client, buyer_context=advertiser_context)
         # Advertiser tier: $20 * 0.85 = $17.00 tiered price
@@ -708,7 +708,7 @@ class TestRequestDealNegotiation:
     async def test_advertiser_negotiate_at_floor(self, mock_client, advertiser_context):
         """Negotiating exactly at floor should be accepted."""
         mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product(base_price=20.0)
+            success=True, data=_product(base_price=20.0, negotiation_enabled=True)
         )
         tool = RequestDealTool(client=mock_client, buyer_context=advertiser_context)
         # Advertiser tier: $20 * 0.85 = $17.00

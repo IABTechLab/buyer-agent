@@ -144,7 +144,7 @@ Returns:
             if deal_type_enum == DealType.PROGRAMMATIC_GUARANTEED and not impressions:
                 return "Programmatic Guaranteed (PG) deals require an impressions volume."
 
-            # Check negotiation eligibility
+            # Check negotiation eligibility (buyer tier)
             tier = self._buyer_context.identity.get_access_tier()
             if target_cpm and not self._buyer_context.can_negotiate():
                 return f"Price negotiation requires Agency or Advertiser tier (current: {tier.value})"
@@ -201,9 +201,11 @@ Returns:
             elif impressions >= 5_000_000:
                 tiered_price *= 0.95  # 5% volume discount
 
-        # Handle negotiation
+        # Handle negotiation -- only when BOTH buyer can negotiate AND
+        # the seller's package has negotiation_enabled=True (ar-9xi)
         final_price = tiered_price
-        if target_cpm and self._buyer_context.can_negotiate():
+        package_negotiation_enabled = product.get("negotiation_enabled", False)
+        if target_cpm and self._buyer_context.can_negotiate() and package_negotiation_enabled:
             # Simple negotiation: accept if within 10% of floor
             floor_price = tiered_price * 0.90
             if target_cpm >= floor_price:
