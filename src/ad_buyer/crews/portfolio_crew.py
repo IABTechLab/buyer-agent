@@ -100,7 +100,6 @@ recommend specific inventory.
 
     return Crew(
         agents=[
-            portfolio_manager,
             branding_agent,
             mobile_app_agent,
             ctv_agent,

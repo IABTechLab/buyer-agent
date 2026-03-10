@@ -167,7 +167,7 @@ Finalize your recommendations for approval.
     )
 
     return Crew(
-        agents=[branding_agent, research_agent, execution_agent],
+        agents=[research_agent, execution_agent],
         tasks=[research_task, recommendation_task],
         process=Process.hierarchical,
         manager_agent=branding_agent,
@@ -240,7 +240,7 @@ Prioritize quality over scale - low fraud and proper attribution are critical.
     )
 
     return Crew(
-        agents=[mobile_agent, research_agent, execution_agent],
+        agents=[research_agent, execution_agent],
         tasks=[research_task, recommendation_task],
         process=Process.hierarchical,
         manager_agent=mobile_agent,
@@ -313,7 +313,7 @@ Balance reach with frequency management across devices.
     )
 
     return Crew(
-        agents=[ctv_agent, research_agent, execution_agent],
+        agents=[research_agent, execution_agent],
         tasks=[research_task, recommendation_task],
         process=Process.hierarchical,
         manager_agent=ctv_agent,
@@ -387,7 +387,7 @@ Optimize for ROAS and conversion efficiency.
     )
 
     return Crew(
-        agents=[performance_agent, research_agent, execution_agent],
+        agents=[research_agent, execution_agent],
         tasks=[research_task, recommendation_task],
         process=Process.hierarchical,
         manager_agent=performance_agent,
