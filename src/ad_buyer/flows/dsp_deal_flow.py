@@ -3,6 +3,7 @@
 
 """DSP Deal Discovery Flow - workflow for obtaining Deal IDs for programmatic activation."""
 
+import logging
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
@@ -21,7 +22,10 @@ from ..models.buyer_identity import (
     DealResponse,
     DealType,
 )
+from ..storage.deal_store import DealStore
 from ..tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+
+logger = logging.getLogger(__name__)
 
 
 class DSPFlowStatus(str, Enum):
@@ -136,16 +140,21 @@ class DSPDealFlow(Flow[DSPFlowState]):
         self,
         client: UnifiedClient,
         buyer_context: BuyerContext,
+        store: Optional[DealStore] = None,
     ):
-        """Initialize the flow with client and buyer context.
+        """Initialize the flow with client, buyer context, and optional persistence.
 
         Args:
             client: UnifiedClient for seller communication
             buyer_context: BuyerContext with identity for tiered access
+            store: Optional DealStore for persisting deal state. When None,
+                the flow behaves identically to before (in-memory only).
         """
         super().__init__()
         self._client = client
         self._buyer_context = buyer_context
+        self._store = store
+        self._store_deal_id: Optional[str] = None
 
         # Create tools
         self._discover_tool = DiscoverInventoryTool(
@@ -160,6 +169,44 @@ class DSPDealFlow(Flow[DSPFlowState]):
             client=client,
             buyer_context=buyer_context,
         )
+
+    # ------------------------------------------------------------------
+    # Persistence helpers (best-effort dual-write)
+    # ------------------------------------------------------------------
+
+    def _persist_deal(self, deal_data: dict[str, Any]) -> None:
+        """Best-effort persist a deal record to the store.
+
+        Never raises -- logs and continues on failure.
+
+        Args:
+            deal_data: Dict of keyword args for DealStore.save_deal().
+        """
+        if self._store is None:
+            return
+        try:
+            self._store_deal_id = self._store.save_deal(**deal_data)
+        except Exception:
+            logger.exception("Failed to persist deal %s", deal_data.get("product_id"))
+
+    def _persist_deal_status(self, new_status: str) -> None:
+        """Best-effort update deal status in the store.
+
+        Args:
+            new_status: New status value.
+        """
+        if self._store is None or self._store_deal_id is None:
+            return
+        try:
+            self._store.update_deal_status(
+                self._store_deal_id, new_status, triggered_by="system"
+            )
+        except Exception:
+            logger.exception(
+                "Failed to persist status %s for deal %s",
+                new_status,
+                self._store_deal_id,
+            )
 
     @start()
     def receive_request(self) -> dict[str, Any]:
@@ -176,6 +223,25 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
         self.state.status = DSPFlowStatus.REQUEST_RECEIVED
         self.state.updated_at = datetime.utcnow()
+
+        # Persist initial deal record
+        import json as _json
+
+        self._persist_deal(
+            dict(
+                seller_url=getattr(self._client, "base_url", ""),
+                product_id=self.state.request[:80],  # placeholder until discovered
+                product_name=self.state.request[:120],
+                deal_type=self.state.deal_type.value if self.state.deal_type else "PD",
+                status="draft",
+                impressions=self.state.impressions,
+                flight_start=self.state.flight_start,
+                flight_end=self.state.flight_end,
+                buyer_context=_json.dumps(self.state.buyer_context)
+                if self.state.buyer_context
+                else None,
+            )
+        )
 
         return {
             "status": "success",
@@ -264,6 +330,7 @@ Return the product_id of the best matching product and explain why.""",
 
             if product_id:
                 self.state.selected_product_id = product_id
+                self._persist_deal_status("evaluating_pricing")
 
                 # Get detailed pricing
                 pricing_result = self._pricing_tool._run(
@@ -335,6 +402,9 @@ Return the product_id of the best matching product and explain why.""",
             self.state.status = DSPFlowStatus.DEAL_CREATED
             self.state.updated_at = datetime.utcnow()
 
+            # Persist deal creation status
+            self._persist_deal_status("deal_created")
+
             return {
                 "status": "success",
                 "deal_result": deal_result,
@@ -343,6 +413,7 @@ Return the product_id of the best matching product and explain why.""",
         except Exception as e:
             self.state.errors.append(f"Deal request failed: {e}")
             self.state.status = DSPFlowStatus.FAILED
+            self._persist_deal_status("failed")
             return {"status": "failed", "error": str(e)}
 
     def get_status(self) -> dict[str, Any]:
@@ -376,6 +447,7 @@ async def run_dsp_deal_flow(
     flight_start: Optional[str] = None,
     flight_end: Optional[str] = None,
     base_url: Optional[str] = None,
+    store: Optional[DealStore] = None,
 ) -> dict[str, Any]:
     """Convenience function to run the DSP deal flow.
 
@@ -388,6 +460,7 @@ async def run_dsp_deal_flow(
         flight_start: Deal start date
         flight_end: Deal end date
         base_url: Server URL (defaults to Settings.iab_server_url)
+        store: Optional DealStore for persistence.
 
     Returns:
         Flow result with Deal ID and activation instructions
@@ -410,6 +483,7 @@ async def run_dsp_deal_flow(
         flow = DSPDealFlow(
             client=client,
             buyer_context=buyer_context,
+            store=store,
         )
 
         # Set initial state

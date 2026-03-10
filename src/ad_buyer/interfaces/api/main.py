@@ -3,6 +3,8 @@
 
 """FastAPI server for the Ad Buyer System."""
 
+import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Optional
@@ -18,6 +20,9 @@ from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
+from ...storage import DealStore
+
+logger = logging.getLogger(__name__)
 
 
 def _current_settings():
@@ -86,6 +91,57 @@ async def api_key_auth_middleware(request: Request, call_next):
 
 # In-memory job storage (use Redis/DB in production)
 jobs: dict[str, dict[str, Any]] = {}
+
+# Lazy DealStore singleton
+_deal_store: Optional[DealStore] = None
+
+
+def _get_store() -> Optional[DealStore]:
+    """Return a lazily-initialised DealStore singleton.
+
+    Returns None (and logs a warning) if initialisation fails so that
+    the API can continue operating with in-memory state only.
+    """
+    global _deal_store
+    if _deal_store is not None:
+        return _deal_store
+    try:
+        current = _current_settings()
+        _deal_store = DealStore(current.database_url)
+        _deal_store.connect()
+        return _deal_store
+    except Exception:
+        logger.exception("Failed to initialise DealStore; running without persistence")
+        return None
+
+
+def _persist_job(job_id: str, job: dict[str, Any]) -> None:
+    """Best-effort dual-write of a job dict to the DealStore.
+
+    Never raises -- logs errors and continues so the API endpoint is
+    unaffected by persistence failures.
+
+    Args:
+        job_id: Unique job identifier.
+        job: The in-memory job dict.
+    """
+    store = _get_store()
+    if store is None:
+        return
+    try:
+        store.save_job(
+            job_id=job_id,
+            status=job.get("status", "pending"),
+            progress=job.get("progress", 0.0),
+            brief=json.dumps(job.get("brief", {})),
+            auto_approve=job.get("auto_approve", False),
+            budget_allocs=json.dumps(job.get("budget_allocations", {})),
+            recommendations=json.dumps(job.get("recommendations", [])),
+            booked_lines=json.dumps(job.get("booked_lines", [])),
+            errors=json.dumps(job.get("errors", [])),
+        )
+    except Exception:
+        logger.exception("Failed to persist job %s", job_id)
 
 
 # Request/Response Models
@@ -196,6 +252,9 @@ async def create_booking(
         "updated_at": now,
     }
 
+    # Dual-write to SQLite
+    _persist_job(job_id, jobs[job_id])
+
     # Run booking flow in background
     background_tasks.add_task(_run_booking_flow, job_id, request)
 
@@ -263,6 +322,9 @@ async def approve_recommendations(
     job["updated_at"] = datetime.utcnow().isoformat()
     job["progress"] = 1.0
 
+    # Dual-write to SQLite
+    _persist_job(job_id, job)
+
     return {
         "status": result.get("status"),
         "approved_count": len(request.approved_product_ids),
@@ -297,6 +359,9 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
     job["updated_at"] = datetime.utcnow().isoformat()
     job["progress"] = 1.0
+
+    # Dual-write to SQLite
+    _persist_job(job_id, job)
 
     return result
 
@@ -352,9 +417,10 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["status"] = "running"
         job["progress"] = 0.1
         job["updated_at"] = datetime.utcnow().isoformat()
+        _persist_job(job_id, job)
 
         client = _create_client()
-        flow = DealBookingFlow(client)
+        flow = DealBookingFlow(client, store=_get_store())
         flow.state = BookingState(campaign_brief=request.brief.model_dump())
 
         # Store flow reference for approval
@@ -380,11 +446,13 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
 
         job["progress"] = 1.0 if job["status"] == "completed" else 0.9
         job["updated_at"] = datetime.utcnow().isoformat()
+        _persist_job(job_id, job)
 
     except Exception as e:
         job["status"] = "failed"
         job["errors"].append(str(e))
         job["updated_at"] = datetime.utcnow().isoformat()
+        _persist_job(job_id, job)
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:

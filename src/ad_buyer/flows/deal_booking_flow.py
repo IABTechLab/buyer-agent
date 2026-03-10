@@ -4,9 +4,10 @@
 """Deal Booking Flow - main workflow for booking advertising deals."""
 
 import json
+import logging
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from crewai.flow.flow import Flow, listen, or_, start
 
@@ -27,6 +28,9 @@ from ..models.flow_state import (
     ProductRecommendation,
 )
 from ..models.ucp import AudiencePlan, SignalType, UCPConsent
+from ..storage.deal_store import DealStore
+
+logger = logging.getLogger(__name__)
 
 
 class DealBookingFlow(Flow[BookingState]):
@@ -42,14 +46,68 @@ class DealBookingFlow(Flow[BookingState]):
     7. Confirm and report
     """
 
-    def __init__(self, client: OpenDirectClient):
-        """Initialize the flow with OpenDirect client.
+    def __init__(
+        self,
+        client: OpenDirectClient,
+        store: Optional[DealStore] = None,
+    ):
+        """Initialize the flow with OpenDirect client and optional persistence.
 
         Args:
             client: OpenDirect API client for publisher interactions
+            store: Optional DealStore for persisting deal state. When None,
+                the flow behaves identically to before (in-memory only).
         """
         super().__init__()
         self._client = client
+        self._store = store
+
+    # ------------------------------------------------------------------
+    # Persistence helpers (best-effort dual-write)
+    # ------------------------------------------------------------------
+
+    def _persist_booking(self, deal_id: str, booked_line: Any) -> None:
+        """Best-effort persist a booking record to the store.
+
+        Never raises -- logs and continues on failure so the flow is
+        unaffected by persistence errors.
+
+        Args:
+            deal_id: The deal this booking belongs to.
+            booked_line: A BookedLine instance from flow state.
+        """
+        if self._store is None:
+            return
+        try:
+            self._store.save_booking_record(
+                deal_id=deal_id,
+                order_id=getattr(booked_line, "order_id", None),
+                line_id=getattr(booked_line, "line_id", None),
+                channel=getattr(booked_line, "channel", ""),
+                impressions=getattr(booked_line, "impressions", 0),
+                cost=getattr(booked_line, "cost", 0.0),
+                booking_status=getattr(booked_line, "booking_status", "pending"),
+            )
+        except Exception:
+            logger.exception("Failed to persist booking for deal %s", deal_id)
+
+    def _persist_deal_status(self, deal_id: str, new_status: str) -> None:
+        """Best-effort update deal status in the store.
+
+        Args:
+            deal_id: The deal to update.
+            new_status: New status value.
+        """
+        if self._store is None:
+            return
+        try:
+            self._store.update_deal_status(deal_id, new_status, triggered_by="system")
+        except Exception:
+            logger.exception(
+                "Failed to persist status change to %s for deal %s",
+                new_status,
+                deal_id,
+            )
 
     @start()
     def receive_campaign_brief(self) -> dict[str, Any]:
@@ -464,6 +522,26 @@ class DealBookingFlow(Flow[BookingState]):
         self.state.execution_status = ExecutionStatus.AWAITING_APPROVAL
         self.state.updated_at = datetime.utcnow()
 
+        # Persist awaiting-approval status for each recommendation's deal
+        if self._store is not None:
+            for rec in self.state.pending_approvals:
+                try:
+                    deal_id = self._store.save_deal(
+                        seller_url=getattr(rec, "publisher", ""),
+                        product_id=rec.product_id,
+                        product_name=rec.product_name,
+                        deal_type="PD",
+                        status="awaiting_approval",
+                    )
+                    # Stash the store deal_id on the recommendation for
+                    # later use when booking
+                    rec._store_deal_id = deal_id  # type: ignore[attr-defined]
+                except Exception:
+                    logger.exception(
+                        "Failed to persist deal for recommendation %s",
+                        rec.product_id,
+                    )
+
         return {
             "status": "ready_for_approval",
             "total_recommendations": len(self.state.pending_approvals),
@@ -533,6 +611,12 @@ class DealBookingFlow(Flow[BookingState]):
                 booked_at=datetime.utcnow(),
             )
             self.state.booked_lines.append(booked)
+
+            # Persist booking record and update deal status
+            deal_id = getattr(rec, "_store_deal_id", None)
+            if deal_id:
+                self._persist_booking(deal_id, booked)
+                self._persist_deal_status(deal_id, "booked")
 
         self.state.execution_status = ExecutionStatus.COMPLETED
         self.state.updated_at = datetime.utcnow()
