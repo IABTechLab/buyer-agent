@@ -68,6 +68,8 @@ nav:
       - Overview: architecture/overview.md
       - Booking Flow: architecture/booking-flow.md
       - Models: architecture/models.md
+  - Guides:
+      - Negotiation: guides/negotiation.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
