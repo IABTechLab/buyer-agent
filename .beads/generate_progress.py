@@ -17,6 +17,7 @@ PHASE_MAP = {
     "2": ("Phase 2", "Campaign Automation"),
     "3": ("Phase 3", "Platform & Infrastructure"),
     "4": ("Phase 4", "Production Hardening"),
+    "5": ("Phase 5", "Deal Jockey"),
 }
 
 
