@@ -55,6 +55,7 @@ nav:
   - Home: index.md
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
+      - Running with Seller: getting-started/running-with-seller.md
   - API Reference:
       - Overview: api/overview.md
       - Protocol Overview: api/protocols.md
