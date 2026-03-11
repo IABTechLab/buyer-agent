@@ -68,11 +68,15 @@ nav:
       - Products: api/products.md
       - Sessions: api/sessions.md
   - Architecture:
+      - Agent Hierarchy: architecture/agent-hierarchy.md
       - Overview: architecture/overview.md
       - Booking Flow: architecture/booking-flow.md
+      - DSP Deal Flow: architecture/dsp-deal-flow.md
       - Deal Store: architecture/deal-store.md
       - Models: architecture/models.md
+      - Tools Reference: architecture/tools.md
   - Guides:
+      - Configuration: guides/configuration.md
       - Deal Booking: guides/deal-booking.md
       - Negotiation: guides/negotiation.md
       - Media Kit Browsing: guides/media-kit.md
