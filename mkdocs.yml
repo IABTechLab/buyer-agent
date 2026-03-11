@@ -75,7 +75,9 @@ nav:
   - Guides:
       - Deal Booking: guides/deal-booking.md
       - Negotiation: guides/negotiation.md
+      - Media Kit Browsing: guides/media-kit.md
       - Identity Strategy: guides/identity.md
+      - Sessions: guides/sessions.md
       - Multi-Seller Discovery: guides/multi-seller.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
