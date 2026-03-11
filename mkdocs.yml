@@ -75,14 +75,21 @@ nav:
       - Deal Store: architecture/deal-store.md
       - Models: architecture/models.md
       - Tools Reference: architecture/tools.md
+      - Order State Machine (Planned): architecture/state-machine.md
+      - Event Bus (Planned): architecture/event-bus.md
   - Guides:
       - Configuration: guides/configuration.md
       - Deal Booking: guides/deal-booking.md
       - Negotiation: guides/negotiation.md
+      - Linear TV Buying: guides/linear-tv.md
       - Media Kit Browsing: guides/media-kit.md
       - Identity Strategy: guides/identity.md
       - Sessions: guides/sessions.md
       - Multi-Seller Discovery: guides/multi-seller.md
+      - Multi-Seller Orchestration (Planned): guides/multi-seller-orchestration.md
+      - Campaign Pipeline (Planned): guides/campaign-pipeline.md
+      - Budget Pacing (Planned): guides/budget-pacing.md
+      - Creative Management (Planned): guides/creative-management.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md

@@ -68,15 +68,24 @@ strategy = SimpleThresholdStrategy(
 
 ### AdaptiveStrategy (Coming Soon)
 
-Adjusts concession behavior based on observed seller patterns — if the seller concedes large amounts, hold firm; if the seller is firm, concede faster.
+Adjusts concession behavior based on observed seller patterns. The adaptive strategy tracks the seller's concession magnitude across rounds and modulates the buyer's response accordingly:
 
-See [buyer-llu in PROGRESS.md](https://github.com/IABTechLab/buyer-agent/blob/main/.beads/PROGRESS.md) for status.
+- **Seller conceding aggressively** — Hold firm. If the seller is dropping price by large increments, the buyer reduces its own concession step to capture more of the surplus.
+- **Seller holding firm** — Concede faster. If the seller is barely moving, the buyer increases its concession step to avoid a stalemate and reach agreement sooner.
+- **Seller pattern shift** — Re-calibrate. If the seller changes behavior mid-negotiation (e.g., switches from firm to aggressive after round 3), the strategy adapts within the same session.
+
+The adaptive strategy is planned as part of Phase 2 (buyer-llu). It will implement the same `NegotiationStrategy` interface as `SimpleThresholdStrategy`, so it can be used as a drop-in replacement in `auto_negotiate()` or manual step-by-step flows.
 
 ### CompetitiveStrategy (Coming Soon)
 
-Aggressive strategy for when the buyer is shopping multiple sellers simultaneously. Leverages competition to drive harder bargains.
+Strategy for when the buyer is shopping multiple sellers simultaneously via [Multi-Seller Orchestration](multi-seller-orchestration.md). The competitive strategy uses cross-seller intelligence to drive harder bargains:
 
-See [buyer-llu in PROGRESS.md](https://github.com/IABTechLab/buyer-agent/blob/main/.beads/PROGRESS.md) for status.
+- **Quote benchmarking** — Uses the best quote received from other sellers as an anchor point, countering above that floor rather than the buyer's internal target
+- **Walk-away credibility** — Willing to walk away from a seller when a comparable deal exists elsewhere, making the walk-away threat credible rather than a bluff
+- **Last-look leverage** — Gives each seller a "last look" opportunity to beat the best competing offer before the buyer commits elsewhere
+- **Portfolio awareness** — Factors in the buyer's total portfolio needs (e.g., if CTV inventory is scarce across sellers, compete less aggressively on CTV and focus competitive pressure on display)
+
+The competitive strategy is planned as part of Phase 2 (buyer-8ih). It requires the [Multi-Seller Orchestration](multi-seller-orchestration.md) capability to provide the cross-seller context.
 
 ## Auto-Negotiate
 
