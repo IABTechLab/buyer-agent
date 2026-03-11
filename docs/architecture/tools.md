@@ -30,7 +30,7 @@ graph LR
         AC[AvailsCheckTool]
     end
 
-    subgraph Reporting["Reporting Tools"]
+    subgraph Reporting["Reporting Tools (Coming Soon)"]
         GS[GetStatsTool]
     end
 ```
@@ -41,7 +41,7 @@ graph LR
 | **DSP** | DiscoverInventory, GetPricing, RequestDeal | DSP Specialist |
 | **Execution** | CreateOrder, CreateLine, ReserveLine, BookLine | Execution Agent |
 | **Research** | ProductSearch, AvailsCheck | Research Agent |
-| **Reporting** | GetStats | Reporting Agent |
+| **Reporting** | GetStats | Reporting Agent (Coming Soon) |
 
 ---
 
@@ -436,6 +436,9 @@ Checks real-time availability and pricing for a specific product during a flight
 ---
 
 ## Reporting Tools
+
+!!! info "Coming Soon"
+    The Reporting Agent and its tools (buyer-brn) are planned for a future phase. This section describes the planned reporting functionality.
 
 **Package:** `src/ad_buyer/tools/reporting/`
 

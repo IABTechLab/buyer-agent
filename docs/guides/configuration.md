@@ -101,7 +101,7 @@ While `LLM_TEMPERATURE` sets the global default, each agent type uses a tuned te
 | Channel Specialists (L2) | 0.5 | Creative inventory selection |
 | Audience Planner (L3) | 0.3 | Precise audience strategy |
 | Research Agent (L3) | 0.2 | Data-focused, minimal creativity |
-| Reporting Agent (L3) | 0.2 | Analytical precision |
+| Reporting Agent (L3) (Coming Soon) | 0.2 | Analytical precision |
 | Execution Agent (L3) | 0.1 | Precise booking execution |
 
 ---

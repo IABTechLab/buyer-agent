@@ -22,7 +22,7 @@ graph TB
         AUD["Audience Planner<br/>(UCP)"]
         RES["Research Agent<br/>(inventory)"]
         EXEC["Execution Agent<br/>(orders / lines)"]
-        REP["Reporting Agent<br/>(stats / analysis)"]
+        REP["Reporting Agent<br/>(stats / analysis)<br/><i>Coming Soon</i>"]
     end
 
     PM -->|budget allocation| BR
@@ -238,6 +238,9 @@ Handles the OpenDirect booking lifecycle.
 **Tools used:** `CreateOrderTool`, `CreateLineTool`, `ReserveLineTool`, `BookLineTool`
 
 ### Reporting Agent
+
+!!! info "Coming Soon"
+    The Reporting Agent (buyer-brn) is planned for a future phase. This section describes the planned reporting functionality.
 
 **File:** `src/ad_buyer/agents/level3/reporting_agent.py`
 
