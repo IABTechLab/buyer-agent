@@ -7,11 +7,20 @@ These models match the seller's API contract defined in
 docs/api/deal-creation-api-contract.md. They represent the buyer-side
 view of quotes and deals returned by the seller's /api/v1/quotes and
 /api/v1/deals endpoints.
+
+Extended with linear TV support (Option C hybrid approach, bead buyer-6io):
+- media_type discriminator on QuoteRequest/QuoteResponse
+- LinearTVParams nested object on QuoteRequest
+- LinearTVQuoteDetails nested object on QuoteResponse
+- CPP pricing fields on PricingInfo
+- GRP/demo fields on TermsInfo
 """
 
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+from .linear_tv import LinearTVParams, LinearTVQuoteDetails
 
 
 # ---------------------------------------------------------------------------
@@ -40,24 +49,39 @@ class ProductInfo(BaseModel):
 
 
 class PricingInfo(BaseModel):
-    """Pricing breakdown returned by the seller."""
+    """Pricing breakdown returned by the seller.
+
+    Extended with CPP fields for linear TV (pricing_model "cpp" or "hybrid").
+    """
 
     base_cpm: float
     tier_discount_pct: float = 0.0
     volume_discount_pct: float = 0.0
     final_cpm: float
     currency: str = "USD"
-    pricing_model: str = "cpm"
+    pricing_model: str = "cpm"  # "cpm", "cpp", "unit_rate", "hybrid"
     rationale: str = ""
+
+    # Linear TV CPP pricing (None for digital/CTV)
+    base_cpp: Optional[float] = None
+    final_cpp: Optional[float] = None
 
 
 class TermsInfo(BaseModel):
-    """Deal/quote terms (volume, flight dates, guarantee)."""
+    """Deal/quote terms (volume, flight dates, guarantee).
+
+    Extended with GRP-based fields for linear TV.
+    """
 
     impressions: Optional[int] = None
     flight_start: Optional[str] = None
     flight_end: Optional[str] = None
     guaranteed: bool = False
+
+    # Linear TV GRP-based terms (None for digital/CTV)
+    grps: Optional[int] = None
+    guaranteed_grps: Optional[int] = None
+    target_demo: Optional[str] = None
 
 
 class AvailabilityInfo(BaseModel):
@@ -88,6 +112,7 @@ class QuoteRequest(BaseModel):
     """Request body for POST /api/v1/quotes.
 
     Buyer requests non-binding pricing from a seller.
+    Works for digital, CTV, and linear TV (via media_type discriminator).
     """
 
     product_id: str
@@ -98,6 +123,12 @@ class QuoteRequest(BaseModel):
     target_cpm: Optional[float] = None
     buyer_identity: Optional[BuyerIdentityPayload] = None
     agent_url: Optional[str] = None
+
+    # Media type discriminator (Option C hybrid approach)
+    media_type: str = "digital"  # "digital", "ctv", "linear_tv"
+
+    # Linear TV nested params (None for digital/CTV)
+    linear_tv: Optional[LinearTVParams] = None
 
 
 class DealBookingRequest(BaseModel):
@@ -120,6 +151,7 @@ class QuoteResponse(BaseModel):
     """Response from GET/POST /api/v1/quotes.
 
     Represents a non-binding price quote from the seller.
+    Extended with linear TV details when media_type is "linear_tv".
     """
 
     quote_id: str
@@ -132,6 +164,12 @@ class QuoteResponse(BaseModel):
     expires_at: Optional[str] = None
     seller_id: Optional[str] = None
     created_at: Optional[str] = None
+
+    # Media type (echoes the request)
+    media_type: str = "digital"
+
+    # Linear TV quote details (None for digital/CTV)
+    linear_tv: Optional[LinearTVQuoteDetails] = None
 
 
 class DealResponse(BaseModel):

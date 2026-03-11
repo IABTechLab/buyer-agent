@@ -5,10 +5,12 @@
 
 Async HTTP client for the seller's quote-then-book deal endpoints:
 
-- POST /api/v1/quotes     -- request a non-binding price quote
-- GET  /api/v1/quotes/{id} -- retrieve a quote
-- POST /api/v1/deals      -- book a deal from a quote
-- GET  /api/v1/deals/{id}  -- retrieve a deal
+- POST /api/v1/quotes            -- request a non-binding price quote
+- GET  /api/v1/quotes/{id}       -- retrieve a quote
+- POST /api/v1/deals             -- book a deal from a quote
+- GET  /api/v1/deals/{id}        -- retrieve a deal
+- POST /api/v1/deals/{id}/makegoods -- request makegood (linear TV)
+- POST /api/v1/deals/{id}/cancel    -- request cancellation (linear TV)
 
 Follows the API contract defined in docs/api/deal-creation-api-contract.md.
 Uses httpx for async HTTP, with auth header injection, configurable
@@ -29,6 +31,7 @@ from ..models.deals import (
     QuoteResponse,
     SellerErrorResponse,
 )
+from ..models.linear_tv import CancellationRequest, MakegoodRequest
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +202,65 @@ class DealsClient:
         self._update_stored_deal_status(result)
 
         return result
+
+    # ------------------------------------------------------------------
+    # Linear TV post-booking endpoints
+    # ------------------------------------------------------------------
+
+    async def request_makegood(
+        self, deal_id: str, makegood_request: MakegoodRequest
+    ) -> dict[str, Any]:
+        """Request makegood inventory for a linear TV deal.
+
+        POST /api/v1/deals/{deal_id}/makegoods
+
+        Sent when audience delivery falls short of the guaranteed
+        GRP level. The seller responds with offered replacement
+        inventory.
+
+        Args:
+            deal_id: The deal identifier.
+            makegood_request: Makegood request parameters.
+
+        Returns:
+            Dict with makegood offer details from the seller.
+
+        Raises:
+            DealsClientError: On HTTP or transport errors.
+        """
+        body = makegood_request.model_dump(exclude_none=True)
+        response = await self._request_with_retry(
+            "POST", f"/api/v1/deals/{deal_id}/makegoods", json=body
+        )
+        return response.json()
+
+    async def request_cancellation(
+        self, deal_id: str, cancellation_request: CancellationRequest
+    ) -> dict[str, Any]:
+        """Request cancellation of a linear TV deal.
+
+        POST /api/v1/deals/{deal_id}/cancel
+
+        Supports full and partial cancellation with notice period
+        awareness. The seller validates against the deal's
+        cancellation terms before processing.
+
+        Args:
+            deal_id: The deal identifier.
+            cancellation_request: Cancellation request parameters.
+
+        Returns:
+            Dict with cancellation result from the seller.
+
+        Raises:
+            DealsClientError: On HTTP or transport errors (including
+                422 if cancellation window has expired).
+        """
+        body = cancellation_request.model_dump(exclude_none=True)
+        response = await self._request_with_retry(
+            "POST", f"/api/v1/deals/{deal_id}/cancel", json=body
+        )
+        return response.json()
 
     # ------------------------------------------------------------------
     # Lifecycle
