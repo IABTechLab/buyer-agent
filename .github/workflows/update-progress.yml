@@ -12,6 +12,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use beads-sync JSONL if available
+        run: |
+          # The beads-sync branch may have fresher issues.jsonl than main.
+          # bd sync exports to beads-sync but assume-unchanged can prevent
+          # those changes from reaching main via normal commits.
+          # Fetch and overlay the beads-sync copy as a safety net.
+          if git rev-parse --verify origin/beads-sync >/dev/null 2>&1; then
+            echo "Found beads-sync branch, checking for fresher JSONL..."
+            sync_jsonl=$(git show origin/beads-sync:.beads/issues.jsonl 2>/dev/null || true)
+            if [ -n "$sync_jsonl" ]; then
+              echo "$sync_jsonl" > .beads/issues.jsonl
+              echo "Using issues.jsonl from beads-sync branch"
+            else
+              echo "No issues.jsonl on beads-sync, using main copy"
+            fi
+          else
+            echo "No beads-sync branch on remote, using main copy"
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -24,7 +45,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .beads/PROGRESS.md
+          git add .beads/PROGRESS.md .beads/issues.jsonl
           if ! git diff --cached --quiet; then
             git commit -m "Auto-update PROGRESS.md"
             git push
