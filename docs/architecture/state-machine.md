@@ -16,137 +16,7 @@ Without transition enforcement, any code path can set a deal to any status --- a
 
 ---
 
-## BuyerDealStatus
-
-The `BuyerDealStatus` enum defines 12 states for the buyer-side deal lifecycle.
-
-| Status | Category | Description |
-|--------|----------|-------------|
-| `quoted` | Entry | Initial quote received from seller |
-| `negotiating` | Negotiation | Active price negotiation in progress |
-| `accepted` | Acceptance | Deal terms accepted by buyer |
-| `booking` | Booking | Booking request sent to seller |
-| `booked` | Booking | Booking confirmed by seller |
-| `delivering` | Delivery | Campaign delivery in progress |
-| `completed` | Terminal | Campaign delivery finished successfully |
-| `failed` | Terminal | Unrecoverable error at any active stage |
-| `cancelled` | Terminal | Deal cancelled by buyer or seller |
-| `expired` | Terminal | Quote or negotiation timed out |
-| `makegood_pending` | Linear TV | Under-delivery detected, makegood requested |
-| `partially_canceled` | Linear TV | Some booked units cancelled, remainder proceeds |
-
-### Happy Path
-
-```
-quoted -> negotiating -> accepted -> booking -> booked -> delivering -> completed
-```
-
-A deal can also skip negotiation entirely:
-
-```
-quoted -> accepted -> booking -> booked -> delivering -> completed
-```
-
-### Terminal States
-
-`completed`, `failed`, `cancelled`, and `expired` are terminal --- no transitions leave them.
-
-### Linear TV Extensions
-
-Two additional states handle scenarios specific to linear television buying:
-
-- **`makegood_pending`** --- Entered from `delivering` when the seller under-delivers against guaranteed impressions. Resolves back to `delivering`, or directly to `completed` or `failed`.
-- **`partially_canceled`** --- Entered from `booked` when the buyer cancels some (but not all) units. The remaining units can proceed to `delivering`, or the deal can be fully `cancelled`.
-
----
-
-## BuyerCampaignStatus
-
-The `BuyerCampaignStatus` enum defines 9 states for the campaign/booking workflow. It maps to the existing `ExecutionStatus` enum used by `DealBookingFlow`.
-
-| Status | Description |
-|--------|-------------|
-| `initialized` | Campaign object created |
-| `brief_received` | Campaign brief parsed and validated |
-| `validation_failed` | Brief validation failed (recoverable) |
-| `budget_allocated` | Budget distributed across channels |
-| `researching` | Channel research and inventory discovery in progress |
-| `awaiting_approval` | Recommendations ready, waiting for human approval |
-| `executing_bookings` | Booking requests being submitted to sellers |
-| `completed` | All bookings executed successfully |
-| `failed` | Unrecoverable error (recoverable via reset to `initialized`) |
-
-### Campaign Happy Path
-
-```
-initialized -> brief_received -> budget_allocated -> researching ->
-awaiting_approval -> executing_bookings -> completed
-```
-
-### Recovery Paths
-
-Both `validation_failed` and `failed` can transition back to `initialized`, allowing the campaign to be retried from scratch.
-
----
-
-## Transition Rules
-
-Every permitted transition is declared as a `TransitionRule` with a `(from_status, to_status)` pair and an optional guard function. The default rule sets are built by `_build_deal_rules()` and `_build_campaign_rules()`.
-
-### Deal Transitions
-
-| From | To | Description |
-|------|----|-------------|
-| `quoted` | `negotiating` | Buyer initiates negotiation |
-| `quoted` | `accepted` | Quote accepted without negotiation |
-| `negotiating` | `accepted` | Deal terms accepted |
-| `negotiating` | `quoted` | Counter-offer received, re-quoting |
-| `accepted` | `booking` | Booking process started |
-| `booking` | `booked` | Booking confirmed by seller |
-| `booked` | `delivering` | Campaign delivery started |
-| `delivering` | `completed` | Campaign delivery completed |
-| `quoted` | `failed` | Quote processing failed |
-| `negotiating` | `failed` | Negotiation failed |
-| `booking` | `failed` | Booking failed |
-| `delivering` | `failed` | Delivery failed |
-| `quoted` | `cancelled` | Deal cancelled |
-| `negotiating` | `cancelled` | Deal cancelled during negotiation |
-| `accepted` | `cancelled` | Deal cancelled after acceptance |
-| `booking` | `cancelled` | Deal cancelled during booking |
-| `booked` | `cancelled` | Booked deal cancelled |
-| `delivering` | `cancelled` | Delivery cancelled |
-| `quoted` | `expired` | Quote expired |
-| `negotiating` | `expired` | Negotiation expired |
-| `delivering` | `makegood_pending` | Makegood requested for under-delivery |
-| `makegood_pending` | `delivering` | Makegood resolved, delivery resumed |
-| `makegood_pending` | `completed` | Makegood resolved, campaign complete |
-| `makegood_pending` | `failed` | Makegood could not be fulfilled |
-| `booked` | `partially_canceled` | Partial cancellation of booked units |
-| `partially_canceled` | `delivering` | Partially canceled deal begins delivery |
-| `partially_canceled` | `cancelled` | Remaining units cancelled |
-
-### Campaign Transitions
-
-| From | To | Description |
-|------|----|-------------|
-| `initialized` | `brief_received` | Campaign brief received |
-| `brief_received` | `budget_allocated` | Budget allocated across channels |
-| `brief_received` | `validation_failed` | Brief validation failed |
-| `budget_allocated` | `researching` | Channel research started |
-| `researching` | `awaiting_approval` | Recommendations ready for approval |
-| `awaiting_approval` | `executing_bookings` | Approvals granted, executing |
-| `executing_bookings` | `completed` | All bookings executed |
-| `brief_received` | `failed` | Brief processing failed |
-| `budget_allocated` | `failed` | Budget allocation failed |
-| `researching` | `failed` | Research failed |
-| `awaiting_approval` | `failed` | Approval process failed |
-| `executing_bookings` | `failed` | Booking execution failed |
-| `validation_failed` | `initialized` | Reset after validation failure |
-| `failed` | `initialized` | Reset after failure |
-
----
-
-## Deal Lifecycle Diagram
+## Deal Lifecycle
 
 ```mermaid
 stateDiagram-v2
@@ -193,9 +63,85 @@ stateDiagram-v2
     expired --> [*]
 ```
 
+### BuyerDealStatus
+
+The `BuyerDealStatus` enum defines 12 states for the buyer-side deal lifecycle.
+
+| Status | Category | Description |
+|--------|----------|-------------|
+| `quoted` | Entry | Initial quote received from seller |
+| `negotiating` | Negotiation | Active price negotiation in progress |
+| `accepted` | Acceptance | Deal terms accepted by buyer |
+| `booking` | Booking | Booking request sent to seller |
+| `booked` | Booking | Booking confirmed by seller |
+| `delivering` | Delivery | Campaign delivery in progress |
+| `completed` | Terminal | Campaign delivery finished successfully |
+| `failed` | Terminal | Unrecoverable error at any active stage |
+| `cancelled` | Terminal | Deal cancelled by buyer or seller |
+| `expired` | Terminal | Quote or negotiation timed out |
+| `makegood_pending` | Linear TV | Under-delivery detected, makegood requested |
+| `partially_canceled` | Linear TV | Some booked units cancelled, remainder proceeds |
+
+### Happy Path
+
+```
+quoted -> negotiating -> accepted -> booking -> booked -> delivering -> completed
+```
+
+A deal can also skip negotiation entirely:
+
+```
+quoted -> accepted -> booking -> booked -> delivering -> completed
+```
+
+### Terminal States
+
+`completed`, `failed`, `cancelled`, and `expired` are terminal --- no transitions leave them.
+
+### Linear TV Extensions
+
+Two additional states handle scenarios specific to linear television buying:
+
+- **`makegood_pending`** --- Entered from `delivering` when the seller under-delivers against guaranteed impressions. Resolves back to `delivering`, or directly to `completed` or `failed`.
+- **`partially_canceled`** --- Entered from `booked` when the buyer cancels some (but not all) units. The remaining units can proceed to `delivering`, or the deal can be fully `cancelled`.
+
+### Deal Transition Rules
+
+Every permitted transition is declared as a `TransitionRule` with a `(from_status, to_status)` pair and an optional guard function. The default rule sets are built by `_build_deal_rules()` and `_build_campaign_rules()`.
+
+| From | To | Description |
+|------|----|-------------|
+| `quoted` | `negotiating` | Buyer initiates negotiation |
+| `quoted` | `accepted` | Quote accepted without negotiation |
+| `negotiating` | `accepted` | Deal terms accepted |
+| `negotiating` | `quoted` | Counter-offer received, re-quoting |
+| `accepted` | `booking` | Booking process started |
+| `booking` | `booked` | Booking confirmed by seller |
+| `booked` | `delivering` | Campaign delivery started |
+| `delivering` | `completed` | Campaign delivery completed |
+| `quoted` | `failed` | Quote processing failed |
+| `negotiating` | `failed` | Negotiation failed |
+| `booking` | `failed` | Booking failed |
+| `delivering` | `failed` | Delivery failed |
+| `quoted` | `cancelled` | Deal cancelled |
+| `negotiating` | `cancelled` | Deal cancelled during negotiation |
+| `accepted` | `cancelled` | Deal cancelled after acceptance |
+| `booking` | `cancelled` | Deal cancelled during booking |
+| `booked` | `cancelled` | Booked deal cancelled |
+| `delivering` | `cancelled` | Delivery cancelled |
+| `quoted` | `expired` | Quote expired |
+| `negotiating` | `expired` | Negotiation expired |
+| `delivering` | `makegood_pending` | Makegood requested for under-delivery |
+| `makegood_pending` | `delivering` | Makegood resolved, delivery resumed |
+| `makegood_pending` | `completed` | Makegood resolved, campaign complete |
+| `makegood_pending` | `failed` | Makegood could not be fulfilled |
+| `booked` | `partially_canceled` | Partial cancellation of booked units |
+| `partially_canceled` | `delivering` | Partially canceled deal begins delivery |
+| `partially_canceled` | `cancelled` | Remaining units cancelled |
+
 ---
 
-## Campaign Lifecycle Diagram
+## Campaign Lifecycle
 
 ```mermaid
 stateDiagram-v2
@@ -225,6 +171,52 @@ stateDiagram-v2
 
     completed --> [*]
 ```
+
+### BuyerCampaignStatus
+
+The `BuyerCampaignStatus` enum defines 9 states for the campaign/booking workflow. It maps to the existing `ExecutionStatus` enum used by `DealBookingFlow`.
+
+| Status | Description |
+|--------|-------------|
+| `initialized` | Campaign object created |
+| `brief_received` | Campaign brief parsed and validated |
+| `validation_failed` | Brief validation failed (recoverable) |
+| `budget_allocated` | Budget distributed across channels |
+| `researching` | Channel research and inventory discovery in progress |
+| `awaiting_approval` | Recommendations ready, waiting for human approval |
+| `executing_bookings` | Booking requests being submitted to sellers |
+| `completed` | All bookings executed successfully |
+| `failed` | Unrecoverable error (recoverable via reset to `initialized`) |
+
+### Campaign Happy Path
+
+```
+initialized -> brief_received -> budget_allocated -> researching ->
+awaiting_approval -> executing_bookings -> completed
+```
+
+### Recovery Paths
+
+Both `validation_failed` and `failed` can transition back to `initialized`, allowing the campaign to be retried from scratch.
+
+### Campaign Transition Rules
+
+| From | To | Description |
+|------|----|-------------|
+| `initialized` | `brief_received` | Campaign brief received |
+| `brief_received` | `budget_allocated` | Budget allocated across channels |
+| `brief_received` | `validation_failed` | Brief validation failed |
+| `budget_allocated` | `researching` | Channel research started |
+| `researching` | `awaiting_approval` | Recommendations ready for approval |
+| `awaiting_approval` | `executing_bookings` | Approvals granted, executing |
+| `executing_bookings` | `completed` | All bookings executed |
+| `brief_received` | `failed` | Brief processing failed |
+| `budget_allocated` | `failed` | Budget allocation failed |
+| `researching` | `failed` | Research failed |
+| `awaiting_approval` | `failed` | Approval process failed |
+| `executing_bookings` | `failed` | Booking execution failed |
+| `validation_failed` | `initialized` | Reset after validation failure |
+| `failed` | `initialized` | Reset after failure |
 
 ---
 
