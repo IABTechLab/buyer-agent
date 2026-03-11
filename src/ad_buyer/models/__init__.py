@@ -36,6 +36,15 @@ from .ucp import (
     UCPEmbedding,
     UCPModelDescriptor,
 )
+from .linear_tv import (
+    CancellationRequest,
+    CancellationTerms,
+    LinearTVParams,
+    LinearTVQuoteDetails,
+    MakegoodRequest,
+    cpp_to_cpm,
+    cpm_to_cpp,
+)
 from .deals import (
     AvailabilityInfo,
     BuyerIdentityPayload,
@@ -84,6 +93,14 @@ __all__ = [
     "UCPContextDescriptor",
     "UCPEmbedding",
     "UCPModelDescriptor",
+    # Linear TV models (Option C hybrid)
+    "CancellationRequest",
+    "CancellationTerms",
+    "LinearTVParams",
+    "LinearTVQuoteDetails",
+    "MakegoodRequest",
+    "cpp_to_cpm",
+    "cpm_to_cpp",
     # Deals API v1.0 models (quote-then-book)
     "AvailabilityInfo",
     "BuyerIdentityPayload",
