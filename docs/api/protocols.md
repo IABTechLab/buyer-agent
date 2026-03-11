@@ -15,6 +15,17 @@ The buyer agent supports **three protocols** for communicating with seller agent
 
 **MCP** is the default for all CrewAI tool operations. **A2A** is used for exploratory discovery and complex negotiations where natural language interpretation adds value. **REST** (OpenDirect 2.1) supports operator dashboards and legacy integrations.
 
+## When to Use Which
+
+!!! tip "Decision guide"
+    **Use MCP** when you know exactly which operation to perform and want fast, predictable results. This covers the vast majority of automated workflows -- listing products, creating orders, booking line items.
+
+    **Use A2A** when the request is ambiguous or benefits from interpretation. Examples: multi-criteria inventory searches expressed in natural language, complex negotiation exchanges where the seller's AI can reason about pricing, or exploratory discovery where you do not know the exact tool to call.
+
+    **Use REST (OpenDirect)** when integrating with systems that do not support MCP or A2A -- for example, existing dashboards, third-party DSP platforms, or legacy ad servers. The buyer's own REST API also uses this path internally to proxy requests from human operators.
+
+Most buyers will use MCP exclusively and only reach for A2A in discovery or negotiation scenarios. The `UnifiedClient` makes switching trivial -- change a single `protocol` parameter.
+
 ## UnifiedClient
 
 The `UnifiedClient` wraps both MCP and A2A behind a single interface. CrewAI tools use it internally so they can switch protocols without changing their logic.
