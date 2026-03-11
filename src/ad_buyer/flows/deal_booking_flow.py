@@ -27,6 +27,7 @@ from ..models.flow_state import (
     ExecutionStatus,
     ProductRecommendation,
 )
+from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
 from ..models.ucp import AudiencePlan, SignalType, UCPConsent
 from ..storage.deal_store import DealStore
 
@@ -94,6 +95,9 @@ class DealBookingFlow(Flow[BookingState]):
     def _persist_deal_status(self, deal_id: str, new_status: str) -> None:
         """Best-effort update deal status in the store.
 
+        Uses DealStore.update_deal_status() which enforces state machine
+        transitions when both statuses are valid BuyerDealStatus values.
+
         Args:
             deal_id: The deal to update.
             new_status: New status value.
@@ -101,7 +105,13 @@ class DealBookingFlow(Flow[BookingState]):
         if self._store is None:
             return
         try:
-            self._store.update_deal_status(deal_id, new_status, triggered_by="system")
+            ok = self._store.update_deal_status(deal_id, new_status, triggered_by="system")
+            if not ok:
+                logger.warning(
+                    "State machine rejected transition to %s for deal %s",
+                    new_status,
+                    deal_id,
+                )
         except Exception:
             logger.exception(
                 "Failed to persist status change to %s for deal %s",
