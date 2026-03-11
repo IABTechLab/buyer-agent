@@ -1,6 +1,6 @@
 # Quickstart
 
-Get the buyer agent running locally and execute your first booking workflow.
+Get the buyer agent running locally and verify it works.
 
 ## Prerequisites
 
@@ -65,7 +65,7 @@ All settings are loaded from environment variables or the `.env` file via `pydan
 uvicorn ad_buyer.interfaces.api.main:app --reload --port 8001
 ```
 
-The API will be available at `http://localhost:8001`. Interactive docs are served at `/docs` (Swagger) and `/redoc`.
+The API will be available at `http://localhost:8001`.
 
 ## Verify It Works
 
@@ -79,67 +79,32 @@ Expected response:
 {"status": "healthy", "version": "1.0.0"}
 ```
 
-## Example Workflow
+## Browse the API Docs
 
-### 1. Create a booking
+The buyer agent serves interactive API documentation:
+
+- **Swagger UI**: [http://localhost:8001/docs](http://localhost:8001/docs)
+- **ReDoc**: [http://localhost:8001/redoc](http://localhost:8001/redoc)
+
+## First API Calls
+
+These calls work without a seller agent running.
+
+### List Bookings
 
 ```bash
-curl -X POST http://localhost:8001/bookings \
-  -H "Content-Type: application/json" \
-  -d '{
-    "brief": {
-      "name": "Summer Campaign 2026",
-      "objectives": ["brand_awareness", "reach"],
-      "budget": 50000,
-      "start_date": "2026-07-01",
-      "end_date": "2026-08-31",
-      "target_audience": {
-        "demographics": {"age": "25-54"},
-        "interests": ["travel", "outdoor"]
-      },
-      "kpis": {"target_cpm": 12, "viewability": 70},
-      "channels": ["branding", "ctv"]
-    },
-    "auto_approve": false
-  }'
+curl http://localhost:8001/bookings
 ```
 
-Response:
+On a fresh server, this returns an empty list:
 
 ```json
-{
-  "job_id": "a1b2c3d4-...",
-  "status": "pending",
-  "message": "Booking workflow started. Use GET /bookings/{job_id} to check status."
-}
+{"jobs": [], "total": 0}
 ```
 
-### 2. Check status
+## Next Steps
 
-```bash
-curl http://localhost:8001/bookings/a1b2c3d4-...
-```
-
-Poll until `status` reaches `awaiting_approval` (or `completed` if `auto_approve` was true).
-
-### 3. Approve recommendations
-
-```bash
-curl -X POST http://localhost:8001/bookings/a1b2c3d4-.../approve-all
-```
-
-Or approve specific products:
-
-```bash
-curl -X POST http://localhost:8001/bookings/a1b2c3d4-.../approve \
-  -H "Content-Type: application/json" \
-  -d '{"approved_product_ids": ["prod_001", "prod_003"]}'
-```
-
-### 4. View results
-
-```bash
-curl http://localhost:8001/bookings/a1b2c3d4-...
-```
-
-The response now includes `booked_lines` with confirmed deal details.
+- [**Running with Seller**](running-with-seller.md) — Connect to the seller agent and execute a full booking workflow end-to-end.
+- [**Configuration**](../guides/configuration.md) — Deep dive into all configuration options.
+- [**Deal Booking Guide**](../guides/deal-booking.md) — Understand the full booking lifecycle.
+- [**API Reference**](../api/overview.md) — Explore every endpoint in detail.
