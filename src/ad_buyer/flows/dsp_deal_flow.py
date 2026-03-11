@@ -22,6 +22,7 @@ from ..models.buyer_identity import (
     DealResponse,
     DealType,
 )
+from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
 from ..storage.deal_store import DealStore
 from ..tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
@@ -192,15 +193,24 @@ class DSPDealFlow(Flow[DSPFlowState]):
     def _persist_deal_status(self, new_status: str) -> None:
         """Best-effort update deal status in the store.
 
+        Uses DealStore.update_deal_status() which enforces state machine
+        transitions when both statuses are valid BuyerDealStatus values.
+
         Args:
             new_status: New status value.
         """
         if self._store is None or self._store_deal_id is None:
             return
         try:
-            self._store.update_deal_status(
+            ok = self._store.update_deal_status(
                 self._store_deal_id, new_status, triggered_by="system"
             )
+            if not ok:
+                logger.warning(
+                    "State machine rejected transition to %s for deal %s",
+                    new_status,
+                    self._store_deal_id,
+                )
         except Exception:
             logger.exception(
                 "Failed to persist status %s for deal %s",

@@ -19,6 +19,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from ..models.state_machine import (
+    BuyerDealStatus,
+    DealStateMachine,
+    InvalidTransitionError,
+)
 from .schema import initialize_schema
 
 logger = logging.getLogger(__name__)
@@ -222,6 +227,12 @@ class DealStore:
     ) -> bool:
         """Update a deal's status and log the transition.
 
+        When both the current status and new_status are valid
+        BuyerDealStatus values, the state machine enforces that only
+        allowed transitions are executed.  If the current status is not
+        a recognized BuyerDealStatus (e.g. a legacy value), the update
+        proceeds without validation for backward compatibility.
+
         Args:
             deal_id: The deal to update.
             new_status: Target status value.
@@ -229,7 +240,9 @@ class DealStore:
             notes: Optional note for the audit log.
 
         Returns:
-            True if the deal was found and updated.
+            True if the deal was found and updated, False if the deal
+            was not found or the transition was rejected by the state
+            machine.
         """
         now = _now_iso()
 
@@ -243,6 +256,27 @@ class DealStore:
                 return False
 
             old_status = row["status"]
+
+            # Enforce state machine if both statuses are known
+            try:
+                old_deal_status = BuyerDealStatus(old_status)
+                new_deal_status = BuyerDealStatus(new_status)
+                # Build a throwaway machine to validate the transition
+                sm = DealStateMachine(
+                    deal_id, initial_status=old_deal_status
+                )
+                if not sm.can_transition(new_deal_status):
+                    logger.warning(
+                        "Rejected transition for deal %s: %s -> %s",
+                        deal_id,
+                        old_status,
+                        new_status,
+                    )
+                    return False
+            except ValueError:
+                # One or both statuses are not BuyerDealStatus members;
+                # skip validation for backward compatibility.
+                pass
 
             self._conn.execute(
                 "UPDATE deals SET status = ?, updated_at = ? WHERE id = ?",
