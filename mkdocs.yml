@@ -61,6 +61,7 @@ nav:
       - MCP Client: api/mcp-client.md
       - A2A Client: api/a2a-client.md
       - Authentication: api/authentication.md
+      - Change Requests: api/change-requests.md
       - Media Kit: api/media-kit.md
       - Deals: api/deals.md
       - Bookings: api/bookings.md
