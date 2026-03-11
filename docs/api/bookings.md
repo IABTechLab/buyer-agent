@@ -175,3 +175,46 @@ List all booking jobs, optionally filtered by status.
 ```bash
 curl "http://localhost:8001/bookings?status=awaiting_approval&limit=5"
 ```
+
+---
+
+## Error Handling
+
+All booking endpoints return structured error responses with an HTTP status code and a JSON body containing `error` and `detail` fields.
+
+```json
+{
+  "error": "not_found",
+  "detail": "Booking job a1b2c3d4-... not found"
+}
+```
+
+### Error Codes
+
+| Endpoint | HTTP Status | `error` | When |
+|----------|------------|---------|------|
+| `POST /bookings` | `400` | `invalid_brief` | Required brief fields missing or invalid (e.g., budget <= 0, empty objectives, end_date before start_date) |
+| `POST /bookings` | `422` | `validation_error` | Brief payload fails Pydantic schema validation |
+| `GET /bookings/{job_id}` | `404` | `not_found` | No booking job exists with the given ID |
+| `POST /bookings/{job_id}/approve` | `404` | `not_found` | No booking job exists with the given ID |
+| `POST /bookings/{job_id}/approve` | `409` | `invalid_status` | Job is not in `awaiting_approval` status |
+| `POST /bookings/{job_id}/approve` | `400` | `invalid_products` | None of the submitted product IDs match pending recommendations |
+| `POST /bookings/{job_id}/approve-all` | `404` | `not_found` | No booking job exists with the given ID |
+| `POST /bookings/{job_id}/approve-all` | `409` | `invalid_status` | Job is not in `awaiting_approval` status |
+| `GET /bookings` | `422` | `validation_error` | Invalid query parameter value (e.g., non-integer `limit`) |
+| *any* | `500` | `internal_error` | Unexpected server error during booking flow execution |
+
+### Booking Flow Failures
+
+When the background booking flow fails (seller unreachable, budget allocation error, etc.), the job transitions to `failed` status rather than returning an HTTP error. Poll `GET /bookings/{job_id}` and check the `errors` array:
+
+```json
+{
+  "job_id": "a1b2c3d4-...",
+  "status": "failed",
+  "errors": [
+    "Seller agent unreachable at http://seller:8001",
+    "Budget allocation failed: no valid channel splits found"
+  ]
+}
+```

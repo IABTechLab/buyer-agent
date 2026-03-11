@@ -50,3 +50,30 @@ The product search connects to the seller agent's OpenDirect API. Make sure:
 2. Authentication credentials (`OPENDIRECT_TOKEN` or `OPENDIRECT_API_KEY`) are set if the seller requires them.
 
 See [Seller Agent Integration](../integration/seller-agent.md) for details.
+
+---
+
+## Error Handling
+
+The products endpoint returns structured error responses with an HTTP status code and a JSON body.
+
+```json
+{
+  "error": "seller_unreachable",
+  "detail": "Cannot connect to seller agent at http://seller:8001"
+}
+```
+
+### Error Codes
+
+| HTTP Status | `error` | When |
+|------------|---------|------|
+| `422` | `validation_error` | Invalid search parameters (e.g., `min_price` > `max_price`, `limit` out of 1-50 range) |
+| `502` | `seller_unreachable` | Seller agent is not running or not accessible at the configured `OPENDIRECT_BASE_URL` |
+| `502` | `seller_error` | Seller agent returned a non-2xx response to the product search request |
+| `401` | `auth_error` | Seller rejected the configured `OPENDIRECT_TOKEN` or `OPENDIRECT_API_KEY` |
+| `504` | `seller_timeout` | Seller agent did not respond within the request timeout |
+| `500` | `internal_error` | Unexpected error during product search execution |
+
+!!! tip "Empty results are not errors"
+    If no products match the search criteria, the endpoint returns `200` with an empty `results` array -- not a `404`.
