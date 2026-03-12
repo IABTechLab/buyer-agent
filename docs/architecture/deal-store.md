@@ -146,7 +146,7 @@ Append-only log of every negotiation round for a deal. Each row captures the buy
 
 #### `booking_records`
 
-Tracks booked line items resulting from completed deals. Links deals to OpenDirect orders and lines.
+Tracks booked line items resulting from completed deals. Links deals to [OpenDirect](https://iabtechlab.com/standards/opendirect/) orders and lines.
 
 | Column | Type | Description |
 |--------|------|-------------|

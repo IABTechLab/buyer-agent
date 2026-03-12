@@ -19,7 +19,7 @@ This guide walks through the process of discovering multiple sellers, comparing 
 
 ### Step 1: Discover Sellers via the Registry
 
-Use `RegistryClient` to query the IAB AAMP agent registry for seller agents. You can filter by capability to narrow results to sellers that carry the inventory types you need.
+Use `RegistryClient` to query the IAB [Agentic Advertising Management Protocols (AAMP)](https://iabtechlab.com/standards/aamp-agentic-advertising-management-protocols/) agent registry for seller agents. You can filter by capability to narrow results to sellers that carry the inventory types you need.
 
 ```python
 from ad_buyer.registry.client import RegistryClient
