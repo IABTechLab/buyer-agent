@@ -40,7 +40,7 @@ async def book_a_deal():
             quote_id=quote.quote_id,
         ))
         print(f"Deal ID: {deal.deal_id}")
-        print(f"OpenRTB floor: ${deal.openrtb_params.bidfloor}")
+        print(f"[Open Real-Time Bidding (OpenRTB)](https://iabtechlab.com/standards/openrtb/) floor: ${deal.openrtb_params.bidfloor}")
 
 asyncio.run(book_a_deal())
 ```

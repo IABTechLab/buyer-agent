@@ -1,6 +1,6 @@
 # Seller Agent Integration
 
-The buyer agent connects to one or more seller agents to search inventory, check availability, negotiate pricing, and book deals using the IAB OpenDirect 2.1 protocol.
+The buyer agent connects to one or more seller agents to search inventory, check availability, negotiate pricing, and book deals using the IAB [OpenDirect](https://iabtechlab.com/standards/opendirect/) 2.1 protocol.
 
 ## Connection Configuration
 
