@@ -338,7 +338,7 @@ graph LR
 1. **Browse** the seller's media kit (public or authenticated)
 2. **Select** a package that matches campaign requirements
 3. **Get exact pricing** by authenticating with your API key
-4. **Request a quote** via the OpenDirect API for specific products in the package
+4. **Request a quote** via the [OpenDirect](https://iabtechlab.com/standards/opendirect/) API for specific products in the package
 5. **Negotiate** if your tier allows it (Agency/Advertiser)
 6. **Book** the deal through the standard booking flow
 

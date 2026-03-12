@@ -1,6 +1,6 @@
 # Seller Discovery
 
-The buyer agent discovers seller agents through the **IAB AAMP agent registry** — a centralized directory where agents register their identity, capabilities, and connection details. The `RegistryClient` handles discovery, agent card fetching, buyer registration, and trust verification, with built-in caching to minimize registry round-trips.
+The buyer agent discovers seller agents through the **IAB [Agentic Advertising Management Protocols (AAMP)](https://iabtechlab.com/standards/aamp-agentic-advertising-management-protocols/) agent registry** — a centralized directory where agents register their identity, capabilities, and connection details. The `RegistryClient` handles discovery, agent card fetching, buyer registration, and trust verification, with built-in caching to minimize registry round-trips.
 
 ## Overview
 

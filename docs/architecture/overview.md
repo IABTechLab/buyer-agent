@@ -1,6 +1,6 @@
 # Architecture Overview
 
-The buyer agent is a multi-layer system that combines a FastAPI service layer with CrewAI agent orchestration and an OpenDirect protocol client.
+The buyer agent is a multi-layer system that combines a FastAPI service layer with CrewAI agent orchestration and an [OpenDirect](https://iabtechlab.com/standards/opendirect/) protocol client.
 
 ## System Architecture
 

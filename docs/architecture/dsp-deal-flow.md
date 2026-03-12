@@ -1,6 +1,6 @@
 # DSP Deal Flow
 
-The `DSPDealFlow` is a CrewAI event-driven flow that discovers seller inventory, evaluates products, and obtains Deal IDs for activation in traditional DSP platforms. It is distinct from the [`DealBookingFlow`](booking-flow.md), which handles the full campaign booking lifecycle through OpenDirect.
+The `DSPDealFlow` is a CrewAI event-driven flow that discovers seller inventory, evaluates products, and obtains Deal IDs for activation in traditional DSP platforms. It is distinct from the [`DealBookingFlow`](booking-flow.md), which handles the full campaign booking lifecycle through [OpenDirect](https://iabtechlab.com/standards/opendirect/).
 
 **Key file:** `src/ad_buyer/flows/dsp_deal_flow.py`
 

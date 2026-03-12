@@ -149,7 +149,7 @@ The central state object carried through the entire `DealBookingFlow`.
 
 ## OpenDirect Models
 
-Defined in `models/opendirect.py`, these represent IAB OpenDirect 2.1 resources used by the `OpenDirectClient`.
+Defined in `models/opendirect.py`, these represent IAB [OpenDirect](https://iabtechlab.com/standards/opendirect/) 2.1 resources used by the `OpenDirectClient`.
 
 ### Organization
 

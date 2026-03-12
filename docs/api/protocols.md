@@ -4,7 +4,7 @@ The buyer agent supports **three protocols** for communicating with seller agent
 
 ## Protocol Comparison
 
-| Feature | MCP | A2A | REST (OpenDirect) |
+| Feature | MCP | A2A | REST ([OpenDirect](https://iabtechlab.com/standards/opendirect/)) |
 |---------|-----|-----|-------------------|
 | Transport | Streamable HTTP (SSE) | JSON-RPC 2.0 | Standard HTTP |
 | Input | Structured tool calls | Natural language | HTTP requests |

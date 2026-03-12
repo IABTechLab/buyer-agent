@@ -228,7 +228,7 @@ Discovers and evaluates advertising inventory across publishers.
 
 **File:** `src/ad_buyer/agents/level3/execution_agent.py`
 
-Handles the OpenDirect booking lifecycle.
+Handles the [OpenDirect](https://iabtechlab.com/standards/opendirect/) booking lifecycle.
 
 | Area | Detail |
 |------|--------|
