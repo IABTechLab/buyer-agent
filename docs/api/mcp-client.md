@@ -28,7 +28,7 @@ A lightweight HTTP fallback that does not require the MCP SDK. It calls simple R
 
 - **Tool listing**: `GET /mcp/tools` --- returns available tool definitions
 - **Tool execution**: `POST /mcp/call` --- sends `{"name": ..., "arguments": {...}}`
-- **Fallback chain**: Tries `/mcp/tools`, then `call_tool("list_tools")`, then assumes standard OpenDirect tools
+- **Fallback chain**: Tries `/mcp/tools`, then `call_tool("list_tools")`, then assumes standard [OpenDirect](https://iabtechlab.com/standards/opendirect/) tools
 - **No session**: Each request is independent (no SSE connection)
 
 The `SimpleMCPClient` is used automatically when the `mcp` SDK is not installed.

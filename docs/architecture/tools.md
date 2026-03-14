@@ -298,7 +298,7 @@ result = tool._run(
 
 ## Execution Tools
 
-Execution tools manage the OpenDirect booking lifecycle: creating orders, adding line items, reserving inventory, and confirming bookings. All require an `OpenDirectClient` at initialization.
+Execution tools manage the [OpenDirect](https://iabtechlab.com/standards/opendirect/) booking lifecycle: creating orders, adding line items, reserving inventory, and confirming bookings. All require an `OpenDirectClient` at initialization.
 
 **Package:** `src/ad_buyer/tools/execution/`
 

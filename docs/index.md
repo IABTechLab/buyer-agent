@@ -11,7 +11,7 @@ Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https:/
 
 - Structured campaign briefing with objectives, budget, dates, audience, and KPIs
 - Portfolio-manager agent splits budget across 4 channels (branding, CTV, mobile, performance)
-- Multi-seller discovery via AAMP registry with trust verification and capability filtering
+- Multi-seller discovery via [Agentic Advertising Management Protocols (AAMP)](https://iabtechlab.com/standards/aamp-agentic-advertising-management-protocols/) registry with trust verification and capability filtering
 - Channel-specialist agents research seller catalogs via MCP and A2A protocols
 - Progressive media-kit browsing from summary through full product details and pricing
 - Tiered identity strategy with 4 access tiers (public, seat, agency, advertiser) and progressive rate discounts

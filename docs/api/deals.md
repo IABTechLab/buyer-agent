@@ -1,6 +1,6 @@
 # Deals API Client
 
-The `DealsClient` is the buyer's interface to the seller's **quote-then-book** deal endpoints. Instead of fabricating deal IDs client-side, the buyer requests a non-binding price quote from the seller, optionally negotiates, and then books a deal --- receiving a seller-issued Deal ID with OpenRTB activation parameters.
+The `DealsClient` is the buyer's interface to the seller's **quote-then-book** deal endpoints. Instead of fabricating deal IDs client-side, the buyer requests a non-binding price quote from the seller, optionally negotiates, and then books a deal --- receiving a seller-issued Deal ID with [Open Real-Time Bidding (OpenRTB)](https://iabtechlab.com/standards/openrtb/) activation parameters.
 
 ## Overview
 
@@ -28,7 +28,7 @@ sequenceDiagram
 ```
 
 !!! info "Why quote-then-book?"
-    Earlier versions of the buyer generated deal IDs locally and hoped the seller would accept them. The quote-then-book flow ensures the seller validates inventory availability, applies tier-based pricing, and issues the authoritative Deal ID. This matches the IAB OpenDirect pattern where the sell-side is the system of record.
+    Earlier versions of the buyer generated deal IDs locally and hoped the seller would accept them. The quote-then-book flow ensures the seller validates inventory availability, applies tier-based pricing, and issues the authoritative Deal ID. This matches the IAB [OpenDirect](https://iabtechlab.com/standards/opendirect/) pattern where the sell-side is the system of record.
 
 ---
 

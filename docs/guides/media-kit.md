@@ -83,7 +83,7 @@ pkg = await client.get_package(seller_url, "pkg-abc12345")
 # Ad formats are strings: "video", "banner", "native", "audio"
 print(f"Formats: {pkg.ad_formats}")
 
-# Device types are OpenRTB integers:
+# Device types are [Open Real-Time Bidding (OpenRTB)](https://iabtechlab.com/standards/openrtb/) integers:
 #   1 = Mobile/Tablet, 2 = PC, 3 = CTV, 4 = Phone, 5 = Tablet, 6 = Connected Device, 7 = Set Top Box
 print(f"Devices: {pkg.device_types}")
 ```
@@ -309,7 +309,7 @@ graph LR
 
 5. **Negotiate or accept** --- If negotiation is enabled and the price is above your target, use the [Negotiation module](negotiation.md) to drive counter-offers. If not, accept the posted price.
 
-6. **Book the deal** --- Use the [Booking flow](../api/bookings.md) to finalize the transaction via the OpenDirect API.
+6. **Book the deal** --- Use the [Booking flow](../api/bookings.md) to finalize the transaction via the [OpenDirect](https://iabtechlab.com/standards/opendirect/) API.
 
 ### Connecting to Negotiation
 

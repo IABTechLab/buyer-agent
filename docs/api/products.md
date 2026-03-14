@@ -44,7 +44,7 @@ curl -X POST http://localhost:8001/products/search \
 
 ### Connection to Seller Agent
 
-The product search connects to the seller agent's OpenDirect API. Make sure:
+The product search connects to the seller agent's [OpenDirect](https://iabtechlab.com/standards/opendirect/) API. Make sure:
 
 1. The seller agent is running and accessible at the configured `OPENDIRECT_BASE_URL`.
 2. Authentication credentials (`OPENDIRECT_TOKEN` or `OPENDIRECT_API_KEY`) are set if the seller requires them.

@@ -61,7 +61,7 @@ endpoints = settings.get_seller_endpoints()
 # ["http://seller1.example.com:8000", "http://seller2.example.com:8000"]
 ```
 
-### OpenDirect (Legacy)
+### [OpenDirect](https://iabtechlab.com/standards/opendirect/) (Legacy)
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|

@@ -35,7 +35,7 @@ ANTHROPIC_API_KEY=sk-ant-...              # For Anthropic (default)
 # Inbound API key for this service (leave empty to disable auth in dev)
 API_KEY=
 
-# OpenDirect seller connection
+# [OpenDirect](https://iabtechlab.com/standards/opendirect/) seller connection
 OPENDIRECT_BASE_URL=http://localhost:3000/api/v2.1
 OPENDIRECT_TOKEN=              # OAuth bearer token (optional)
 OPENDIRECT_API_KEY=            # API key for seller (optional)
