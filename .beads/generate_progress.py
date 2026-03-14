@@ -84,25 +84,35 @@ def get_cross_repo_blockers(issue):
     return CROSS_REPO_BLOCKERS.get(issue.get("id", ""), [])
 
 
-def is_blocked(issue, closed_ids):
-    """Check if issue has unresolved blockers (in-repo deps or cross-repo annotations)."""
+def is_blocked(issue, closed_ids, all_ids):
+    """Check if issue has unresolved blockers (in-repo deps or cross-repo annotations).
+
+    Dependencies pointing to tombstoned/compacted beads (not in all_ids)
+    are ignored since the target no longer exists in the tracker.
+    """
     # Closed issues are never blocked
     if issue.get("status") == "closed":
         return False
     deps = issue.get("dependencies") or []
     for dep in deps:
         blocker_id = dep.get("depends_on_id", "")
-        if blocker_id not in closed_ids:
+        # Skip tombstoned/compacted beads and already-closed blockers
+        if blocker_id and blocker_id in all_ids and blocker_id not in closed_ids:
             return True
     if get_cross_repo_blockers(issue):
         return True
     return False
 
 
-def get_blocker_ids(issue):
-    """Get list of depends_on_id values plus cross-repo blockers from notes."""
+def get_blocker_ids(issue, all_ids):
+    """Get list of depends_on_id values plus cross-repo blockers from notes.
+
+    Dependencies pointing to tombstoned/compacted beads (not in all_ids)
+    are excluded.
+    """
     deps = issue.get("dependencies") or []
-    blockers = [dep.get("depends_on_id", "") for dep in deps]
+    blockers = [dep.get("depends_on_id", "") for dep in deps
+                if dep.get("depends_on_id") and dep.get("depends_on_id") in all_ids]
     blockers.extend(get_cross_repo_blockers(issue))
     return blockers
 
@@ -117,14 +127,14 @@ def progress_bar(done, total, width=20):
     return f"`[{'█' * filled}{'░' * empty}] {pct}% ({done}/{total})`"
 
 
-def status_icon(issue, closed_ids):
+def status_icon(issue, closed_ids, all_ids):
     """Return status icon for an issue."""
     s = issue.get("status", "open")
     if s == "closed":
         return "\\[x]"
     if s == "in_progress":
         return "\\[~]"
-    if is_blocked(issue, closed_ids):
+    if is_blocked(issue, closed_ids, all_ids):
         return "\\[!]"
     return "\\[ ]"
 
@@ -150,7 +160,7 @@ def generate():
     total = len(issues)
     closed = len([i for i in issues if i.get("status") == "closed"])
     in_progress = len([i for i in issues if i.get("status") == "in_progress"])
-    blocked = len([i for i in issues if i.get("status") not in ("closed",) and is_blocked(i, closed_ids)])
+    blocked = len([i for i in issues if i.get("status") not in ("closed",) and is_blocked(i, closed_ids, all_ids)])
     open_count = total - closed - in_progress
 
     # Group by phase
@@ -193,11 +203,11 @@ def generate():
                 top_level.append(issue)
 
         for issue in top_level:
-            icon = status_icon(issue, closed_ids)
+            icon = status_icon(issue, closed_ids, all_ids)
             iid = issue["id"]
             title = issue.get("title", "")
             priority = f"P{issue.get('priority', '?')}"
-            blockers = get_blocker_ids(issue)
+            blockers = get_blocker_ids(issue, all_ids)
             unresolved = [b for b in blockers if b not in closed_ids]
             blocker_str = ", ".join(unresolved) if unresolved else "—"
             done = format_date(issue.get("closed_at", ""))
@@ -208,11 +218,11 @@ def generate():
             if task_key_match:
                 task_key = task_key_match.group(1)
                 for sub in sub_tasks.get(task_key, []):
-                    sub_icon = status_icon(sub, closed_ids)
+                    sub_icon = status_icon(sub, closed_ids, all_ids)
                     sub_iid = sub["id"]
                     sub_title = sub.get("title", "")
                     sub_priority = f"P{sub.get('priority', '?')}"
-                    sub_blockers = get_blocker_ids(sub)
+                    sub_blockers = get_blocker_ids(sub, all_ids)
                     sub_unresolved = [b for b in sub_blockers if b not in closed_ids]
                     sub_blocker_str = ", ".join(sub_unresolved) if sub_unresolved else "—"
                     sub_done = format_date(sub.get("closed_at", ""))
@@ -226,11 +236,11 @@ def generate():
         lines.append("| | ID | Task | Priority | Blockers | Done |")
         lines.append("|---|---|---|---|---|---|")
         for issue in ungrouped:
-            icon = status_icon(issue, closed_ids)
+            icon = status_icon(issue, closed_ids, all_ids)
             iid = issue["id"]
             title = issue.get("title", "")
             priority = f"P{issue.get('priority', '?')}"
-            blockers = get_blocker_ids(issue)
+            blockers = get_blocker_ids(issue, all_ids)
             unresolved = [b for b in blockers if b not in closed_ids]
             blocker_str = ", ".join(unresolved) if unresolved else "—"
             done = format_date(issue.get("closed_at", ""))
