@@ -1,8 +1,18 @@
-# Sessions & Persistence
+# Sessions API Reference
 
-Sessions enable **multi-turn conversations** between the buyer agent and seller agents. Rather than treating each API call as an isolated request, sessions maintain context across a sequence of messages --- allowing the buyer to browse inventory, negotiate pricing, and close deals within a single conversational thread.
+This page documents the `SessionManager` and `SessionStore` classes --- their methods, parameters, return types, and error behavior. Sessions enable multi-turn conversations between the buyer agent and seller agents, maintaining context across a sequence of messages.
+
+!!! tip "Looking for usage patterns?"
+    For practical guidance on when and how to use sessions --- conversation patterns, negotiation flows, multi-seller strategies, and best practices --- see the [Session Management Guide](../guides/sessions.md).
 
 ## Overview
+
+The buyer agent uses two components for session management:
+
+| Component | Role |
+|-----------|------|
+| **SessionManager** | Orchestrates the session lifecycle --- creation, reuse, messaging, and closure |
+| **SessionStore** | File-backed persistence layer that stores active sessions as JSON |
 
 ```mermaid
 sequenceDiagram
@@ -29,18 +39,11 @@ sequenceDiagram
     SM->>Store: Remove session record
 ```
 
-The buyer agent uses two components for session management:
-
-| Component | Role |
-|-----------|------|
-| **SessionManager** | Orchestrates the session lifecycle --- creation, reuse, messaging, and closure |
-| **SessionStore** | File-backed persistence layer that stores active sessions as JSON |
-
 ---
 
 ## SessionManager
 
-The `SessionManager` is the primary interface for session operations. It handles creating sessions with seller endpoints, reusing active sessions, sending messages, and transparently recreating sessions that have expired.
+The `SessionManager` is the primary interface for session operations.
 
 ### Initialization
 
@@ -66,11 +69,20 @@ manager = SessionManager(
 
 ---
 
-## Creating Sessions
+## Methods
 
-### Create a New Session
+### `create_session(seller_url, buyer_identity)`
 
-Establish a new session with a seller by posting to their `/sessions` endpoint:
+Establish a new session with a seller by posting to their `/sessions` endpoint.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `seller_url` | `str` | yes | Base URL of the seller agent |
+| `buyer_identity` | `dict` | yes | Buyer identity fields (`seat_id`, `name`, `agency_id`, etc.) |
+
+**Returns:** `str` --- the session ID.
+
+**Seller endpoint:** `POST /sessions`
 
 ```python
 session_id = await manager.create_session(
@@ -81,38 +93,20 @@ session_id = await manager.create_session(
         "agency_id": "omnicom-456",
     },
 )
-print(f"Session: {session_id}")
 ```
 
-**Seller endpoint:** `POST /sessions`
+The manager persists the returned session record to the `SessionStore` automatically. Sessions follow a **7-day TTL** by default.
 
-```bash
-curl -X POST http://seller.example.com:8001/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "buyer_identity": {
-      "seat_id": "ttd-seat-123",
-      "name": "Acme Media Buying",
-      "agency_id": "omnicom-456"
-    }
-  }'
-```
+### `get_or_create_session(seller_url, buyer_identity)`
 
-**Response:**
+Check for an existing active session with the seller; create a new one if none exists.
 
-```json
-{
-  "session_id": "sess-a1b2c3d4",
-  "created_at": "2026-03-10T14:00:00Z",
-  "expires_at": "2026-03-17T14:00:00Z"
-}
-```
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `seller_url` | `str` | yes | Base URL of the seller agent |
+| `buyer_identity` | `dict` | no | Buyer identity (required if creating a new session) |
 
-The `SessionManager` automatically persists the returned session record to the `SessionStore`. Sessions follow a **7-day TTL** by default --- if the seller does not specify an `expires_at`, the manager uses its own 7-day fallback.
-
-### Get or Create (Recommended)
-
-In most cases, use `get_or_create_session` to reuse an existing active session or create a new one automatically:
+**Returns:** `str` --- the session ID (existing or newly created).
 
 ```python
 session_id = await manager.get_or_create_session(
@@ -121,98 +115,46 @@ session_id = await manager.get_or_create_session(
 )
 ```
 
-This method checks the local store for a non-expired session with the given seller. If one exists, it returns that session ID. Otherwise, it creates a new session and persists it.
-
 !!! tip "Prefer `get_or_create_session`"
-    This is the recommended entry point for session management. It avoids creating unnecessary sessions and handles the common case of resuming work with a seller you've already contacted.
+    This is the recommended entry point. It avoids creating unnecessary sessions and handles the common case of resuming work with a seller.
 
----
+### `send_message(seller_url, session_id, message, buyer_identity)`
 
-## Sending Messages
+Send a message to the seller on an existing session.
 
-Once a session is established, send messages to the seller on that session:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `seller_url` | `str` | yes | Base URL of the seller agent |
+| `session_id` | `str` | yes | Active session ID |
+| `message` | `dict` | yes | Message payload with `type` and content fields |
+| `buyer_identity` | `dict` | no | Needed for auto-recovery if the session has expired |
 
-```python
-response = await manager.send_message(
-    seller_url="http://seller.example.com:8001",
-    session_id=session_id,
-    message={
-        "type": "inquiry",
-        "content": "What premium CTV inventory is available for Q3?",
-    },
-)
-print(f"Seller says: {response}")
-```
+**Returns:** Seller response (dict).
 
 **Seller endpoint:** `POST /sessions/{session_id}/messages`
 
-```bash
-curl -X POST http://seller.example.com:8001/sessions/sess-a1b2c3d4/messages \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "inquiry",
-    "content": "What premium CTV inventory is available for Q3?"
-  }'
-```
+**Automatic recovery:** If the seller returns 404 (session expired), the manager transparently removes the stale session, creates a new one, and retries the message.
 
-### Automatic Session Recovery
+### `close_session(seller_url, session_id)`
 
-If the seller returns a **404** (session not found or expired on the seller side), the `SessionManager` transparently:
+Close a session and remove it from the local store.
 
-1. Removes the stale session from the local store
-2. Creates a new session with the seller
-3. Retries the message on the new session
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `seller_url` | `str` | yes | Base URL of the seller agent |
+| `session_id` | `str` | yes | Session ID to close |
 
-This means callers do not need to handle session expiry manually --- the manager recovers automatically.
-
-```mermaid
-sequenceDiagram
-    participant Buyer as Buyer Agent
-    participant SM as SessionManager
-    participant Seller as Seller Agent
-
-    Buyer->>SM: send_message(session_id, message)
-    SM->>Seller: POST /sessions/{id}/messages
-    Seller-->>SM: 404 (session expired)
-
-    Note over SM: Auto-recovery
-    SM->>Seller: POST /sessions (create new)
-    Seller-->>SM: {new_session_id}
-    SM->>Seller: POST /sessions/{new_id}/messages
-    Seller-->>SM: 200 (response)
-    SM-->>Buyer: Response (transparent to caller)
-```
-
----
-
-## Closing Sessions
-
-Explicitly close a session when the conversation is complete:
-
-```python
-await manager.close_session(
-    seller_url="http://seller.example.com:8001",
-    session_id=session_id,
-)
-```
+**Returns:** None.
 
 **Seller endpoint:** `POST /sessions/{session_id}/close`
 
-This sends a close request to the seller and removes the session from the local store. If the close request fails (e.g., the session already expired on the seller side), the error is logged but not raised --- the local cleanup still occurs.
+Close failures are logged but not raised --- local cleanup always occurs.
 
----
+### `list_active_sessions()`
 
-## Listing Active Sessions
+Return all active (non-expired) sessions.
 
-Inspect all active (non-expired) sessions across sellers:
-
-```python
-active = manager.list_active_sessions()
-for seller_url, session_id in active.items():
-    print(f"{seller_url}: {session_id}")
-```
-
-Returns a dictionary mapping seller URLs to session IDs, excluding any sessions that have passed their expiry time.
+**Returns:** `dict[str, str]` --- mapping of seller URLs to session IDs.
 
 ---
 
@@ -229,8 +171,6 @@ The `SessionStore` is the persistence backend, storing session records as a JSON
 
 ### File Format
 
-The store file is a simple JSON dictionary:
-
 ```json
 {
   "http://seller-a.example.com:8001": {
@@ -238,12 +178,6 @@ The store file is a simple JSON dictionary:
     "seller_url": "http://seller-a.example.com:8001",
     "created_at": "2026-03-10T14:00:00Z",
     "expires_at": "2026-03-17T14:00:00Z"
-  },
-  "http://seller-b.example.com:8002": {
-    "session_id": "sess-e5f6g7h8",
-    "seller_url": "http://seller-b.example.com:8002",
-    "created_at": "2026-03-09T10:00:00Z",
-    "expires_at": "2026-03-16T10:00:00Z"
   }
 }
 ```
@@ -293,8 +227,6 @@ Key methods:
 
 ## Session Lifecycle
 
-The complete lifecycle of a session from creation through closure:
-
 ```mermaid
 stateDiagram-v2
     [*] --> Created: POST /sessions
@@ -308,12 +240,6 @@ stateDiagram-v2
     Expired --> [*]: Manual cleanup
 ```
 
-### Typical Flow
-
-1. **Create** --- Call `get_or_create_session()` to establish a session with a seller
-2. **Converse** --- Send messages via `send_message()` for browsing, negotiation, or deal-making
-3. **Close** --- Call `close_session()` when the conversation is complete
-
 ### Expiry Handling
 
 Sessions expire after **7 days** (or the TTL specified by the seller). Expiry is handled at two levels:
@@ -322,152 +248,6 @@ Sessions expire after **7 days** (or the TTL specified by the seller). Expiry is
 |-------|----------|
 | **Local (SessionStore)** | `get()` returns `None` for expired records; `cleanup_expired()` removes them from disk |
 | **Remote (Seller)** | Seller returns 404; `send_message()` auto-recovers by creating a new session |
-
----
-
-## Integration with Negotiation and Deals
-
-Sessions are the transport layer for multi-turn negotiation flows. A typical negotiation sequence within a single session:
-
-```mermaid
-sequenceDiagram
-    participant Buyer as Buyer Agent
-    participant SM as SessionManager
-    participant Seller as Seller Agent
-
-    Buyer->>SM: get_or_create_session()
-    SM-->>Buyer: session_id
-
-    Note over Buyer,Seller: Browse inventory
-    Buyer->>SM: send_message({type: "inquiry", ...})
-    SM->>Seller: POST /sessions/{id}/messages
-    Seller-->>SM: Available packages
-
-    Note over Buyer,Seller: Request pricing
-    Buyer->>SM: send_message({type: "quote_request", ...})
-    SM->>Seller: POST /sessions/{id}/messages
-    Seller-->>SM: Quote with pricing
-
-    Note over Buyer,Seller: Negotiate
-    Buyer->>SM: send_message({type: "counter_offer", ...})
-    SM->>Seller: POST /sessions/{id}/messages
-    Seller-->>SM: Revised terms
-
-    Note over Buyer,Seller: Book deal
-    Buyer->>SM: send_message({type: "accept", ...})
-    SM->>Seller: POST /sessions/{id}/messages
-    Seller-->>SM: Deal confirmed
-
-    Buyer->>SM: close_session()
-```
-
-The session provides **context continuity** --- the seller knows the full conversation history and can reference previous offers, counter-offers, and agreements without the buyer needing to resend them.
-
-### How Sessions Relate to Other APIs
-
-| API | Relationship to Sessions |
-|-----|--------------------------|
-| [Media Kit](media-kit.md) | Browse results can inform session-based inquiries |
-| [Deals](https://iabtechlab.github.io/seller-agent/api/quotes/) | Quotes and deals can be requested via session messages or the REST API directly |
-| [Bookings](bookings.md) | Campaign bookings may reference deals negotiated within a session |
-| [Authentication](authentication.md) | Buyer identity passed at session creation determines seller-side tier |
-
----
-
-## Full Workflow Example
-
-End-to-end: create a session, negotiate, and close.
-
-```python
-from ad_buyer.sessions import SessionManager
-
-manager = SessionManager()
-
-seller_url = "http://seller.example.com:8001"
-buyer_identity = {
-    "seat_id": "ttd-seat-123",
-    "name": "Acme Media Buying",
-    "agency_id": "omnicom-456",
-    "advertiser_id": "coca-cola",
-}
-
-# 1. Establish a session
-session_id = await manager.get_or_create_session(
-    seller_url=seller_url,
-    buyer_identity=buyer_identity,
-)
-print(f"Session: {session_id}")
-
-# 2. Browse inventory
-response = await manager.send_message(
-    seller_url=seller_url,
-    session_id=session_id,
-    message={
-        "type": "inquiry",
-        "content": "Show me premium CTV sports packages for Q3",
-    },
-)
-print(f"Available packages: {response}")
-
-# 3. Request a quote
-response = await manager.send_message(
-    seller_url=seller_url,
-    session_id=session_id,
-    message={
-        "type": "quote_request",
-        "product_id": "prod-ctv-sports-001",
-        "impressions": 500_000,
-        "flight_start": "2026-07-01",
-        "flight_end": "2026-09-30",
-    },
-)
-print(f"Quote: ${response.get('pricing', {}).get('final_cpm')} CPM")
-
-# 4. Counter-offer
-response = await manager.send_message(
-    seller_url=seller_url,
-    session_id=session_id,
-    message={
-        "type": "counter_offer",
-        "target_cpm": 10.50,
-        "rationale": "Volume commitment of 500K+ impressions",
-    },
-)
-print(f"Seller response: {response}")
-
-# 5. Accept and close
-response = await manager.send_message(
-    seller_url=seller_url,
-    session_id=session_id,
-    message={"type": "accept"},
-)
-print(f"Deal confirmed: {response}")
-
-await manager.close_session(seller_url, session_id)
-print("Session closed")
-```
-
-### Resuming Work Across Restarts
-
-Because sessions are persisted to disk, a buyer agent can resume where it left off after a process restart:
-
-```python
-# After restart -- SessionStore loads from disk automatically
-manager = SessionManager()
-
-# This returns the existing session, no new HTTP call
-session_id = await manager.get_or_create_session(
-    seller_url="http://seller.example.com:8001",
-)
-print(f"Resumed session: {session_id}")
-
-# Continue the conversation
-response = await manager.send_message(
-    seller_url="http://seller.example.com:8001",
-    session_id=session_id,
-    message={"type": "inquiry", "content": "Any updates on my quote?"},
-)
-```
 
 ---
 
@@ -503,8 +283,8 @@ except RuntimeError as e:
 
 ## Related
 
+- [Session Management Guide](../guides/sessions.md) --- Practical patterns, negotiation flows, multi-seller strategies, and best practices
 - [Seller Sessions API](https://iabtechlab.github.io/seller-agent/) --- Seller-side session endpoints (POST /sessions, GET /sessions, etc.)
 - [Authentication](authentication.md) --- Buyer identity setup for session creation
 - [Media Kit Discovery](media-kit.md) --- Browse seller inventory before starting a session
 - [Bookings](bookings.md) --- Campaign booking workflow
-- [Seller Agent Integration](../integration/seller-agent.md) --- Full integration guide

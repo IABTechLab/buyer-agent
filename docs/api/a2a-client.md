@@ -2,6 +2,18 @@
 
 The buyer agent uses the **Agent-to-Agent (A2A) protocol** for conversational discovery and negotiation with seller agents. A2A sends natural language messages over JSON-RPC 2.0; the seller's AI interprets the request and executes the appropriate tools.
 
+## When to Use A2A
+
+| Scenario | A2A | MCP |
+|----------|-----|-----|
+| Exploratory discovery queries | Preferred | -- |
+| Complex negotiations with context | Preferred | -- |
+| Ambiguous or open-ended requests | Preferred | -- |
+| Automated booking workflows | -- | Preferred |
+| Deterministic, repeatable results | -- | Preferred |
+
+Use A2A when the request benefits from natural language interpretation --- for example, asking "What CTV inventory do you have under $25 with household targeting?" rather than constructing exact filter parameters. For structured, deterministic operations, see the [MCP Client](mcp-client.md).
+
 ## A2AClient Class
 
 The `A2AClient` connects to a seller's A2A endpoint and sends natural language messages.
@@ -238,18 +250,6 @@ async with A2AClient(base_url="http://seller:8001") as client:
         end_date="2026-06-30",
     )
 ```
-
-## When to Use A2A
-
-| Scenario | A2A | MCP |
-|----------|-----|-----|
-| Exploratory discovery queries | Preferred | -- |
-| Complex negotiations with context | Preferred | -- |
-| Ambiguous or open-ended requests | Preferred | -- |
-| Automated booking workflows | -- | Preferred |
-| Deterministic, repeatable results | -- | Preferred |
-
-Use A2A when the request benefits from natural language interpretation --- for example, asking "What CTV inventory do you have under $25 with household targeting?" rather than constructing exact filter parameters.
 
 ## Error Handling
 

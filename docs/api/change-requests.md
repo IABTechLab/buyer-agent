@@ -2,9 +2,6 @@
 
 Change requests allow the buyer to propose post-deal modifications to orders on the seller. Each request is validated against the current order state, assigned a severity level, and routed through the appropriate approval path on the seller side.
 
-!!! info "Planned client"
-    The buyer does not yet have a dedicated `ChangeRequestsClient`. The workflows below document the seller's REST API that the buyer calls directly. A typed client is planned for a future release.
-
 !!! tip "Seller-side reference"
     For the full server-side behavior --- including severity auto-classification, validation rules, and the review/apply workflow --- see the [Seller Change Requests docs](https://iabtechlab.github.io/seller-agent/api/change-requests/).
 
@@ -32,6 +29,9 @@ sequenceDiagram
 ```
 
 The buyer submits a change request and receives a change request ID. Minor changes (e.g., small flight date shifts, creative swaps) are auto-approved and applied immediately. Material and critical changes enter a review queue on the seller side.
+
+!!! info "Planned client"
+    The buyer does not yet have a dedicated `ChangeRequestsClient`. The workflows below document the seller's REST API that the buyer calls directly. A typed client is planned for a future release.
 
 ---
 

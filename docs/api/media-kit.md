@@ -1,6 +1,9 @@
-# Media Kit Discovery
+# Media Kit API Reference
 
-The media kit is a seller's **inventory catalog** — a curated collection of ad packages that buyer agents browse to discover available inventory. The buyer agent includes a dedicated `MediaKitClient` for consuming seller media kits.
+The media kit is a seller's **inventory catalog** --- a curated collection of ad packages that buyer agents browse to discover available inventory. The buyer agent includes a dedicated `MediaKitClient` for consuming seller media kits. This page documents the client's methods, parameters, data models, and error handling.
+
+!!! tip "Looking for usage patterns?"
+    For practical guidance on browsing strategies, progressive identity revelation, cross-seller comparison, and connecting discovery to the buying workflow, see the [Media Kit Browsing Guide](../guides/media-kit.md).
 
 ## Overview
 
@@ -198,38 +201,6 @@ Sellers apply tier-based discounts. Higher identity revelation unlocks better pr
 !!! tip "Progressive Identity Revelation"
     Start with public browsing to evaluate inventory, then authenticate to see exact pricing. Provide agency/advertiser identity during search to unlock the best rates.
 
-## Identity-Based Access
-
-Beyond the API key, the buyer can reveal its identity for seller-side tier resolution. The `SearchFilter` supports this:
-
-```python
-# Search with full identity context
-results = await client.search_packages(
-    seller_url,
-    query="premium video",
-    filters=SearchFilter(
-        buyer_tier="advertiser",
-        agency_id="omnicom-456",
-        advertiser_id="coca-cola",
-    ),
-)
-```
-
-Alternatively, the `BuyerIdentity` model can generate identity headers for direct HTTP calls:
-
-```python
-from ad_buyer.models.buyer_identity import BuyerIdentity
-
-identity = BuyerIdentity(
-    seat_id="ttd-seat-123",
-    agency_id="omnicom-456",
-    advertiser_id="coca-cola",
-)
-
-# Produces: {"X-DSP-Seat-ID": "...", "X-Agency-ID": "...", "X-Advertiser-ID": "..."}
-headers = identity.to_header_dict()
-```
-
 ## Data Models
 
 ### PackageSummary (Public)
@@ -322,31 +293,10 @@ Common error scenarios:
 | HTTP 4xx/5xx | `MediaKitError` with status code |
 | Failed seller in aggregation | Silently skipped, warning logged |
 
-## Workflow: From Media Kit to Booking
-
-The media kit is the first step in the deal lifecycle:
-
-```mermaid
-graph LR
-    A[Browse Media Kit] --> B[Select Package]
-    B --> C[Get Exact Pricing]
-    C --> D[Request Quote]
-    D --> E[Negotiate]
-    E --> F[Book Deal]
-```
-
-1. **Browse** the seller's media kit (public or authenticated)
-2. **Select** a package that matches campaign requirements
-3. **Get exact pricing** by authenticating with your API key
-4. **Request a quote** via the [OpenDirect](https://iabtechlab.com/standards/opendirect/) API for specific products in the package
-5. **Negotiate** if your tier allows it (Agency/Advertiser)
-6. **Book** the deal through the standard booking flow
-
-See [Booking Lifecycle](bookings.md) and [Seller Agent Integration](../integration/seller-agent.md) for the full workflow.
-
 ## Related
 
-- [Seller Agent Media Kit Setup](https://iabtechlab.github.io/seller-agent/guides/media-kit/) — How publishers configure their media kit
-- [Authentication](authentication.md) — API key setup for authenticated access
-- [Products](products.md) — Product search endpoint
-- [Seller Agent Integration](../integration/seller-agent.md) — Full integration guide
+- [Media Kit Browsing Guide](../guides/media-kit.md) --- Practical patterns for browsing, cross-seller comparison, and connecting discovery to the buying workflow
+- [Seller Agent Media Kit Setup](https://iabtechlab.github.io/seller-agent/guides/media-kit/) --- How publishers configure their media kit
+- [Authentication](authentication.md) --- API key setup for authenticated access
+- [Products](products.md) --- Product search endpoint
+- [Seller Agent Integration](../integration/seller-agent.md) --- Full integration guide
