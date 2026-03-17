@@ -1,6 +1,6 @@
 # Deployment
 
-Deploy the buyer agent using Docker locally or to AWS with CloudFormation or Terraform.
+This guide covers how to run the buyer agent in production. Locally, Docker Compose gets you a containerized instance in seconds. For cloud deployment, both CloudFormation and Terraform templates are provided for AWS ECS Fargate with EFS-backed SQLite persistence. Start with Docker Compose for development and testing; move to AWS when you need a durable, always-on deployment.
 
 ---
 

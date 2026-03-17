@@ -2,6 +2,9 @@
 
 Sessions enable multi-turn conversations with seller agents. Instead of treating each API call as a one-off request, a session maintains context across a sequence of messages --- the seller remembers what you've asked, what you've negotiated, and where you left off. This is essential for any workflow that spans more than a single request: browsing inventory, negotiating prices, and booking deals all benefit from conversational continuity.
 
+!!! tip "Looking for method signatures and data models?"
+    For constructor parameters, method signatures, return types, `SessionRecord` fields, and error codes, see the [Sessions API Reference](../api/sessions.md).
+
 ## Why Sessions Matter
 
 Without sessions, every message to a seller starts from scratch. The seller has no memory of prior interactions, so you would need to re-identify yourself, re-state your interests, and re-establish any negotiation progress on every call.
@@ -283,46 +286,9 @@ await manager.close_session(
 
 ## Session Persistence
 
-Sessions are persisted to a JSON file on disk so they survive process restarts. The `SessionStore` handles all persistence operations.
+Sessions are persisted to a JSON file on disk so they survive process restarts. The `SessionStore` handles all persistence operations --- sessions are keyed by seller URL (one active session per seller at a time) and written to disk on every change.
 
-### How It Works
-
-- Sessions are keyed by **seller URL** --- one active session per seller at a time
-- The store file is created automatically if it does not exist
-- Data is loaded from disk on `SessionStore` initialization
-- Every `save()` or `remove()` call writes immediately to disk
-
-### Store File Location
-
-| Configuration | Path |
-|--------------|------|
-| Default | `~/.ad_buyer/sessions.json` |
-| Custom | Pass `store_path` to `SessionManager()` |
-
-### File Format
-
-The store file is a JSON dictionary mapping seller URLs to session records:
-
-```json
-{
-  "http://seller-a.example.com:8001": {
-    "session_id": "sess-a1b2c3d4",
-    "seller_url": "http://seller-a.example.com:8001",
-    "created_at": "2026-03-10T14:00:00Z",
-    "expires_at": "2026-03-17T14:00:00Z"
-  },
-  "http://seller-b.example.com:8002": {
-    "session_id": "sess-e5f6g7h8",
-    "seller_url": "http://seller-b.example.com:8002",
-    "created_at": "2026-03-09T10:00:00Z",
-    "expires_at": "2026-03-16T10:00:00Z"
-  }
-}
-```
-
-### Resuming After a Restart
-
-Because sessions are persisted, a buyer agent picks up where it left off without any special handling:
+Because sessions are persisted, a buyer agent picks up where it left off after a restart without any special handling:
 
 ```python
 # After a process restart -- SessionStore loads from disk automatically
@@ -342,29 +308,7 @@ response = await manager.send_message(
 )
 ```
 
-### Direct Store Access
-
-For inspection or maintenance, access the `SessionStore` directly:
-
-```python
-from ad_buyer.sessions import SessionStore
-
-store = SessionStore("~/.ad_buyer/sessions.json")
-
-# Look up a specific seller's session
-record = store.get("http://seller.example.com:8001")
-if record:
-    print(f"Session: {record.session_id}")
-    print(f"Expires: {record.expires_at}")
-    print(f"Expired? {record.is_expired()}")
-
-# List all sessions (including expired)
-all_sessions = store.list_sessions()
-
-# Clean up expired records
-removed = store.cleanup_expired()
-print(f"Removed {removed} expired sessions")
-```
+For store file format, direct store access, and `SessionRecord` field details, see the [Sessions API Reference](../api/sessions.md#sessionstore).
 
 ## Managing Multiple Seller Sessions
 

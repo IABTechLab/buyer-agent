@@ -1,6 +1,6 @@
 # Products API
 
-The products endpoint lets you search the seller agent's product catalog directly, outside of a booking workflow.
+The products endpoint lets you search the seller agent's product catalog directly, outside of a booking workflow. Use this for quick inventory lookups when you already know what channel, format, or price range you need --- for richer browsing with package metadata, tier-based pricing, and cross-seller comparison, use the [Media Kit API](media-kit.md) instead.
 
 ## POST /products/search
 

@@ -2,6 +2,21 @@
 
 The buyer agent uses the **Model Context Protocol (MCP)** as its primary protocol for calling seller agent tools. MCP provides deterministic, structured tool execution over HTTP --- ideal for automated workflows where the buyer knows exactly which operation to perform.
 
+## When to Use MCP
+
+| Scenario | MCP | A2A |
+|----------|-----|-----|
+| Automated booking workflows | Preferred | -- |
+| Structured CRUD operations | Preferred | -- |
+| Deterministic, repeatable results | Preferred | -- |
+| Exploratory discovery | -- | Preferred |
+| Complex multi-turn negotiation | -- | Preferred |
+
+Use MCP when you know the exact tool and arguments. The buyer's CrewAI tools default to MCP for all standard operations. For open-ended discovery and negotiation, see the [A2A Client](a2a-client.md).
+
+!!! note "Automatic protocol selection"
+    The `UnifiedClient` selects MCP by default for standard operations. You do not need to choose the protocol manually unless you have a specific reason to prefer A2A.
+
 ## Client Implementations
 
 The buyer includes two MCP client implementations, selected based on environment and dependency availability.
@@ -96,18 +111,6 @@ async with IABMCPClient(base_url="http://seller:8001") as client:
         quantity=5000000,
     )
 ```
-
-## When to Use MCP
-
-| Scenario | MCP | A2A |
-|----------|-----|-----|
-| Automated booking workflows | Preferred | -- |
-| Structured CRUD operations | Preferred | -- |
-| Deterministic, repeatable results | Preferred | -- |
-| Exploratory discovery | -- | Preferred |
-| Complex multi-turn negotiation | -- | Preferred |
-
-Use MCP when you know the exact tool and arguments. The buyer's CrewAI tools default to MCP for all standard operations.
 
 ## Error Handling
 
