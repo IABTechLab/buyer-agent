@@ -2,6 +2,8 @@
 
 The buyer agent enforces deal and campaign lifecycle transitions through a formal state machine. Every status change is validated against declared transition rules, optionally gated by guard conditions, and recorded in an immutable audit trail. Invalid transitions are rejected before they reach the database.
 
+The state machine tracks two distinct lifecycles. **Deals** are individual transactions with a seller --- a single quote, negotiation, and booking. **Campaigns** orchestrate multiple deals across channels via the DealBookingFlow. Both lifecycles are enforced independently: a campaign can contain many deals, each progressing through its own state machine. Linear TV extensions (`makegood_pending`, `partially_canceled`) are special cases of the deal lifecycle for readers working with linear inventory --- they can be skipped otherwise.
+
 ## Why a State Machine
 
 Without transition enforcement, any code path can set a deal to any status --- a completed deal could accidentally revert to "quoted," or a cancelled deal could resume delivery. The state machine prevents this class of bugs at the model layer:
@@ -17,6 +19,9 @@ Without transition enforcement, any code path can set a deal to any status --- a
 ---
 
 ## Deal Lifecycle
+
+!!! tip "Linear TV states"
+    The `makegood_pending` and `partially_canceled` states are specific to linear television buying. If you are not working with linear TV inventory, you can skip those states --- the core deal lifecycle flows through the remaining 10 states.
 
 ```mermaid
 stateDiagram-v2

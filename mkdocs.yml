@@ -55,7 +55,6 @@ nav:
   - Home: index.md
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
-      - Running with Seller: getting-started/running-with-seller.md
   - API Reference:
       - Overview: api/overview.md
       - Protocol Overview: api/protocols.md
@@ -74,27 +73,26 @@ nav:
       - Agent Hierarchy: architecture/agent-hierarchy.md
       - Booking Flow: architecture/booking-flow.md
       - DSP Deal Flow: architecture/dsp-deal-flow.md
+      - Order State Machine: architecture/state-machine.md
+      - Event Bus: architecture/event-bus.md
       - Deal Store: architecture/deal-store.md
       - Models: architecture/models.md
       - Tools Reference: architecture/tools.md
-  - State Machines:
-      - Order Lifecycle: architecture/state-machine.md
-  - Event Bus:
-      - Overview: architecture/event-bus.md
   - Buyer Guide:
-      - Configuration: guides/configuration.md
+      - Overview: guides/overview.md
       - Deal Booking: guides/deal-booking.md
       - Negotiation: guides/negotiation.md
-      - Linear TV Buying: guides/linear-tv.md
-      - Media Kit Browsing: guides/media-kit.md
       - Identity Strategy: guides/identity.md
+      - Media Kit Browsing: guides/media-kit.md
       - Sessions: guides/sessions.md
       - Multi-Seller Discovery: guides/multi-seller.md
+      - Linear TV Buying: guides/linear-tv.md
+      - Configuration: guides/configuration.md
+      - Deployment: guides/deployment.md
       - Multi-Seller Orchestration: guides/multi-seller-orchestration.md
       - Campaign Pipeline: guides/campaign-pipeline.md
       - Budget Pacing: guides/budget-pacing.md
       - Creative Management: guides/creative-management.md
-      - Deployment: guides/deployment.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md

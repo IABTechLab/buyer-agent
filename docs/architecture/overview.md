@@ -2,6 +2,8 @@
 
 The buyer agent is a multi-layer system that combines a FastAPI service layer with CrewAI agent orchestration and an [OpenDirect](https://iabtechlab.com/standards/opendirect/) protocol client.
 
+The architecture separates concerns into three layers: an HTTP API that accepts campaign briefs and exposes status, a flow engine that orchestrates the buying process through well-defined states, and a set of protocol clients that talk to seller agents. This separation means you can change how the buyer communicates with sellers (MCP, A2A, or REST) without touching the flow logic, and you can extend the flow without modifying the API surface.
+
 ## System Architecture
 
 ```mermaid
@@ -64,6 +66,30 @@ graph TB
     API -->|"status / results"| User
 ```
 
+## Architecture at a Glance
+
+The Architecture section covers these topics:
+
+| Topic | What It Covers |
+|-------|---------------|
+| **[Agent Hierarchy](agent-hierarchy.md)** | Three-level agent structure: portfolio manager, channel specialists, and tool-level agents |
+| **[Booking Flow](booking-flow.md)** | Detailed sequence diagram of the DealBookingFlow --- the campaign-level orchestration |
+| **[DSP Deal Flow](dsp-deal-flow.md)** | Single-deal flow for direct DSP integration without multi-channel orchestration |
+| **[Order State Machine](state-machine.md)** | 12 deal states and 9 campaign states with guard conditions and audit trail |
+| **[Event Bus](event-bus.md)** | 13 event types providing structured observability across all flows |
+| **[Deal Store](deal-store.md)** | SQLite persistence for deals, events, and session state |
+| **[Models](models.md)** | Pydantic data models for API requests, flow state, and deal records |
+| **[Tools Reference](tools.md)** | CrewAI tools available to agents for research, booking, and negotiation |
+
+### Two Entry Points: Campaign Flow vs. Deal Flow
+
+The buyer has two distinct flow entry points, depending on the use case:
+
+- **DealBookingFlow** (campaign flow) --- Starts from a campaign brief. The portfolio manager allocates budget across channels, channel specialists research inventory in parallel, recommendations are built and approved, then deals are booked. This is the multi-channel, orchestrated path.
+- **DSPDealFlow** (deal flow) --- Starts from a single deal request. Discovers inventory, evaluates pricing, and books one deal directly. This is the lightweight, single-deal path used for DSP integration.
+
+Both flows share the same deal state machine, event bus, and DealStore persistence --- they differ in scope and orchestration, not in how individual deals are managed.
+
 ## Component Summary
 
 | Component | Role | Key File |
@@ -122,6 +148,9 @@ See also: [Seller Agent Architecture](https://iabtechlab.github.io/seller-agent/
 
 ## Related
 
-- [Booking Flow](booking-flow.md) --- detailed sequence diagram
+- [Booking Flow](booking-flow.md) --- detailed sequence diagram of the campaign-level DealBookingFlow
+- [DSP Deal Flow](dsp-deal-flow.md) --- single-deal flow for direct DSP integration
+- [Order State Machine](state-machine.md) --- deal and campaign lifecycle enforcement
+- [Event Bus](event-bus.md) --- structured observability across all flows
 - [Models](models.md) --- data model reference
 - [Seller Agent Integration](../integration/seller-agent.md)

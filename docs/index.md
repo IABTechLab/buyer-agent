@@ -2,6 +2,8 @@
 
 The Ad Buyer Agent is an automated advertising buying system built on [CrewAI](https://crewai.com/) and the [IAB OpenDirect 2.1](https://iabtechlab.com/standards/opendirect/) protocol. It receives a campaign brief, allocates budget across channels, researches seller inventory, builds recommendations, and books deals --- all through a single API.
 
+You give the buyer a campaign brief describing what you want to buy. The agent does the rest: it discovers sellers, browses their inventory, negotiates pricing where your access tier allows, and books deals --- pausing for your approval before committing spend. The result is a set of confirmed order lines with full audit trail, ready for delivery.
+
 Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https://iabtechlab.github.io/seller-agent/).
 
 !!! note "Alpha Release"
@@ -9,19 +11,30 @@ Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https:/
 
 ## Key Capabilities
 
-- Structured campaign briefing with objectives, budget, dates, audience, and KPIs
-- Portfolio-manager agent splits budget across 4 channels (branding, CTV, mobile, performance)
-- Multi-seller discovery via [Agentic Advertising Management Protocols (AAMP)](https://iabtechlab.com/standards/aamp-agentic-advertising-management-protocols/) registry with trust verification and capability filtering
+**Discovery & Research**
+
+- Multi-seller discovery via [AAMP](https://iabtechlab.com/standards/aamp-agentic-advertising-management-protocols/) registry with trust verification and capability filtering
 - Channel-specialist agents research seller catalogs via MCP and A2A protocols
 - Progressive media-kit browsing from summary through full product details and pricing
+
+**Negotiation & Pricing**
+
 - Tiered identity strategy with 4 access tiers (public, seat, agency, advertiser) and progressive rate discounts
 - Multi-turn negotiation with pluggable strategies (threshold, adaptive, competitive) over A2A conversations
+- Human-in-the-loop approval gate before committing spend
+
+**Execution & Booking**
+
+- Structured campaign briefing with objectives, budget, dates, audience, and KPIs
+- Portfolio-manager agent splits budget across 4 channels (branding, CTV, mobile, performance)
 - Quote-then-book deal flow via IAB Deals API v1.0 with DealStore persistence
+- Linear TV scatter buying with DMA-level targeting, CPP/CPM pricing, and daypart selection
+
+**Observability & Lifecycle**
+
 - Formal order state machine with 12 deal states, guard conditions, and audit trail
 - Event bus with 13 event types, fail-open emission, subscriber dispatch, and SQLite persistence
-- Human-in-the-loop approval gate before committing spend
 - Persistent session management tracking conversation state, negotiation history, and deal context
-- Linear TV scatter buying with DMA-level targeting, CPP/CPM pricing, and daypart selection
 - Severity-based change request management for post-deal modifications
 
 ## Access Methods
@@ -53,7 +66,7 @@ See the [API Overview](api/overview.md) for full details.
 
 ### Getting Started
 
-- [Quickstart](getting-started/quickstart.md) --- install, configure, and run your first booking
+- [Quickstart](getting-started/quickstart.md) --- install, configure, run, and connect to a seller agent
 
 ### Architecture & Reference
 
@@ -67,13 +80,14 @@ See the [API Overview](api/overview.md) for full details.
 
 ### Guides
 
+- [Buyer Guide Overview](guides/overview.md) --- end-to-end buyer workflow orientation and topic map
+- [Deal Booking](guides/deal-booking.md) --- end-to-end quote-then-book workflow
 - [Negotiation](guides/negotiation.md) --- multi-turn negotiation strategies and deal flow
 - [Identity Strategy](guides/identity.md) --- tiered pricing and buyer identity resolution
+- [Media Kit Browsing](guides/media-kit.md) --- progressive disclosure of seller inventory
 - [Sessions](guides/sessions.md) --- persistent session management across interactions
 - [Multi-Seller Discovery](guides/multi-seller.md) --- AAMP registry and trust verification
 - [Linear TV Buying](guides/linear-tv.md) --- scatter, upfront, DMA targeting, and CPP/CPM pricing
-- [Media Kit Browsing](guides/media-kit.md) --- progressive disclosure of seller inventory
-- [Deal Booking](guides/deal-booking.md) --- end-to-end quote-then-book workflow
 
 ### Integration
 

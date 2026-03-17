@@ -16,6 +16,49 @@ Standard Python logging captures text messages. The event bus captures structure
 
 ---
 
+## Architecture
+
+The diagram below shows how events flow from the buyer's deal and campaign flows through helper functions into the event bus, and from there to subscribers and the persistence layer. Flows emit events via sync or async helpers; the bus dispatches to subscribers and the API layer exposes events for external queries.
+
+```mermaid
+graph TB
+    subgraph Flows
+        DSP["DSPDealFlow"]
+        DBF["DealBookingFlow"]
+    end
+
+    subgraph "Event Helpers"
+        ES["emit_event_sync()"]
+        EA["emit_event()"]
+    end
+
+    subgraph "Event Bus"
+        BUS["InMemoryEventBus"]
+        SUBS["Subscribers"]
+    end
+
+    subgraph "Persistence"
+        STORE["DealStore.save_event()"]
+        DB[("SQLite events table")]
+    end
+
+    subgraph "API Layer"
+        LIST["/events"]
+        GET["/events/{event_id}"]
+    end
+
+    DSP -->|sync calls| ES
+    DBF -->|sync calls| ES
+    EA --> BUS
+    ES -->|async bridge| BUS
+    BUS -->|notify| SUBS
+    BUS --> LIST
+    BUS --> GET
+    STORE --> DB
+```
+
+---
+
 ## Event Model
 
 Every event is a Pydantic `Event` instance with the following fields:
@@ -98,47 +141,6 @@ The `EventType` enum defines 13 event types organized by domain.
 |------------|-------|--------------|-----------------|
 | `SESSION_CREATED` | `session.created` | New buyer session started | `{"session_id": "..."}` |
 | `SESSION_CLOSED` | `session.closed` | Buyer session ended | `{"session_id": "...", "deals_count": 3}` |
-
----
-
-## Architecture
-
-```mermaid
-graph TB
-    subgraph Flows
-        DSP["DSPDealFlow"]
-        DBF["DealBookingFlow"]
-    end
-
-    subgraph "Event Helpers"
-        ES["emit_event_sync()"]
-        EA["emit_event()"]
-    end
-
-    subgraph "Event Bus"
-        BUS["InMemoryEventBus"]
-        SUBS["Subscribers"]
-    end
-
-    subgraph "Persistence"
-        STORE["DealStore.save_event()"]
-        DB[("SQLite events table")]
-    end
-
-    subgraph "API Layer"
-        LIST["/events"]
-        GET["/events/{event_id}"]
-    end
-
-    DSP -->|sync calls| ES
-    DBF -->|sync calls| ES
-    EA --> BUS
-    ES -->|async bridge| BUS
-    BUS -->|notify| SUBS
-    BUS --> LIST
-    BUS --> GET
-    STORE --> DB
-```
 
 ---
 
