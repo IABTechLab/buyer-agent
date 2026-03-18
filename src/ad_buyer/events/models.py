@@ -47,6 +47,12 @@ class EventType(str, Enum):
     SESSION_CREATED = "session.created"
     SESSION_CLOSED = "session.closed"
 
+    # DealJockey - Phase 1
+    DEAL_IMPORTED = "deal.imported"
+    DEAL_TEMPLATE_CREATED = "deal.template_created"
+    PORTFOLIO_INSPECTED = "portfolio.inspected"
+    DEAL_MANUAL_ACTION_REQUIRED = "deal.manual_action_required"
+
 
 class Event(BaseModel):
     """An event emitted by the buyer system."""
