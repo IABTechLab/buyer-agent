@@ -8,7 +8,13 @@ from .audience import (
     AudienceMatchingTool,
     CoverageEstimationTool,
 )
-from .deal_jockey import ManualDealEntryTool
+from .deal_jockey import (
+    InspectDealTool,
+    ListPortfolioTool,
+    ManualDealEntryTool,
+    PortfolioSummaryTool,
+    SearchPortfolioTool,
+)
 
 __all__ = [
     # Audience tools
@@ -17,4 +23,8 @@ __all__ = [
     "CoverageEstimationTool",
     # DealJockey tools
     "ManualDealEntryTool",
+    "ListPortfolioTool",
+    "SearchPortfolioTool",
+    "PortfolioSummaryTool",
+    "InspectDealTool",
 ]
