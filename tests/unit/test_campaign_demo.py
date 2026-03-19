@@ -17,6 +17,9 @@ bead: ar-llj4
 """
 
 import json
+import sqlite3
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -481,3 +484,172 @@ class TestFullPipeline:
         resp = client.get(f"/api/campaign/{campaign_id}")
         assert resp.status_code == 200
         assert resp.get_json()["status"] == "ready"
+
+
+# ---------------------------------------------------------------------------
+# Fresh database on startup (Issue 1)
+# ---------------------------------------------------------------------------
+
+
+class TestFreshDatabase:
+    """Test that stale databases are cleaned up on app startup."""
+
+    def test_app_starts_fresh_with_file_db(self):
+        """create_campaign_demo_app works even after schema changes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "demo.db"
+            url = f"sqlite:///{db_path}"
+
+            # Create the app once to populate the DB
+            app1 = create_campaign_demo_app(database_url=url)
+            assert db_path.exists()
+
+            # Creating again should succeed (DB deleted and recreated)
+            app2 = create_campaign_demo_app(database_url=url)
+            assert db_path.exists()
+
+    def test_stale_db_with_wrong_schema_does_not_crash(self):
+        """App recreates DB if old schema is incompatible."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "stale.db"
+            url = f"sqlite:///{db_path}"
+
+            # Create a DB with a bogus table to simulate stale schema
+            conn = sqlite3.connect(str(db_path))
+            conn.execute("CREATE TABLE fake_table (id TEXT)")
+            conn.commit()
+            conn.close()
+            assert db_path.exists()
+
+            # App should delete the stale DB and start fresh
+            app = create_campaign_demo_app(database_url=url)
+            assert db_path.exists()
+
+            # Verify the app works (campaign creation succeeds)
+            app.config["TESTING"] = True
+            with app.test_client() as c:
+                resp = c.get("/api/sample-briefs")
+                assert resp.status_code == 200
+
+    def test_memory_db_works(self):
+        """In-memory database works without issues."""
+        app = create_campaign_demo_app(database_url="sqlite:///:memory:")
+        app.config["TESTING"] = True
+        with app.test_client() as c:
+            resp = c.get("/")
+            assert resp.status_code == 200
+
+    def test_new_app_has_empty_campaigns(self):
+        """Restarting the app gives a fresh (empty) campaign list."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "demo.db"
+            url = f"sqlite:///{db_path}"
+
+            # First run: create a campaign
+            app1 = create_campaign_demo_app(database_url=url)
+            app1.config["TESTING"] = True
+            with app1.test_client() as c1:
+                brief = {
+                    "advertiser_id": "ADV-TEST",
+                    "campaign_name": "Stale Campaign",
+                    "objective": "AWARENESS",
+                    "total_budget": 1000,
+                    "currency": "USD",
+                    "flight_start": "2026-06-01",
+                    "flight_end": "2026-09-01",
+                    "channels": [{"channel": "DISPLAY", "budget_pct": 100}],
+                    "target_audience": ["IAB-AUD-001"],
+                }
+                resp = c1.post(
+                    "/api/submit-brief",
+                    data=json.dumps(brief),
+                    content_type="application/json",
+                )
+                assert resp.get_json()["success"]
+
+            # Second run: DB should be fresh (no old campaigns)
+            app2 = create_campaign_demo_app(database_url=url)
+            app2.config["TESTING"] = True
+            with app2.test_client() as c2:
+                resp = c2.get("/api/campaigns")
+                data = resp.get_json()
+                assert len(data["campaigns"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# Form-based brief input (Issue 2)
+# ---------------------------------------------------------------------------
+
+
+class TestFormBasedInput:
+    """Test that the HTML contains form-based input elements."""
+
+    def test_page_has_form_tab(self, client):
+        """Main page contains the Form input tab."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'data-tab="form"' in html
+
+    def test_page_has_sample_briefs_tab(self, client):
+        """Main page contains the Sample Briefs tab."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'data-tab="samples"' in html
+
+    def test_page_has_json_tab(self, client):
+        """Main page contains the Advanced JSON tab."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'data-tab="json"' in html
+
+    def test_form_has_advertiser_field(self, client):
+        """Form pane contains advertiser name input."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'id="formAdvertiser"' in html
+
+    def test_form_has_campaign_name_field(self, client):
+        """Form pane contains campaign name input."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'id="formCampaignName"' in html
+
+    def test_form_has_budget_field(self, client):
+        """Form pane contains total budget input."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'id="formBudget"' in html
+
+    def test_form_has_channel_checkboxes(self, client):
+        """Form pane contains channel checkboxes."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'id="channelCheckboxes"' in html
+        for channel in ["CTV", "DISPLAY", "AUDIO", "NATIVE", "DOOH"]:
+            assert f'value="{channel}"' in html
+
+    def test_form_has_flight_date_fields(self, client):
+        """Form pane contains flight start and end date inputs."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'id="formFlightStart"' in html
+        assert 'id="formFlightEnd"' in html
+
+    def test_form_has_audience_field(self, client):
+        """Form pane contains target audience input."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'id="formAudience"' in html
+
+    def test_form_has_budget_split_options(self, client):
+        """Form pane contains even/manual budget split radio buttons."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'name="budgetSplit"' in html
+
+    def test_form_pane_is_default_active(self, client):
+        """The form pane is the default active tab."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'class="input-pane active" id="pane-form"' in html
+

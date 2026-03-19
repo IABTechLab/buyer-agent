@@ -126,7 +126,7 @@
         /* Forms */
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text-muted); }
-        select, textarea {
+        select, textarea, input[type="text"], input[type="number"], input[type="date"] {
             width: 100%;
             padding: 8px 12px;
             border: 1px solid var(--border);
@@ -136,6 +136,95 @@
             background: white;
         }
         textarea { min-height: 200px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+
+        /* Input mode tabs */
+        .input-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+        .input-tab {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            border: none;
+            background: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+        .input-tab:hover { color: var(--text); }
+        .input-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        .input-pane { display: none; }
+        .input-pane.active { display: block; }
+
+        /* Checkbox group */
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 4px;
+        }
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .checkbox-group input[type="checkbox"] { width: auto; margin: 0; }
+
+        /* Budget split section */
+        .budget-split-mode {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+        .budget-split-mode label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+            font-weight: 400;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .budget-split-mode input[type="radio"] { width: auto; margin: 0; }
+        .channel-budget-inputs { margin-top: 8px; }
+        .channel-budget-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .channel-budget-row .channel-name {
+            min-width: 80px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .channel-budget-row input[type="number"] {
+            width: 100px;
+        }
+        .channel-budget-row .pct-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 600px) {
+            .form-row { grid-template-columns: 1fr; }
+        }
 
         /* Buttons */
         .btn {
@@ -280,16 +369,96 @@
     <div class="stage-card visible" id="stage1">
         <h2>Stage 1: Enter Brief <span class="badge badge-draft">DRAFT</span></h2>
         <div class="stage-content">
-            <div class="form-group">
-                <label>Select a sample brief or paste custom JSON</label>
-                <select id="briefSelector" onchange="loadSampleBrief()">
-                    <option value="">-- Select a sample brief --</option>
-                </select>
+            <!-- Input mode tabs -->
+            <div class="input-tabs">
+                <button class="input-tab active" onclick="switchInputTab('form')" data-tab="form">Form</button>
+                <button class="input-tab" onclick="switchInputTab('samples')" data-tab="samples">Sample Briefs</button>
+                <button class="input-tab" onclick="switchInputTab('json')" data-tab="json">Advanced (JSON)</button>
             </div>
-            <div class="form-group">
-                <label>Campaign Brief JSON</label>
-                <textarea id="briefJson" placeholder='{"advertiser_id": "...", "campaign_name": "...", ...}'></textarea>
+
+            <!-- Form input pane -->
+            <div class="input-pane active" id="pane-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="formAdvertiser">Advertiser Name</label>
+                        <input type="text" id="formAdvertiser" placeholder="e.g. ACME Corp">
+                    </div>
+                    <div class="form-group">
+                        <label for="formCampaignName">Campaign Name</label>
+                        <input type="text" id="formCampaignName" placeholder="e.g. Q3 Brand Awareness">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="formBudget">Total Budget (USD)</label>
+                        <input type="number" id="formBudget" min="1" step="1000" placeholder="e.g. 500000">
+                    </div>
+                    <div class="form-group">
+                        <label for="formObjective">Objective</label>
+                        <select id="formObjective">
+                            <option value="AWARENESS">Awareness</option>
+                            <option value="REACH">Reach</option>
+                            <option value="CONSIDERATION">Consideration</option>
+                            <option value="CONVERSION">Conversion</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="formFlightStart">Flight Start Date</label>
+                        <input type="date" id="formFlightStart">
+                    </div>
+                    <div class="form-group">
+                        <label for="formFlightEnd">Flight End Date</label>
+                        <input type="date" id="formFlightEnd">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Channels</label>
+                    <div class="checkbox-group" id="channelCheckboxes">
+                        <label><input type="checkbox" value="CTV" onchange="updateChannelBudgets()"> CTV</label>
+                        <label><input type="checkbox" value="DISPLAY" onchange="updateChannelBudgets()"> Display</label>
+                        <label><input type="checkbox" value="AUDIO" onchange="updateChannelBudgets()"> Audio</label>
+                        <label><input type="checkbox" value="NATIVE" onchange="updateChannelBudgets()"> Native</label>
+                        <label><input type="checkbox" value="DOOH" onchange="updateChannelBudgets()"> DOOH</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Budget Split</label>
+                    <div class="budget-split-mode">
+                        <label><input type="radio" name="budgetSplit" value="even" checked onchange="updateChannelBudgets()"> Even split</label>
+                        <label><input type="radio" name="budgetSplit" value="manual" onchange="updateChannelBudgets()"> Manual</label>
+                    </div>
+                    <div class="channel-budget-inputs" id="channelBudgetInputs"></div>
+                </div>
+                <div class="form-group">
+                    <label for="formAudience">Target Audience (optional)</label>
+                    <input type="text" id="formAudience" placeholder="e.g. Sports fans, Millennials, Tech enthusiasts">
+                </div>
             </div>
+
+            <!-- Sample briefs pane -->
+            <div class="input-pane" id="pane-samples">
+                <div class="form-group">
+                    <label>Select a pre-built sample brief</label>
+                    <select id="briefSelector" onchange="loadSampleBrief()">
+                        <option value="">-- Select a sample brief --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Brief Preview (JSON)</label>
+                    <textarea id="samplePreview" readonly style="min-height: 180px; background: #f8fafc;"></textarea>
+                </div>
+            </div>
+
+            <!-- Advanced JSON pane -->
+            <div class="input-pane" id="pane-json">
+                <div class="form-group">
+                    <label>Campaign Brief JSON</label>
+                    <textarea id="briefJson" placeholder='{"advertiser_id": "...", "campaign_name": "...", ...}'></textarea>
+                </div>
+            </div>
+
             <button class="btn btn-primary" id="submitBriefBtn" onclick="submitBrief()">
                 Submit Brief
             </button>
@@ -387,14 +556,37 @@
     let campaignId = null;
     let currentStage = 1;
     let sampleBriefs = [];
+    let activeInputTab = 'form';
 
     // ---------------------------------------------------------------
     // Initialization
     // ---------------------------------------------------------------
     document.addEventListener('DOMContentLoaded', () => {
         loadSampleBriefs();
+        // Set default flight dates (1 month from now to 3 months from now)
+        const today = new Date();
+        const start = new Date(today);
+        start.setMonth(start.getMonth() + 1);
+        const end = new Date(today);
+        end.setMonth(end.getMonth() + 3);
+        document.getElementById('formFlightStart').value = start.toISOString().split('T')[0];
+        document.getElementById('formFlightEnd').value = end.toISOString().split('T')[0];
     });
 
+    // ---------------------------------------------------------------
+    // Input tab switching
+    // ---------------------------------------------------------------
+    function switchInputTab(tab) {
+        activeInputTab = tab;
+        document.querySelectorAll('.input-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.input-pane').forEach(p => p.classList.remove('active'));
+        document.querySelector('.input-tab[data-tab="' + tab + '"]').classList.add('active');
+        document.getElementById('pane-' + tab).classList.add('active');
+    }
+
+    // ---------------------------------------------------------------
+    // Sample brief handling
+    // ---------------------------------------------------------------
     async function loadSampleBriefs() {
         try {
             const resp = await fetch('/api/sample-briefs');
@@ -416,8 +608,110 @@
         const select = document.getElementById('briefSelector');
         const idx = parseInt(select.value);
         if (!isNaN(idx) && sampleBriefs[idx]) {
-            document.getElementById('briefJson').value = JSON.stringify(sampleBriefs[idx], null, 2);
+            document.getElementById('samplePreview').value = JSON.stringify(sampleBriefs[idx], null, 2);
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Form: channel budget management
+    // ---------------------------------------------------------------
+    function getSelectedChannels() {
+        const checkboxes = document.querySelectorAll('#channelCheckboxes input[type="checkbox"]:checked');
+        return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    function updateChannelBudgets() {
+        const channels = getSelectedChannels();
+        const isEven = document.querySelector('input[name="budgetSplit"][value="even"]').checked;
+        const container = document.getElementById('channelBudgetInputs');
+
+        if (channels.length === 0) {
+            container.innerHTML = '<div style="font-size: 13px; color: var(--text-muted);">Select at least one channel above</div>';
+            return;
+        }
+
+        const evenPct = Math.round(100 / channels.length * 100) / 100;
+
+        let html = '';
+        channels.forEach(ch => {
+            const existingInput = document.querySelector('#budget_' + ch);
+            const currentVal = existingInput ? existingInput.value : (isEven ? evenPct : '');
+            html += '<div class="channel-budget-row">';
+            html += '  <span class="channel-name"><span class="channel-tag">' + ch + '</span></span>';
+            html += '  <input type="number" id="budget_' + ch + '" min="0" max="100" step="0.01" value="' + (isEven ? evenPct : currentVal) + '"' + (isEven ? ' readonly' : '') + '>';
+            html += '  <span class="pct-label">%</span>';
+            html += '</div>';
+        });
+        container.innerHTML = html;
+    }
+
+    // ---------------------------------------------------------------
+    // Form: build brief JSON from form fields
+    // ---------------------------------------------------------------
+    function buildBriefFromForm() {
+        const advertiser = document.getElementById('formAdvertiser').value.trim();
+        const campaignName = document.getElementById('formCampaignName').value.trim();
+        const budget = parseFloat(document.getElementById('formBudget').value);
+        const objective = document.getElementById('formObjective').value;
+        const flightStart = document.getElementById('formFlightStart').value;
+        const flightEnd = document.getElementById('formFlightEnd').value;
+        const audienceRaw = document.getElementById('formAudience').value.trim();
+
+        // Validation
+        if (!advertiser) throw new Error('Advertiser name is required');
+        if (!campaignName) throw new Error('Campaign name is required');
+        if (!budget || budget <= 0) throw new Error('Budget must be greater than 0');
+        if (!flightStart) throw new Error('Flight start date is required');
+        if (!flightEnd) throw new Error('Flight end date is required');
+        if (flightEnd <= flightStart) throw new Error('Flight end must be after flight start');
+
+        const channels = getSelectedChannels();
+        if (channels.length === 0) throw new Error('Select at least one channel');
+
+        // Gather channel allocations
+        const channelAllocations = channels.map(ch => {
+            const input = document.getElementById('budget_' + ch);
+            const pct = input ? parseFloat(input.value) : (100 / channels.length);
+            return {
+                channel: ch,
+                budget_pct: Math.round(pct * 100) / 100,
+            };
+        });
+
+        // Verify budget_pct sums to 100
+        const totalPct = channelAllocations.reduce((sum, c) => sum + c.budget_pct, 0);
+        if (Math.abs(totalPct - 100) > 0.1) {
+            throw new Error('Channel budget percentages must sum to 100% (currently ' + totalPct.toFixed(1) + '%)');
+        }
+
+        // Build audience array -- use typed segments or free-text
+        let audience;
+        if (audienceRaw) {
+            audience = audienceRaw.split(',').map(s => s.trim()).filter(Boolean).map(s => 'IAB-AUD-' + s.replace(/\s+/g, '-'));
+        } else {
+            audience = ['IAB-AUD-GENERAL'];
+        }
+
+        // Use advertiser name as ID (slugified)
+        const advertiserId = 'ADV-' + advertiser.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/-+$/, '').substring(0, 20);
+
+        return {
+            advertiser_id: advertiserId,
+            campaign_name: campaignName,
+            objective: objective,
+            total_budget: budget,
+            currency: 'USD',
+            flight_start: flightStart,
+            flight_end: flightEnd,
+            channels: channelAllocations,
+            target_audience: audience,
+            approval_config: {
+                plan_review: true,
+                booking: true,
+                creative: true,
+                pacing_adjustment: false,
+            },
+        };
     }
 
     // ---------------------------------------------------------------
@@ -486,9 +780,17 @@
 
         let briefData;
         try {
-            briefData = JSON.parse(document.getElementById('briefJson').value);
+            if (activeInputTab === 'form') {
+                briefData = buildBriefFromForm();
+            } else if (activeInputTab === 'samples') {
+                const preview = document.getElementById('samplePreview').value;
+                if (!preview) throw new Error('Select a sample brief first');
+                briefData = JSON.parse(preview);
+            } else {
+                briefData = JSON.parse(document.getElementById('briefJson').value);
+            }
         } catch (e) {
-            showError(1, 'Invalid JSON: ' + e.message);
+            showError(1, e.message || 'Invalid input');
             setButtonLoading(btn, false);
             return;
         }

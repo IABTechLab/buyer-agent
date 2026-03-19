@@ -559,6 +559,35 @@ class DemoPipelineHelper:
 # ---------------------------------------------------------------------------
 
 
+def _ensure_fresh_database(database_url: str) -> None:
+    """Delete an existing demo database file so we start with a clean slate.
+
+    This is a demo app -- stale tables from an older schema cause
+    ``OperationalError`` (e.g. missing columns added in later migrations).
+    Deleting the file before ``connect()`` is the simplest fix.
+
+    In-memory databases (``sqlite:///:memory:``) are ignored.
+    """
+    if ":memory:" in database_url:
+        return
+
+    # Extract the file path from the SQLite URL
+    if database_url.startswith("sqlite:///"):
+        db_path = database_url[len("sqlite:///"):]
+    else:
+        db_path = database_url
+
+    path = Path(db_path)
+    if path.exists():
+        logger.info("Removing stale demo database: %s", path)
+        path.unlink()
+    # Also remove WAL/SHM sidecars if present
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(str(path) + suffix)
+        if sidecar.exists():
+            sidecar.unlink()
+
+
 def create_campaign_demo_app(
     database_url: str = "sqlite:///campaign_demo.db",
 ) -> Flask:
@@ -570,6 +599,9 @@ def create_campaign_demo_app(
     Returns:
         Configured Flask application.
     """
+    # Delete stale database on startup so schema changes don't crash the app
+    _ensure_fresh_database(database_url)
+
     app = Flask(
         __name__,
         template_folder=str(_TEMPLATE_DIR),
