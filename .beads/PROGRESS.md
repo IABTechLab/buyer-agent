@@ -43,7 +43,8 @@
 | \[!] | buyer-1o3 | 3F: Deployment & Operations Guide | P3 | buyer-j95 |  |
 | \[ ] | buyer-j95 | 3G: Infrastructure-as-Code Deployment (CloudFormation/Terraform) | P3 | — |  |
 
-## DealJockey Phase 1 — MVP DealJockey
+## Phase 4 — DealJockey 
+## DealJockey Phase 4a — MVP DealJockey
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
@@ -55,7 +56,7 @@
 | \[x] | buyer-te6b.1.11 | Extend DealStore schema | P1 | — | 2026-03-18 |
 | \[x] | buyer-te6b.1.3 | Implement CSV deal import parser | P1 | — | 2026-03-18 |
 
-## DealJockey Phase 2 — Templates & Seller Integration
+## DealJockey Phase 4b — Templates & Seller Integration
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
@@ -68,7 +69,7 @@
 | \[!] | buyer-te6b.1.9 | [seller-dj3] Add POST /api/v1/deals/from-template endpoint | P1 | buyer-te6b.1.1 |  |
 | \[!] | buyer-te6b.1.10 | [seller-dj4] Add GET /api/v1/deals/{id}/performance endpoint | P1 | buyer-te6b.1.1 |  |
 
-## DealJockey Phase 3 — Portfolio Intelligence
+## DealJockey Phase 4c — Portfolio Intelligence
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
@@ -85,7 +86,7 @@
 | \[!] | buyer-te6b.2.13 | [seller-dj5] Enhanced supply-chain with sellers.json and schain | P2 | buyer-te6b.1.8 |  |
 | \[!] | buyer-te6b.2.14 | [seller-dj6] Add POST /api/v1/deals/bulk endpoint | P2 | buyer-te6b.1.1 |  |
 
-## DealJockey Phase 4 — Platform Integrations
+## DealJockey Phase 4d — Platform Integrations
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
@@ -98,7 +99,7 @@
 | \[ ] | buyer-te6b.3.3 | Xandr API connector for deal import | P3 | — |  |
 | \[ ] | buyer-te6b.3.7 | [buyer-dj11] Cross-platform deal activation tracker | P3 | — |  |
 
-## DealJockey Phase 5 — External Model Integration
+## DealJockey Phase 4e — External Model Integration
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
