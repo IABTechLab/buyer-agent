@@ -19,8 +19,10 @@ import pytest
 from ad_buyer.models.state_machine import (
     BuyerCampaignStatus,
     BuyerDealStatus,
+    CampaignStatus,
     DealStateMachine,
     CampaignStateMachine,
+    CampaignAutomationStateMachine,
     InvalidTransitionError,
     StateTransition,
     OrderAuditLog,
@@ -489,6 +491,380 @@ class TestSerialization:
         sm = DealStateMachine("deal-rules-3")
         result = sm.remove_rule(BuyerDealStatus.COMPLETED, BuyerDealStatus.QUOTED)
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# CampaignStatus enum (Campaign Automation)
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignStatus:
+    """Test the CampaignStatus enum for Campaign Automation state machine."""
+
+    def test_all_states_exist(self):
+        """Verify all campaign automation states are defined."""
+        expected = [
+            "draft", "planning", "booking", "ready",
+            "active", "paused", "pacing_hold", "completed", "canceled",
+        ]
+        for state in expected:
+            assert hasattr(CampaignStatus, state.upper()), f"Missing state: {state}"
+
+    def test_is_str_enum(self):
+        """CampaignStatus should be a str enum for serialization."""
+        assert isinstance(CampaignStatus.DRAFT, str)
+        assert CampaignStatus.DRAFT == "draft"
+
+    def test_enum_values_are_lowercase(self):
+        """Ensure enum values are lowercase strings."""
+        for member in CampaignStatus:
+            assert member.value == member.value.lower()
+
+    def test_ready_state_value(self):
+        """The READY state should have the value 'ready'."""
+        assert CampaignStatus.READY == "ready"
+
+    def test_paused_vs_pacing_hold_are_distinct(self):
+        """PAUSED and PACING_HOLD must be distinct states."""
+        assert CampaignStatus.PAUSED != CampaignStatus.PACING_HOLD
+        assert CampaignStatus.PAUSED.value == "paused"
+        assert CampaignStatus.PACING_HOLD.value == "pacing_hold"
+
+
+# ---------------------------------------------------------------------------
+# CampaignAutomationStateMachine transitions
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignAutomationStateMachine:
+    """Test the full campaign automation state machine with READY state."""
+
+    def test_happy_path_draft_to_completed(self):
+        """Walk the full happy path: DRAFT -> PLANNING -> BOOKING -> READY -> ACTIVE -> COMPLETED."""
+        sm = CampaignAutomationStateMachine("campaign-auto-001")
+        assert sm.status == CampaignStatus.DRAFT
+
+        sm.transition(CampaignStatus.PLANNING)
+        assert sm.status == CampaignStatus.PLANNING
+
+        sm.transition(CampaignStatus.BOOKING)
+        assert sm.status == CampaignStatus.BOOKING
+
+        sm.transition(CampaignStatus.READY)
+        assert sm.status == CampaignStatus.READY
+
+        sm.transition(CampaignStatus.ACTIVE)
+        assert sm.status == CampaignStatus.ACTIVE
+
+        sm.transition(CampaignStatus.COMPLETED)
+        assert sm.status == CampaignStatus.COMPLETED
+
+    def test_default_initial_status_is_draft(self):
+        """Default initial status should be DRAFT."""
+        sm = CampaignAutomationStateMachine("campaign-auto-002")
+        assert sm.status == CampaignStatus.DRAFT
+
+    # -- DRAFT transitions --
+
+    def test_draft_to_planning(self):
+        """DRAFT -> PLANNING when campaign planning begins."""
+        sm = CampaignAutomationStateMachine("campaign-draft-1")
+        sm.transition(CampaignStatus.PLANNING)
+        assert sm.status == CampaignStatus.PLANNING
+
+    def test_draft_cannot_skip_to_booking(self):
+        """DRAFT cannot skip directly to BOOKING."""
+        sm = CampaignAutomationStateMachine("campaign-draft-2")
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.BOOKING)
+
+    def test_draft_cannot_skip_to_active(self):
+        """DRAFT cannot skip directly to ACTIVE."""
+        sm = CampaignAutomationStateMachine("campaign-draft-3")
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.ACTIVE)
+
+    # -- PLANNING transitions --
+
+    def test_planning_to_booking(self):
+        """PLANNING -> BOOKING when plan is approved."""
+        sm = CampaignAutomationStateMachine("campaign-plan-1", initial_status=CampaignStatus.PLANNING)
+        sm.transition(CampaignStatus.BOOKING)
+        assert sm.status == CampaignStatus.BOOKING
+
+    def test_planning_to_canceled(self):
+        """PLANNING -> CANCELED is allowed."""
+        sm = CampaignAutomationStateMachine("campaign-plan-2", initial_status=CampaignStatus.PLANNING)
+        sm.transition(CampaignStatus.CANCELED)
+        assert sm.status == CampaignStatus.CANCELED
+
+    # -- BOOKING transitions --
+
+    def test_booking_to_ready(self):
+        """BOOKING -> READY when all deals booked and creative validated."""
+        sm = CampaignAutomationStateMachine("campaign-book-1", initial_status=CampaignStatus.BOOKING)
+        sm.transition(CampaignStatus.READY)
+        assert sm.status == CampaignStatus.READY
+
+    def test_booking_to_planning(self):
+        """BOOKING -> PLANNING when replanning is needed."""
+        sm = CampaignAutomationStateMachine("campaign-book-2", initial_status=CampaignStatus.BOOKING)
+        sm.transition(CampaignStatus.PLANNING)
+        assert sm.status == CampaignStatus.PLANNING
+
+    def test_booking_to_canceled(self):
+        """BOOKING -> CANCELED is allowed."""
+        sm = CampaignAutomationStateMachine("campaign-book-3", initial_status=CampaignStatus.BOOKING)
+        sm.transition(CampaignStatus.CANCELED)
+        assert sm.status == CampaignStatus.CANCELED
+
+    # -- READY transitions --
+
+    def test_ready_to_active(self):
+        """READY -> ACTIVE when flight start date reached or manual activation."""
+        sm = CampaignAutomationStateMachine("campaign-ready-1", initial_status=CampaignStatus.READY)
+        sm.transition(CampaignStatus.ACTIVE)
+        assert sm.status == CampaignStatus.ACTIVE
+
+    def test_ready_to_canceled(self):
+        """READY -> CANCELED is allowed."""
+        sm = CampaignAutomationStateMachine("campaign-ready-2", initial_status=CampaignStatus.READY)
+        sm.transition(CampaignStatus.CANCELED)
+        assert sm.status == CampaignStatus.CANCELED
+
+    def test_ready_to_planning(self):
+        """READY -> PLANNING for replanning before start."""
+        sm = CampaignAutomationStateMachine("campaign-ready-3", initial_status=CampaignStatus.READY)
+        sm.transition(CampaignStatus.PLANNING)
+        assert sm.status == CampaignStatus.PLANNING
+
+    def test_ready_cannot_go_to_completed(self):
+        """READY cannot skip directly to COMPLETED."""
+        sm = CampaignAutomationStateMachine("campaign-ready-4", initial_status=CampaignStatus.READY)
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.COMPLETED)
+
+    def test_ready_cannot_go_to_paused(self):
+        """READY cannot go to PAUSED (only ACTIVE can)."""
+        sm = CampaignAutomationStateMachine("campaign-ready-5", initial_status=CampaignStatus.READY)
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.PAUSED)
+
+    # -- ACTIVE transitions --
+
+    def test_active_to_paused(self):
+        """ACTIVE -> PAUSED on manual pause."""
+        sm = CampaignAutomationStateMachine("campaign-active-1", initial_status=CampaignStatus.ACTIVE)
+        sm.transition(CampaignStatus.PAUSED)
+        assert sm.status == CampaignStatus.PAUSED
+
+    def test_active_to_pacing_hold(self):
+        """ACTIVE -> PACING_HOLD on automated pacing deviation threshold."""
+        sm = CampaignAutomationStateMachine("campaign-active-2", initial_status=CampaignStatus.ACTIVE)
+        sm.transition(CampaignStatus.PACING_HOLD)
+        assert sm.status == CampaignStatus.PACING_HOLD
+
+    def test_active_to_completed(self):
+        """ACTIVE -> COMPLETED when flight end date reached."""
+        sm = CampaignAutomationStateMachine("campaign-active-3", initial_status=CampaignStatus.ACTIVE)
+        sm.transition(CampaignStatus.COMPLETED)
+        assert sm.status == CampaignStatus.COMPLETED
+
+    def test_active_to_canceled(self):
+        """ACTIVE -> CANCELED is allowed."""
+        sm = CampaignAutomationStateMachine("campaign-active-4", initial_status=CampaignStatus.ACTIVE)
+        sm.transition(CampaignStatus.CANCELED)
+        assert sm.status == CampaignStatus.CANCELED
+
+    # -- PAUSED transitions --
+
+    def test_paused_to_active(self):
+        """PAUSED -> ACTIVE on manual resume."""
+        sm = CampaignAutomationStateMachine("campaign-paused-1", initial_status=CampaignStatus.PAUSED)
+        sm.transition(CampaignStatus.ACTIVE)
+        assert sm.status == CampaignStatus.ACTIVE
+
+    def test_paused_to_canceled(self):
+        """PAUSED -> CANCELED is allowed."""
+        sm = CampaignAutomationStateMachine("campaign-paused-2", initial_status=CampaignStatus.PAUSED)
+        sm.transition(CampaignStatus.CANCELED)
+        assert sm.status == CampaignStatus.CANCELED
+
+    # -- PACING_HOLD transitions --
+
+    def test_pacing_hold_to_active(self):
+        """PACING_HOLD -> ACTIVE when deviation resolved."""
+        sm = CampaignAutomationStateMachine("campaign-ph-1", initial_status=CampaignStatus.PACING_HOLD)
+        sm.transition(CampaignStatus.ACTIVE)
+        assert sm.status == CampaignStatus.ACTIVE
+
+    def test_pacing_hold_to_paused(self):
+        """PACING_HOLD -> PAUSED when escalated to manual."""
+        sm = CampaignAutomationStateMachine("campaign-ph-2", initial_status=CampaignStatus.PACING_HOLD)
+        sm.transition(CampaignStatus.PAUSED)
+        assert sm.status == CampaignStatus.PAUSED
+
+    def test_pacing_hold_to_canceled(self):
+        """PACING_HOLD -> CANCELED is allowed."""
+        sm = CampaignAutomationStateMachine("campaign-ph-3", initial_status=CampaignStatus.PACING_HOLD)
+        sm.transition(CampaignStatus.CANCELED)
+        assert sm.status == CampaignStatus.CANCELED
+
+    # -- Terminal states --
+
+    def test_completed_is_terminal(self):
+        """COMPLETED is a terminal state -- no transitions out."""
+        sm = CampaignAutomationStateMachine("campaign-term-1", initial_status=CampaignStatus.COMPLETED)
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.ACTIVE)
+
+    def test_canceled_is_terminal(self):
+        """CANCELED is a terminal state -- no transitions out."""
+        sm = CampaignAutomationStateMachine("campaign-term-2", initial_status=CampaignStatus.CANCELED)
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.DRAFT)
+
+    # -- Cancellation from all non-terminal states --
+
+    def test_cancellation_from_all_non_terminal_states(self):
+        """All non-terminal states should allow transition to CANCELED."""
+        cancellable = [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+            CampaignStatus.PAUSED,
+            CampaignStatus.PACING_HOLD,
+        ]
+        for idx, state in enumerate(cancellable):
+            sm = CampaignAutomationStateMachine(f"campaign-cancel-{idx}", initial_status=state)
+            sm.transition(CampaignStatus.CANCELED)
+            assert sm.status == CampaignStatus.CANCELED
+
+    # -- Invalid transitions --
+
+    def test_invalid_transition_preserves_state(self):
+        """An invalid transition must NOT change the current state."""
+        sm = CampaignAutomationStateMachine("campaign-invalid-1")
+        with pytest.raises(InvalidTransitionError):
+            sm.transition(CampaignStatus.COMPLETED)
+        assert sm.status == CampaignStatus.DRAFT
+
+    # -- validate_transition method --
+
+    def test_validate_transition_returns_true_for_valid(self):
+        """validate_transition returns True for valid transitions."""
+        sm = CampaignAutomationStateMachine("campaign-vt-1")
+        assert sm.validate_transition(CampaignStatus.DRAFT, CampaignStatus.PLANNING) is True
+
+    def test_validate_transition_returns_false_for_invalid(self):
+        """validate_transition returns False for invalid transitions."""
+        sm = CampaignAutomationStateMachine("campaign-vt-2")
+        assert sm.validate_transition(CampaignStatus.DRAFT, CampaignStatus.ACTIVE) is False
+
+    def test_validate_transition_all_valid_transitions(self):
+        """validate_transition returns True for every valid transition."""
+        sm = CampaignAutomationStateMachine("campaign-vt-3")
+        valid_transitions = [
+            (CampaignStatus.DRAFT, CampaignStatus.PLANNING),
+            (CampaignStatus.PLANNING, CampaignStatus.BOOKING),
+            (CampaignStatus.PLANNING, CampaignStatus.CANCELED),
+            (CampaignStatus.BOOKING, CampaignStatus.READY),
+            (CampaignStatus.BOOKING, CampaignStatus.PLANNING),
+            (CampaignStatus.BOOKING, CampaignStatus.CANCELED),
+            (CampaignStatus.READY, CampaignStatus.ACTIVE),
+            (CampaignStatus.READY, CampaignStatus.CANCELED),
+            (CampaignStatus.READY, CampaignStatus.PLANNING),
+            (CampaignStatus.ACTIVE, CampaignStatus.PAUSED),
+            (CampaignStatus.ACTIVE, CampaignStatus.PACING_HOLD),
+            (CampaignStatus.ACTIVE, CampaignStatus.COMPLETED),
+            (CampaignStatus.ACTIVE, CampaignStatus.CANCELED),
+            (CampaignStatus.PAUSED, CampaignStatus.ACTIVE),
+            (CampaignStatus.PAUSED, CampaignStatus.CANCELED),
+            (CampaignStatus.PACING_HOLD, CampaignStatus.ACTIVE),
+            (CampaignStatus.PACING_HOLD, CampaignStatus.PAUSED),
+            (CampaignStatus.PACING_HOLD, CampaignStatus.CANCELED),
+        ]
+        for from_s, to_s in valid_transitions:
+            assert sm.validate_transition(from_s, to_s) is True, (
+                f"Expected valid: {from_s.value} -> {to_s.value}"
+            )
+
+    def test_validate_transition_invalid_pairs(self):
+        """validate_transition returns False for known-invalid transitions."""
+        sm = CampaignAutomationStateMachine("campaign-vt-4")
+        invalid_transitions = [
+            (CampaignStatus.DRAFT, CampaignStatus.ACTIVE),
+            (CampaignStatus.DRAFT, CampaignStatus.BOOKING),
+            (CampaignStatus.DRAFT, CampaignStatus.READY),
+            (CampaignStatus.READY, CampaignStatus.COMPLETED),
+            (CampaignStatus.READY, CampaignStatus.PAUSED),
+            (CampaignStatus.COMPLETED, CampaignStatus.ACTIVE),
+            (CampaignStatus.CANCELED, CampaignStatus.DRAFT),
+        ]
+        for from_s, to_s in invalid_transitions:
+            assert sm.validate_transition(from_s, to_s) is False, (
+                f"Expected invalid: {from_s.value} -> {to_s.value}"
+            )
+
+    # -- Allowed transitions --
+
+    def test_allowed_transitions_from_draft(self):
+        """From DRAFT, only PLANNING should be allowed."""
+        sm = CampaignAutomationStateMachine("campaign-allowed-1")
+        allowed = sm.allowed_transitions()
+        assert CampaignStatus.PLANNING in allowed
+        assert len(allowed) == 1
+
+    def test_allowed_transitions_from_ready(self):
+        """From READY, ACTIVE, CANCELED, and PLANNING should be allowed."""
+        sm = CampaignAutomationStateMachine("campaign-allowed-2", initial_status=CampaignStatus.READY)
+        allowed = sm.allowed_transitions()
+        assert CampaignStatus.ACTIVE in allowed
+        assert CampaignStatus.CANCELED in allowed
+        assert CampaignStatus.PLANNING in allowed
+        assert len(allowed) == 3
+
+    def test_allowed_transitions_from_active(self):
+        """From ACTIVE, PAUSED, PACING_HOLD, COMPLETED, and CANCELED should be allowed."""
+        sm = CampaignAutomationStateMachine("campaign-allowed-3", initial_status=CampaignStatus.ACTIVE)
+        allowed = sm.allowed_transitions()
+        assert CampaignStatus.PAUSED in allowed
+        assert CampaignStatus.PACING_HOLD in allowed
+        assert CampaignStatus.COMPLETED in allowed
+        assert CampaignStatus.CANCELED in allowed
+        assert len(allowed) == 4
+
+    # -- Serialization round-trip --
+
+    def test_serialization_round_trip(self):
+        """Serialize and deserialize preserves state and history."""
+        sm = CampaignAutomationStateMachine("campaign-serial-1")
+        sm.transition(CampaignStatus.PLANNING, actor="agent:buyer")
+        sm.transition(CampaignStatus.BOOKING, reason="Plan approved")
+
+        data = sm.to_dict()
+        restored = CampaignAutomationStateMachine.from_dict(data)
+
+        assert restored.order_id == "campaign-serial-1"
+        assert restored.status == CampaignStatus.BOOKING
+        assert len(restored.history) == 2
+        assert restored.history[0].actor == "agent:buyer"
+        assert restored.history[1].reason == "Plan approved"
+
+    # -- Audit trail --
+
+    def test_transitions_recorded_in_audit(self):
+        """Transitions should be recorded in the audit log."""
+        sm = CampaignAutomationStateMachine("campaign-audit-1")
+        sm.transition(CampaignStatus.PLANNING)
+        sm.transition(CampaignStatus.BOOKING)
+        sm.transition(CampaignStatus.READY)
+
+        assert len(sm.history) == 3
+        assert sm.history[0].from_status == "draft"
+        assert sm.history[0].to_status == "planning"
+        assert sm.history[2].to_status == "ready"
 
 
 # ---------------------------------------------------------------------------

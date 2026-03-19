@@ -8,6 +8,13 @@ Provides CRUD operations for the campaign automation data model:
 - pacing_snapshots: Periodic pacing data points per campaign
 - creative_assets: Creative files and metadata per campaign
 - ad_server_campaigns: Ad server integration records (Innovid/Flashtalking)
+- campaign_events: Lifecycle events emitted during state transitions
+
+Integrates with CampaignAutomationStateMachine (buyer-0u9) to validate
+all status transitions before persisting them.  Lifecycle convenience
+methods (create_campaign, start_planning, start_booking, mark_ready,
+activate_campaign, pause_campaign, resume_campaign, complete_campaign,
+cancel_campaign) combine validation, DB update, and event emission.
 
 Thread safety is provided by check_same_thread=False and a threading.Lock(),
 matching the DealStore pattern.
@@ -20,6 +27,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from ..models.state_machine import (
+    CampaignAutomationStateMachine,
+    CampaignStatus,
+    InvalidTransitionError,
+)
 from .schema import initialize_schema
 
 logger = logging.getLogger(__name__)
@@ -58,6 +70,7 @@ class CampaignStore:
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.execute("PRAGMA busy_timeout=5000")
         initialize_schema(self._conn)
+        self._create_campaign_events_table()
 
     def disconnect(self) -> None:
         """Close the database connection."""
@@ -75,8 +88,299 @@ class CampaignStore:
             return url[len("sqlite:///"):]
         return url
 
+    def _create_campaign_events_table(self) -> None:
+        """Create the campaign_events table if it doesn't exist."""
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS campaign_events (
+                event_id        TEXT PRIMARY KEY,
+                campaign_id     TEXT NOT NULL,
+                event_type      TEXT NOT NULL,
+                timestamp       TEXT NOT NULL,
+                from_status     TEXT,
+                to_status       TEXT,
+                payload         TEXT DEFAULT '{}',
+                FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id)
+            )
+        """)
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_campaign_events_campaign_id "
+            "ON campaign_events(campaign_id)"
+        )
+        self._conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_campaign_events_timestamp "
+            "ON campaign_events(timestamp)"
+        )
+        self._conn.commit()
+
+    def _emit_event(
+        self,
+        campaign_id: str,
+        event_type: str,
+        from_status: Optional[str] = None,
+        to_status: Optional[str] = None,
+        payload: Optional[str] = None,
+    ) -> str:
+        """Record a campaign lifecycle event.
+
+        Args:
+            campaign_id: The campaign this event belongs to.
+            event_type: Event type string (e.g. ``campaign.created``).
+            from_status: Previous status (for transitions).
+            to_status: New status (for transitions).
+            payload: Optional JSON payload string.
+
+        Returns:
+            The generated event_id.
+        """
+        event_id = str(uuid.uuid4())
+        now = _now_iso()
+
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO campaign_events
+                   (event_id, campaign_id, event_type, timestamp,
+                    from_status, to_status, payload)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (event_id, campaign_id, event_type, now,
+                 from_status, to_status, payload or "{}"),
+            )
+            self._conn.commit()
+
+        return event_id
+
     # ------------------------------------------------------------------
-    # Campaigns
+    # Campaign lifecycle events
+    # ------------------------------------------------------------------
+
+    def get_campaign_events(
+        self,
+        campaign_id: str,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Retrieve lifecycle events for a campaign, oldest first.
+
+        Args:
+            campaign_id: The campaign to query.
+            limit: Maximum number of events to return.
+
+        Returns:
+            List of event dicts ordered by timestamp ascending.
+        """
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM campaign_events WHERE campaign_id = ? "
+                "ORDER BY timestamp ASC LIMIT ?",
+                (campaign_id, limit),
+            )
+            rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # State machine integration
+    # ------------------------------------------------------------------
+
+    # Map CampaignStatus transitions to event type strings.
+    _TRANSITION_EVENT_MAP: dict[CampaignStatus, str] = {
+        CampaignStatus.PLANNING: "campaign.plan_generated",
+        CampaignStatus.BOOKING: "campaign.booking_started",
+        CampaignStatus.READY: "campaign.ready",
+        CampaignStatus.ACTIVE: "campaign.activated",
+        CampaignStatus.COMPLETED: "campaign.completed",
+        CampaignStatus.CANCELED: "campaign.canceled",
+        CampaignStatus.PAUSED: "campaign.paused",
+        CampaignStatus.PACING_HOLD: "campaign.pacing_hold",
+    }
+
+    def transition_campaign_status(
+        self,
+        campaign_id: str,
+        new_status: CampaignStatus,
+    ) -> bool:
+        """Validate and execute a campaign status transition.
+
+        Uses the CampaignAutomationStateMachine to validate that the
+        transition is legal before updating the database.
+
+        Args:
+            campaign_id: The campaign to transition.
+            new_status: Target CampaignStatus.
+
+        Returns:
+            True if the transition succeeded.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If the transition is not valid.
+        """
+        campaign = self.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign not found: {campaign_id}")
+
+        current_status = CampaignStatus(campaign["status"])
+
+        # Build a transient state machine at the current status to validate.
+        sm = CampaignAutomationStateMachine(
+            order_id=campaign_id,
+            initial_status=current_status,
+        )
+        # This raises InvalidTransitionError if the transition is illegal.
+        sm.transition(new_status)
+
+        # Persist the transition.
+        self.update_campaign_status(campaign_id, new_status.value)
+
+        # Emit event.
+        event_type = self._TRANSITION_EVENT_MAP.get(new_status)
+        if event_type:
+            self._emit_event(
+                campaign_id=campaign_id,
+                event_type=event_type,
+                from_status=current_status.value,
+                to_status=new_status.value,
+            )
+
+        return True
+
+    # ------------------------------------------------------------------
+    # Campaign lifecycle convenience methods
+    # ------------------------------------------------------------------
+
+    def create_campaign(self, brief: dict[str, Any]) -> str:
+        """Create a new campaign in DRAFT status from a brief dict.
+
+        Args:
+            brief: Dict with campaign brief fields (advertiser_id,
+                campaign_name, total_budget, currency, flight_start,
+                flight_end, and optional channels, target_audience,
+                target_geo, kpis, brand_safety, approval_config).
+
+        Returns:
+            The new campaign_id.
+        """
+        campaign_id = self.save_campaign(
+            advertiser_id=brief["advertiser_id"],
+            campaign_name=brief["campaign_name"],
+            status=CampaignStatus.DRAFT.value,
+            total_budget=brief["total_budget"],
+            currency=brief.get("currency", "USD"),
+            flight_start=brief["flight_start"],
+            flight_end=brief["flight_end"],
+            channels=brief.get("channels"),
+            target_audience=brief.get("target_audience"),
+            target_geo=brief.get("target_geo"),
+            kpis=brief.get("kpis"),
+            brand_safety=brief.get("brand_safety"),
+            approval_config=brief.get("approval_config"),
+        )
+        self._emit_event(
+            campaign_id=campaign_id,
+            event_type="campaign.created",
+            to_status=CampaignStatus.DRAFT.value,
+        )
+        return campaign_id
+
+    def start_planning(self, campaign_id: str) -> None:
+        """Transition campaign from DRAFT to PLANNING.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not DRAFT.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.PLANNING)
+
+    def start_booking(self, campaign_id: str) -> None:
+        """Transition campaign from PLANNING to BOOKING.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not PLANNING.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.BOOKING)
+
+    def mark_ready(self, campaign_id: str) -> None:
+        """Transition campaign from BOOKING to READY.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not BOOKING.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.READY)
+
+    def activate_campaign(self, campaign_id: str) -> None:
+        """Transition campaign from READY to ACTIVE.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not READY.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.ACTIVE)
+
+    def pause_campaign(self, campaign_id: str) -> None:
+        """Transition campaign from ACTIVE to PAUSED.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not ACTIVE.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.PAUSED)
+
+    def resume_campaign(self, campaign_id: str) -> None:
+        """Transition campaign from PAUSED to ACTIVE.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not PAUSED.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.ACTIVE)
+
+    def complete_campaign(self, campaign_id: str) -> None:
+        """Transition campaign from ACTIVE to COMPLETED.
+
+        Args:
+            campaign_id: Campaign to transition.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If current status is not ACTIVE.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.COMPLETED)
+
+    def cancel_campaign(self, campaign_id: str) -> None:
+        """Transition campaign to CANCELED from any non-terminal state.
+
+        Note: DRAFT -> CANCELED is not a valid transition per the state
+        machine. Cancel is available from PLANNING, BOOKING, READY,
+        ACTIVE, PAUSED, and PACING_HOLD.
+
+        Args:
+            campaign_id: Campaign to cancel.
+
+        Raises:
+            KeyError: If the campaign does not exist.
+            InvalidTransitionError: If already in a terminal state or DRAFT.
+        """
+        self.transition_campaign_status(campaign_id, CampaignStatus.CANCELED)
+
+    # ------------------------------------------------------------------
+    # Campaigns (low-level CRUD)
     # ------------------------------------------------------------------
 
     def save_campaign(
