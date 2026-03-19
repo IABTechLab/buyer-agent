@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campaign Automation Demo</title>
+    <title>Buyer Agent: Campaign Automation Demo</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -22,27 +22,58 @@
             --stage-complete: #16a34a;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.6;
+            display: flex;
+            flex-direction: column;
         }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
         header {
             background: var(--primary);
             color: white;
             padding: 24px 0;
-            margin-bottom: 24px;
+            flex-shrink: 0;
         }
         header h1 { font-size: 24px; font-weight: 600; }
         header p { opacity: 0.85; font-size: 14px; margin-top: 4px; }
+
+        /* Layout wrappers */
+        .progress-wrapper {
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+        .progress-wrapper .container { padding-bottom: 12px; }
+        .stage-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .event-log-wrapper {
+            flex-shrink: 0;
+            height: 170px;
+            border-top: 1px solid var(--border);
+            background: #1e293b;
+            display: flex;
+            flex-direction: column;
+        }
+        .event-log-wrapper h3 {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #94a3b8;
+            padding: 8px 16px 0;
+            flex-shrink: 0;
+        }
 
         /* Progress bar */
         .progress-bar {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 32px;
             position: relative;
         }
         .progress-bar::before {
@@ -196,15 +227,13 @@
 
         /* Event log */
         .event-log {
-            max-height: 300px;
+            flex: 1;
             overflow-y: auto;
             background: #1e293b;
-            border-radius: 8px;
-            padding: 16px;
+            padding: 8px 16px;
             font-family: 'SF Mono', 'Fira Code', monospace;
             font-size: 12px;
             color: #e2e8f0;
-            margin-top: 24px;
         }
         .event-log .event-entry {
             padding: 4px 0;
@@ -245,141 +274,145 @@
 
 <header>
     <div class="container">
-        <h1>Campaign Automation Demo</h1>
+        <h1>Buyer Agent: Campaign Automation Demo</h1>
         <p>Step through the full Campaign Automation pipeline &mdash; one stage at a time</p>
     </div>
 </header>
 
-<div class="container">
-
-    <!-- Progress Bar -->
-    <div class="progress-bar" id="progressBar">
-        <div class="progress-step active" data-step="1">
-            <div class="step-circle">1</div>
-            <div class="step-label">Enter Brief</div>
-        </div>
-        <div class="progress-step" data-step="2">
-            <div class="step-circle">2</div>
-            <div class="step-label">Review Plan</div>
-        </div>
-        <div class="progress-step" data-step="3">
-            <div class="step-circle">3</div>
-            <div class="step-label">Review Deals</div>
-        </div>
-        <div class="progress-step" data-step="4">
-            <div class="step-circle">4</div>
-            <div class="step-label">Review Creative</div>
-        </div>
-        <div class="progress-step" data-step="5">
-            <div class="step-circle">5</div>
-            <div class="step-label">Campaign Ready</div>
-        </div>
-    </div>
-
-    <!-- Stage 1: Enter Brief -->
-    <div class="stage-card visible" id="stage1">
-        <h2>Stage 1: Enter Brief <span class="badge badge-draft">DRAFT</span></h2>
-        <div class="stage-content">
-            <div class="form-group">
-                <label>Select a sample brief or paste custom JSON</label>
-                <select id="briefSelector" onchange="loadSampleBrief()">
-                    <option value="">-- Select a sample brief --</option>
-                </select>
+<div class="progress-wrapper">
+    <div class="container">
+        <div class="progress-bar" id="progressBar">
+            <div class="progress-step active" data-step="1">
+                <div class="step-circle">1</div>
+                <div class="step-label">Enter Brief</div>
             </div>
-            <div class="form-group">
-                <label>Campaign Brief JSON</label>
-                <textarea id="briefJson" placeholder='{"advertiser_id": "...", "campaign_name": "...", ...}'></textarea>
+            <div class="progress-step" data-step="2">
+                <div class="step-circle">2</div>
+                <div class="step-label">Review Plan</div>
             </div>
-            <button class="btn btn-primary" id="submitBriefBtn" onclick="submitBrief()">
-                Submit Brief
-            </button>
-            <div id="stage1Error" class="error-msg" style="display:none"></div>
-        </div>
-        <div class="stage-summary"></div>
-    </div>
-
-    <!-- Stage 2: Review Plan -->
-    <div class="stage-card" id="stage2">
-        <h2>Stage 2: Review Plan <span class="badge badge-planning">PLANNING</span></h2>
-        <div class="stage-content">
-            <div class="metric-row" id="planMetrics"></div>
-            <table id="planTable">
-                <thead>
-                    <tr>
-                        <th>Channel</th>
-                        <th>Budget</th>
-                        <th>% of Total</th>
-                        <th>Media Type</th>
-                        <th>Deal Types</th>
-                        <th>Format Prefs</th>
-                    </tr>
-                </thead>
-                <tbody id="planTableBody"></tbody>
-            </table>
-            <button class="btn btn-success" id="approvePlanBtn" onclick="approvePlan()">
-                Approve Plan
-            </button>
-            <div id="stage2Error" class="error-msg" style="display:none"></div>
-        </div>
-        <div class="stage-summary"></div>
-    </div>
-
-    <!-- Stage 3: Review Deals -->
-    <div class="stage-card" id="stage3">
-        <h2>Stage 3: Review Deals <span class="badge badge-booking">BOOKING</span></h2>
-        <div class="stage-content">
-            <div class="metric-row" id="dealMetrics"></div>
-            <div id="dealTables"></div>
-            <button class="btn btn-success" id="approveBookingBtn" onclick="approveBooking()">
-                Approve Booking
-            </button>
-            <div id="stage3Error" class="error-msg" style="display:none"></div>
-        </div>
-        <div class="stage-summary"></div>
-    </div>
-
-    <!-- Stage 4: Review Creative -->
-    <div class="stage-card" id="stage4">
-        <h2>Stage 4: Review Creative <span class="badge badge-booking">CREATIVE</span></h2>
-        <div class="stage-content">
-            <div class="metric-row" id="creativeMetrics"></div>
-            <table id="creativeTable">
-                <thead>
-                    <tr>
-                        <th>Asset Name</th>
-                        <th>Type</th>
-                        <th>Channel</th>
-                        <th>Format</th>
-                        <th>Status</th>
-                        <th>Matched Deals</th>
-                    </tr>
-                </thead>
-                <tbody id="creativeTableBody"></tbody>
-            </table>
-            <button class="btn btn-success" id="approveCreativeBtn" onclick="approveCreative()">
-                Approve Creative
-            </button>
-            <div id="stage4Error" class="error-msg" style="display:none"></div>
-        </div>
-        <div class="stage-summary"></div>
-    </div>
-
-    <!-- Stage 5: Campaign Ready -->
-    <div class="stage-card" id="stage5">
-        <h2>Stage 5: Campaign Ready <span class="badge badge-ready">READY</span></h2>
-        <div class="stage-content">
-            <div id="reportContent"></div>
+            <div class="progress-step" data-step="3">
+                <div class="step-circle">3</div>
+                <div class="step-label">Review Deals</div>
+            </div>
+            <div class="progress-step" data-step="4">
+                <div class="step-circle">4</div>
+                <div class="step-label">Review Creative</div>
+            </div>
+            <div class="progress-step" data-step="5">
+                <div class="step-circle">5</div>
+                <div class="step-label">Campaign Ready</div>
+            </div>
         </div>
     </div>
+</div>
 
-    <!-- Event Log -->
-    <div style="margin-top: 32px;">
-        <h3 style="font-size: 16px; margin-bottom: 8px;">Event Log</h3>
-        <div class="event-log" id="eventLog">
-            <div style="color: #94a3b8;">Waiting for events...</div>
+<div class="stage-scroll-area">
+    <div class="container">
+
+        <!-- Stage 1: Enter Brief -->
+        <div class="stage-card visible" id="stage1">
+            <h2>Stage 1: Enter Brief <span class="badge badge-draft">DRAFT</span></h2>
+            <div class="stage-content">
+                <div class="form-group">
+                    <label>Select a sample brief or paste custom JSON</label>
+                    <select id="briefSelector" onchange="loadSampleBrief()">
+                        <option value="">-- Select a sample brief --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Campaign Brief JSON</label>
+                    <textarea id="briefJson" placeholder='{"advertiser_id": "...", "campaign_name": "...", ...}'></textarea>
+                </div>
+                <button class="btn btn-primary" id="submitBriefBtn" onclick="submitBrief()">
+                    Submit Brief
+                </button>
+                <div id="stage1Error" class="error-msg" style="display:none"></div>
+            </div>
+            <div class="stage-summary"></div>
         </div>
-    </div>
 
+        <!-- Stage 2: Review Plan -->
+        <div class="stage-card" id="stage2">
+            <h2>Stage 2: Review Plan <span class="badge badge-planning">PLANNING</span></h2>
+            <div class="stage-content">
+                <div class="metric-row" id="planMetrics"></div>
+                <table id="planTable">
+                    <thead>
+                        <tr>
+                            <th>Channel</th>
+                            <th>Budget</th>
+                            <th>% of Total</th>
+                            <th>Media Type</th>
+                            <th>Deal Types</th>
+                            <th>Format Prefs</th>
+                        </tr>
+                    </thead>
+                    <tbody id="planTableBody"></tbody>
+                </table>
+                <button class="btn btn-success" id="approvePlanBtn" onclick="approvePlan()">
+                    Approve Plan
+                </button>
+                <div id="stage2Error" class="error-msg" style="display:none"></div>
+            </div>
+            <div class="stage-summary"></div>
+        </div>
+
+        <!-- Stage 3: Review Deals -->
+        <div class="stage-card" id="stage3">
+            <h2>Stage 3: Review Deals <span class="badge badge-booking">BOOKING</span></h2>
+            <div class="stage-content">
+                <div class="metric-row" id="dealMetrics"></div>
+                <div id="dealTables"></div>
+                <button class="btn btn-success" id="approveBookingBtn" onclick="approveBooking()">
+                    Approve Booking
+                </button>
+                <div id="stage3Error" class="error-msg" style="display:none"></div>
+            </div>
+            <div class="stage-summary"></div>
+        </div>
+
+        <!-- Stage 4: Review Creative -->
+        <div class="stage-card" id="stage4">
+            <h2>Stage 4: Review Creative <span class="badge badge-booking">CREATIVE</span></h2>
+            <div class="stage-content">
+                <div class="metric-row" id="creativeMetrics"></div>
+                <table id="creativeTable">
+                    <thead>
+                        <tr>
+                            <th>Asset Name</th>
+                            <th>Type</th>
+                            <th>Channel</th>
+                            <th>Format</th>
+                            <th>Status</th>
+                            <th>Matched Deals</th>
+                        </tr>
+                    </thead>
+                    <tbody id="creativeTableBody"></tbody>
+                </table>
+                <button class="btn btn-success" id="approveCreativeBtn" onclick="approveCreative()">
+                    Approve Creative
+                </button>
+                <div id="stage4Error" class="error-msg" style="display:none"></div>
+            </div>
+            <div class="stage-summary"></div>
+        </div>
+
+        <!-- Stage 5: Campaign Ready -->
+        <div class="stage-card" id="stage5">
+            <h2>Stage 5: Campaign Ready <span class="badge badge-ready">READY</span></h2>
+            <div class="stage-content">
+                <div id="reportContent"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="event-log-wrapper">
+    <h3>Event Log</h3>
+    <div class="event-log" id="eventLog">
+        <div style="color: #94a3b8;">Waiting for events...</div>
+    </div>
 </div>
 
 <script>
