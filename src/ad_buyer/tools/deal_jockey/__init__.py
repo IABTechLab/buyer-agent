@@ -4,6 +4,7 @@
 """DealJockey tools for deal portfolio management."""
 
 from .deal_entry import ManualDealEntryTool
+from .instantiate_from_template import InstantiateDealFromTemplateTool
 from .portfolio_inspection import (
     InspectDealTool,
     ListPortfolioTool,
@@ -14,6 +15,7 @@ from .templates import ManageDealTemplateTool, ManageSupplyPathTemplateTool
 
 __all__ = [
     "ManualDealEntryTool",
+    "InstantiateDealFromTemplateTool",
     "ListPortfolioTool",
     "SearchPortfolioTool",
     "PortfolioSummaryTool",
