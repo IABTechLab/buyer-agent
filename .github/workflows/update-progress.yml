@@ -39,7 +39,13 @@ jobs:
           python-version: '3.11'
 
       - name: Regenerate PROGRESS.md
-        run: python .beads/generate_progress.py
+        env:
+          GITHUB_ACTIONS: 'true'  # Tells generator to skip bd export (no DB in CI)
+        run: |
+          echo "JSONL source: CI (committed JSONL, refreshed via beads-sync fallback)"
+          echo "JSONL line count: $(wc -l < .beads/issues.jsonl)"
+          python .beads/generate_progress.py
+          echo "PROGRESS.md generated successfully"
 
       - name: Commit and push if changed
         run: |
