@@ -9,6 +9,7 @@ from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ...async_utils import run_async
+from ...booking.pricing import PricingCalculator
 from ...clients.unified_client import Protocol, UnifiedClient
 from ...models.buyer_identity import AccessTier, BuyerContext, DealType
 
@@ -139,7 +140,11 @@ Returns:
         flight_start: Optional[str],
         flight_end: Optional[str],
     ) -> str:
-        """Format pricing response with tier calculations."""
+        """Format pricing response with tier calculations.
+
+        Uses the centralized PricingCalculator from ad_buyer.booking
+        to avoid duplicated pricing logic.
+        """
         tier = self._buyer_context.identity.get_access_tier()
         discount = self._buyer_context.identity.get_discount_percentage()
 
@@ -150,24 +155,22 @@ Returns:
         publisher = product.get("publisherId", product.get("publisher", "Unknown"))
         rate_type = product.get("rateType", "CPM")
 
-        # Calculate tiered price
-        if isinstance(base_price, (int, float)):
-            tiered_price = base_price * (1 - discount / 100)
-        else:
-            tiered_price = 0
+        # Calculate pricing using centralized calculator
+        if not isinstance(base_price, (int, float)):
+            base_price = 0
 
-        # Volume discount (additional 5% for 5M+, 10% for 10M+ impressions)
-        volume_discount = 0
-        if volume and tier in (AccessTier.AGENCY, AccessTier.ADVERTISER):
-            if volume >= 10_000_000:
-                volume_discount = 10.0
-            elif volume >= 5_000_000:
-                volume_discount = 5.0
+        calculator = PricingCalculator()
+        pricing = calculator.calculate(
+            base_price=base_price,
+            tier=tier,
+            tier_discount=discount,
+            volume=volume,
+            deal_type=deal_type,
+        )
 
-        if volume_discount > 0:
-            final_price = tiered_price * (1 - volume_discount / 100)
-        else:
-            final_price = tiered_price
+        tiered_price = pricing.tiered_price
+        volume_discount = pricing.volume_discount
+        final_price = pricing.final_price
 
         # Build output
         output_lines = [

@@ -13,6 +13,9 @@ from .mcp_client import IABMCPClient, MCPToolResult
 if TYPE_CHECKING:
     from ..models.buyer_identity import BuyerIdentity
 
+from ..booking.deal_id import generate_deal_id
+from ..booking.pricing import PricingCalculator
+
 
 class Protocol(Enum):
     """Protocol to use for communication with IAB server."""
@@ -508,28 +511,28 @@ class UnifiedClient:
         if result.data and isinstance(result.data, dict):
             base_price = result.data.get("basePrice", result.data.get("price", 0))
             if isinstance(base_price, (int, float)) and self.buyer_identity:
+                from ..models.buyer_identity import AccessTier
+
+                tier_obj = self.buyer_identity.get_access_tier()
                 discount = self.buyer_identity.get_discount_percentage()
-                tiered_price = base_price * (1 - discount / 100)
 
-                # Volume discount for agency/advertiser tiers
-                volume_discount = 0
-                tier = self.buyer_identity.get_access_tier().value
-                if volume and tier in ("agency", "advertiser"):
-                    if volume >= 10_000_000:
-                        volume_discount = 10.0
-                    elif volume >= 5_000_000:
-                        volume_discount = 5.0
-
-                if volume_discount > 0:
-                    tiered_price = tiered_price * (1 - volume_discount / 100)
+                # Use centralized PricingCalculator
+                calculator = PricingCalculator()
+                pricing = calculator.calculate(
+                    base_price=base_price,
+                    tier=tier_obj,
+                    tier_discount=discount,
+                    volume=volume,
+                    deal_type=deal_type,
+                )
 
                 # Add pricing context to result
                 result.data["pricing"] = {
-                    "base_price": base_price,
-                    "tiered_price": round(tiered_price, 2),
-                    "tier": tier if self.buyer_identity else "public",
+                    "base_price": pricing.base_price,
+                    "tiered_price": round(pricing.final_price, 2),
+                    "tier": tier_obj.value if self.buyer_identity else "public",
                     "tier_discount": discount if self.buyer_identity else 0,
-                    "volume_discount": volume_discount,
+                    "volume_discount": pricing.volume_discount,
                     "requested_volume": volume,
                     "deal_type": deal_type,
                 }
@@ -563,8 +566,10 @@ class UnifiedClient:
         Returns:
             UnifiedResult with Deal ID and activation instructions
         """
-        import hashlib
         from datetime import datetime, timedelta
+
+        from ..booking.quote_flow import QuoteFlowClient
+        from ..models.buyer_identity import AccessTier, BuyerContext, BuyerIdentity
 
         # Get product details first
         product_result = await self.get_product(product_id, protocol=protocol)
@@ -580,72 +585,30 @@ class UnifiedClient:
                 protocol=protocol or self.default_protocol,
             )
 
-        # Calculate pricing
-        base_price = product.get("basePrice", product.get("price", 20.0))
-        if not isinstance(base_price, (int, float)):
-            base_price = 20.0
+        # Build buyer context for QuoteFlowClient
+        identity = self.buyer_identity or BuyerIdentity()
+        tier = identity.get_access_tier()
+        can_negotiate = tier in (AccessTier.AGENCY, AccessTier.ADVERTISER)
 
-        tier = "public"
-        discount = 0.0
-        if self.buyer_identity:
-            tier = self.buyer_identity.get_access_tier().value
-            discount = self.buyer_identity.get_discount_percentage()
+        buyer_ctx = BuyerContext(
+            identity=identity,
+            is_authenticated=bool(self.buyer_identity),
+        )
 
-        tiered_price = base_price * (1 - discount / 100)
+        # Use QuoteFlowClient for deal data construction
+        quote_client = QuoteFlowClient(
+            buyer_context=buyer_ctx,
+            seller_base_url=self.base_url,
+        )
 
-        # Volume discount
-        if impressions and tier in ("agency", "advertiser"):
-            if impressions >= 10_000_000:
-                tiered_price *= 0.90
-            elif impressions >= 5_000_000:
-                tiered_price *= 0.95
-
-        # Handle negotiation
-        final_price = tiered_price
-        if target_cpm and tier in ("agency", "advertiser"):
-            floor_price = tiered_price * 0.90
-            if target_cpm >= floor_price:
-                final_price = target_cpm
-            else:
-                final_price = floor_price
-
-        # Generate Deal ID
-        timestamp = datetime.now().strftime("%Y%m%d%H%M")
-        identity_seed = ""
-        if self.buyer_identity:
-            identity_seed = self.buyer_identity.agency_id or self.buyer_identity.seat_id or "public"
-        seed = f"{product_id}-{identity_seed}-{timestamp}"
-        hash_suffix = hashlib.md5(seed.encode()).hexdigest()[:8].upper()
-        deal_id = f"DEAL-{hash_suffix}"
-
-        # Default flight dates
-        if not flight_start:
-            flight_start = datetime.now().strftime("%Y-%m-%d")
-        if not flight_end:
-            flight_end = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-
-        # Build deal response
-        deal_data = {
-            "deal_id": deal_id,
-            "product_id": product_id,
-            "product_name": product.get("name", "Unknown Product"),
-            "deal_type": deal_type,
-            "price": round(final_price, 2),
-            "original_price": round(base_price, 2),
-            "discount_applied": round(discount, 1),
-            "access_tier": tier,
-            "impressions": impressions,
-            "flight_start": flight_start,
-            "flight_end": flight_end,
-            "activation_instructions": {
-                "ttd": f"The Trade Desk > Inventory > Private Marketplace > Add Deal ID: {deal_id}",
-                "dv360": f"Display & Video 360 > Inventory > My Inventory > New > Deal ID: {deal_id}",
-                "amazon": f"Amazon DSP > Private Marketplace > Deals > Add Deal: {deal_id}",
-                "xandr": f"Xandr > Inventory > Deals > Create Deal with ID: {deal_id}",
-                "yahoo": f"Yahoo DSP > Inventory > Private Marketplace > Enter Deal ID: {deal_id}",
-            },
-            "expires_at": (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d"),
-        }
+        deal_data = quote_client.build_deal_data(
+            product=product,
+            deal_type=deal_type or "PD",
+            impressions=impressions,
+            flight_start=flight_start,
+            flight_end=flight_end,
+            target_cpm=target_cpm,
+        )
 
         return UnifiedResult(
             success=True,
