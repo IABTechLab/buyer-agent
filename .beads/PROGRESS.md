@@ -102,7 +102,7 @@
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
-| \[!] | buyer-te6b.4.4 | Add Agent Range optimization hooks to DealJockey | P3 | buyer-te6b.2.5, buyer-te6b.2.11 |  |
+| \[!] | buyer-te6b.4.4 | Add optimization hooks to DealJockey | P3 | buyer-te6b.2.5, buyer-te6b.2.11 |  |
 | \[!] | buyer-te6b.4.5 | ML-tuned supply path scoring | P3 | buyer-te6b.2.7 |  |
 | \[ ] | buyer-te6b.4.1 | [buyer-dj14] Event system (Phase 4: optimization events) | P3 | — |  |
 | \[ ] | buyer-te6b.4.2 | [buyer-dj15] Receive IAB Deals API v1.0 push updates | P3 | — |  |
