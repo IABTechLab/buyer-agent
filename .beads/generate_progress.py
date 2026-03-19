@@ -44,7 +44,7 @@ def refresh_jsonl():
         return
     try:
         subprocess.run(
-            ["bd", "export", "-o", str(JSONL_PATH)],
+            ["bd", "export", "--no-auto-import", "-o", str(JSONL_PATH)],
             check=True,
             capture_output=True,
             timeout=30,
@@ -492,7 +492,9 @@ def generate():
     # Also exclude non-phase epics from display (e.g. "Epic: Buyer reporting agent")
     all_epic_ids = {i["id"] for i in issues if i.get("issue_type") == "epic"}
 
-    display_issues = [i for i in issues if i["id"] not in all_epic_ids]
+    display_issues = [i for i in issues
+                      if i["id"] not in all_epic_ids
+                      and i.get("issue_type") != "bug"]
     total = len(display_issues)
     closed = len([i for i in display_issues if i.get("status") == "closed"])
     in_progress = len([i for i in display_issues if i.get("status") == "in_progress"])
