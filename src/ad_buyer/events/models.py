@@ -28,6 +28,15 @@ class EventType(str, Enum):
 
     # Campaign lifecycle
     CAMPAIGN_CREATED = "campaign.created"
+    CAMPAIGN_BRIEF_VALIDATED = "campaign.brief_validated"
+    CAMPAIGN_PLAN_GENERATED = "campaign.plan_generated"
+    CAMPAIGN_PLAN_APPROVED = "campaign.plan_approved"
+    CAMPAIGN_BOOKING_STARTED = "campaign.booking_started"
+    CAMPAIGN_BOOKING_COMPLETED = "campaign.booking_completed"
+    CAMPAIGN_READY = "campaign.ready"
+    CAMPAIGN_ACTIVATED = "campaign.activated"
+    CAMPAIGN_COMPLETED = "campaign.completed"
+    CAMPAIGN_CANCELED = "campaign.canceled"
 
     # Budget lifecycle
     BUDGET_ALLOCATED = "budget.allocated"
@@ -53,6 +62,19 @@ class EventType(str, Enum):
     PORTFOLIO_INSPECTED = "portfolio.inspected"
     DEAL_MANUAL_ACTION_REQUIRED = "deal.manual_action_required"
 
+    # Pacing lifecycle (Campaign Automation)
+    PACING_SNAPSHOT_TAKEN = "pacing.snapshot_taken"
+    PACING_DEVIATION_DETECTED = "pacing.deviation_detected"
+    PACING_REALLOCATION_RECOMMENDED = "pacing.reallocation_recommended"
+    PACING_REALLOCATION_APPLIED = "pacing.reallocation_applied"
+
+    # Creative lifecycle (Campaign Automation)
+    CREATIVE_UPLOADED = "creative.uploaded"
+    CREATIVE_VALIDATED = "creative.validated"
+    CREATIVE_MATCHED = "creative.matched"
+    CREATIVE_ROTATION_UPDATED = "creative.rotation_updated"
+    CREATIVE_AD_SERVER_PUSHED = "creative.ad_server_pushed"
+
 
 class Event(BaseModel):
     """An event emitted by the buyer system."""
@@ -63,6 +85,7 @@ class Event(BaseModel):
     flow_id: str = ""
     flow_type: str = ""
     deal_id: str = ""
+    campaign_id: str = ""
     session_id: str = ""
     payload: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)

@@ -8,8 +8,12 @@ the seller's OrderStateMachine framework.  Provides:
 
 - BuyerDealStatus: deal lifecycle (quoted -> negotiating -> ... -> completed)
 - BuyerCampaignStatus: campaign/booking lifecycle (maps to ExecutionStatus)
+- CampaignStatus: campaign automation lifecycle with READY state
+  (draft -> planning -> booking -> ready -> active -> completed)
 - DealStateMachine / CampaignStateMachine: configurable transitions, guard
   conditions, and a full audit log of every state change
+- CampaignAutomationStateMachine: campaign automation with READY state,
+  PAUSED/PACING_HOLD distinction, and validate_transition() method
 - Linear TV extensions: makegood_pending, partially_canceled
 
 Existing code continues to work: ExecutionStatus and DSPFlowStatus are
@@ -92,6 +96,52 @@ class BuyerCampaignStatus(str, Enum):
     EXECUTING_BOOKINGS = "executing_bookings"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+# ---------------------------------------------------------------------------
+# Campaign Status (Campaign Automation)
+# ---------------------------------------------------------------------------
+
+
+class CampaignStatus(str, Enum):
+    """Status for campaign automation lifecycle.
+
+    Happy path:
+        draft -> planning -> booking -> ready -> active -> completed
+
+    READY separates "campaign is prepared" from "campaign is live."
+    A campaign enters READY when all deals are booked and creative is
+    validated.  Transition to ACTIVE can be automatic (flight start date)
+    or manual (buyer activates).
+
+    PAUSED vs PACING_HOLD:
+        PAUSED is manual (human decision).
+        PACING_HOLD is automated (system detected pacing deviation
+        exceeding threshold).
+
+    Terminal states: completed, canceled
+    """
+
+    # Entry
+    DRAFT = "draft"
+
+    # Planning & booking
+    PLANNING = "planning"
+    BOOKING = "booking"
+
+    # Ready -- all deals booked, creative validated, awaiting activation
+    READY = "ready"
+
+    # Live
+    ACTIVE = "active"
+
+    # Hold states
+    PAUSED = "paused"          # manual pause (human decision)
+    PACING_HOLD = "pacing_hold"  # automated (pacing deviation threshold)
+
+    # Terminal
+    COMPLETED = "completed"
+    CANCELED = "canceled"
 
 
 # ---------------------------------------------------------------------------
@@ -458,6 +508,131 @@ class CampaignStateMachine(_BaseStateMachine):
         if audit_data:
             machine._audit = OrderAuditLog(**audit_data)
         return machine
+
+
+# ---------------------------------------------------------------------------
+# Campaign Automation transition rules
+# ---------------------------------------------------------------------------
+
+
+def _build_campaign_automation_rules() -> list[TransitionRule]:
+    """Build transition rules for the campaign automation state machine.
+
+    Implements the state machine from Section 6.6 of the Campaign Automation
+    Strategic Plan, including the READY state that separates "campaign is
+    prepared" from "campaign is live."
+    """
+    S = CampaignStatus
+    transitions: list[tuple[CampaignStatus, CampaignStatus, str]] = [
+        # Happy path
+        (S.DRAFT, S.PLANNING, "Campaign planning begins"),
+        (S.PLANNING, S.BOOKING, "Plan approved, booking starts"),
+        (S.BOOKING, S.READY, "All deals booked, creative validated"),
+        (S.READY, S.ACTIVE, "Flight start date reached or manual activation"),
+        (S.ACTIVE, S.COMPLETED, "Flight end date reached"),
+
+        # Cancellation from non-terminal states
+        (S.PLANNING, S.CANCELED, "Campaign canceled during planning"),
+        (S.BOOKING, S.CANCELED, "Campaign canceled during booking"),
+        (S.READY, S.CANCELED, "Campaign canceled before going live"),
+        (S.ACTIVE, S.CANCELED, "Campaign terminated"),
+        (S.PAUSED, S.CANCELED, "Paused campaign canceled"),
+        (S.PACING_HOLD, S.CANCELED, "Pacing-held campaign canceled"),
+
+        # Replanning
+        (S.BOOKING, S.PLANNING, "Needs replanning"),
+        (S.READY, S.PLANNING, "Needs replanning before start"),
+
+        # Pause / hold from ACTIVE
+        (S.ACTIVE, S.PAUSED, "Manual pause"),
+        (S.ACTIVE, S.PACING_HOLD, "Automated pacing deviation threshold"),
+
+        # Resume from PAUSED
+        (S.PAUSED, S.ACTIVE, "Manual resume"),
+
+        # Resume / escalate from PACING_HOLD
+        (S.PACING_HOLD, S.ACTIVE, "Deviation resolved, auto-resume"),
+        (S.PACING_HOLD, S.PAUSED, "Escalated to manual pause"),
+    ]
+
+    return [
+        TransitionRule(from_status=f, to_status=t, description=d)
+        for f, t, d in transitions
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Campaign Automation State Machine
+# ---------------------------------------------------------------------------
+
+
+class CampaignAutomationStateMachine(_BaseStateMachine):
+    """State machine for campaign automation lifecycle.
+
+    Implements the full campaign lifecycle from Section 6.6 of the Campaign
+    Automation Strategic Plan:
+
+        DRAFT -> PLANNING -> BOOKING -> READY -> ACTIVE -> COMPLETED
+
+    The READY state separates "campaign is prepared" from "campaign is live."
+    PAUSED is for manual holds; PACING_HOLD is for automated pacing deviation.
+
+    Provides validate_transition(from_state, to_state) for checking whether
+    a transition is permitted without requiring a machine in that state.
+    """
+
+    # Class-level transition table for static validation
+    TRANSITION_TABLE: dict[CampaignStatus, list[CampaignStatus]] = {}
+
+    def __init__(
+        self,
+        order_id: str,
+        initial_status: CampaignStatus = CampaignStatus.DRAFT,
+        rules: Optional[list[TransitionRule]] = None,
+    ):
+        super().__init__(
+            order_id=order_id,
+            initial_status=initial_status,
+            rules=rules if rules is not None else _build_campaign_automation_rules(),
+        )
+
+    def validate_transition(
+        self, from_state: CampaignStatus, to_state: CampaignStatus
+    ) -> bool:
+        """Check whether a transition from from_state to to_state is valid.
+
+        This is a static check against the transition rules -- it does not
+        require the machine to be in from_state, and it does not evaluate
+        guard conditions.
+        """
+        return (from_state, to_state) in self._rule_index
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        rules: Optional[list[TransitionRule]] = None,
+    ) -> "CampaignAutomationStateMachine":
+        """Restore a machine from stored state."""
+        machine = cls(
+            order_id=data["order_id"],
+            initial_status=CampaignStatus(data["status"]),
+            rules=rules,
+        )
+        audit_data = data.get("audit_log", {})
+        if audit_data:
+            machine._audit = OrderAuditLog(**audit_data)
+        return machine
+
+
+# Build class-level transition table for static access
+CampaignAutomationStateMachine.TRANSITION_TABLE = {
+    state: [
+        r.to_status for r in _build_campaign_automation_rules()
+        if r.from_status == state
+    ]
+    for state in CampaignStatus
+}
 
 
 # ---------------------------------------------------------------------------
