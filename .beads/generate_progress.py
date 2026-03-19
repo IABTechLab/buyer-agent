@@ -19,13 +19,19 @@ PHASE_MAP = {
     "4": ("Phase 4", "Production Hardening"),
 }
 
-# DealJockey phases mapped by bead ID pattern (buyer-te6b.N.*)
-DJ_PHASE_MAP = {
-    "1": ("DealJockey Phase 1", "Foundation"),
-    "2": ("DealJockey Phase 2", "Intelligence"),
-    "3": ("DealJockey Phase 3", "Platform Integrations"),
-    "4": ("DealJockey Phase 4", "External Model Integration"),
+# DealJockey phase epic IDs -> display names
+# These are the canonical phase epics created per the revised 5-phase plan
+# (DEAL_JOCKEY_STRATEGIC_PLAN.md Section 9)
+DJ_PHASE_EPICS = {
+    "buyer-te6b.1": ("DealJockey Phase 1", "MVP DealJockey"),
+    "buyer-te6b.2": ("DealJockey Phase 2", "Templates & Seller Integration"),
+    "buyer-te6b.3": ("DealJockey Phase 3", "Portfolio Intelligence"),
+    "buyer-te6b.4": ("DealJockey Phase 4", "Platform Integrations"),
+    "buyer-te6b.5": ("DealJockey Phase 5", "External Model Integration"),
 }
+
+# Ordered list of DJ phase epic IDs for rendering order
+DJ_PHASE_ORDER = ["buyer-te6b.1", "buyer-te6b.2", "buyer-te6b.3", "buyer-te6b.4", "buyer-te6b.5"]
 
 
 def load_issues():
@@ -45,11 +51,9 @@ def load_issues():
 
 def get_phase(title):
     """Extract phase number from title like '1D: ...', '2B: ...', or '1A-Phase1: ...'."""
-    # Match sub-tasks like "1A-Phase1: ..." or "1A-Phase2: ..."
     m = re.match(r"(\d)[A-Z]-", title)
     if m:
         return m.group(1)
-    # Match top-level tasks like "1D: ..."
     m = re.match(r"(\d)[A-Z]:", title)
     if m:
         return m.group(1)
@@ -66,11 +70,9 @@ def get_parent_task(title):
 
 def get_sort_key(title):
     """Sort key: phase number then letter then sub-phase, e.g. '1A-Phase2' -> (1, 'A', 2)."""
-    # Sub-task: "1A-Phase2: ..."
     m = re.match(r"(\d)([A-Z])-Phase(\d+):", title)
     if m:
         return (int(m.group(1)), m.group(2), int(m.group(3)))
-    # Top-level: "1D: ..."
     m = re.match(r"(\d)([A-Z]):", title)
     if m:
         return (int(m.group(1)), m.group(2), 0)
@@ -78,14 +80,9 @@ def get_sort_key(title):
 
 
 # Cross-repo blockers that can't be tracked as formal bd dependencies.
-# These are seller-side beads owned by Brian that block buyer work.
-# Update this map when cross-repo dependencies change.
-# Cross-repo blockers: remove entries once the blocker is resolved.
 CROSS_REPO_BLOCKERS = {
-    "buyer-4bg": ["seller-dcd"],   # Needs Brian's FreeWheel seller support
-    "buyer-kyo": ["seller-awh"],   # Needs Brian's order lifecycle seller support
-    # buyer-6io: ar-v2f — RESOLVED 2026-03-11 (decisions recorded in LINEAR_TV_DEAL_FLOW_RESEARCH.md Section 10)
-    # buyer-hu7: seller-a3k — RESOLVED 2026-03-10
+    "buyer-4bg": ["seller-dcd"],
+    "buyer-kyo": ["seller-awh"],
 }
 
 
@@ -95,18 +92,12 @@ def get_cross_repo_blockers(issue):
 
 
 def is_blocked(issue, closed_ids, all_ids):
-    """Check if issue has unresolved blockers (in-repo deps or cross-repo annotations).
-
-    Dependencies pointing to tombstoned/compacted beads (not in all_ids)
-    are ignored since the target no longer exists in the tracker.
-    """
-    # Closed issues are never blocked
+    """Check if issue has unresolved blockers."""
     if issue.get("status") == "closed":
         return False
     deps = issue.get("dependencies") or []
     for dep in deps:
         blocker_id = dep.get("depends_on_id", "")
-        # Skip tombstoned/compacted beads and already-closed blockers
         if blocker_id and blocker_id in all_ids and blocker_id not in closed_ids:
             return True
     if get_cross_repo_blockers(issue):
@@ -115,16 +106,32 @@ def is_blocked(issue, closed_ids, all_ids):
 
 
 def get_blocker_ids(issue, all_ids):
-    """Get list of depends_on_id values plus cross-repo blockers from notes.
-
-    Dependencies pointing to tombstoned/compacted beads (not in all_ids)
-    are excluded.
-    """
+    """Get list of depends_on_id values plus cross-repo blockers."""
     deps = issue.get("dependencies") or []
     blockers = [dep.get("depends_on_id", "") for dep in deps
                 if dep.get("depends_on_id") and dep.get("depends_on_id") in all_ids]
     blockers.extend(get_cross_repo_blockers(issue))
     return blockers
+
+
+def build_dj_phase_membership(issues):
+    """Build a map of bead ID -> DJ phase epic ID based on dependency relationships.
+
+    A bead belongs to a DJ phase if the phase epic depends on it (i.e., the epic
+    lists the bead as a dependency, meaning 'epic blocked by bead').
+    """
+    bead_to_phase = {}
+    for issue in issues:
+        iid = issue.get("id", "")
+        if iid not in DJ_PHASE_EPICS:
+            continue
+        # This is a phase epic. Its dependencies are the beads in this phase.
+        deps = issue.get("dependencies") or []
+        for dep in deps:
+            child_id = dep.get("depends_on_id", "")
+            if child_id:
+                bead_to_phase[child_id] = iid
+    return bead_to_phase
 
 
 def progress_bar(done, total, width=20):
@@ -156,11 +163,29 @@ def format_date(iso_str):
     return iso_str[:10]
 
 
+def render_issue_row(issue, closed_ids, all_ids, indent=False):
+    """Render a single issue as a markdown table row."""
+    icon = status_icon(issue, closed_ids, all_ids)
+    iid = issue["id"]
+    title = issue.get("title", "")
+    if indent:
+        title = f"&nbsp;&nbsp;↳ {title}"
+    priority = f"P{issue.get('priority', '?')}"
+    blockers = get_blocker_ids(issue, all_ids)
+    unresolved = [b for b in blockers if b not in closed_ids]
+    blocker_str = ", ".join(unresolved) if unresolved else "—"
+    done = format_date(issue.get("closed_at", ""))
+    return f"| {icon} | {iid} | {title} | {priority} | {blocker_str} | {done} |"
+
+
 def generate():
     issues = [i for i in load_issues() if i.get("status") != "tombstone"]
     if not issues:
         OUTPUT_PATH.write_text("# Progress\n\nNo issues found.\n")
         return
+
+    # Filter out LEGACY beads
+    issues = [i for i in issues if "[LEGACY]" not in i.get("title", "")]
 
     # Build lookup sets
     closed_ids = {i["id"] for i in issues if i.get("status") == "closed"}
@@ -168,68 +193,45 @@ def generate():
 
     # Stats
     total = len(issues)
-    closed = len([i for i in issues if i.get("status") == "closed"])
+    closed = len(closed_ids)
     in_progress = len([i for i in issues if i.get("status") == "in_progress"])
     blocked = len([i for i in issues if i.get("status") not in ("closed",) and is_blocked(i, closed_ids, all_ids)])
     open_count = total - closed - in_progress
 
-    # Filter out LEGACY beads
-    issues = [i for i in issues if "[LEGACY]" not in i.get("title", "")]
+    # Build DJ phase membership from dependency relationships
+    dj_bead_to_phase = build_dj_phase_membership(issues)
 
-    # Recalculate stats after filtering
-    total = len(issues)
-    closed = len([i for i in issues if i.get("status") == "closed"])
-    in_progress = len([i for i in issues if i.get("status") == "in_progress"])
-    closed_ids = {i["id"] for i in issues if i.get("status") == "closed"}
-    all_ids = {i["id"] for i in issues}
-    blocked = len([i for i in issues if i.get("status") not in ("closed",) and is_blocked(i, closed_ids, all_ids)])
-    open_count = total - closed - in_progress
-
-    # Group by phase (numbered) or DealJockey phase (by bead ID)
-    phases = {}
-    dj_phases = {}
-    dj_epics = []  # top-level DealJockey epics
+    # Group issues
+    numbered_phases = {}  # "1" -> [issues], "2" -> [issues], etc.
+    dj_phases = {}        # phase_epic_id -> [issues]
     ungrouped = []
+
     for issue in issues:
         iid = issue.get("id", "")
         title = issue.get("title", "")
 
-        # DealJockey beads: buyer-te6b, buyer-te6b.N, buyer-te6b.N.M
-        if iid.startswith("buyer-te6b"):
-            # Top-level epic or phase epic
-            if iid == "buyer-te6b":
-                dj_epics.append(issue)
-            elif re.match(r"buyer-te6b\.\d+$", iid):
-                # Phase epic like buyer-te6b.2
-                phase_num = iid.split(".")[-1]
-                dj_phases.setdefault(phase_num, []).insert(0, issue)
-            elif re.match(r"buyer-te6b\.\d+\.\d+", iid):
-                # Task like buyer-te6b.2.3
-                phase_num = iid.split(".")[1]
-                dj_phases.setdefault(phase_num, []).append(issue)
-            else:
-                ungrouped.append(issue)
+        # Skip DJ phase epics themselves and top-level DJ epic (they're headers, not rows)
+        if iid in DJ_PHASE_EPICS or iid == "buyer-te6b":
             continue
 
-        # DealJockey Phase 1 execution beads (buyer-5tg, buyer-muf, etc.)
-        # These are grouped under DealJockey Phase 1 by checking title/description
-        dj_p1_titles = ["Deal library schema", "DealJockey L2 agent", "DealJockey event types",
-                        "Deal library CRUD", "CSV deal import", "Manual deal entry",
-                        "Portfolio inspection", "DealJockey Phase 1"]
-        if any(t.lower() in title.lower() for t in dj_p1_titles):
-            dj_phases.setdefault("1", []).append(issue)
+        # Check if this bead belongs to a DJ phase via dependency
+        if iid in dj_bead_to_phase:
+            phase_epic_id = dj_bead_to_phase[iid]
+            dj_phases.setdefault(phase_epic_id, []).append(issue)
             continue
 
         # Numbered phase tasks (1A:, 2B:, etc.)
         phase = get_phase(title)
         if phase:
-            phases.setdefault(phase, []).append(issue)
+            numbered_phases.setdefault(phase, []).append(issue)
         else:
             ungrouped.append(issue)
 
-    # Sort each phase
-    for phase in phases:
-        phases[phase].sort(key=lambda i: get_sort_key(i.get("title", "")))
+    # Sort each group
+    for phase in numbered_phases:
+        numbered_phases[phase].sort(key=lambda i: get_sort_key(i.get("title", "")))
+    for phase_id in dj_phases:
+        dj_phases[phase_id].sort(key=lambda i: i.get("title", ""))
     ungrouped.sort(key=lambda i: i.get("title", ""))
 
     # Build markdown
@@ -238,17 +240,16 @@ def generate():
     lines.append(f"**{open_count} open** | **{in_progress} in progress** | **{closed} closed** | **{blocked} blocked** | {total} total\n")
     lines.append(f"{progress_bar(closed, total)}\n")
 
-    # Render each phase
-    for phase_num in sorted(phases.keys()):
+    # Render numbered phases
+    for phase_num in sorted(numbered_phases.keys()):
         phase_name, phase_desc = PHASE_MAP.get(phase_num, (f"Phase {phase_num}", ""))
         lines.append(f"## {phase_name} — {phase_desc}\n")
         lines.append("| | ID | Task | Priority | Blockers | Done |")
         lines.append("|---|---|---|---|---|---|")
 
-        # Separate top-level tasks and sub-tasks
         top_level = []
-        sub_tasks = {}  # parent_key -> [issues]
-        for issue in phases[phase_num]:
+        sub_tasks = {}
+        for issue in numbered_phases[phase_num]:
             title = issue.get("title", "")
             parent = get_parent_task(title)
             if parent:
@@ -257,52 +258,27 @@ def generate():
                 top_level.append(issue)
 
         for issue in top_level:
-            icon = status_icon(issue, closed_ids, all_ids)
-            iid = issue["id"]
-            title = issue.get("title", "")
-            priority = f"P{issue.get('priority', '?')}"
-            blockers = get_blocker_ids(issue, all_ids)
-            unresolved = [b for b in blockers if b not in closed_ids]
-            blocker_str = ", ".join(unresolved) if unresolved else "—"
-            done = format_date(issue.get("closed_at", ""))
-            lines.append(f"| {icon} | {iid} | {title} | {priority} | {blocker_str} | {done} |")
-
-            # Render sub-tasks indented right after their parent
-            task_key_match = re.match(r"(\d[A-Z]):", title)
+            lines.append(render_issue_row(issue, closed_ids, all_ids))
+            task_key_match = re.match(r"(\d[A-Z]):", issue.get("title", ""))
             if task_key_match:
                 task_key = task_key_match.group(1)
                 for sub in sub_tasks.get(task_key, []):
-                    sub_icon = status_icon(sub, closed_ids, all_ids)
-                    sub_iid = sub["id"]
-                    sub_title = sub.get("title", "")
-                    sub_priority = f"P{sub.get('priority', '?')}"
-                    sub_blockers = get_blocker_ids(sub, all_ids)
-                    sub_unresolved = [b for b in sub_blockers if b not in closed_ids]
-                    sub_blocker_str = ", ".join(sub_unresolved) if sub_unresolved else "—"
-                    sub_done = format_date(sub.get("closed_at", ""))
-                    lines.append(f"| {sub_icon} | {sub_iid} | &nbsp;&nbsp;↳ {sub_title} | {sub_priority} | {sub_blocker_str} | {sub_done} |")
+                    lines.append(render_issue_row(sub, closed_ids, all_ids, indent=True))
 
         lines.append("")
 
-    # Render DealJockey phases
-    if dj_phases or dj_epics:
-        for phase_num in sorted(dj_phases.keys()):
-            phase_name, phase_desc = DJ_PHASE_MAP.get(phase_num, (f"DealJockey Phase {phase_num}", ""))
-            lines.append(f"## {phase_name} — {phase_desc}\n")
-            lines.append("| | ID | Task | Priority | Blockers | Done |")
-            lines.append("|---|---|---|---|---|---|")
+    # Render DealJockey phases in order
+    for phase_epic_id in DJ_PHASE_ORDER:
+        if phase_epic_id not in dj_phases:
+            continue
+        phase_name, phase_desc = DJ_PHASE_EPICS[phase_epic_id]
+        lines.append(f"## {phase_name} — {phase_desc}\n")
+        lines.append("| | ID | Task | Priority | Blockers | Done |")
+        lines.append("|---|---|---|---|---|---|")
 
-            for issue in dj_phases[phase_num]:
-                icon = status_icon(issue, closed_ids, all_ids)
-                iid = issue["id"]
-                title = issue.get("title", "")
-                priority = f"P{issue.get('priority', '?')}"
-                blockers = get_blocker_ids(issue, all_ids)
-                unresolved = [b for b in blockers if b not in closed_ids]
-                blocker_str = ", ".join(unresolved) if unresolved else "—"
-                done = format_date(issue.get("closed_at", ""))
-                lines.append(f"| {icon} | {iid} | {title} | {priority} | {blocker_str} | {done} |")
-            lines.append("")
+        for issue in dj_phases[phase_epic_id]:
+            lines.append(render_issue_row(issue, closed_ids, all_ids))
+        lines.append("")
 
     # Ungrouped issues
     if ungrouped:
@@ -310,15 +286,7 @@ def generate():
         lines.append("| | ID | Task | Priority | Blockers | Done |")
         lines.append("|---|---|---|---|---|---|")
         for issue in ungrouped:
-            icon = status_icon(issue, closed_ids, all_ids)
-            iid = issue["id"]
-            title = issue.get("title", "")
-            priority = f"P{issue.get('priority', '?')}"
-            blockers = get_blocker_ids(issue, all_ids)
-            unresolved = [b for b in blockers if b not in closed_ids]
-            blocker_str = ", ".join(unresolved) if unresolved else "—"
-            done = format_date(issue.get("closed_at", ""))
-            lines.append(f"| {icon} | {iid} | {title} | {priority} | {blocker_str} | {done} |")
+            lines.append(render_issue_row(issue, closed_ids, all_ids))
         lines.append("")
 
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
