@@ -65,6 +65,23 @@ from .creative_asset import (
     CreativeAsset,
     ValidationStatus,
 )
+from .campaign_brief import (
+    ApprovalConfig,
+    ApprovalStage,
+    BrandSafety,
+    CampaignBrief,
+    CampaignObjective,
+    ChannelAllocation,
+    ChannelType,
+    DealPreferences,
+    FrequencyCap,
+    GeoTarget,
+    GeoType,
+    KPI,
+    KPIMetric,
+    PacingModel,
+    parse_campaign_brief,
+)
 
 __all__ = [
     # OpenDirect models
@@ -122,4 +139,20 @@ __all__ = [
     "AssetType",
     "CreativeAsset",
     "ValidationStatus",
+    # Campaign brief models (buyer-80k)
+    "ApprovalConfig",
+    "ApprovalStage",
+    "BrandSafety",
+    "CampaignBrief",
+    "CampaignObjective",
+    "ChannelAllocation",
+    "ChannelType",
+    "DealPreferences",
+    "FrequencyCap",
+    "GeoTarget",
+    "GeoType",
+    "KPI",
+    "KPIMetric",
+    "PacingModel",
+    "parse_campaign_brief",
 ]
