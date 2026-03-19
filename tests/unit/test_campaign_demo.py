@@ -10,10 +10,12 @@ Covers:
   - Booking approval triggers creative matching
   - Creative approval finalizes the campaign
   - Campaign report is generated for READY campaigns
+  - Campaign activation transitions to ACTIVE with pacing data (Stage 6)
+  - Pause and complete controls for active campaigns
   - Sample briefs are pre-seeded
   - Error handling for invalid briefs and missing campaigns
 
-bead: ar-llj4
+bead: ar-llj4, ar-uxpw
 """
 
 import json
@@ -95,7 +97,7 @@ class TestPageLoad:
         assert "Campaign Automation" in html
 
     def test_index_contains_stage_sections(self, client):
-        """Main page has all 5 stage sections."""
+        """Main page has all 6 stage sections."""
         resp = client.get("/")
         html = resp.data.decode("utf-8")
         assert "Enter Brief" in html
@@ -103,6 +105,13 @@ class TestPageLoad:
         assert "Review Deals" in html
         assert "Review Creative" in html
         assert "Campaign Ready" in html
+        assert "Active" in html or "Live Campaign" in html
+
+    def test_index_has_six_progress_steps(self, client):
+        """Progress bar has 6 steps."""
+        resp = client.get("/")
+        html = resp.data.decode("utf-8")
+        assert 'data-step="6"' in html
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +439,7 @@ class TestEventLog:
 
 
 class TestFullPipeline:
-    """Test the complete 5-stage pipeline walkthrough."""
+    """Test the complete 6-stage pipeline walkthrough."""
 
     def test_full_walkthrough(self, client):
         """Complete pipeline from brief to READY."""
@@ -481,3 +490,361 @@ class TestFullPipeline:
         resp = client.get(f"/api/campaign/{campaign_id}")
         assert resp.status_code == 200
         assert resp.get_json()["status"] == "ready"
+
+    def test_full_walkthrough_through_activation(self, client):
+        """Complete pipeline from brief through ACTIVE (Stage 6)."""
+        # Stages 1-4
+        resp = client.post(
+            "/api/submit-brief",
+            data=json.dumps(SAMPLE_BRIEF),
+            content_type="application/json",
+        )
+        campaign_id = resp.get_json()["campaign_id"]
+        client.post(
+            "/api/approve-plan",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-booking",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-creative",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+
+        # Stage 6: Activate campaign
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["status"] == "active"
+
+        # Verify campaign state
+        resp = client.get(f"/api/campaign/{campaign_id}")
+        assert resp.status_code == 200
+        assert resp.get_json()["status"] == "active"
+
+
+# ---------------------------------------------------------------------------
+# API: Activate campaign (Stage 6)
+# ---------------------------------------------------------------------------
+
+
+class TestActivateCampaign:
+    """Test campaign activation and pacing data generation."""
+
+    def _advance_to_ready(self, client):
+        """Helper: advance campaign through all stages to READY."""
+        resp = client.post(
+            "/api/submit-brief",
+            data=json.dumps(SAMPLE_BRIEF),
+            content_type="application/json",
+        )
+        campaign_id = resp.get_json()["campaign_id"]
+        client.post(
+            "/api/approve-plan",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-booking",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-creative",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        return campaign_id
+
+    def test_activate_campaign_transitions_to_active(self, client):
+        """POST /api/activate-campaign transitions campaign from READY to ACTIVE."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["status"] == "active"
+
+    def test_activate_campaign_returns_pacing_data(self, client):
+        """Activation response includes pacing dashboard data."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        data = resp.get_json()
+        assert "pacing" in data
+        pacing = data["pacing"]
+        assert "total_budget" in pacing
+        assert "total_spend" in pacing
+        assert "expected_spend" in pacing
+        assert "pacing_pct" in pacing
+        assert "deviation_pct" in pacing
+        assert "channel_snapshots" in pacing
+        assert "deal_snapshots" in pacing
+
+    def test_activate_campaign_generates_simulated_spend(self, client):
+        """Activation generates non-zero simulated spend data."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        data = resp.get_json()
+        pacing = data["pacing"]
+        # Simulated spend should be non-zero
+        assert pacing["total_spend"] > 0
+        assert pacing["expected_spend"] > 0
+        # Channel snapshots should have varying pacing
+        for ch in pacing["channel_snapshots"]:
+            assert ch["allocated_budget"] > 0
+
+    def test_activate_campaign_has_varied_channel_pacing(self, client):
+        """Channels should have different pacing percentages (some over, some under)."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        data = resp.get_json()
+        pacing_pcts = [ch["pacing_pct"] for ch in data["pacing"]["channel_snapshots"]]
+        # Not all channels should have the same pacing
+        assert len(set(pacing_pcts)) > 1, "All channels have identical pacing"
+
+    def test_activate_campaign_returns_alerts(self, client):
+        """Activation should produce pacing deviation alerts."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        data = resp.get_json()
+        assert "alerts" in data["pacing"]
+        # With varied pacing, there should be at least one alert
+        assert len(data["pacing"]["alerts"]) > 0
+
+    def test_activate_campaign_returns_reallocation_proposals(self, client):
+        """Activation should propose budget reallocations."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        data = resp.get_json()
+        assert "recommendations" in data["pacing"]
+        # With under/overpacing, should have at least one proposal
+        assert len(data["pacing"]["recommendations"]) > 0
+        rec = data["pacing"]["recommendations"][0]
+        assert "source_channel" in rec
+        assert "target_channel" in rec
+        assert "amount" in rec
+        assert "reason" in rec
+
+    def test_activate_campaign_returns_deal_metrics(self, client):
+        """Activation response includes deal-level metrics."""
+        campaign_id = self._advance_to_ready(client)
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        data = resp.get_json()
+        deals = data["pacing"]["deal_snapshots"]
+        assert len(deals) > 0
+        for deal in deals:
+            assert "deal_id" in deal
+            assert "allocated_budget" in deal
+            assert "spend" in deal
+            assert "fill_rate" in deal
+            assert "win_rate" in deal
+
+    def test_activate_campaign_emits_activated_event(self, client):
+        """Activation emits a CAMPAIGN_ACTIVATED event."""
+        campaign_id = self._advance_to_ready(client)
+        client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        resp = client.get(f"/api/events?campaign_id={campaign_id}")
+        data = resp.get_json()
+        event_types = [e["event_type"] for e in data["events"]]
+        assert "campaign.activated" in event_types
+
+    def test_activate_nonexistent_campaign_returns_404(self, client):
+        """Activating a non-existent campaign returns 404."""
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": "nonexistent-id"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+    def test_activate_campaign_missing_body_returns_400(self, client):
+        """Activation without campaign_id returns 400."""
+        resp = client.post(
+            "/api/activate-campaign",
+            data=json.dumps({}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# API: Pause / Complete campaign (Stage 6 controls)
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignControls:
+    """Test pause and complete controls for active campaigns."""
+
+    def _advance_to_active(self, client):
+        """Helper: advance campaign through all stages to ACTIVE."""
+        resp = client.post(
+            "/api/submit-brief",
+            data=json.dumps(SAMPLE_BRIEF),
+            content_type="application/json",
+        )
+        campaign_id = resp.get_json()["campaign_id"]
+        client.post(
+            "/api/approve-plan",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-booking",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-creative",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        return campaign_id
+
+    def test_pause_campaign(self, client):
+        """POST /api/pause-campaign transitions ACTIVE to PAUSED."""
+        campaign_id = self._advance_to_active(client)
+        resp = client.post(
+            "/api/pause-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["status"] == "paused"
+
+        # Verify state
+        resp = client.get(f"/api/campaign/{campaign_id}")
+        assert resp.get_json()["status"] == "paused"
+
+    def test_complete_campaign(self, client):
+        """POST /api/complete-campaign transitions ACTIVE to COMPLETED."""
+        campaign_id = self._advance_to_active(client)
+        resp = client.post(
+            "/api/complete-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert data["status"] == "completed"
+
+        # Verify state
+        resp = client.get(f"/api/campaign/{campaign_id}")
+        assert resp.get_json()["status"] == "completed"
+
+    def test_pause_nonexistent_campaign_returns_404(self, client):
+        """Pausing a non-existent campaign returns 404."""
+        resp = client.post(
+            "/api/pause-campaign",
+            data=json.dumps({"campaign_id": "nonexistent-id"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+    def test_complete_nonexistent_campaign_returns_404(self, client):
+        """Completing a non-existent campaign returns 404."""
+        resp = client.post(
+            "/api/complete-campaign",
+            data=json.dumps({"campaign_id": "nonexistent-id"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# API: Pacing report for active campaign (Stage 6)
+# ---------------------------------------------------------------------------
+
+
+class TestActivePacingReport:
+    """Test pacing report endpoint for active campaigns."""
+
+    def _advance_to_active(self, client):
+        """Helper: advance campaign through all stages to ACTIVE."""
+        resp = client.post(
+            "/api/submit-brief",
+            data=json.dumps(SAMPLE_BRIEF),
+            content_type="application/json",
+        )
+        campaign_id = resp.get_json()["campaign_id"]
+        client.post(
+            "/api/approve-plan",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-booking",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/approve-creative",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        client.post(
+            "/api/activate-campaign",
+            data=json.dumps({"campaign_id": campaign_id}),
+            content_type="application/json",
+        )
+        return campaign_id
+
+    def test_pacing_report_returns_active_data(self, client):
+        """GET /api/campaign/<id>/report for ACTIVE campaign has pacing data."""
+        campaign_id = self._advance_to_active(client)
+        resp = client.get(f"/api/campaign/{campaign_id}/report")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status_summary"]["status"] == "active"
+        # Should have non-zero pacing data
+        pd = data["pacing_dashboard"]
+        assert pd["total_spend"] > 0

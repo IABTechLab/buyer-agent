@@ -1,17 +1,18 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Campaign Automation step-through demo app (ar-llj4).
+"""Campaign Automation step-through demo app (ar-llj4, ar-uxpw).
 
 Interactive Flask app that lets a user step through the entire Campaign
 Automation pipeline, one stage at a time, with approval at each step.
 
-5 stages:
-  1. Enter Brief     -- Submit a campaign brief, create campaign in DRAFT
-  2. Review Plan     -- View channel breakdown, approve plan -> PLANNING
-  3. Review Deals    -- View booked deals, approve booking -> BOOKING
-  4. Review Creative -- View creative matching, approve -> READY
-  5. Campaign Ready  -- View full campaign report
+6 stages:
+  1. Enter Brief      -- Submit a campaign brief, create campaign in DRAFT
+  2. Review Plan      -- View channel breakdown, approve plan -> PLANNING
+  3. Review Deals     -- View booked deals, approve booking -> BOOKING
+  4. Review Creative  -- View creative matching, approve -> READY
+  5. Campaign Ready   -- View full campaign report, activate button
+  6. Active Campaign  -- Pacing dashboard, alerts, reallocations, controls
 
 Run standalone:
     cd ad_buyer_system && source venv/bin/activate
@@ -25,7 +26,7 @@ Uses real pipeline modules:
   - BudgetPacingEngine (pacing/engine.py)
   - EventBus (events/)
 
-bead: ar-llj4
+bead: ar-llj4, ar-uxpw
 """
 
 from __future__ import annotations
@@ -34,8 +35,9 @@ import asyncio
 import json
 import logging
 import os
+import random
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -55,6 +57,7 @@ from ..models.campaign_brief import (
     parse_campaign_brief,
 )
 from ..models.state_machine import CampaignStatus
+from ..pacing.engine import BudgetPacingEngine, PacingConfig
 from ..reporting.campaign_report import CampaignReporter
 from ..storage.campaign_store import CampaignStore
 from ..storage.pacing_store import PacingStore
@@ -553,6 +556,176 @@ class DemoPipelineHelper:
             payload={"campaign_id": campaign_id},
         )
 
+    # -- Stage 6: Activate -> ACTIVE (with simulated pacing) ---------------
+
+    def activate_campaign(self, campaign_id: str) -> PacingSnapshot:
+        """Transition campaign from READY to ACTIVE, generate simulated pacing.
+
+        Since there is no real ad serving, we simulate delivery data:
+        - Some channels overpace, some underpace (triggering alerts)
+        - Deal-level metrics are generated with realistic fill/win rates
+        - The BudgetPacingEngine generates alerts and reallocation proposals
+
+        Returns:
+            PacingSnapshot with simulated delivery data and recommendations.
+        """
+        campaign = self._store.get_campaign(campaign_id)
+        if campaign is None:
+            raise KeyError(f"Campaign not found: {campaign_id}")
+
+        # Transition READY -> ACTIVE
+        self._store.activate_campaign(campaign_id)
+
+        self._emit_sync(
+            EventType.CAMPAIGN_ACTIVATED,
+            campaign_id=campaign_id,
+            payload={"campaign_id": campaign_id},
+        )
+
+        # Build simulated delivery data
+        booking = self._booking_results.get(campaign_id, {})
+        total_budget = campaign["total_budget"]
+
+        # Parse flight dates for pacing calculation
+        flight_start_str = campaign["flight_start"]
+        flight_end_str = campaign["flight_end"]
+        flight_start = datetime.fromisoformat(flight_start_str).replace(
+            tzinfo=timezone.utc
+        )
+        flight_end = datetime.fromisoformat(flight_end_str).replace(
+            tzinfo=timezone.utc
+        )
+
+        # Simulate "current time" as 35% through the flight
+        flight_duration = (flight_end - flight_start).total_seconds()
+        sim_elapsed = flight_duration * 0.35
+        sim_now = flight_start + timedelta(seconds=sim_elapsed)
+
+        # Pre-defined pacing multipliers per channel to create varied scenarios.
+        # Values <1.0 = underpacing, >1.0 = overpacing.
+        pacing_multipliers = {
+            "CTV": 0.72,        # Underpacing (critical, -28%)
+            "DISPLAY": 1.35,    # Overpacing (critical, +35%)
+            "AUDIO": 0.88,      # Slightly underpacing (warning, -12%)
+            "NATIVE": 1.15,     # Slightly overpacing (warning, +15%)
+            "DOOH": 0.60,       # Heavily underpacing
+            "LINEAR_TV": 1.05,  # On pace
+        }
+
+        # Build channel_data and deal_data for the pacing engine
+        channel_data: dict[str, dict[str, Any]] = {}
+        deal_data: list[dict[str, Any]] = []
+
+        # Use a seeded RNG for reproducible but realistic variance
+        rng = random.Random(hash(campaign_id) % (2**32))
+
+        for channel, deals in booking.items():
+            ch_budget = sum(d["spend"] for d in deals)
+            multiplier = pacing_multipliers.get(channel, 1.0)
+
+            # Expected spend for this channel at sim_now
+            ch_expected = ch_budget * 0.35  # 35% through flight
+            ch_spend = round(ch_expected * multiplier, 2)
+
+            # Impressions based on spend and deal CPMs
+            ch_impressions = 0
+            avg_cpm = 0.0
+            if deals:
+                avg_cpm = sum(d["cpm"] for d in deals) / len(deals)
+                ch_impressions = int((ch_spend / avg_cpm) * 1000) if avg_cpm > 0 else 0
+
+            ch_fill_rate = round(rng.uniform(0.60, 0.95), 2)
+            ch_ecpm = round(avg_cpm * rng.uniform(0.85, 1.15), 2)
+
+            channel_data[channel] = {
+                "allocated_budget": ch_budget,
+                "spend": ch_spend,
+                "impressions": ch_impressions,
+                "effective_cpm": ch_ecpm,
+                "fill_rate": ch_fill_rate,
+            }
+
+            # Per-deal metrics
+            for d in deals:
+                deal_budget = d["spend"]
+                deal_expected = deal_budget * 0.35
+                # Add per-deal variance around channel multiplier
+                deal_mult = multiplier * rng.uniform(0.85, 1.15)
+                deal_spend = round(deal_expected * deal_mult, 2)
+                deal_imps = int((deal_spend / d["cpm"]) * 1000) if d["cpm"] > 0 else 0
+                deal_fill = round(rng.uniform(0.55, 0.98), 2)
+                deal_win = round(rng.uniform(0.30, 0.85), 2)
+                deal_ecpm = round(d["cpm"] * rng.uniform(0.90, 1.10), 2)
+
+                deal_data.append({
+                    "deal_id": d["deal_id"],
+                    "allocated_budget": deal_budget,
+                    "spend": deal_spend,
+                    "impressions": deal_imps,
+                    "effective_cpm": deal_ecpm,
+                    "fill_rate": deal_fill,
+                    "win_rate": deal_win,
+                })
+
+        # Use BudgetPacingEngine to generate the official snapshot
+        engine = BudgetPacingEngine(
+            config=PacingConfig(),
+            event_bus=self._event_bus,
+        )
+        snapshot = engine.generate_snapshot(
+            campaign_id=campaign_id,
+            total_budget=total_budget,
+            flight_start=flight_start,
+            flight_end=flight_end,
+            current_time=sim_now,
+            channel_data=channel_data,
+            deal_data=deal_data,
+        )
+
+        # Persist the snapshot
+        self._pacing_store.save_pacing_snapshot(snapshot)
+
+        return snapshot
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _extract_alerts(snapshot: PacingSnapshot) -> list:
+    """Extract pacing deviation alerts from a snapshot.
+
+    Uses the BudgetPacingEngine to detect deviations at both the campaign
+    level and per-channel level.
+    """
+    from ..pacing.engine import BudgetPacingEngine, PacingAlert
+
+    engine = BudgetPacingEngine()
+    alerts: list[PacingAlert] = []
+
+    # Campaign-level alert
+    campaign_alert = engine.detect_deviation(
+        snapshot.total_spend, snapshot.expected_spend
+    )
+    if campaign_alert is not None:
+        alerts.append(campaign_alert)
+
+    # Per-channel alerts
+    for ch in snapshot.channel_snapshots:
+        if ch.allocated_budget <= 0 or snapshot.total_budget <= 0:
+            continue
+        ch_expected = snapshot.expected_spend * (
+            ch.allocated_budget / snapshot.total_budget
+        )
+        ch_alert = engine.detect_deviation(ch.spend, ch_expected)
+        if ch_alert is not None:
+            # Add channel context to the message
+            ch_alert.message = f"[{ch.channel}] {ch_alert.message}"
+            alerts.append(ch_alert)
+
+    return alerts
+
 
 # ---------------------------------------------------------------------------
 # Flask app factory
@@ -755,6 +928,112 @@ def _register_routes(
             "creatives": creatives,
         })
 
+    # -- API: Activate campaign (Stage 6) ----------------------------------
+
+    @app.route("/api/activate-campaign", methods=["POST"])
+    def api_activate_campaign():
+        """Activate campaign (READY -> ACTIVE), generate simulated pacing."""
+        data = request.get_json(silent=True)
+        if not data or "campaign_id" not in data:
+            return jsonify({"success": False, "error": "Missing campaign_id"}), 400
+
+        campaign_id = data["campaign_id"]
+
+        try:
+            snapshot = pipeline.activate_campaign(campaign_id)
+        except KeyError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+
+        # Build response with pacing data
+        pacing_data = {
+            "total_budget": snapshot.total_budget,
+            "total_spend": snapshot.total_spend,
+            "expected_spend": snapshot.expected_spend,
+            "pacing_pct": snapshot.pacing_pct,
+            "deviation_pct": snapshot.deviation_pct,
+            "channel_snapshots": [
+                ch.model_dump() for ch in snapshot.channel_snapshots
+            ],
+            "deal_snapshots": [
+                ds.model_dump() for ds in snapshot.deal_snapshots
+            ],
+            "alerts": [
+                {
+                    "level": alert.level.value if hasattr(alert.level, "value") else alert.level,
+                    "direction": alert.direction,
+                    "deviation_pct": alert.deviation_pct,
+                    "message": alert.message,
+                }
+                for alert in _extract_alerts(snapshot)
+            ],
+            "recommendations": [
+                rec.model_dump() for rec in snapshot.recommendations
+            ],
+        }
+
+        return jsonify({
+            "success": True,
+            "campaign_id": campaign_id,
+            "status": "active",
+            "pacing": pacing_data,
+        })
+
+    # -- API: Pause campaign (Stage 6 control) -----------------------------
+
+    @app.route("/api/pause-campaign", methods=["POST"])
+    def api_pause_campaign():
+        """Pause an active campaign (ACTIVE -> PAUSED)."""
+        data = request.get_json(silent=True)
+        if not data or "campaign_id" not in data:
+            return jsonify({"success": False, "error": "Missing campaign_id"}), 400
+
+        campaign_id = data["campaign_id"]
+
+        try:
+            campaign = campaign_store.get_campaign(campaign_id)
+            if campaign is None:
+                raise KeyError(f"Campaign not found: {campaign_id}")
+            campaign_store.pause_campaign(campaign_id)
+        except KeyError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+
+        return jsonify({
+            "success": True,
+            "campaign_id": campaign_id,
+            "status": "paused",
+        })
+
+    # -- API: Complete campaign (Stage 6 control) --------------------------
+
+    @app.route("/api/complete-campaign", methods=["POST"])
+    def api_complete_campaign():
+        """Complete an active campaign (ACTIVE -> COMPLETED)."""
+        data = request.get_json(silent=True)
+        if not data or "campaign_id" not in data:
+            return jsonify({"success": False, "error": "Missing campaign_id"}), 400
+
+        campaign_id = data["campaign_id"]
+
+        try:
+            campaign = campaign_store.get_campaign(campaign_id)
+            if campaign is None:
+                raise KeyError(f"Campaign not found: {campaign_id}")
+            campaign_store.complete_campaign(campaign_id)
+        except KeyError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+
+        return jsonify({
+            "success": True,
+            "campaign_id": campaign_id,
+            "status": "completed",
+        })
+
     # -- API: Campaign report (Stage 5) ------------------------------------
 
     @app.route("/api/campaign/<campaign_id>/report")
@@ -889,6 +1168,7 @@ def main() -> None:
     print("    3. Review Deals      -> Approve deal booking")
     print("    4. Review Creative   -> Approve creative matching")
     print("    5. Campaign Ready    -> View full campaign report")
+    print("    6. Active Campaign   -> Pacing dashboard, alerts, controls")
     print()
     app.run(host="0.0.0.0", port=port, debug=True)
 

@@ -151,6 +151,14 @@
         .badge-planning { background: #dbeafe; color: #1d4ed8; }
         .badge-booking { background: #fef3c7; color: #92400e; }
         .badge-ready { background: #dcfce7; color: #166534; }
+        .badge-active { background: #dbeafe; color: #1d4ed8; animation: pulse-badge 2s infinite; }
+        .badge-paused { background: #fef3c7; color: #92400e; }
+        .badge-completed { background: #dcfce7; color: #166534; }
+
+        @keyframes pulse-badge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
 
         .stage-summary { display: none; font-size: 14px; color: var(--text-muted); }
 
@@ -185,6 +193,64 @@
         .btn-success { background: var(--success); color: white; }
         .btn-success:hover:not(:disabled) { background: #15803d; }
         .btn-secondary { background: #e2e8f0; color: var(--text); }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-warning:hover:not(:disabled) { background: #b45309; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover:not(:disabled) { background: #b91c1c; }
+        .btn-group { display: flex; gap: 12px; margin-top: 16px; }
+
+        /* Pacing deviation indicators */
+        .deviation-warning { color: var(--warning); }
+        .deviation-critical { color: var(--danger); }
+        .deviation-ok { color: var(--success); }
+
+        /* Alert cards */
+        .alert-card {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin: 8px 0;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert-warning {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            color: #92400e;
+        }
+        .alert-critical {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+        .alert-icon { font-weight: 700; font-size: 16px; }
+
+        /* Reallocation proposal cards */
+        .realloc-card {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        .realloc-arrow { color: var(--primary); font-weight: 700; margin: 0 8px; }
+
+        /* Flight progress bar */
+        .flight-progress {
+            background: #e2e8f0;
+            border-radius: 4px;
+            height: 8px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .flight-progress-fill {
+            background: var(--primary);
+            border-radius: 4px;
+            height: 100%;
+            transition: width 0.3s;
+        }
 
         /* Tables */
         table {
@@ -302,6 +368,10 @@
                 <div class="step-circle">5</div>
                 <div class="step-label">Campaign Ready</div>
             </div>
+            <div class="progress-step" data-step="6">
+                <div class="step-circle">6</div>
+                <div class="step-label">Active</div>
+            </div>
         </div>
     </div>
 </div>
@@ -402,7 +472,32 @@
             <h2>Stage 5: Campaign Ready <span class="badge badge-ready">READY</span></h2>
             <div class="stage-content">
                 <div id="reportContent"></div>
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <button class="btn btn-success" id="activateCampaignBtn" onclick="activateCampaign()">
+                        Activate Campaign
+                    </button>
+                </div>
+                <div id="stage5Error" class="error-msg" style="display:none"></div>
             </div>
+            <div class="stage-summary"></div>
+        </div>
+
+        <!-- Stage 6: Active Campaign -->
+        <div class="stage-card" id="stage6">
+            <h2>Stage 6: Active Campaign <span class="badge badge-active" id="stage6Badge">ACTIVE</span></h2>
+            <div class="stage-content">
+                <div id="activeCampaignContent"></div>
+                <div class="btn-group" id="activeCampaignControls">
+                    <button class="btn btn-warning" id="pauseCampaignBtn" onclick="pauseCampaign()">
+                        Pause Campaign
+                    </button>
+                    <button class="btn btn-danger" id="completeCampaignBtn" onclick="completeCampaign()">
+                        Complete Campaign
+                    </button>
+                </div>
+                <div id="stage6Error" class="error-msg" style="display:none"></div>
+            </div>
+            <div class="stage-summary"></div>
         </div>
 
     </div>
@@ -466,9 +561,10 @@
             else if (s === stage) step.classList.add('active');
         });
 
-        // Show/collapse stage cards
-        for (let i = 1; i <= 5; i++) {
+        // Show/collapse stage cards (6 stages)
+        for (let i = 1; i <= 6; i++) {
             const card = document.getElementById('stage' + i);
+            if (!card) continue;
             card.classList.remove('visible', 'collapsed');
             if (i < stage) {
                 card.classList.add('collapsed');
@@ -926,6 +1022,246 @@
             document.getElementById('reportContent').innerHTML =
                 '<div class="error-msg">Failed to load report: ' + e.message + '</div>';
         }
+    }
+
+    // ---------------------------------------------------------------
+    // Stage 6: Activate Campaign
+    // ---------------------------------------------------------------
+    async function activateCampaign() {
+        hideError(5);
+        const btn = document.getElementById('activateCampaignBtn');
+        setButtonLoading(btn, true);
+
+        try {
+            const resp = await fetch('/api/activate-campaign', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({campaign_id: campaignId}),
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                showError(5, data.error || 'Failed to activate campaign');
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            // Update stage 5 summary
+            const summary = document.querySelector('#stage5 .stage-summary');
+            summary.textContent = 'Campaign activated - now live with pacing monitoring';
+
+            // Render Stage 6 content
+            renderActiveCampaign(data.pacing);
+
+            setStage(6);
+            refreshEvents();
+
+        } catch (e) {
+            showError(5, 'Activation failed: ' + e.message);
+        }
+        setButtonLoading(btn, false);
+    }
+
+    function renderActiveCampaign(pacing) {
+        const div = document.getElementById('activeCampaignContent');
+        let html = '';
+
+        // Campaign Status + Flight Progress
+        const flightPct = 35; // Simulated at 35% through flight
+        html += `
+            <h3 style="margin-bottom: 12px;">Campaign Status</h3>
+            <div class="metric-row">
+                <div class="metric-card">
+                    <div class="metric-label">Status</div>
+                    <div class="metric-value" style="color: var(--primary)">ACTIVE</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Flight Progress</div>
+                    <div class="metric-value">${flightPct.toFixed(0)}%</div>
+                    <div class="flight-progress">
+                        <div class="flight-progress-fill" style="width: ${flightPct}%"></div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Budget Delivered</div>
+                    <div class="metric-value money">${formatMoney(pacing.total_spend)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Total Budget</div>
+                    <div class="metric-value money">${formatMoney(pacing.total_budget)}</div>
+                </div>
+            </div>
+        `;
+
+        // Pacing Dashboard
+        const deviationClass = Math.abs(pacing.deviation_pct) > 25 ? 'deviation-critical' :
+                               Math.abs(pacing.deviation_pct) > 10 ? 'deviation-warning' : 'deviation-ok';
+        html += `
+            <h3 style="margin: 24px 0 12px;">Pacing Dashboard</h3>
+            <div class="metric-row">
+                <div class="metric-card">
+                    <div class="metric-label">Overall Pacing</div>
+                    <div class="metric-value ${deviationClass}">${pacing.pacing_pct.toFixed(1)}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Expected Spend</div>
+                    <div class="metric-value money">${formatMoney(pacing.expected_spend)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Actual Spend</div>
+                    <div class="metric-value money">${formatMoney(pacing.total_spend)}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Deviation</div>
+                    <div class="metric-value ${deviationClass}">${pacing.deviation_pct > 0 ? '+' : ''}${pacing.deviation_pct.toFixed(1)}%</div>
+                </div>
+            </div>
+        `;
+
+        // Per-Channel Breakdown
+        if (pacing.channel_snapshots && pacing.channel_snapshots.length > 0) {
+            html += `
+                <h3 style="margin: 24px 0 12px;">Per-Channel Breakdown</h3>
+                <table><thead><tr>
+                    <th>Channel</th><th>Budget</th><th>Spent</th>
+                    <th>Pacing %</th><th>Impressions</th><th>eCPM</th><th>Status</th>
+                </tr></thead><tbody>`;
+            pacing.channel_snapshots.forEach(ch => {
+                const chDev = ch.pacing_pct - 100;
+                const chClass = Math.abs(chDev) > 25 ? 'deviation-critical' :
+                                Math.abs(chDev) > 10 ? 'deviation-warning' : 'deviation-ok';
+                const statusLabel = Math.abs(chDev) > 25 ? 'CRITICAL' :
+                                    Math.abs(chDev) > 10 ? 'WARNING' : 'ON PACE';
+                html += `<tr>
+                    <td><span class="channel-tag">${ch.channel}</span></td>
+                    <td class="money">${formatMoney(ch.allocated_budget)}</td>
+                    <td class="money">${formatMoney(ch.spend)}</td>
+                    <td class="${chClass}" style="font-weight:600">${ch.pacing_pct.toFixed(1)}%</td>
+                    <td>${(ch.impressions || 0).toLocaleString()}</td>
+                    <td class="money">$${(ch.effective_cpm || 0).toFixed(2)}</td>
+                    <td><span class="${chClass}" style="font-weight:600; font-size:12px">${statusLabel}</span></td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+
+        // Alerts
+        if (pacing.alerts && pacing.alerts.length > 0) {
+            html += `<h3 style="margin: 24px 0 12px;">Pacing Alerts</h3>`;
+            pacing.alerts.forEach(alert => {
+                const alertClass = alert.level === 'critical' ? 'alert-critical' : 'alert-warning';
+                const icon = alert.level === 'critical' ? '!!' : '!';
+                html += `<div class="alert-card ${alertClass}">
+                    <span class="alert-icon">[${icon}]</span>
+                    <span>${alert.message}</span>
+                </div>`;
+            });
+        }
+
+        // Reallocation Proposals
+        if (pacing.recommendations && pacing.recommendations.length > 0) {
+            html += `<h3 style="margin: 24px 0 12px;">Reallocation Proposals</h3>`;
+            pacing.recommendations.forEach(rec => {
+                html += `<div class="realloc-card">
+                    <strong>${rec.source_channel}</strong>
+                    <span class="realloc-arrow">&rarr;</span>
+                    <strong>${rec.target_channel}</strong>
+                    &mdash; <span class="money">${formatMoney(rec.amount)}</span>
+                    <div style="margin-top: 6px; font-size: 12px; color: var(--text-muted)">${rec.reason}</div>
+                </div>`;
+            });
+        }
+
+        // Deal-Level Metrics
+        if (pacing.deal_snapshots && pacing.deal_snapshots.length > 0) {
+            html += `
+                <h3 style="margin: 24px 0 12px;">Deal-Level Metrics</h3>
+                <table><thead><tr>
+                    <th>Deal ID</th><th>Budget</th><th>Spend</th>
+                    <th>Impressions</th><th>eCPM</th><th>Fill Rate</th><th>Win Rate</th>
+                </tr></thead><tbody>`;
+            pacing.deal_snapshots.forEach(d => {
+                html += `<tr>
+                    <td style="font-family: monospace; font-size: 12px;">${d.deal_id}</td>
+                    <td class="money">${formatMoney(d.allocated_budget)}</td>
+                    <td class="money">${formatMoney(d.spend)}</td>
+                    <td>${(d.impressions || 0).toLocaleString()}</td>
+                    <td class="money">$${(d.effective_cpm || 0).toFixed(2)}</td>
+                    <td>${(d.fill_rate * 100).toFixed(1)}%</td>
+                    <td>${(d.win_rate * 100).toFixed(1)}%</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+
+        div.innerHTML = html;
+    }
+
+    // ---------------------------------------------------------------
+    // Stage 6: Campaign Controls (Pause / Complete)
+    // ---------------------------------------------------------------
+    async function pauseCampaign() {
+        hideError(6);
+        const btn = document.getElementById('pauseCampaignBtn');
+        setButtonLoading(btn, true);
+
+        try {
+            const resp = await fetch('/api/pause-campaign', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({campaign_id: campaignId}),
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                showError(6, data.error || 'Failed to pause campaign');
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            // Update badge and controls
+            const badge = document.getElementById('stage6Badge');
+            badge.textContent = 'PAUSED';
+            badge.className = 'badge badge-paused';
+            document.getElementById('activeCampaignControls').style.display = 'none';
+            refreshEvents();
+
+        } catch (e) {
+            showError(6, 'Pause failed: ' + e.message);
+        }
+        setButtonLoading(btn, false);
+    }
+
+    async function completeCampaign() {
+        hideError(6);
+        const btn = document.getElementById('completeCampaignBtn');
+        setButtonLoading(btn, true);
+
+        try {
+            const resp = await fetch('/api/complete-campaign', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({campaign_id: campaignId}),
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                showError(6, data.error || 'Failed to complete campaign');
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            // Update badge and controls
+            const badge = document.getElementById('stage6Badge');
+            badge.textContent = 'COMPLETED';
+            badge.className = 'badge badge-completed';
+            document.getElementById('activeCampaignControls').style.display = 'none';
+            refreshEvents();
+
+        } catch (e) {
+            showError(6, 'Complete failed: ' + e.message);
+        }
+        setButtonLoading(btn, false);
     }
 
     // ---------------------------------------------------------------
