@@ -1015,6 +1015,33 @@ def _register_routes(
             "status": "paused",
         })
 
+    # -- API: Resume campaign (Stage 6 control) ----------------------------
+
+    @app.route("/api/resume-campaign", methods=["POST"])
+    def api_resume_campaign():
+        """Resume a paused campaign (PAUSED -> ACTIVE)."""
+        data = request.get_json(silent=True)
+        if not data or "campaign_id" not in data:
+            return jsonify({"success": False, "error": "Missing campaign_id"}), 400
+
+        campaign_id = data["campaign_id"]
+
+        try:
+            campaign = campaign_store.get_campaign(campaign_id)
+            if campaign is None:
+                raise KeyError(f"Campaign not found: {campaign_id}")
+            campaign_store.resume_campaign(campaign_id)
+        except KeyError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 404
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
+
+        return jsonify({
+            "success": True,
+            "campaign_id": campaign_id,
+            "status": "active",
+        })
+
     # -- API: Complete campaign (Stage 6 control) --------------------------
 
     @app.route("/api/complete-campaign", methods=["POST"])

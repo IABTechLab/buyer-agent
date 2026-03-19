@@ -491,6 +491,9 @@
                     <button class="btn btn-warning" id="pauseCampaignBtn" onclick="pauseCampaign()">
                         Pause Campaign
                     </button>
+                    <button class="btn btn-success" id="resumeCampaignBtn" onclick="resumeCampaign()" style="display:none">
+                        Resume Campaign
+                    </button>
                     <button class="btn btn-danger" id="completeCampaignBtn" onclick="completeCampaign()">
                         Complete Campaign
                     </button>
@@ -1219,15 +1222,49 @@
                 return;
             }
 
-            // Update badge and controls
+            // Update badge and swap buttons
             const badge = document.getElementById('stage6Badge');
             badge.textContent = 'PAUSED';
             badge.className = 'badge badge-paused';
-            document.getElementById('activeCampaignControls').style.display = 'none';
+            document.getElementById('pauseCampaignBtn').style.display = 'none';
+            document.getElementById('resumeCampaignBtn').style.display = 'inline-block';
             refreshEvents();
 
         } catch (e) {
             showError(6, 'Pause failed: ' + e.message);
+        }
+        setButtonLoading(btn, false);
+    }
+
+    async function resumeCampaign() {
+        hideError(6);
+        const btn = document.getElementById('resumeCampaignBtn');
+        setButtonLoading(btn, true);
+
+        try {
+            const resp = await fetch('/api/resume-campaign', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({campaign_id: campaignId}),
+            });
+            const data = await resp.json();
+
+            if (!data.success) {
+                showError(6, data.error || 'Failed to resume campaign');
+                setButtonLoading(btn, false);
+                return;
+            }
+
+            // Update badge and swap buttons back
+            const badge = document.getElementById('stage6Badge');
+            badge.textContent = 'ACTIVE';
+            badge.className = 'badge badge-active';
+            document.getElementById('resumeCampaignBtn').style.display = 'none';
+            document.getElementById('pauseCampaignBtn').style.display = 'inline-block';
+            refreshEvents();
+
+        } catch (e) {
+            showError(6, 'Resume failed: ' + e.message);
         }
         setButtonLoading(btn, false);
     }
