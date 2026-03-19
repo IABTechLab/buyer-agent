@@ -135,6 +135,50 @@ class TestDiscoverInventoryTool:
         assert "15%" in result or "ADVERTISER" in result.upper()
 
     @pytest.mark.asyncio
+    async def test_discover_tiered_price_uses_pricing_calculator(self, mock_client, agency_context):
+        """Test that discovery computes tiered price via PricingCalculator.
+
+        Agency tier (10% discount) on $25.00 base -> $22.50 tiered price.
+        Verifies the refactored _format_results uses PricingCalculator
+        and produces identical output to the old inline math.
+        """
+        mock_client.search_products.return_value = MagicMock(
+            success=True,
+            data=[{"id": "prod_1", "name": "Premium CTV", "basePrice": 25.00}],
+        )
+
+        tool = DiscoverInventoryTool(
+            client=mock_client,
+            buyer_context=agency_context,
+        )
+
+        result = await tool._arun(query="CTV")
+
+        # Agency 10% discount: $25.00 * 0.90 = $22.50
+        assert "$22.50" in result
+        assert "was $25.00" in result
+
+    @pytest.mark.asyncio
+    async def test_discover_public_tier_no_discount(self, mock_client, public_context):
+        """Test that public tier shows base price without discount annotation."""
+        mock_client.search_products.return_value = MagicMock(
+            success=True,
+            data=[{"id": "prod_1", "name": "Standard Display", "basePrice": 15.00}],
+        )
+
+        tool = DiscoverInventoryTool(
+            client=mock_client,
+            buyer_context=public_context,
+        )
+
+        result = await tool._arun(query="display")
+
+        # Public tier gets 0% discount, so price display should be flat $15.00
+        assert "$15.00" in result
+        # Should NOT show "was $X" since there's no discount
+        assert "was $" not in result
+
+    @pytest.mark.asyncio
     async def test_discover_error_handling(self, mock_client, agency_context):
         """Test error handling in discovery."""
         mock_client.search_products.return_value = MagicMock(
