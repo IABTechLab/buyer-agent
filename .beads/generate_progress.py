@@ -23,15 +23,15 @@ PHASE_MAP = {
 # These are the canonical phase epics created per the revised 5-phase plan
 # (DEAL_JOCKEY_STRATEGIC_PLAN.md Section 9)
 DJ_PHASE_EPICS = {
-    "buyer-4km": ("DealJockey Phase 1", "MVP DealJockey"),
-    "buyer-bzf": ("DealJockey Phase 2", "Templates & Seller Integration"),
-    "buyer-x3a": ("DealJockey Phase 3", "Portfolio Intelligence"),
-    "buyer-91o": ("DealJockey Phase 4", "Platform Integrations"),
-    "buyer-q8n": ("DealJockey Phase 5", "External Model Integration"),
+    "buyer-te6b.1": ("DealJockey Phase 1", "MVP DealJockey"),
+    "buyer-te6b.2": ("DealJockey Phase 2", "Templates & Seller Integration"),
+    "buyer-te6b.3": ("DealJockey Phase 3", "Portfolio Intelligence"),
+    "buyer-te6b.4": ("DealJockey Phase 4", "Platform Integrations"),
+    "buyer-te6b.5": ("DealJockey Phase 5", "External Model Integration"),
 }
 
 # Ordered list of DJ phase epic IDs for rendering order
-DJ_PHASE_ORDER = ["buyer-4km", "buyer-bzf", "buyer-x3a", "buyer-91o", "buyer-q8n"]
+DJ_PHASE_ORDER = ["buyer-te6b.1", "buyer-te6b.2", "buyer-te6b.3", "buyer-te6b.4", "buyer-te6b.5"]
 
 
 def load_issues():
