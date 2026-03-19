@@ -44,7 +44,7 @@ def refresh_jsonl():
         return
     try:
         subprocess.run(
-            ["bd", "export", "-o", str(JSONL_PATH)],
+            ["bd", "export", "--no-auto-import", "-o", str(JSONL_PATH)],
             check=True,
             capture_output=True,
             timeout=30,
