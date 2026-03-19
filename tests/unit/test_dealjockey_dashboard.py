@@ -158,7 +158,7 @@ class TestAPIRoutes:
         resp = client.get("/api/schema")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["schema_version"] == 2
+        assert data["schema_version"] == 3
         assert isinstance(data["tables"], list)
         assert len(data["tables"]) > 0
         assert isinstance(data["v2_columns"], list)

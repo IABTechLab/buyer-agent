@@ -1265,6 +1265,332 @@ class DealStore:
             return cursor.rowcount > 0
 
     # ------------------------------------------------------------------
+    # Deal Templates (v3, Strategic Plan Section 6.3)
+    # ------------------------------------------------------------------
+
+    def save_deal_template(
+        self,
+        *,
+        template_id: Optional[str] = None,
+        name: str,
+        deal_type_pref: Optional[str] = None,
+        inventory_types: Optional[str] = None,
+        preferred_publishers: Optional[str] = None,
+        excluded_publishers: Optional[str] = None,
+        targeting_defaults: Optional[str] = None,
+        max_cpm: Optional[float] = None,
+        min_impressions: Optional[int] = None,
+        default_flight_days: Optional[int] = None,
+        supply_path_prefs: Optional[str] = None,
+        advertiser_id: Optional[str] = None,
+        agency_id: Optional[str] = None,
+    ) -> str:
+        """Insert a new deal template.
+
+        Args:
+            template_id: Optional UUID. Generated if not provided.
+            name: Human-readable template name (required).
+            deal_type_pref: Preferred deal type (PG, PD, PA, etc.).
+            inventory_types: JSON array of media types.
+            preferred_publishers: JSON array of publisher domains.
+            excluded_publishers: JSON array of excluded publisher domains.
+            targeting_defaults: JSON object with default targeting.
+            max_cpm: Maximum CPM ceiling.
+            min_impressions: Minimum impression volume.
+            default_flight_days: Standard deal duration in days.
+            supply_path_prefs: JSON object with supply path preferences.
+            advertiser_id: Scoped to advertiser, or None for agency-wide.
+            agency_id: Agency identifier.
+
+        Returns:
+            The template ID (generated or provided).
+        """
+        if template_id is None:
+            template_id = str(uuid.uuid4())
+        now = _now_iso()
+
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO deal_templates (
+                    id, name, deal_type_pref, inventory_types,
+                    preferred_publishers, excluded_publishers,
+                    targeting_defaults, max_cpm, min_impressions,
+                    default_flight_days, supply_path_prefs,
+                    advertiser_id, agency_id, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    template_id, name, deal_type_pref, inventory_types,
+                    preferred_publishers, excluded_publishers,
+                    targeting_defaults, max_cpm, min_impressions,
+                    default_flight_days, supply_path_prefs,
+                    advertiser_id, agency_id, now, now,
+                ),
+            )
+            self._conn.commit()
+
+        logger.info("Saved deal template %s: %s", template_id, name)
+        return template_id
+
+    def get_deal_template(self, template_id: str) -> Optional[dict[str, Any]]:
+        """Retrieve a deal template by ID.
+
+        Args:
+            template_id: The template's primary key.
+
+        Returns:
+            Template as a dict, or None if not found.
+        """
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM deal_templates WHERE id = ?", (template_id,)
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    def list_deal_templates(
+        self,
+        *,
+        advertiser_id: Optional[str] = None,
+        deal_type_pref: Optional[str] = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """List deal templates with optional filters.
+
+        Args:
+            advertiser_id: Filter by advertiser scope.
+            deal_type_pref: Filter by preferred deal type.
+            limit: Maximum rows to return.
+
+        Returns:
+            List of template dicts ordered by created_at descending.
+        """
+        conditions: list[str] = []
+        params: list[Any] = []
+
+        if advertiser_id is not None:
+            conditions.append("advertiser_id = ?")
+            params.append(advertiser_id)
+        if deal_type_pref is not None:
+            conditions.append("deal_type_pref = ?")
+            params.append(deal_type_pref)
+
+        where = ""
+        if conditions:
+            where = "WHERE " + " AND ".join(conditions)
+
+        query = f"SELECT * FROM deal_templates {where} ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        with self._lock:
+            cursor = self._conn.execute(query, params)
+            rows = cursor.fetchall()
+
+        return [dict(row) for row in rows]
+
+    def update_deal_template(self, template_id: str, **kwargs: Any) -> bool:
+        """Update fields on an existing deal template.
+
+        Args:
+            template_id: The template to update.
+            **kwargs: Column-value pairs to update.
+
+        Returns:
+            True if a row was updated, False if not found or no kwargs.
+        """
+        if not kwargs:
+            return False
+
+        # Only allow known columns
+        allowed = {
+            "name", "deal_type_pref", "inventory_types",
+            "preferred_publishers", "excluded_publishers",
+            "targeting_defaults", "max_cpm", "min_impressions",
+            "default_flight_days", "supply_path_prefs",
+            "advertiser_id", "agency_id",
+        }
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return False
+
+        updates["updated_at"] = _now_iso()
+        set_clause = ", ".join(f"{col} = ?" for col in updates)
+        values = list(updates.values()) + [template_id]
+
+        with self._lock:
+            cursor = self._conn.execute(
+                f"UPDATE deal_templates SET {set_clause} WHERE id = ?",
+                values,
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_deal_template(self, template_id: str) -> bool:
+        """Delete a deal template by ID.
+
+        Args:
+            template_id: The template to delete.
+
+        Returns:
+            True if a row was deleted, False if not found.
+        """
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM deal_templates WHERE id = ?", (template_id,)
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    # ------------------------------------------------------------------
+    # Supply Path Templates (v3, Strategic Plan Section 6.4)
+    # ------------------------------------------------------------------
+
+    def save_supply_path_template(
+        self,
+        *,
+        template_id: Optional[str] = None,
+        name: str,
+        scoring_weights: Optional[str] = None,
+        max_reseller_hops: Optional[int] = None,
+        require_sellers_json: Optional[int] = None,
+        preferred_ssps: Optional[str] = None,
+        blocked_ssps: Optional[str] = None,
+        preferred_curators: Optional[str] = None,
+        rules: Optional[str] = None,
+    ) -> str:
+        """Insert a new supply path template.
+
+        Args:
+            template_id: Optional UUID. Generated if not provided.
+            name: Human-readable template name (required).
+            scoring_weights: JSON object with transparency/fee/trust/performance weights.
+            max_reseller_hops: Maximum acceptable intermediary hops.
+            require_sellers_json: 1 to require sellers.json, 0 otherwise.
+            preferred_ssps: JSON array of preferred SSP identifiers.
+            blocked_ssps: JSON array of blocked SSP identifiers.
+            preferred_curators: JSON array of preferred curator identifiers.
+            rules: JSON array of routing rules.
+
+        Returns:
+            The template ID (generated or provided).
+        """
+        if template_id is None:
+            template_id = str(uuid.uuid4())
+        now = _now_iso()
+
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO supply_path_templates (
+                    id, name, scoring_weights, max_reseller_hops,
+                    require_sellers_json, preferred_ssps, blocked_ssps,
+                    preferred_curators, rules, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    template_id, name, scoring_weights, max_reseller_hops,
+                    require_sellers_json, preferred_ssps, blocked_ssps,
+                    preferred_curators, rules, now, now,
+                ),
+            )
+            self._conn.commit()
+
+        logger.info("Saved supply path template %s: %s", template_id, name)
+        return template_id
+
+    def get_supply_path_template(
+        self, template_id: str
+    ) -> Optional[dict[str, Any]]:
+        """Retrieve a supply path template by ID.
+
+        Args:
+            template_id: The template's primary key.
+
+        Returns:
+            Template as a dict, or None if not found.
+        """
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM supply_path_templates WHERE id = ?",
+                (template_id,),
+            )
+            row = cursor.fetchone()
+        if row is None:
+            return None
+        return dict(row)
+
+    def list_supply_path_templates(
+        self, *, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """List supply path templates.
+
+        Args:
+            limit: Maximum rows to return.
+
+        Returns:
+            List of template dicts ordered by created_at descending.
+        """
+        with self._lock:
+            cursor = self._conn.execute(
+                "SELECT * FROM supply_path_templates ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            )
+            rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+
+    def update_supply_path_template(
+        self, template_id: str, **kwargs: Any
+    ) -> bool:
+        """Update fields on an existing supply path template.
+
+        Args:
+            template_id: The template to update.
+            **kwargs: Column-value pairs to update.
+
+        Returns:
+            True if a row was updated, False if not found or no kwargs.
+        """
+        if not kwargs:
+            return False
+
+        allowed = {
+            "name", "scoring_weights", "max_reseller_hops",
+            "require_sellers_json", "preferred_ssps", "blocked_ssps",
+            "preferred_curators", "rules",
+        }
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return False
+
+        updates["updated_at"] = _now_iso()
+        set_clause = ", ".join(f"{col} = ?" for col in updates)
+        values = list(updates.values()) + [template_id]
+
+        with self._lock:
+            cursor = self._conn.execute(
+                f"UPDATE supply_path_templates SET {set_clause} WHERE id = ?",
+                values,
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    def delete_supply_path_template(self, template_id: str) -> bool:
+        """Delete a supply path template by ID.
+
+        Args:
+            template_id: The template to delete.
+
+        Returns:
+            True if a row was deleted, False if not found.
+        """
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM supply_path_templates WHERE id = ?",
+                (template_id,),
+            )
+            self._conn.commit()
+            return cursor.rowcount > 0
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
