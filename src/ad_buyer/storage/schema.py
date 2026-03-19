@@ -350,13 +350,15 @@ CREATE TABLE IF NOT EXISTS creative_assets (
     source_url          TEXT,
     validation_status   TEXT,
     validation_errors   TEXT,
-    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 """
 
 CREATIVE_ASSETS_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_creative_assets_campaign_id ON creative_assets(campaign_id);",
     "CREATE INDEX IF NOT EXISTS idx_creative_assets_asset_type ON creative_assets(asset_type);",
+    "CREATE INDEX IF NOT EXISTS idx_creative_assets_validation_status ON creative_assets(validation_status);",
 ]
 
 AD_SERVER_CAMPAIGNS_TABLE = """
