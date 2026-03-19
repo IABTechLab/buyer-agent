@@ -23,6 +23,25 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# Schema Version Registry
+# ============================================================
+# Each workstream reserves version numbers here BEFORE writing
+# migrations. This prevents two workstreams from claiming the
+# same version and creating merge conflicts.
+#
+# Version | Workstream           | Bead            | Description
+# --------|----------------------|-----------------|---------------------------
+# v1      | Core                 | (initial)       | Base buyer agent schema
+# v2      | DealJockey Wave 1    | buyer-te6b.1.11 | DealStore: deal_library, portfolio_metadata, deal_activations
+# v3      | DealJockey Wave 2    | buyer-te6b.1.13 | DealStore: deal_templates, supply_path_templates
+# v4      | Campaign Auto        | buyer-80o       | Campaign data model: campaigns, pacing_snapshots, creative_assets, ad_server_campaigns
+# v5      | (reserved)           |                 |
+# ============================================================
+# To claim a version: add a row above BEFORE writing the migration.
+# Rule: one version per bead, one bead per migration.
+# ============================================================
+
 # Current schema version
 SCHEMA_VERSION = 2
 
