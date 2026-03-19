@@ -150,10 +150,11 @@ class TestSchemaMigrationV4:
         cursor = v4_conn.execute("PRAGMA table_info(pacing_snapshots)")
         cols = {row[1] for row in cursor.fetchall()}
         expected = {
-            "snapshot_id", "campaign_id", "timestamp", "channel",
-            "budget_allocated", "budget_spent", "impressions_target",
-            "impressions_delivered", "pacing_percentage", "deviation",
-            "data_source", "data_freshness",
+            "snapshot_id", "campaign_id", "timestamp",
+            "total_budget", "total_spend", "pacing_pct",
+            "expected_spend", "deviation_pct",
+            "channel_snapshots", "deal_snapshots", "recommendations",
+            "created_at",
         }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
 
@@ -363,13 +364,11 @@ class TestPacingSnapshotCRUD:
         sid = campaign_store.save_pacing_snapshot(
             campaign_id=cid,
             timestamp="2026-04-10T12:00:00Z",
-            channel="CTV",
-            budget_allocated=720000.0,
-            budget_spent=120000.0,
-            impressions_target=5000000,
-            impressions_delivered=850000,
-            pacing_percentage=95.0,
-            deviation=-5.0,
+            total_budget=720000.0,
+            total_spend=120000.0,
+            pacing_pct=95.0,
+            expected_spend=126000.0,
+            deviation_pct=-5.0,
         )
         assert isinstance(sid, str)
         assert len(sid) > 0
@@ -380,19 +379,16 @@ class TestPacingSnapshotCRUD:
         sid = campaign_store.save_pacing_snapshot(
             campaign_id=cid,
             timestamp="2026-04-10T12:00:00Z",
-            channel="CTV",
-            budget_allocated=720000.0,
-            budget_spent=120000.0,
-            impressions_target=5000000,
-            impressions_delivered=850000,
-            pacing_percentage=95.0,
-            deviation=-5.0,
+            total_budget=720000.0,
+            total_spend=120000.0,
+            pacing_pct=95.0,
+            expected_spend=126000.0,
+            deviation_pct=-5.0,
         )
         snap = campaign_store.get_pacing_snapshot(sid)
         assert snap is not None
         assert snap["campaign_id"] == cid
-        assert snap["channel"] == "CTV"
-        assert snap["budget_allocated"] == 720000.0
+        assert snap["total_budget"] == 720000.0
 
     def test_get_pacing_snapshot_not_found(self, campaign_store):
         """get_pacing_snapshot should return None for unknown ID."""
@@ -405,13 +401,11 @@ class TestPacingSnapshotCRUD:
             campaign_store.save_pacing_snapshot(
                 campaign_id=cid,
                 timestamp=f"2026-04-{10+i}T12:00:00Z",
-                channel="CTV",
-                budget_allocated=720000.0,
-                budget_spent=120000.0 * (i + 1),
-                impressions_target=5000000,
-                impressions_delivered=850000 * (i + 1),
-                pacing_percentage=95.0 + i,
-                deviation=-5.0 + i,
+                total_budget=720000.0,
+                total_spend=120000.0 * (i + 1),
+                pacing_pct=95.0 + i,
+                expected_spend=126000.0 * (i + 1),
+                deviation_pct=-5.0 + i,
             )
         snaps = campaign_store.list_pacing_snapshots(campaign_id=cid)
         assert len(snaps) == 3
@@ -422,24 +416,23 @@ class TestPacingSnapshotCRUD:
         assert snaps == []
 
     def test_pacing_snapshot_optional_fields(self, campaign_store, sample_campaign_data):
-        """Optional fields (data_source, data_freshness) should be storable."""
+        """Optional fields (channel_snapshots, deal_snapshots, recommendations) should be storable."""
         cid = campaign_store.save_campaign(**sample_campaign_data)
         sid = campaign_store.save_pacing_snapshot(
             campaign_id=cid,
             timestamp="2026-04-10T12:00:00Z",
-            channel="DISPLAY",
-            budget_allocated=360000.0,
-            budget_spent=50000.0,
-            impressions_target=2000000,
-            impressions_delivered=300000,
-            pacing_percentage=80.0,
-            deviation=-20.0,
-            data_source="dsp_report",
-            data_freshness="2026-04-10T11:55:00Z",
+            total_budget=360000.0,
+            total_spend=50000.0,
+            pacing_pct=80.0,
+            expected_spend=62500.0,
+            deviation_pct=-20.0,
+            channel_snapshots='[{"channel": "DISPLAY"}]',
+            deal_snapshots='[{"deal_id": "d1"}]',
+            recommendations='[{"action": "increase"}]',
         )
         snap = campaign_store.get_pacing_snapshot(sid)
-        assert snap["data_source"] == "dsp_report"
-        assert snap["data_freshness"] == "2026-04-10T11:55:00Z"
+        assert snap["channel_snapshots"] == '[{"channel": "DISPLAY"}]'
+        assert snap["deal_snapshots"] == '[{"deal_id": "d1"}]'
 
 
 # ===================================================================

@@ -595,15 +595,14 @@ class CampaignStore:
         snapshot_id: Optional[str] = None,
         campaign_id: str,
         timestamp: str,
-        channel: Optional[str] = None,
-        budget_allocated: Optional[float] = None,
-        budget_spent: Optional[float] = None,
-        impressions_target: Optional[int] = None,
-        impressions_delivered: Optional[int] = None,
-        pacing_percentage: Optional[float] = None,
-        deviation: Optional[float] = None,
-        data_source: Optional[str] = None,
-        data_freshness: Optional[str] = None,
+        total_budget: float = 0.0,
+        total_spend: float = 0.0,
+        pacing_pct: float = 0.0,
+        expected_spend: float = 0.0,
+        deviation_pct: float = 0.0,
+        channel_snapshots: str = "[]",
+        deal_snapshots: str = "[]",
+        recommendations: str = "[]",
     ) -> str:
         """Insert a new pacing snapshot.
 
@@ -611,15 +610,14 @@ class CampaignStore:
             snapshot_id: Optional UUID. Generated if not provided.
             campaign_id: FK to campaigns table.
             timestamp: When this snapshot was taken (ISO string).
-            channel: Channel this snapshot covers (CTV, DISPLAY, etc.).
-            budget_allocated: Budget allocated to this channel/campaign.
-            budget_spent: Budget spent to date.
-            impressions_target: Target impressions.
-            impressions_delivered: Impressions delivered to date.
-            pacing_percentage: Spend / expected spend * 100.
-            deviation: Pacing deviation percentage.
-            data_source: Where the data came from (e.g. dsp_report).
-            data_freshness: Timestamp of source data.
+            total_budget: Total campaign budget.
+            total_spend: Total spend to date.
+            pacing_pct: Current pacing percentage.
+            expected_spend: Expected spend at this point in flight.
+            deviation_pct: Pacing deviation percentage.
+            channel_snapshots: JSON array of per-channel breakdowns.
+            deal_snapshots: JSON array of per-deal breakdowns.
+            recommendations: JSON array of reallocation recommendations.
 
         Returns:
             The snapshot_id (generated or provided).
@@ -630,18 +628,16 @@ class CampaignStore:
         with self._lock:
             self._conn.execute(
                 """INSERT INTO pacing_snapshots (
-                    snapshot_id, campaign_id, timestamp, channel,
-                    budget_allocated, budget_spent,
-                    impressions_target, impressions_delivered,
-                    pacing_percentage, deviation,
-                    data_source, data_freshness
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    snapshot_id, campaign_id, timestamp,
+                    total_budget, total_spend, pacing_pct,
+                    expected_spend, deviation_pct,
+                    channel_snapshots, deal_snapshots, recommendations
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    snapshot_id, campaign_id, timestamp, channel,
-                    budget_allocated, budget_spent,
-                    impressions_target, impressions_delivered,
-                    pacing_percentage, deviation,
-                    data_source, data_freshness,
+                    snapshot_id, campaign_id, timestamp,
+                    total_budget, total_spend, pacing_pct,
+                    expected_spend, deviation_pct,
+                    channel_snapshots, deal_snapshots, recommendations,
                 ),
             )
             self._conn.commit()
@@ -671,29 +667,19 @@ class CampaignStore:
         self,
         *,
         campaign_id: str,
-        channel: Optional[str] = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """List pacing snapshots for a campaign.
 
         Args:
             campaign_id: Filter by campaign ID.
-            channel: Optional channel filter.
             limit: Maximum rows to return.
 
         Returns:
             List of snapshot dicts ordered by timestamp descending.
         """
-        clauses = ["campaign_id = ?"]
-        params: list[Any] = [campaign_id]
-
-        if channel is not None:
-            clauses.append("channel = ?")
-            params.append(channel)
-
-        where = "WHERE " + " AND ".join(clauses)
-        query = f"SELECT * FROM pacing_snapshots {where} ORDER BY timestamp DESC LIMIT ?"
-        params.append(limit)
+        query = "SELECT * FROM pacing_snapshots WHERE campaign_id = ? ORDER BY timestamp DESC LIMIT ?"
+        params: list[Any] = [campaign_id, limit]
 
         with self._lock:
             cursor = self._conn.execute(query, params)
