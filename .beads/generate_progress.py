@@ -180,11 +180,17 @@ def build_phase_structure(epics, issues):
         phases.append(phase_entry)
 
     # Build synthetic phases for numbered-prefix-only phases
+    # Fallback descriptions for phases that have numbered-prefix beads but
+    # no corresponding epic record in the database.
+    _SYNTHETIC_PHASE_DESCRIPTIONS = {
+        1: "Seller Interoperability",
+        3: "Platform & Infrastructure",
+    }
     for phase_num in sorted(synthetic_phase_nums):
         phases.append({
             "phase": phase_num,
             "label": f"Phase {phase_num}",
-            "desc": "",  # No epic title to extract from
+            "desc": _SYNTHETIC_PHASE_DESCRIPTIONS.get(phase_num, ""),
             "top_epic_id": None,
             "sub_phases": [],
             "deps": [],
