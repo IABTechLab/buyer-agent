@@ -5,6 +5,7 @@
 
 from .analyze_supply_path import AnalyzeSupplyPathTool
 from .deal_entry import ManualDealEntryTool
+from .instantiate_from_template import InstantiateDealFromTemplateTool
 from .portfolio_inspection import (
     InspectDealTool,
     ListPortfolioTool,
@@ -16,6 +17,7 @@ from .templates import ManageDealTemplateTool, ManageSupplyPathTemplateTool
 __all__ = [
     "AnalyzeSupplyPathTool",
     "ManualDealEntryTool",
+    "InstantiateDealFromTemplateTool",
     "ListPortfolioTool",
     "SearchPortfolioTool",
     "PortfolioSummaryTool",
