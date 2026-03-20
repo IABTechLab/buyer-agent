@@ -291,6 +291,7 @@ CREATE TABLE IF NOT EXISTS deal_templates (
     preferred_publishers TEXT,
     excluded_publishers TEXT,
     targeting_defaults  TEXT,
+    default_price       REAL,
     max_cpm             REAL,
     min_impressions     INTEGER,
     default_flight_days INTEGER,

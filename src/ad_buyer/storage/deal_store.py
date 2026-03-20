@@ -1278,6 +1278,7 @@ class DealStore:
         preferred_publishers: Optional[str] = None,
         excluded_publishers: Optional[str] = None,
         targeting_defaults: Optional[str] = None,
+        default_price: Optional[float] = None,
         max_cpm: Optional[float] = None,
         min_impressions: Optional[int] = None,
         default_flight_days: Optional[int] = None,
@@ -1295,6 +1296,7 @@ class DealStore:
             preferred_publishers: JSON array of publisher domains.
             excluded_publishers: JSON array of excluded publisher domains.
             targeting_defaults: JSON object with default targeting.
+            default_price: Default price (CPM) for deals created from template.
             max_cpm: Maximum CPM ceiling.
             min_impressions: Minimum impression volume.
             default_flight_days: Standard deal duration in days.
@@ -1314,16 +1316,17 @@ class DealStore:
                 """INSERT INTO deal_templates (
                     id, name, deal_type_pref, inventory_types,
                     preferred_publishers, excluded_publishers,
-                    targeting_defaults, max_cpm, min_impressions,
-                    default_flight_days, supply_path_prefs,
-                    advertiser_id, agency_id, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    targeting_defaults, default_price, max_cpm,
+                    min_impressions, default_flight_days,
+                    supply_path_prefs, advertiser_id, agency_id,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     template_id, name, deal_type_pref, inventory_types,
                     preferred_publishers, excluded_publishers,
-                    targeting_defaults, max_cpm, min_impressions,
-                    default_flight_days, supply_path_prefs,
-                    advertiser_id, agency_id, now, now,
+                    targeting_defaults, default_price, max_cpm,
+                    min_impressions, default_flight_days,
+                    supply_path_prefs, advertiser_id, agency_id, now, now,
                 ),
             )
             self._conn.commit()
@@ -1406,9 +1409,9 @@ class DealStore:
         allowed = {
             "name", "deal_type_pref", "inventory_types",
             "preferred_publishers", "excluded_publishers",
-            "targeting_defaults", "max_cpm", "min_impressions",
-            "default_flight_days", "supply_path_prefs",
-            "advertiser_id", "agency_id",
+            "targeting_defaults", "default_price", "max_cpm",
+            "min_impressions", "default_flight_days",
+            "supply_path_prefs", "advertiser_id", "agency_id",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:

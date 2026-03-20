@@ -302,6 +302,45 @@ class TestDealTemplateUpdate:
         )
         assert "New Name" in read_result
 
+    def test_update_deal_template_default_price(self, deal_template_tool):
+        """Updating default_price succeeds and persists the new value.
+
+        Regression test for buyer-5wx: update_deal_template() was missing
+        default_price in its allowed column set, causing updates to silently
+        return False and the tool to report "not found".
+        """
+        create_result = deal_template_tool._run(
+            action="create",
+            params_json=json.dumps({
+                "name": "Price Update Test",
+                "deal_type_pref": "PG",
+                "default_price": 15.00,
+            }),
+        )
+        template_id = _extract_template_id(create_result)
+        assert template_id is not None
+
+        # Update the default_price
+        update_result = deal_template_tool._run(
+            action="update",
+            params_json=json.dumps({
+                "template_id": template_id,
+                "default_price": 32.00,
+            }),
+        )
+        assert "updated" in update_result.lower(), (
+            f"Expected 'updated' in result but got: {update_result}"
+        )
+
+        # Read back to verify the new value persisted
+        read_result = deal_template_tool._run(
+            action="read",
+            params_json=json.dumps({"template_id": template_id}),
+        )
+        assert "32" in read_result, (
+            f"Expected default_price 32.0 in template but got: {read_result}"
+        )
+
     def test_update_deal_template_not_found(self, deal_template_tool):
         """Updating a nonexistent template returns a not-found message."""
         result = deal_template_tool._run(

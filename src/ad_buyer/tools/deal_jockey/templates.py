@@ -60,8 +60,8 @@ class ManageDealTemplateInput(BaseModel):
             "JSON string with action parameters. "
             "create: name (required), deal_type_pref, inventory_types, "
             "preferred_publishers, excluded_publishers, targeting_defaults, "
-            "max_cpm, min_impressions, default_flight_days, supply_path_prefs, "
-            "advertiser_id, agency_id. "
+            "default_price, max_cpm, min_impressions, default_flight_days, "
+            "supply_path_prefs, advertiser_id, agency_id. "
             "read: template_id (required). "
             "list: advertiser_id (optional), deal_type_pref (optional). "
             "update: template_id (required), plus fields to update. "
@@ -190,6 +190,9 @@ def _format_deal_template(tmpl: dict[str, Any]) -> str:
 
     if tmpl.get("agency_id"):
         lines.append(f"  Agency ID: {tmpl['agency_id']}")
+
+    if tmpl.get("default_price") is not None:
+        lines.append(f"  Default Price: ${tmpl['default_price']:.2f}")
 
     if tmpl.get("max_cpm") is not None:
         lines.append(f"  Max CPM: ${tmpl['max_cpm']:.2f}")
@@ -374,6 +377,7 @@ class ManageDealTemplateTool(BaseTool):
                 targeting_defaults=_serialize_dict_field(
                     params.get("targeting_defaults")
                 ),
+                default_price=params.get("default_price"),
                 max_cpm=params.get("max_cpm"),
                 min_impressions=params.get("min_impressions"),
                 default_flight_days=params.get("default_flight_days"),
