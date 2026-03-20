@@ -24,7 +24,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Current schema version
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # -- Schema version tracking ------------------------------------------------
 
@@ -280,6 +280,54 @@ PERFORMANCE_CACHE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_performance_cache_deal_id ON performance_cache(deal_id);",
 ]
 
+# -- v3: Template tables (DealJockey Section 6.3, 6.4) ---------------------
+
+DEAL_TEMPLATE_TABLE = """
+CREATE TABLE IF NOT EXISTS deal_templates (
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL,
+    deal_type_pref      TEXT,
+    inventory_types     TEXT,
+    preferred_publishers TEXT,
+    excluded_publishers TEXT,
+    targeting_defaults  TEXT,
+    max_cpm             REAL,
+    min_impressions     INTEGER,
+    default_flight_days INTEGER,
+    supply_path_prefs   TEXT,
+    advertiser_id       TEXT,
+    agency_id           TEXT,
+    created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+"""
+
+DEAL_TEMPLATE_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_deal_templates_name ON deal_templates(name);",
+    "CREATE INDEX IF NOT EXISTS idx_deal_templates_advertiser_id ON deal_templates(advertiser_id);",
+    "CREATE INDEX IF NOT EXISTS idx_deal_templates_deal_type_pref ON deal_templates(deal_type_pref);",
+]
+
+SUPPLY_PATH_TEMPLATE_TABLE = """
+CREATE TABLE IF NOT EXISTS supply_path_templates (
+    id                      TEXT PRIMARY KEY,
+    name                    TEXT NOT NULL,
+    scoring_weights         TEXT,
+    max_reseller_hops       INTEGER,
+    require_sellers_json    INTEGER DEFAULT 0,
+    preferred_ssps          TEXT,
+    blocked_ssps            TEXT,
+    preferred_curators      TEXT,
+    rules                   TEXT,
+    created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+"""
+
+SUPPLY_PATH_TEMPLATE_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_supply_path_templates_name ON supply_path_templates(name);",
+]
+
 
 def create_tables(conn: sqlite3.Connection) -> None:
     """Create all tables and indexes if they don't already exist.
@@ -304,6 +352,9 @@ def create_tables(conn: sqlite3.Connection) -> None:
         PORTFOLIO_METADATA_TABLE,
         DEAL_ACTIVATIONS_TABLE,
         PERFORMANCE_CACHE_TABLE,
+        # v3 template tables
+        DEAL_TEMPLATE_TABLE,
+        SUPPLY_PATH_TEMPLATE_TABLE,
     ]:
         cursor.execute(ddl)
 
@@ -319,6 +370,9 @@ def create_tables(conn: sqlite3.Connection) -> None:
         PORTFOLIO_METADATA_INDEXES,
         DEAL_ACTIVATIONS_INDEXES,
         PERFORMANCE_CACHE_INDEXES,
+        # v3 template indexes
+        DEAL_TEMPLATE_INDEXES,
+        SUPPLY_PATH_TEMPLATE_INDEXES,
     ]:
         for idx in index_list:
             cursor.execute(idx)
@@ -462,6 +516,34 @@ def migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
     logger.info("Migration v1 -> v2 complete: deal library hybrid schema applied")
 
 
+def migrate_v2_to_v3(conn: sqlite3.Connection) -> None:
+    """Migrate schema from v2 to v3 (deal and supply path templates).
+
+    Creates ``deal_templates`` and ``supply_path_templates`` tables for
+    DealJockey template CRUD (Strategic Plan Sections 6.3 and 6.4).
+
+    This migration is idempotent: CREATE TABLE IF NOT EXISTS is a no-op
+    for existing tables.
+
+    Args:
+        conn: Active SQLite connection.
+    """
+    cursor = conn.cursor()
+
+    # Create template tables
+    cursor.execute(DEAL_TEMPLATE_TABLE)
+    cursor.execute(SUPPLY_PATH_TEMPLATE_TABLE)
+
+    # Create indexes
+    for idx in DEAL_TEMPLATE_INDEXES:
+        cursor.execute(idx)
+    for idx in SUPPLY_PATH_TEMPLATE_INDEXES:
+        cursor.execute(idx)
+
+    conn.commit()
+    logger.info("Migration v2 -> v3 complete: template tables created")
+
+
 def run_migrations(conn: sqlite3.Connection) -> None:
     """Run pending schema migrations.
 
@@ -479,6 +561,7 @@ def run_migrations(conn: sqlite3.Connection) -> None:
     # Migration registry: version -> migration function
     migrations: dict[int, callable] = {
         2: migrate_v1_to_v2,
+        3: migrate_v2_to_v3,
     }
 
     for version in range(current + 1, SCHEMA_VERSION + 1):
