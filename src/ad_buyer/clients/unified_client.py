@@ -13,7 +13,6 @@ from .mcp_client import IABMCPClient, MCPToolResult
 if TYPE_CHECKING:
     from ..models.buyer_identity import BuyerIdentity
 
-from ..booking.deal_id import generate_deal_id
 from ..booking.pricing import PricingCalculator
 
 
