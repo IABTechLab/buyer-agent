@@ -67,6 +67,10 @@ Your [identity tier](identity.md) determines what the buyer can do with a given 
 | Guide | When to Read It |
 |-------|----------------|
 | [Deal Booking](deal-booking.md) | You want to understand the core booking lifecycle from brief to confirmed deal |
+| [Campaign Pipeline](campaign-pipeline.md) | You want to automate the full campaign lifecycle from brief to booked deals |
+| [Multi-Seller Orchestration](multi-seller-orchestration.md) | You need to coordinate deal booking across multiple sellers with quote normalization |
+| [Budget Pacing](budget-pacing.md) | You need to monitor spend against plan and manage mid-flight budget reallocations |
+| [Creative Management](creative-management.md) | You need to manage creative assets, validation, and ad server integration |
 | [Negotiation](negotiation.md) | You want to configure or customize how the buyer negotiates pricing |
 | [Identity Strategy](identity.md) | You need to understand access tiers and how they affect pricing and capabilities |
 | [Media Kit Browsing](media-kit.md) | You want to explore seller inventory before or outside of a booking flow |
@@ -75,14 +79,6 @@ Your [identity tier](identity.md) determines what the buyer can do with a given 
 | [Linear TV Buying](linear-tv.md) | You are buying linear TV inventory with DMA targeting and scatter/upfront pricing |
 | [Configuration](configuration.md) | You need to set environment variables, seller connections, or feature flags |
 | [Deployment](deployment.md) | You are deploying the buyer agent to production |
-
-!!! note "Coming Soon"
-    The following guides cover features that are planned but not yet implemented:
-
-    - **[Multi-Seller Orchestration](multi-seller-orchestration.md)** --- Coordinating bookings across multiple sellers in a single campaign
-    - **[Campaign Pipeline](campaign-pipeline.md)** --- Managing multiple campaigns with shared budgets and scheduling
-    - **[Budget Pacing](budget-pacing.md)** --- Controlling spend rate across a campaign's flight dates
-    - **[Creative Management](creative-management.md)** --- Associating and validating creative assets for booked deals
 
 ## Related
 
