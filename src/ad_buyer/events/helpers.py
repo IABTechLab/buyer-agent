@@ -13,7 +13,7 @@ in worker threads that may not have an asyncio event loop.
 
 import asyncio
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from .models import Event, EventType
 
@@ -26,9 +26,9 @@ async def emit_event(
     flow_type: str = "",
     deal_id: str = "",
     session_id: str = "",
-    payload: Optional[dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
     **kwargs: Any,
-) -> Optional[Event]:
+) -> Event | None:
     """Emit an event to the event bus. Fail-open: logs on error.
 
     Returns the Event if published, None if the bus was unavailable.
@@ -59,9 +59,9 @@ def emit_event_sync(
     flow_type: str = "",
     deal_id: str = "",
     session_id: str = "",
-    payload: Optional[dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
     **kwargs: Any,
-) -> Optional[Event]:
+) -> Event | None:
     """Synchronous wrapper around emit_event for use in CrewAI flows.
 
     CrewAI flow methods run synchronously in worker threads. This helper
@@ -79,6 +79,7 @@ def emit_event_sync(
         if bus is None:
             bus = InMemoryEventBus()
             import ad_buyer.events.bus as bus_mod
+
             bus_mod._event_bus_instance = bus
 
         event = Event(
@@ -96,7 +97,6 @@ def emit_event_sync(
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 # Already in an async context -- schedule on the running loop
-                import concurrent.futures
                 asyncio.ensure_future(bus.publish(event))
             else:
                 loop.run_until_complete(bus.publish(event))

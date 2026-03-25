@@ -3,15 +3,13 @@
 
 """Tests for DSP tools."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ad_buyer.models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     BuyerIdentity,
-    DealType,
 )
 from ad_buyer.tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
@@ -390,9 +388,7 @@ class TestToolIntegration:
     """Integration tests for DSP tools working together."""
 
     @pytest.mark.asyncio
-    async def test_discover_then_price_then_deal(
-        self, mock_client, advertiser_context
-    ):
+    async def test_discover_then_price_then_deal(self, mock_client, advertiser_context):
         """Test typical workflow: discover -> get pricing -> request deal."""
         # Mock product data
         product_data = {

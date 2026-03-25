@@ -16,13 +16,12 @@ import logging
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from ..models.state_machine import (
     BuyerDealStatus,
     DealStateMachine,
-    InvalidTransitionError,
 )
 from .schema import initialize_schema
 
@@ -31,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def _now_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 class DealStore:
@@ -48,7 +47,7 @@ class DealStore:
     def __init__(self, database_url: str) -> None:
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -77,88 +76,114 @@ class DealStore:
     # dynamic INSERT statements when v2 kwargs are provided.
     _V2_DEAL_COLUMNS = (
         # Counterparty fields
-        "display_name", "description", "buyer_org", "buyer_id",
-        "seller_org", "seller_id", "seller_domain", "seller_type",
+        "display_name",
+        "description",
+        "buyer_org",
+        "buyer_id",
+        "seller_org",
+        "seller_id",
+        "seller_domain",
+        "seller_type",
         # Pricing detail fields
-        "price_model", "bid_floor_cpm", "fixed_price_cpm",
-        "cpp", "guaranteed_grps", "currency", "fee_transparency",
+        "price_model",
+        "bid_floor_cpm",
+        "fixed_price_cpm",
+        "cpp",
+        "guaranteed_grps",
+        "currency",
+        "fee_transparency",
         # Inventory targeting fields
-        "media_type", "formats", "content_categories",
-        "publisher_domains", "geo_targets", "dayparts",
-        "programs", "networks", "audience_segments", "estimated_volume",
+        "media_type",
+        "formats",
+        "content_categories",
+        "publisher_domains",
+        "geo_targets",
+        "dayparts",
+        "programs",
+        "networks",
+        "audience_segments",
+        "estimated_volume",
         # Lifecycle extensions
-        "deprecated_at", "deprecated_reason", "parent_deal_id",
+        "deprecated_at",
+        "deprecated_reason",
+        "parent_deal_id",
         # Supply chain fields
-        "schain_complete", "schain_nodes", "sellers_json_url",
-        "is_direct", "hop_count", "inventory_fingerprint",
+        "schain_complete",
+        "schain_nodes",
+        "sellers_json_url",
+        "is_direct",
+        "hop_count",
+        "inventory_fingerprint",
         # Linear TV fields
-        "makegood_provisions", "cancellation_window",
-        "audience_guarantee", "preemption_rights",
+        "makegood_provisions",
+        "cancellation_window",
+        "audience_guarantee",
+        "preemption_rights",
         "agency_of_record_status",
     )
 
     def save_deal(
         self,
         *,
-        deal_id: Optional[str] = None,
+        deal_id: str | None = None,
         seller_url: str,
         product_id: str,
         product_name: str = "",
         deal_type: str = "PD",
         status: str = "draft",
-        seller_deal_id: Optional[str] = None,
-        price: Optional[float] = None,
-        original_price: Optional[float] = None,
-        impressions: Optional[int] = None,
-        flight_start: Optional[str] = None,
-        flight_end: Optional[str] = None,
-        buyer_context: Optional[str] = None,
-        metadata: Optional[str] = None,
+        seller_deal_id: str | None = None,
+        price: float | None = None,
+        original_price: float | None = None,
+        impressions: int | None = None,
+        flight_start: str | None = None,
+        flight_end: str | None = None,
+        buyer_context: str | None = None,
+        metadata: str | None = None,
         # v2 counterparty fields
-        display_name: Optional[str] = None,
-        description: Optional[str] = None,
-        buyer_org: Optional[str] = None,
-        buyer_id: Optional[str] = None,
-        seller_org: Optional[str] = None,
-        seller_id: Optional[str] = None,
-        seller_domain: Optional[str] = None,
-        seller_type: Optional[str] = None,
+        display_name: str | None = None,
+        description: str | None = None,
+        buyer_org: str | None = None,
+        buyer_id: str | None = None,
+        seller_org: str | None = None,
+        seller_id: str | None = None,
+        seller_domain: str | None = None,
+        seller_type: str | None = None,
         # v2 pricing detail fields
-        price_model: Optional[str] = None,
-        bid_floor_cpm: Optional[float] = None,
-        fixed_price_cpm: Optional[float] = None,
-        cpp: Optional[float] = None,
-        guaranteed_grps: Optional[float] = None,
-        currency: Optional[str] = None,
-        fee_transparency: Optional[float] = None,
+        price_model: str | None = None,
+        bid_floor_cpm: float | None = None,
+        fixed_price_cpm: float | None = None,
+        cpp: float | None = None,
+        guaranteed_grps: float | None = None,
+        currency: str | None = None,
+        fee_transparency: float | None = None,
         # v2 inventory targeting fields
-        media_type: Optional[str] = None,
-        formats: Optional[str] = None,
-        content_categories: Optional[str] = None,
-        publisher_domains: Optional[str] = None,
-        geo_targets: Optional[str] = None,
-        dayparts: Optional[str] = None,
-        programs: Optional[str] = None,
-        networks: Optional[str] = None,
-        audience_segments: Optional[str] = None,
-        estimated_volume: Optional[int] = None,
+        media_type: str | None = None,
+        formats: str | None = None,
+        content_categories: str | None = None,
+        publisher_domains: str | None = None,
+        geo_targets: str | None = None,
+        dayparts: str | None = None,
+        programs: str | None = None,
+        networks: str | None = None,
+        audience_segments: str | None = None,
+        estimated_volume: int | None = None,
         # v2 lifecycle extensions
-        deprecated_at: Optional[str] = None,
-        deprecated_reason: Optional[str] = None,
-        parent_deal_id: Optional[str] = None,
+        deprecated_at: str | None = None,
+        deprecated_reason: str | None = None,
+        parent_deal_id: str | None = None,
         # v2 supply chain fields
-        schain_complete: Optional[int] = None,
-        schain_nodes: Optional[str] = None,
-        sellers_json_url: Optional[str] = None,
-        is_direct: Optional[int] = None,
-        hop_count: Optional[int] = None,
-        inventory_fingerprint: Optional[str] = None,
+        schain_complete: int | None = None,
+        schain_nodes: str | None = None,
+        sellers_json_url: str | None = None,
+        is_direct: int | None = None,
+        hop_count: int | None = None,
+        inventory_fingerprint: str | None = None,
         # v2 linear TV fields
-        makegood_provisions: Optional[str] = None,
-        cancellation_window: Optional[str] = None,
-        audience_guarantee: Optional[str] = None,
-        preemption_rights: Optional[str] = None,
-        agency_of_record_status: Optional[str] = None,
+        makegood_provisions: str | None = None,
+        cancellation_window: str | None = None,
+        audience_guarantee: str | None = None,
+        preemption_rights: str | None = None,
+        agency_of_record_status: str | None = None,
     ) -> str:
         """Insert a new deal.
 
@@ -233,33 +258,67 @@ class DealStore:
         # Build column list and values dynamically to include v2 fields
         # when provided.  Start with the v1 columns that are always present.
         columns = [
-            "id", "seller_url", "seller_deal_id", "product_id",
-            "product_name", "deal_type", "status", "price",
-            "original_price", "impressions", "flight_start", "flight_end",
-            "buyer_context", "metadata", "created_at", "updated_at",
+            "id",
+            "seller_url",
+            "seller_deal_id",
+            "product_id",
+            "product_name",
+            "deal_type",
+            "status",
+            "price",
+            "original_price",
+            "impressions",
+            "flight_start",
+            "flight_end",
+            "buyer_context",
+            "metadata",
+            "created_at",
+            "updated_at",
         ]
         values: list[Any] = [
-            deal_id, seller_url, seller_deal_id, product_id,
-            product_name, deal_type, status, price,
-            original_price, impressions, flight_start, flight_end,
-            buyer_context, metadata or "{}", now, now,
+            deal_id,
+            seller_url,
+            seller_deal_id,
+            product_id,
+            product_name,
+            deal_type,
+            status,
+            price,
+            original_price,
+            impressions,
+            flight_start,
+            flight_end,
+            buyer_context,
+            metadata or "{}",
+            now,
+            now,
         ]
 
         # Collect v2 kwargs into a dict for dynamic column building.
         v2_locals = {
-            "display_name": display_name, "description": description,
-            "buyer_org": buyer_org, "buyer_id": buyer_id,
-            "seller_org": seller_org, "seller_id": seller_id,
-            "seller_domain": seller_domain, "seller_type": seller_type,
-            "price_model": price_model, "bid_floor_cpm": bid_floor_cpm,
-            "fixed_price_cpm": fixed_price_cpm, "cpp": cpp,
-            "guaranteed_grps": guaranteed_grps, "currency": currency,
+            "display_name": display_name,
+            "description": description,
+            "buyer_org": buyer_org,
+            "buyer_id": buyer_id,
+            "seller_org": seller_org,
+            "seller_id": seller_id,
+            "seller_domain": seller_domain,
+            "seller_type": seller_type,
+            "price_model": price_model,
+            "bid_floor_cpm": bid_floor_cpm,
+            "fixed_price_cpm": fixed_price_cpm,
+            "cpp": cpp,
+            "guaranteed_grps": guaranteed_grps,
+            "currency": currency,
             "fee_transparency": fee_transparency,
-            "media_type": media_type, "formats": formats,
+            "media_type": media_type,
+            "formats": formats,
             "content_categories": content_categories,
             "publisher_domains": publisher_domains,
-            "geo_targets": geo_targets, "dayparts": dayparts,
-            "programs": programs, "networks": networks,
+            "geo_targets": geo_targets,
+            "dayparts": dayparts,
+            "programs": programs,
+            "networks": networks,
             "audience_segments": audience_segments,
             "estimated_volume": estimated_volume,
             "deprecated_at": deprecated_at,
@@ -268,7 +327,8 @@ class DealStore:
             "schain_complete": schain_complete,
             "schain_nodes": schain_nodes,
             "sellers_json_url": sellers_json_url,
-            "is_direct": is_direct, "hop_count": hop_count,
+            "is_direct": is_direct,
+            "hop_count": hop_count,
             "inventory_fingerprint": inventory_fingerprint,
             "makegood_provisions": makegood_provisions,
             "cancellation_window": cancellation_window,
@@ -305,7 +365,7 @@ class DealStore:
 
         return deal_id
 
-    def get_deal(self, deal_id: str) -> Optional[dict[str, Any]]:
+    def get_deal(self, deal_id: str) -> dict[str, Any] | None:
         """Retrieve a deal by ID.
 
         Args:
@@ -315,22 +375,20 @@ class DealStore:
             Deal as a dict, or None if not found.
         """
         with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM deals WHERE id = ?", (deal_id,)
-            )
+            cursor = self._conn.execute("SELECT * FROM deals WHERE id = ?", (deal_id,))
             row = cursor.fetchone()
         return dict(row) if row else None
 
     def list_deals(
         self,
         *,
-        status: Optional[str] = None,
-        seller_url: Optional[str] = None,
-        created_after: Optional[str] = None,
-        media_type: Optional[str] = None,
-        seller_domain: Optional[str] = None,
-        deal_type: Optional[str] = None,
-        advertiser_id: Optional[str] = None,
+        status: str | None = None,
+        seller_url: str | None = None,
+        created_after: str | None = None,
+        media_type: str | None = None,
+        seller_domain: str | None = None,
+        deal_type: str | None = None,
+        advertiser_id: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """List deals with optional filters.
@@ -390,10 +448,7 @@ class DealStore:
                 f"{where} ORDER BY d.created_at DESC LIMIT ?"
             )
         else:
-            query = (
-                f"SELECT d.* FROM deals d "
-                f"{where} ORDER BY d.created_at DESC LIMIT ?"
-            )
+            query = f"SELECT d.* FROM deals d {where} ORDER BY d.created_at DESC LIMIT ?"
         params.append(limit)
 
         with self._lock:
@@ -432,9 +487,7 @@ class DealStore:
 
         with self._lock:
             # Get current status
-            cursor = self._conn.execute(
-                "SELECT status FROM deals WHERE id = ?", (deal_id,)
-            )
+            cursor = self._conn.execute("SELECT status FROM deals WHERE id = ?", (deal_id,))
             row = cursor.fetchone()
             if row is None:
                 return False
@@ -446,9 +499,7 @@ class DealStore:
                 old_deal_status = BuyerDealStatus(old_status)
                 new_deal_status = BuyerDealStatus(new_status)
                 # Build a throwaway machine to validate the transition
-                sm = DealStateMachine(
-                    deal_id, initial_status=old_deal_status
-                )
+                sm = DealStateMachine(deal_id, initial_status=old_deal_status)
                 if not sm.can_transition(new_deal_status):
                     logger.warning(
                         "Rejected transition for deal %s: %s -> %s",
@@ -556,13 +607,13 @@ class DealStore:
         self,
         *,
         deal_id: str,
-        order_id: Optional[str] = None,
-        line_id: Optional[str] = None,
+        order_id: str | None = None,
+        line_id: str | None = None,
         channel: str = "",
         impressions: int = 0,
         cost: float = 0.0,
         booking_status: str = "pending",
-        metadata: Optional[str] = None,
+        metadata: str | None = None,
     ) -> int:
         """Record a booked line item.
 
@@ -626,12 +677,12 @@ class DealStore:
         job_id: str,
         status: str = "pending",
         progress: float = 0.0,
-        brief: Optional[str] = None,
+        brief: str | None = None,
         auto_approve: bool = False,
-        budget_allocs: Optional[str] = None,
-        recommendations: Optional[str] = None,
-        booked_lines: Optional[str] = None,
-        errors: Optional[str] = None,
+        budget_allocs: str | None = None,
+        recommendations: str | None = None,
+        booked_lines: str | None = None,
+        errors: str | None = None,
     ) -> str:
         """Insert or update a job record (upsert).
 
@@ -685,7 +736,7 @@ class DealStore:
             self._conn.commit()
         return job_id
 
-    def get_job(self, job_id: str) -> Optional[dict[str, Any]]:
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
         """Retrieve a job by ID.
 
         Args:
@@ -695,9 +746,7 @@ class DealStore:
             Job as a dict, or None if not found.
         """
         with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM jobs WHERE id = ?", (job_id,)
-            )
+            cursor = self._conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
             row = cursor.fetchone()
         if row is None:
             return None
@@ -718,7 +767,7 @@ class DealStore:
     def list_jobs(
         self,
         *,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """List jobs with optional status filter.
@@ -763,14 +812,14 @@ class DealStore:
     def save_event(
         self,
         *,
-        event_id: Optional[str] = None,
+        event_id: str | None = None,
         event_type: str,
         flow_id: str = "",
         flow_type: str = "",
         deal_id: str = "",
         session_id: str = "",
-        payload: Optional[str] = None,
-        metadata: Optional[str] = None,
+        payload: str | None = None,
+        metadata: str | None = None,
     ) -> str:
         """Persist an event to the events table.
 
@@ -811,7 +860,7 @@ class DealStore:
 
         return event_id
 
-    def get_event(self, event_id: str) -> Optional[dict[str, Any]]:
+    def get_event(self, event_id: str) -> dict[str, Any] | None:
         """Retrieve an event by ID.
 
         Args:
@@ -821,18 +870,16 @@ class DealStore:
             Event as a dict, or None if not found.
         """
         with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM events WHERE id = ?", (event_id,)
-            )
+            cursor = self._conn.execute("SELECT * FROM events WHERE id = ?", (event_id,))
             row = cursor.fetchone()
         return dict(row) if row else None
 
     def list_events(
         self,
         *,
-        event_type: Optional[str] = None,
-        flow_id: Optional[str] = None,
-        session_id: Optional[str] = None,
+        event_type: str | None = None,
+        flow_id: str | None = None,
+        session_id: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """List events with optional filters.
@@ -880,7 +927,7 @@ class DealStore:
         *,
         entity_type: str,
         entity_id: str,
-        from_status: Optional[str],
+        from_status: str | None,
         to_status: str,
         triggered_by: str = "system",
         notes: str = "",
@@ -941,11 +988,11 @@ class DealStore:
         self,
         *,
         deal_id: str,
-        import_source: Optional[str] = None,
-        import_date: Optional[str] = None,
-        tags: Optional[str] = None,
-        advertiser_id: Optional[str] = None,
-        agency_id: Optional[str] = None,
+        import_source: str | None = None,
+        import_date: str | None = None,
+        tags: str | None = None,
+        advertiser_id: str | None = None,
+        agency_id: str | None = None,
     ) -> int:
         """Insert a portfolio metadata record for a deal.
 
@@ -966,13 +1013,12 @@ class DealStore:
                    (deal_id, import_source, import_date, tags,
                     advertiser_id, agency_id)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (deal_id, import_source, import_date, tags,
-                 advertiser_id, agency_id),
+                (deal_id, import_source, import_date, tags, advertiser_id, agency_id),
             )
             self._conn.commit()
             return cursor.lastrowid
 
-    def get_portfolio_metadata(self, deal_id: str) -> Optional[dict[str, Any]]:
+    def get_portfolio_metadata(self, deal_id: str) -> dict[str, Any] | None:
         """Get portfolio metadata for a deal.
 
         Args:
@@ -1002,8 +1048,7 @@ class DealStore:
             True if a row was updated, False if no metadata exists for
             the deal or no valid kwargs were provided.
         """
-        allowed = {"import_source", "import_date", "tags",
-                    "advertiser_id", "agency_id"}
+        allowed = {"import_source", "import_date", "tags", "advertiser_id", "agency_id"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1046,9 +1091,9 @@ class DealStore:
         *,
         deal_id: str,
         platform: str,
-        platform_deal_id: Optional[str] = None,
-        activation_status: Optional[str] = None,
-        last_sync_at: Optional[str] = None,
+        platform_deal_id: str | None = None,
+        activation_status: str | None = None,
+        last_sync_at: str | None = None,
     ) -> int:
         """Insert a deal activation record.
 
@@ -1068,8 +1113,7 @@ class DealStore:
                    (deal_id, platform, platform_deal_id,
                     activation_status, last_sync_at)
                    VALUES (?, ?, ?, ?, ?)""",
-                (deal_id, platform, platform_deal_id,
-                 activation_status, last_sync_at),
+                (deal_id, platform, platform_deal_id, activation_status, last_sync_at),
             )
             self._conn.commit()
             return cursor.lastrowid
@@ -1104,8 +1148,7 @@ class DealStore:
             True if a row was updated, False if the activation was not
             found or no valid kwargs were provided.
         """
-        allowed = {"platform", "platform_deal_id", "activation_status",
-                    "last_sync_at"}
+        allowed = {"platform", "platform_deal_id", "activation_status", "last_sync_at"}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1147,14 +1190,14 @@ class DealStore:
         self,
         *,
         deal_id: str,
-        impressions_delivered: Optional[int] = None,
-        spend_to_date: Optional[float] = None,
-        fill_rate: Optional[float] = None,
-        win_rate: Optional[float] = None,
-        avg_effective_cpm: Optional[float] = None,
-        last_delivery_at: Optional[str] = None,
-        performance_trend: Optional[str] = None,
-        cached_at: Optional[str] = None,
+        impressions_delivered: int | None = None,
+        spend_to_date: float | None = None,
+        fill_rate: float | None = None,
+        win_rate: float | None = None,
+        avg_effective_cpm: float | None = None,
+        last_delivery_at: str | None = None,
+        performance_trend: str | None = None,
+        cached_at: str | None = None,
     ) -> int:
         """Insert a performance cache entry for a deal.
 
@@ -1179,14 +1222,22 @@ class DealStore:
                     fill_rate, win_rate, avg_effective_cpm,
                     last_delivery_at, performance_trend, cached_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (deal_id, impressions_delivered, spend_to_date,
-                 fill_rate, win_rate, avg_effective_cpm,
-                 last_delivery_at, performance_trend, cached_at),
+                (
+                    deal_id,
+                    impressions_delivered,
+                    spend_to_date,
+                    fill_rate,
+                    win_rate,
+                    avg_effective_cpm,
+                    last_delivery_at,
+                    performance_trend,
+                    cached_at,
+                ),
             )
             self._conn.commit()
             return cursor.lastrowid
 
-    def get_performance_cache(self, deal_id: str) -> Optional[dict[str, Any]]:
+    def get_performance_cache(self, deal_id: str) -> dict[str, Any] | None:
         """Get the latest performance cache entry for a deal.
 
         Args:
@@ -1222,9 +1273,16 @@ class DealStore:
             True if a row was updated, False if no cache exists for
             the deal or no valid kwargs were provided.
         """
-        allowed = {"impressions_delivered", "spend_to_date", "fill_rate",
-                    "win_rate", "avg_effective_cpm", "last_delivery_at",
-                    "performance_trend", "cached_at"}
+        allowed = {
+            "impressions_delivered",
+            "spend_to_date",
+            "fill_rate",
+            "win_rate",
+            "avg_effective_cpm",
+            "last_delivery_at",
+            "performance_trend",
+            "cached_at",
+        }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1271,14 +1329,14 @@ class DealStore:
     def save_creative_asset(
         self,
         *,
-        asset_id: Optional[str] = None,
+        asset_id: str | None = None,
         campaign_id: str,
         asset_name: str,
         asset_type: str,
-        format_spec: Optional[dict] = None,
-        source_url: Optional[str] = None,
+        format_spec: dict | None = None,
+        source_url: str | None = None,
         validation_status: str = "pending",
-        validation_errors: Optional[list] = None,
+        validation_errors: list | None = None,
     ) -> str:
         """Insert a new creative asset.
 
@@ -1310,16 +1368,23 @@ class DealStore:
                     validation_errors, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    asset_id, campaign_id, asset_name, asset_type,
-                    format_spec_json, source_url, validation_status,
-                    errors_json, now, now,
+                    asset_id,
+                    campaign_id,
+                    asset_name,
+                    asset_type,
+                    format_spec_json,
+                    source_url,
+                    validation_status,
+                    errors_json,
+                    now,
+                    now,
                 ),
             )
             self._conn.commit()
 
         return asset_id
 
-    def get_creative_asset(self, asset_id: str) -> Optional[dict[str, Any]]:
+    def get_creative_asset(self, asset_id: str) -> dict[str, Any] | None:
         """Retrieve a creative asset by ID.
 
         JSON fields (format_spec, validation_errors) are automatically
@@ -1355,9 +1420,9 @@ class DealStore:
     def list_creative_assets(
         self,
         *,
-        campaign_id: Optional[str] = None,
-        asset_type: Optional[str] = None,
-        validation_status: Optional[str] = None,
+        campaign_id: str | None = None,
+        asset_type: str | None = None,
+        validation_status: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """List creative assets with optional filters.
@@ -1426,8 +1491,13 @@ class DealStore:
             or no valid kwargs were provided.
         """
         allowed = {
-            "asset_name", "asset_type", "format_spec", "source_url",
-            "validation_status", "validation_errors", "campaign_id",
+            "asset_name",
+            "asset_type",
+            "format_spec",
+            "source_url",
+            "validation_status",
+            "validation_errors",
+            "campaign_id",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
@@ -1492,5 +1562,5 @@ class DealStore:
             Filesystem path or ``:memory:``.
         """
         if database_url.startswith("sqlite:///"):
-            return database_url[len("sqlite:///"):]
+            return database_url[len("sqlite:///") :]
         return database_url

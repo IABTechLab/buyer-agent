@@ -3,8 +3,6 @@
 
 """Audience Discovery Tool - Discover available audience signals from sellers."""
 
-from typing import Any, Optional, Type
-
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -16,14 +14,12 @@ from ...models.ucp import AudienceCapability, SignalType
 class AudienceDiscoveryInput(BaseModel):
     """Input schema for audience discovery tool."""
 
-    seller_endpoint: str = Field(
-        description="Seller's capability discovery endpoint URL"
-    )
-    signal_types: Optional[list[str]] = Field(
+    seller_endpoint: str = Field(description="Seller's capability discovery endpoint URL")
+    signal_types: list[str] | None = Field(
         default=None,
         description="Filter by signal types: identity, contextual, reinforcement",
     )
-    min_coverage: Optional[float] = Field(
+    min_coverage: float | None = Field(
         default=None,
         ge=0,
         le=100,
@@ -43,24 +39,22 @@ class AudienceDiscoveryTool(BaseTool):
     Returns a list of audience signals the seller can provide, including
     coverage percentages and UCP compatibility status. Use this to understand
     what targeting options are available before planning audiences."""
-    args_schema: Type[BaseModel] = AudienceDiscoveryInput
+    args_schema: type[BaseModel] = AudienceDiscoveryInput
 
     def _run(
         self,
         seller_endpoint: str,
-        signal_types: Optional[list[str]] = None,
-        min_coverage: Optional[float] = None,
+        signal_types: list[str] | None = None,
+        min_coverage: float | None = None,
     ) -> str:
         """Execute the audience discovery."""
-        return run_async(
-            self._arun(seller_endpoint, signal_types, min_coverage)
-        )
+        return run_async(self._arun(seller_endpoint, signal_types, min_coverage))
 
     async def _arun(
         self,
         seller_endpoint: str,
-        signal_types: Optional[list[str]] = None,
-        min_coverage: Optional[float] = None,
+        signal_types: list[str] | None = None,
+        min_coverage: float | None = None,
     ) -> str:
         """Async implementation of audience discovery."""
         client = UCPClient()
@@ -86,17 +80,11 @@ class AudienceDiscoveryTool(BaseTool):
                     pass
 
             if valid_types:
-                capabilities = [
-                    cap for cap in capabilities
-                    if cap.signal_type in valid_types
-                ]
+                capabilities = [cap for cap in capabilities if cap.signal_type in valid_types]
 
         # Filter by minimum coverage
         if min_coverage is not None:
-            capabilities = [
-                cap for cap in capabilities
-                if cap.coverage_percentage >= min_coverage
-            ]
+            capabilities = [cap for cap in capabilities if cap.coverage_percentage >= min_coverage]
 
         return self._format_results(capabilities)
 

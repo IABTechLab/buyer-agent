@@ -8,7 +8,7 @@ being swallowed silently, and that partial failures are handled
 gracefully by downstream modules.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,21 +16,17 @@ import httpx
 import pytest
 
 from ad_buyer.auth.key_store import ApiKeyStore
-from ad_buyer.auth.middleware import AuthMiddleware
 from ad_buyer.clients.opendirect_client import OpenDirectClient
-from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
+from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.media_kit.client import MediaKitClient
-from ad_buyer.media_kit.models import MediaKitError, PackageSummary
-from ad_buyer.models.buyer_identity import BuyerContext, BuyerIdentity, DealType
+from ad_buyer.media_kit.models import MediaKitError
 from ad_buyer.models.flow_state import (
-    BookingState,
     ChannelAllocation,
     ExecutionStatus,
 )
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.registry.client import RegistryClient
 from ad_buyer.sessions.session_manager import SessionManager
 from ad_buyer.sessions.session_store import SessionRecord
 
@@ -102,9 +98,7 @@ class TestClientErrorPropagation:
 class TestFlowErrorPropagation:
     """Tests error handling in the DealBookingFlow pipeline."""
 
-    def test_crew_exception_captured_in_flow_errors(
-        self, sample_campaign_brief: dict[str, Any]
-    ):
+    def test_crew_exception_captured_in_flow_errors(self, sample_campaign_brief: dict[str, Any]):
         """Exception in portfolio crew should be captured in flow state errors."""
         client = OpenDirectClient(base_url="http://fake.test")
         flow = DealBookingFlow(client)
@@ -122,9 +116,7 @@ class TestFlowErrorPropagation:
         assert flow.state.execution_status == ExecutionStatus.FAILED
         assert any("Budget allocation failed" in e for e in flow.state.errors)
 
-    def test_channel_research_failure_isolated(
-        self, sample_campaign_brief: dict[str, Any]
-    ):
+    def test_channel_research_failure_isolated(self, sample_campaign_brief: dict[str, Any]):
         """Failure in one channel research should not prevent others."""
         client = OpenDirectClient(base_url="http://fake.test")
         flow = DealBookingFlow(client)
@@ -145,12 +137,15 @@ class TestFlowErrorPropagation:
         mock_ctv_crew = MagicMock()
         mock_ctv_crew.kickoff.side_effect = RuntimeError("CTV crew crashed")
 
-        with patch(
-            "ad_buyer.flows.deal_booking_flow.create_branding_crew",
-            return_value=mock_branding_crew,
-        ), patch(
-            "ad_buyer.flows.deal_booking_flow.create_ctv_crew",
-            return_value=mock_ctv_crew,
+        with (
+            patch(
+                "ad_buyer.flows.deal_booking_flow.create_branding_crew",
+                return_value=mock_branding_crew,
+            ),
+            patch(
+                "ad_buyer.flows.deal_booking_flow.create_ctv_crew",
+                return_value=mock_ctv_crew,
+            ),
         ):
             alloc_result = {"status": "success"}
 
@@ -168,9 +163,7 @@ class TestSessionErrorPropagation:
     """Tests error handling in session management."""
 
     @pytest.mark.asyncio
-    async def test_session_creation_failure_raises(
-        self, tmp_session_store_path: str
-    ):
+    async def test_session_creation_failure_raises(self, tmp_session_store_path: str):
         """Failed session creation should raise RuntimeError."""
         manager = SessionManager(store_path=tmp_session_store_path)
 
@@ -188,9 +181,7 @@ class TestSessionErrorPropagation:
                 await manager.create_session("http://seller.example.com")
 
     @pytest.mark.asyncio
-    async def test_send_message_failure_after_retry(
-        self, tmp_session_store_path: str
-    ):
+    async def test_send_message_failure_after_retry(self, tmp_session_store_path: str):
         """send_message should raise after retry also fails."""
         manager = SessionManager(store_path=tmp_session_store_path)
         seller_url = "http://seller.example.com"
@@ -199,8 +190,8 @@ class TestSessionErrorPropagation:
         record = SessionRecord(
             session_id="active-sess",
             seller_url=seller_url,
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -212,8 +203,8 @@ class TestSessionErrorPropagation:
         new_session_resp.status_code = 201
         new_session_resp.json.return_value = {
             "session_id": "new-sess",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         failed_retry_resp = MagicMock()
@@ -228,9 +219,7 @@ class TestSessionErrorPropagation:
             MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with pytest.raises(RuntimeError, match="Failed to send message"):
-                await manager.send_message(
-                    seller_url, "active-sess", {"type": "query"}
-                )
+                await manager.send_message(seller_url, "active-sess", {"type": "query"})
 
 
 class TestNegotiationErrorPropagation:
@@ -329,10 +318,12 @@ class TestMediaKitErrorPropagation:
                 return good_response
 
             with patch.object(client._http, "get", side_effect=mock_get):
-                results = await client.aggregate_across_sellers([
-                    "http://bad-seller.test",
-                    "http://good-seller.test",
-                ])
+                results = await client.aggregate_across_sellers(
+                    [
+                        "http://bad-seller.test",
+                        "http://good-seller.test",
+                    ]
+                )
 
             # Only packages from the good seller
             assert len(results) == 1

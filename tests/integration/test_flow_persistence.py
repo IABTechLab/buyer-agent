@@ -10,33 +10,28 @@ These tests verify that:
 4. API job tracking writes to the store via _persist_job
 """
 
-import json
-from datetime import datetime
-from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from ad_buyer.storage import DealStore
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.flows.dsp_deal_flow import DSPDealFlow, DSPFlowStatus
-from ad_buyer.models.flow_state import (
-    BookedLine,
-    BookingState,
-    ChannelAllocation,
-    ExecutionStatus,
-    ProductRecommendation,
-)
 from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,
     DealType,
 )
-
+from ad_buyer.models.flow_state import (
+    BookingState,
+    ChannelAllocation,
+    ProductRecommendation,
+)
+from ad_buyer.storage import DealStore
 
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
+
 
 @pytest.fixture
 def deal_store():
@@ -82,6 +77,7 @@ def buyer_context():
 # DealBookingFlow backward compatibility (store=None)
 # -----------------------------------------------------------------------
 
+
 class TestDealBookingFlowNoStore:
     """Verify DealBookingFlow works identically when store=None."""
 
@@ -93,13 +89,15 @@ class TestDealBookingFlowNoStore:
     def test_brief_validation_no_store(self, mock_opendirect_client):
         """Brief validation works without a store."""
         flow = DealBookingFlow(mock_opendirect_client)
-        flow._state = BookingState(campaign_brief={
-            "objectives": ["awareness"],
-            "budget": 10000,
-            "start_date": "2026-04-01",
-            "end_date": "2026-04-30",
-            "target_audience": {"age": "25-45"},
-        })
+        flow._state = BookingState(
+            campaign_brief={
+                "objectives": ["awareness"],
+                "budget": 10000,
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "target_audience": {"age": "25-45"},
+            }
+        )
         result = flow.receive_campaign_brief()
         assert result["status"] == "success"
 
@@ -113,17 +111,22 @@ class TestDealBookingFlowNoStore:
     def test_consolidate_no_store(self, mock_opendirect_client):
         """Consolidation works without a store and creates no DB records."""
         flow = DealBookingFlow(mock_opendirect_client)
-        flow._state = BookingState(campaign_brief={
-            "objectives": ["awareness"],
-            "budget": 10000,
-            "start_date": "2026-04-01",
-            "end_date": "2026-04-30",
-            "target_audience": {},
-        })
+        flow._state = BookingState(
+            campaign_brief={
+                "objectives": ["awareness"],
+                "budget": 10000,
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "target_audience": {},
+            }
+        )
 
         # Set up allocations and recommendations so consolidation triggers
         flow.state.budget_allocations["branding"] = ChannelAllocation(
-            channel="branding", budget=10000, percentage=100, rationale="Test",
+            channel="branding",
+            budget=10000,
+            percentage=100,
+            rationale="Test",
         )
         flow.state.channel_recommendations["branding"] = [
             ProductRecommendation(
@@ -137,22 +140,22 @@ class TestDealBookingFlowNoStore:
             )
         ]
 
-        result = flow.consolidate_recommendations(
-            {"channel": "branding", "status": "success"}
-        )
+        result = flow.consolidate_recommendations({"channel": "branding", "status": "success"})
         assert result["status"] == "ready_for_approval"
         assert result["total_recommendations"] == 1
 
     def test_execute_bookings_no_store(self, mock_opendirect_client):
         """Booking execution works without a store."""
         flow = DealBookingFlow(mock_opendirect_client)
-        flow._state = BookingState(campaign_brief={
-            "objectives": ["awareness"],
-            "budget": 10000,
-            "start_date": "2026-04-01",
-            "end_date": "2026-04-30",
-            "target_audience": {},
-        })
+        flow._state = BookingState(
+            campaign_brief={
+                "objectives": ["awareness"],
+                "budget": 10000,
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "target_audience": {},
+            }
+        )
 
         rec = ProductRecommendation(
             product_id="prod_1",
@@ -175,6 +178,7 @@ class TestDealBookingFlowNoStore:
 # DealBookingFlow with store
 # -----------------------------------------------------------------------
 
+
 class TestDealBookingFlowWithStore:
     """Verify DealBookingFlow persists data when store is provided."""
 
@@ -186,16 +190,21 @@ class TestDealBookingFlowWithStore:
     def test_consolidate_persists_deals(self, mock_opendirect_client, deal_store):
         """Consolidation creates deal records in the store."""
         flow = DealBookingFlow(mock_opendirect_client, store=deal_store)
-        flow._state = BookingState(campaign_brief={
-            "objectives": ["awareness"],
-            "budget": 10000,
-            "start_date": "2026-04-01",
-            "end_date": "2026-04-30",
-            "target_audience": {},
-        })
+        flow._state = BookingState(
+            campaign_brief={
+                "objectives": ["awareness"],
+                "budget": 10000,
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "target_audience": {},
+            }
+        )
 
         flow.state.budget_allocations["branding"] = ChannelAllocation(
-            channel="branding", budget=10000, percentage=100, rationale="Test",
+            channel="branding",
+            budget=10000,
+            percentage=100,
+            rationale="Test",
         )
         flow.state.channel_recommendations["branding"] = [
             ProductRecommendation(
@@ -218,9 +227,7 @@ class TestDealBookingFlowWithStore:
             ),
         ]
 
-        result = flow.consolidate_recommendations(
-            {"channel": "branding", "status": "success"}
-        )
+        result = flow.consolidate_recommendations({"channel": "branding", "status": "success"})
         assert result["status"] == "ready_for_approval"
 
         # Verify deals were persisted
@@ -234,18 +241,18 @@ class TestDealBookingFlowWithStore:
             history = deal_store.get_status_history("deal", deal["id"])
             assert len(history) >= 1
 
-    def test_execute_bookings_persists_records(
-        self, mock_opendirect_client, deal_store
-    ):
+    def test_execute_bookings_persists_records(self, mock_opendirect_client, deal_store):
         """Booking execution persists booking records and updates deal status."""
         flow = DealBookingFlow(mock_opendirect_client, store=deal_store)
-        flow._state = BookingState(campaign_brief={
-            "objectives": ["awareness"],
-            "budget": 10000,
-            "start_date": "2026-04-01",
-            "end_date": "2026-04-30",
-            "target_audience": {},
-        })
+        flow._state = BookingState(
+            campaign_brief={
+                "objectives": ["awareness"],
+                "budget": 10000,
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "target_audience": {},
+            }
+        )
 
         # First create a deal in the store (simulating consolidation)
         deal_id = deal_store.save_deal(
@@ -293,16 +300,21 @@ class TestDealBookingFlowWithStore:
         broken_store.disconnect()  # Close connection to cause errors
 
         flow = DealBookingFlow(mock_opendirect_client, store=broken_store)
-        flow._state = BookingState(campaign_brief={
-            "objectives": ["awareness"],
-            "budget": 10000,
-            "start_date": "2026-04-01",
-            "end_date": "2026-04-30",
-            "target_audience": {},
-        })
+        flow._state = BookingState(
+            campaign_brief={
+                "objectives": ["awareness"],
+                "budget": 10000,
+                "start_date": "2026-04-01",
+                "end_date": "2026-04-30",
+                "target_audience": {},
+            }
+        )
 
         flow.state.budget_allocations["branding"] = ChannelAllocation(
-            channel="branding", budget=10000, percentage=100, rationale="Test",
+            channel="branding",
+            budget=10000,
+            percentage=100,
+            rationale="Test",
         )
         flow.state.channel_recommendations["branding"] = [
             ProductRecommendation(
@@ -317,15 +329,14 @@ class TestDealBookingFlowWithStore:
         ]
 
         # This should NOT raise despite the broken store
-        result = flow.consolidate_recommendations(
-            {"channel": "branding", "status": "success"}
-        )
+        result = flow.consolidate_recommendations({"channel": "branding", "status": "success"})
         assert result["status"] == "ready_for_approval"
 
 
 # -----------------------------------------------------------------------
 # DSPDealFlow backward compatibility (store=None)
 # -----------------------------------------------------------------------
+
 
 class TestDSPDealFlowNoStore:
     """Verify DSPDealFlow works identically when store=None."""
@@ -348,6 +359,7 @@ class TestDSPDealFlowNoStore:
 # DSPDealFlow with store
 # -----------------------------------------------------------------------
 
+
 class TestDSPDealFlowWithStore:
     """Verify DSPDealFlow persists data when store is provided."""
 
@@ -356,9 +368,7 @@ class TestDSPDealFlowWithStore:
         flow = DSPDealFlow(mock_unified_client, buyer_context, store=deal_store)
         assert flow._store is deal_store
 
-    def test_receive_request_persists_deal(
-        self, mock_unified_client, buyer_context, deal_store
-    ):
+    def test_receive_request_persists_deal(self, mock_unified_client, buyer_context, deal_store):
         """Request reception creates a draft deal in the store."""
         flow = DSPDealFlow(mock_unified_client, buyer_context, store=deal_store)
         flow.state.request = "Premium video inventory for Q2"
@@ -383,17 +393,13 @@ class TestDSPDealFlowWithStore:
         assert flow._store_deal_id is not None
         assert flow._store_deal_id == deal["id"]
 
-    def test_store_failure_does_not_break_dsp_flow(
-        self, mock_unified_client, buyer_context
-    ):
+    def test_store_failure_does_not_break_dsp_flow(self, mock_unified_client, buyer_context):
         """DSP flow completes even when store raises exceptions."""
         broken_store = DealStore("sqlite:///:memory:")
         broken_store.connect()
         broken_store.disconnect()
 
-        flow = DSPDealFlow(
-            mock_unified_client, buyer_context, store=broken_store
-        )
+        flow = DSPDealFlow(mock_unified_client, buyer_context, store=broken_store)
         flow.state.request = "Premium video inventory"
 
         # Should not raise
@@ -404,6 +410,7 @@ class TestDSPDealFlowWithStore:
 # -----------------------------------------------------------------------
 # API _persist_job integration
 # -----------------------------------------------------------------------
+
 
 class TestAPIPersistJob:
     """Test the API's _persist_job helper writes to the store."""

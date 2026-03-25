@@ -11,28 +11,25 @@ bead: buyer-80k
 """
 
 from datetime import date, timedelta
-from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
 
 from ad_buyer.models.campaign_brief import (
+    KPI,
     ApprovalConfig,
     ApprovalStage,
     BrandSafety,
     CampaignBrief,
     CampaignObjective,
-    ChannelAllocation,
     ChannelType,
     FrequencyCap,
     GeoTarget,
     GeoType,
-    KPI,
     KPIMetric,
     PacingModel,
     parse_campaign_brief,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers — reusable minimal valid brief data
@@ -378,9 +375,7 @@ class TestDateValidation:
         data["flight_end"] = str(date.today() + timedelta(days=7))
         with pytest.raises(ValidationError) as exc_info:
             CampaignBrief(**data)
-        assert "flight_end" in str(exc_info.value) or "flight" in str(
-            exc_info.value
-        ).lower()
+        assert "flight_end" in str(exc_info.value) or "flight" in str(exc_info.value).lower()
 
     def test_flight_end_same_as_start_rejected(self):
         """flight_end must be after flight_start (not the same day)."""

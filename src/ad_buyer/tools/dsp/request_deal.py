@@ -5,17 +5,16 @@
 
 import hashlib
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ...async_utils import run_async
-from ...clients.unified_client import Protocol, UnifiedClient
+from ...clients.unified_client import UnifiedClient
 from ...models.buyer_identity import (
     AccessTier,
     BuyerContext,
-    DealRequest,
     DealResponse,
     DealType,
 )
@@ -32,20 +31,20 @@ class RequestDealInput(BaseModel):
         default="PD",
         description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         description="Requested impression volume (required for PG deals)",
         ge=0,
     )
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Deal start date (YYYY-MM-DD)",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Deal end date (YYYY-MM-DD)",
     )
-    target_cpm: Optional[float] = Field(
+    target_cpm: float | None = Field(
         default=None,
         description="Target CPM for negotiation (agency/advertiser tier only)",
         ge=0,
@@ -106,10 +105,10 @@ Returns:
         self,
         product_id: str,
         deal_type: str = "PD",
-        impressions: Optional[int] = None,
-        flight_start: Optional[str] = None,
-        flight_end: Optional[str] = None,
-        target_cpm: Optional[float] = None,
+        impressions: int | None = None,
+        flight_start: str | None = None,
+        flight_end: str | None = None,
+        target_cpm: float | None = None,
     ) -> str:
         """Synchronous wrapper for async deal request."""
         return run_async(
@@ -127,10 +126,10 @@ Returns:
         self,
         product_id: str,
         deal_type: str = "PD",
-        impressions: Optional[int] = None,
-        flight_start: Optional[str] = None,
-        flight_end: Optional[str] = None,
-        target_cpm: Optional[float] = None,
+        impressions: int | None = None,
+        flight_start: str | None = None,
+        flight_end: str | None = None,
+        target_cpm: float | None = None,
     ) -> str:
         """Request a deal ID from the seller."""
         try:
@@ -147,7 +146,9 @@ Returns:
             # Check negotiation eligibility (buyer tier)
             tier = self._buyer_context.identity.get_access_tier()
             if target_cpm and not self._buyer_context.can_negotiate():
-                return f"Price negotiation requires Agency or Advertiser tier (current: {tier.value})"
+                return (
+                    f"Price negotiation requires Agency or Advertiser tier (current: {tier.value})"
+                )
 
             # Get product details first
             product_result = await self._client.get_product(product_id)
@@ -177,10 +178,10 @@ Returns:
         self,
         product: dict,
         deal_type: DealType,
-        impressions: Optional[int],
-        flight_start: Optional[str],
-        flight_end: Optional[str],
-        target_cpm: Optional[float],
+        impressions: int | None,
+        flight_start: str | None,
+        flight_end: str | None,
+        target_cpm: float | None,
     ) -> DealResponse:
         """Create a deal response with calculated pricing."""
         # Get tier and base price
@@ -254,7 +255,7 @@ Returns:
         timestamp = datetime.now().strftime("%Y%m%d%H%M")
         identity = self._buyer_context.identity
         seed = f"{product_id}-{identity.agency_id or identity.seat_id or 'public'}-{timestamp}"
-        hash_suffix = hashlib.md5(seed.encode()).hexdigest()[:8].upper()
+        hash_suffix = hashlib.md5(seed.encode(), usedforsecurity=False).hexdigest()[:8].upper()
         return f"DEAL-{hash_suffix}"
 
     def _format_deal_response(self, deal: DealResponse) -> str:
@@ -283,36 +284,42 @@ Returns:
         if deal.impressions:
             output_lines.append(f"Impressions: {deal.impressions:,}")
 
-        output_lines.extend([
-            "",
-            "Pricing",
-            "-" * 30,
-            f"Original CPM: ${deal.original_price:.2f}",
-            f"Your Tier: {deal.access_tier.value.upper()} ({deal.discount_applied}% discount)",
-            f"Final CPM: ${deal.price:.2f}",
-        ])
+        output_lines.extend(
+            [
+                "",
+                "Pricing",
+                "-" * 30,
+                f"Original CPM: ${deal.original_price:.2f}",
+                f"Your Tier: {deal.access_tier.value.upper()} ({deal.discount_applied}% discount)",
+                f"Final CPM: ${deal.price:.2f}",
+            ]
+        )
 
         if deal.impressions:
             total_cost = (deal.price / 1000) * deal.impressions
             output_lines.append(f"Estimated Total: ${total_cost:,.2f}")
 
-        output_lines.extend([
-            "",
-            "Activation Instructions",
-            "-" * 30,
-        ])
+        output_lines.extend(
+            [
+                "",
+                "Activation Instructions",
+                "-" * 30,
+            ]
+        )
 
         for platform, instruction in deal.activation_instructions.items():
             output_lines.append(f"• {platform.upper()}: {instruction}")
 
-        output_lines.extend([
-            "",
-            "-" * 30,
-            f"Deal expires: {deal.expires_at}",
-            "",
-            "Copy the Deal ID above and enter it in your DSP's",
-            "Private Marketplace or Inventory section.",
-            "=" * 60,
-        ])
+        output_lines.extend(
+            [
+                "",
+                "-" * 30,
+                f"Deal expires: {deal.expires_at}",
+                "",
+                "Copy the Deal ID above and enter it in your DSP's",
+                "Private Marketplace or Inventory section.",
+                "=" * 60,
+            ]
+        )
 
         return "\n".join(output_lines)

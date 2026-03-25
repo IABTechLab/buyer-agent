@@ -9,11 +9,11 @@ correctly propagate identity context.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
+from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.identity.strategy import (
     CampaignGoal,
     DealContext,

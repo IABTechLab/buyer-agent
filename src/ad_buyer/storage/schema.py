@@ -24,7 +24,6 @@ Uses a schema_version table for forward-compatible migrations.
 
 import logging
 import sqlite3
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -634,9 +633,7 @@ def migrate_v2_to_v4(conn: sqlite3.Connection) -> None:
             cursor.execute(idx)
 
     conn.commit()
-    logger.info(
-        "Migration v2 -> v4 complete: campaign automation tables created"
-    )
+    logger.info("Migration v2 -> v4 complete: campaign automation tables created")
 
 
 def run_migrations(conn: sqlite3.Connection) -> None:

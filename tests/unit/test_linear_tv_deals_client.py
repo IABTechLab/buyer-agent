@@ -18,16 +18,13 @@ import pytest
 
 from ad_buyer.clients.deals_client import DealsClient, DealsClientError
 from ad_buyer.models.deals import (
-    BuyerIdentityPayload,
     QuoteRequest,
-    QuoteResponse,
 )
 from ad_buyer.models.linear_tv import (
     CancellationRequest,
     LinearTVParams,
     MakegoodRequest,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
@@ -204,6 +201,7 @@ class TestLinearTVQuoteRequest:
     @pytest.mark.asyncio
     async def test_linear_tv_quote_response_parsed(self):
         """Linear TV quote response is parsed with linear_tv details."""
+
         def handler(request):
             return _json_response(200, _linear_tv_quote_response_json())
 
@@ -230,6 +228,7 @@ class TestLinearTVQuoteRequest:
     @pytest.mark.asyncio
     async def test_linear_tv_terms_parsed(self):
         """Linear TV terms include GRP-based fields."""
+
         def handler(request):
             return _json_response(200, _linear_tv_quote_response_json())
 
@@ -250,6 +249,7 @@ class TestLinearTVQuoteRequest:
     @pytest.mark.asyncio
     async def test_linear_tv_pricing_cpp(self):
         """Linear TV pricing uses CPP model."""
+
         def handler(request):
             return _json_response(200, _linear_tv_quote_response_json())
 
@@ -279,6 +279,7 @@ class TestMakegoodClient:
     @pytest.mark.asyncio
     async def test_request_makegood_success(self):
         """POST /deals/{id}/makegoods returns makegood response."""
+
         def handler(request):
             return _json_response(200, _makegood_response_json())
 
@@ -313,9 +314,7 @@ class TestMakegoodClient:
         await c.request_makegood("DEAL-LTV-001", mg_req)
 
         assert capture.last.method == "POST"
-        assert str(capture.last.url).endswith(
-            "/api/v1/deals/DEAL-LTV-001/makegoods"
-        )
+        assert str(capture.last.url).endswith("/api/v1/deals/DEAL-LTV-001/makegoods")
         await c.close()
 
     @pytest.mark.asyncio
@@ -347,10 +346,9 @@ class TestMakegoodClient:
     @pytest.mark.asyncio
     async def test_request_makegood_404(self):
         """404 for missing deal raises DealsClientError."""
+
         def handler(request):
-            return _json_response(
-                404, {"error": "deal_not_found", "detail": "Deal not found"}
-            )
+            return _json_response(404, {"error": "deal_not_found", "detail": "Deal not found"})
 
         c = _make_client_with_transport(handler)
         mg_req = MakegoodRequest(
@@ -376,6 +374,7 @@ class TestCancellationClient:
     @pytest.mark.asyncio
     async def test_request_cancellation_success(self):
         """POST /deals/{id}/cancel returns cancellation response."""
+
         def handler(request):
             return _json_response(200, _cancellation_response_json())
 
@@ -408,9 +407,7 @@ class TestCancellationClient:
         await c.request_cancellation("DEAL-LTV-001", cancel_req)
 
         assert capture.last.method == "POST"
-        assert str(capture.last.url).endswith(
-            "/api/v1/deals/DEAL-LTV-001/cancel"
-        )
+        assert str(capture.last.url).endswith("/api/v1/deals/DEAL-LTV-001/cancel")
         await c.close()
 
     @pytest.mark.asyncio
@@ -439,6 +436,7 @@ class TestCancellationClient:
     @pytest.mark.asyncio
     async def test_request_cancellation_outside_window(self):
         """422 when cancellation is outside the notice window."""
+
         def handler(request):
             return _json_response(
                 422,
@@ -462,10 +460,9 @@ class TestCancellationClient:
     @pytest.mark.asyncio
     async def test_request_cancellation_404(self):
         """404 for missing deal raises DealsClientError."""
+
         def handler(request):
-            return _json_response(
-                404, {"error": "deal_not_found", "detail": "Deal not found"}
-            )
+            return _json_response(404, {"error": "deal_not_found", "detail": "Deal not found"})
 
         c = _make_client_with_transport(handler)
         cancel_req = CancellationRequest(

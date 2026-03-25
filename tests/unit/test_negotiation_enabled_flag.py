@@ -18,15 +18,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ad_buyer.models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     BuyerIdentity,
-    DealType,
 )
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
 from ad_buyer.tools.dsp import GetPricingTool, RequestDealTool
-
 
 # -- Fixtures ----------------------------------------------------------------
 
@@ -234,6 +231,7 @@ class TestNegotiationClientRespectsNegotiationEnabled:
 
         # Should return a result indicating negotiation was rejected
         from ad_buyer.negotiation.models import NegotiationOutcome
+
         assert result.outcome == NegotiationOutcome.DECLINED
         assert result.rounds_count == 0
 

@@ -22,11 +22,11 @@ bead: buyer-9zz (2C: Budget Pacing & Reallocation)
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..events.bus import EventBus
 from ..events.models import Event, EventType
@@ -140,8 +140,8 @@ class BudgetPacingEngine:
 
     def __init__(
         self,
-        config: Optional[PacingConfig] = None,
-        event_bus: Optional[EventBus] = None,
+        config: PacingConfig | None = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         self.config = config or PacingConfig()
         self.event_bus = event_bus
@@ -154,7 +154,7 @@ class BudgetPacingEngine:
         self,
         event_type: EventType,
         campaign_id: str = "",
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ) -> None:
         """Emit an event to the event bus synchronously. Fail-open.
 
@@ -191,7 +191,8 @@ class BudgetPacingEngine:
                     except Exception as e:
                         logger.error(
                             "Subscriber error for %s: %s",
-                            event.event_type, e,
+                            event.event_type,
+                            e,
                         )
                 for cb in bus._subscribers.get("*", []):
                     try:
@@ -305,7 +306,7 @@ class BudgetPacingEngine:
         self,
         actual_spend: float,
         expected_spend: float,
-    ) -> Optional[PacingAlert]:
+    ) -> PacingAlert | None:
         """Detect pacing deviation and return an alert if thresholds are exceeded.
 
         Thresholds are exclusive: the deviation must strictly exceed the
@@ -439,19 +440,21 @@ class BudgetPacingEngine:
                 if amount < self.config.min_reallocation_amount:
                     continue
 
-                proposals.append(ReallocationProposal(
-                    source_channel=source.channel,
-                    target_channel=target.channel,
-                    amount=amount,
-                    reason=(
-                        f"{source.channel} underpacing "
-                        f"(spend: ${source.spend:,.0f} vs "
-                        f"expected: ${expected_spend * (source.allocated_budget / total_budget):,.0f}), "
-                        f"{target.channel} overpacing "
-                        f"(spend: ${target.spend:,.0f} vs "
-                        f"expected: ${expected_spend * (target.allocated_budget / total_budget):,.0f})"
-                    ),
-                ))
+                proposals.append(
+                    ReallocationProposal(
+                        source_channel=source.channel,
+                        target_channel=target.channel,
+                        amount=amount,
+                        reason=(
+                            f"{source.channel} underpacing "
+                            f"(spend: ${source.spend:,.0f} vs "
+                            f"expected: ${expected_spend * (source.allocated_budget / total_budget):,.0f}), "
+                            f"{target.channel} overpacing "
+                            f"(spend: ${target.spend:,.0f} vs "
+                            f"expected: ${expected_spend * (target.allocated_budget / total_budget):,.0f})"
+                        ),
+                    )
+                )
 
         return proposals
 
@@ -552,35 +555,35 @@ class BudgetPacingEngine:
             total_spend += ch_spend
 
             # Calculate channel-level pacing
-            ch_expected = (
-                expected_spend * (ch_budget / total_budget)
-                if total_budget > 0
-                else 0.0
-            )
+            ch_expected = expected_spend * (ch_budget / total_budget) if total_budget > 0 else 0.0
             ch_pacing_pct = self.calculate_pacing_pct(ch_spend, ch_expected)
 
-            channel_snapshots.append(ChannelSnapshot(
-                channel=ch_name,
-                allocated_budget=ch_budget,
-                spend=ch_spend,
-                pacing_pct=ch_pacing_pct,
-                impressions=ch_info.get("impressions", 0),
-                effective_cpm=ch_info.get("effective_cpm", 0.0),
-                fill_rate=ch_info.get("fill_rate", 0.0),
-            ))
+            channel_snapshots.append(
+                ChannelSnapshot(
+                    channel=ch_name,
+                    allocated_budget=ch_budget,
+                    spend=ch_spend,
+                    pacing_pct=ch_pacing_pct,
+                    impressions=ch_info.get("impressions", 0),
+                    effective_cpm=ch_info.get("effective_cpm", 0.0),
+                    fill_rate=ch_info.get("fill_rate", 0.0),
+                )
+            )
 
         # Build deal snapshots
         deal_snapshots: list[DealSnapshot] = []
         for deal_info in deal_data:
-            deal_snapshots.append(DealSnapshot(
-                deal_id=deal_info["deal_id"],
-                allocated_budget=deal_info.get("allocated_budget", 0.0),
-                spend=deal_info.get("spend", 0.0),
-                impressions=deal_info.get("impressions", 0),
-                effective_cpm=deal_info.get("effective_cpm", 0.0),
-                fill_rate=deal_info.get("fill_rate", 0.0),
-                win_rate=deal_info.get("win_rate", 0.0),
-            ))
+            deal_snapshots.append(
+                DealSnapshot(
+                    deal_id=deal_info["deal_id"],
+                    allocated_budget=deal_info.get("allocated_budget", 0.0),
+                    spend=deal_info.get("spend", 0.0),
+                    impressions=deal_info.get("impressions", 0),
+                    effective_cpm=deal_info.get("effective_cpm", 0.0),
+                    fill_rate=deal_info.get("fill_rate", 0.0),
+                    win_rate=deal_info.get("win_rate", 0.0),
+                )
+            )
 
         # Calculate campaign-level pacing
         campaign_pacing_pct = self.calculate_pacing_pct(total_spend, expected_spend)
@@ -595,14 +598,16 @@ class BudgetPacingEngine:
         )
 
         for proposal in proposals:
-            recommendations.append(PacingRecommendation(
-                type=RecommendationType.REALLOCATE,
-                source_channel=proposal.source_channel,
-                target_channel=proposal.target_channel,
-                amount=proposal.amount,
-                reason=proposal.reason,
-                status=RecommendationStatus.PENDING,
-            ))
+            recommendations.append(
+                PacingRecommendation(
+                    type=RecommendationType.REALLOCATE,
+                    source_channel=proposal.source_channel,
+                    target_channel=proposal.target_channel,
+                    amount=proposal.amount,
+                    reason=proposal.reason,
+                    status=RecommendationStatus.PENDING,
+                )
+            )
 
         # Build the snapshot
         snapshot = PacingSnapshot(
@@ -629,9 +634,7 @@ class BudgetPacingEngine:
     # Event emission for pacing lifecycle
     # ------------------------------------------------------------------
 
-    def _emit_snapshot_taken(
-        self, campaign_id: str, snapshot: PacingSnapshot
-    ) -> None:
+    def _emit_snapshot_taken(self, campaign_id: str, snapshot: PacingSnapshot) -> None:
         """Emit PACING_SNAPSHOT_TAKEN event."""
         self._emit_sync(
             EventType.PACING_SNAPSHOT_TAKEN,

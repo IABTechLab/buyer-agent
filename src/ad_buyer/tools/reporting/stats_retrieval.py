@@ -75,9 +75,7 @@ Returns:
             )
             ctr_str = f"{stats.ctr:.3f}%" if stats.ctr is not None else "N/A"
             pacing_str = stats.pacing_status or "N/A"
-            last_updated_str = (
-                stats.last_updated.isoformat() if stats.last_updated else "N/A"
-            )
+            last_updated_str = stats.last_updated.isoformat() if stats.last_updated else "N/A"
 
             # Determine pacing health
             pacing_health = "On track"

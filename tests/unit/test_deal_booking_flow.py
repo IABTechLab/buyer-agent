@@ -15,7 +15,7 @@ Covers:
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -23,14 +23,11 @@ import pytest
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.flow_state import (
     BookedLine,
-    BookingState,
     ChannelAllocation,
-    ChannelBrief,
     ExecutionStatus,
     ProductRecommendation,
 )
 from ad_buyer.models.ucp import SignalType
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -371,10 +368,12 @@ class TestParseAllocations:
 
     def test_valid_json_parsed(self, flow_with_brief):
         """Valid JSON string is parsed correctly."""
-        json_str = json.dumps({
-            "branding": {"budget": 40000, "percentage": 40, "rationale": "Awareness"},
-            "ctv": {"budget": 20000, "percentage": 20, "rationale": "Video"},
-        })
+        json_str = json.dumps(
+            {
+                "branding": {"budget": 40000, "percentage": 40, "rationale": "Awareness"},
+                "ctv": {"budget": 20000, "percentage": 20, "rationale": "Video"},
+            }
+        )
 
         result = flow_with_brief._parse_allocations(json_str)
 
@@ -434,12 +433,14 @@ class TestAllocateBudget:
     @patch("ad_buyer.flows.deal_booking_flow.create_portfolio_crew")
     def test_successful_allocation(self, mock_create_crew, flow_with_brief):
         """Valid crew result populates budget_allocations in state."""
-        allocation_json = json.dumps({
-            "branding": {"budget": 40000, "percentage": 40, "rationale": "Awareness"},
-            "performance": {"budget": 30000, "percentage": 30, "rationale": "Conversions"},
-            "ctv": {"budget": 20000, "percentage": 20, "rationale": "Video reach"},
-            "mobile_app": {"budget": 10000, "percentage": 10, "rationale": "App installs"},
-        })
+        allocation_json = json.dumps(
+            {
+                "branding": {"budget": 40000, "percentage": 40, "rationale": "Awareness"},
+                "performance": {"budget": 30000, "percentage": 30, "rationale": "Conversions"},
+                "ctv": {"budget": 20000, "percentage": 20, "rationale": "Video reach"},
+                "mobile_app": {"budget": 10000, "percentage": 10, "rationale": "App installs"},
+            }
+        )
         mock_crew = MagicMock()
         mock_crew.kickoff.return_value = allocation_json
         mock_create_crew.return_value = mock_crew
@@ -453,12 +454,14 @@ class TestAllocateBudget:
     @patch("ad_buyer.flows.deal_booking_flow.create_portfolio_crew")
     def test_zero_budget_channels_excluded(self, mock_create_crew, flow_with_brief):
         """Channels with 0 budget are not stored in allocations."""
-        allocation_json = json.dumps({
-            "branding": {"budget": 50000, "percentage": 50, "rationale": "Main"},
-            "ctv": {"budget": 50000, "percentage": 50, "rationale": "Video"},
-            "performance": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
-            "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
-        })
+        allocation_json = json.dumps(
+            {
+                "branding": {"budget": 50000, "percentage": 50, "rationale": "Main"},
+                "ctv": {"budget": 50000, "percentage": 50, "rationale": "Video"},
+                "performance": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
+                "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
+            }
+        )
         mock_crew = MagicMock()
         mock_crew.kickoff.return_value = allocation_json
         mock_create_crew.return_value = mock_crew
@@ -958,7 +961,7 @@ class TestGetStatus:
                 impressions=100000,
                 cost=1500,
                 booking_status="booked",
-                booked_at=datetime.utcnow(),
+                booked_at=datetime.now(timezone.utc),
             )
         ]
         flow.state.execution_status = ExecutionStatus.COMPLETED

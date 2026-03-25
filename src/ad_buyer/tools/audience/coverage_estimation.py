@@ -3,7 +3,7 @@
 
 """Coverage Estimation Tool - Estimate audience coverage for targeting."""
 
-from typing import Any, Optional, Type
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -18,11 +18,11 @@ class CoverageEstimationInput(BaseModel):
     targeting: dict[str, Any] = Field(
         description="Targeting specification with demographics, interests, behaviors, etc."
     )
-    channel: Optional[str] = Field(
+    channel: str | None = Field(
         default=None,
         description="Specific channel to estimate (display, video, ctv, mobile_app)",
     )
-    total_impressions: Optional[int] = Field(
+    total_impressions: int | None = Field(
         default=10000000,
         ge=0,
         description="Total available impressions to estimate against",
@@ -41,24 +41,22 @@ class CoverageEstimationTool(BaseTool):
     Returns estimated impressions, coverage percentage, and factors that
     may limit reach. Use this to understand potential scale before committing
     to a targeting strategy."""
-    args_schema: Type[BaseModel] = CoverageEstimationInput
+    args_schema: type[BaseModel] = CoverageEstimationInput
 
     def _run(
         self,
         targeting: dict[str, Any],
-        channel: Optional[str] = None,
-        total_impressions: Optional[int] = 10000000,
+        channel: str | None = None,
+        total_impressions: int | None = 10000000,
     ) -> str:
         """Execute the coverage estimation."""
-        return run_async(
-            self._arun(targeting, channel, total_impressions)
-        )
+        return run_async(self._arun(targeting, channel, total_impressions))
 
     async def _arun(
         self,
         targeting: dict[str, Any],
-        channel: Optional[str] = None,
-        total_impressions: Optional[int] = 10000000,
+        channel: str | None = None,
+        total_impressions: int | None = 10000000,
     ) -> str:
         """Async implementation of coverage estimation."""
         if not targeting:
@@ -76,7 +74,7 @@ class CoverageEstimationTool(BaseTool):
     def _calculate_coverage(
         self,
         targeting: dict[str, Any],
-        channel: Optional[str],
+        channel: str | None,
         total_impressions: int,
     ) -> list[CoverageEstimate]:
         """Calculate coverage estimates for targeting."""
@@ -108,7 +106,7 @@ class CoverageEstimationTool(BaseTool):
             if targeting_type in targeting and targeting[targeting_type]:
                 active_factors.append(factor)
                 if factor < 0.7:
-                    limiting.append(f"{targeting_type} ({factor*100:.0f}% coverage)")
+                    limiting.append(f"{targeting_type} ({factor * 100:.0f}% coverage)")
 
         if not active_factors:
             # No specific targeting = 100% coverage
@@ -156,7 +154,7 @@ class CoverageEstimationTool(BaseTool):
         self,
         estimates: list[CoverageEstimate],
         targeting: dict[str, Any],
-        channel: Optional[str],
+        channel: str | None,
     ) -> str:
         """Format estimates as human-readable output."""
         output = "## Audience Coverage Estimates\n\n"

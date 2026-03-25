@@ -9,24 +9,24 @@ bead: buyer-lna (Pacing snapshot storage)
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ad_buyer.storage.pacing_store import PacingStore
 from ad_buyer.models.campaign import (
-    PacingSnapshot,
     ChannelSnapshot,
     DealSnapshot,
     PacingRecommendation,
-    RecommendationType,
+    PacingSnapshot,
     RecommendationStatus,
+    RecommendationType,
 )
-
+from ad_buyer.storage.pacing_store import PacingStore
 
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
+
 
 @pytest.fixture
 def pacing_store():
@@ -57,6 +57,7 @@ def _make_snapshot(**overrides) -> PacingSnapshot:
 # -----------------------------------------------------------------------
 # Model Tests
 # -----------------------------------------------------------------------
+
 
 class TestPacingSnapshotModel:
     """Tests for the PacingSnapshot Pydantic model."""
@@ -138,6 +139,7 @@ class TestPacingSnapshotModel:
 # -----------------------------------------------------------------------
 # CRUD Tests
 # -----------------------------------------------------------------------
+
 
 class TestPacingStoreSave:
     """Tests for save_pacing_snapshot."""
@@ -230,7 +232,7 @@ class TestPacingStoreList:
 
     def test_list_by_time_range(self, pacing_store):
         """Filter snapshots by time range."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         old = now - timedelta(hours=24)
         recent = now - timedelta(hours=1)
 
@@ -241,15 +243,13 @@ class TestPacingStoreList:
 
         # Only the recent one should match
         cutoff = now - timedelta(hours=2)
-        results = pacing_store.list_pacing_snapshots(
-            campaign_id="camp-001", start_time=cutoff
-        )
+        results = pacing_store.list_pacing_snapshots(campaign_id="camp-001", start_time=cutoff)
         assert len(results) == 1
         assert results[0].snapshot_id == snap_recent.snapshot_id
 
     def test_list_by_end_time(self, pacing_store):
         """Filter snapshots by end time."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         old = now - timedelta(hours=24)
         recent = now - timedelta(hours=1)
 
@@ -260,9 +260,7 @@ class TestPacingStoreList:
 
         # Only the old one should match
         cutoff = now - timedelta(hours=2)
-        results = pacing_store.list_pacing_snapshots(
-            campaign_id="camp-001", end_time=cutoff
-        )
+        results = pacing_store.list_pacing_snapshots(campaign_id="camp-001", end_time=cutoff)
         assert len(results) == 1
         assert results[0].snapshot_id == snap_old.snapshot_id
 
@@ -282,7 +280,7 @@ class TestPacingStoreList:
 
     def test_list_ordered_by_timestamp(self, pacing_store):
         """Snapshots are returned in chronological order."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         snaps = []
         for i in range(3):
             snap = _make_snapshot(
@@ -302,7 +300,7 @@ class TestPacingStoreList:
 
     def test_latest_snapshot(self, pacing_store):
         """Get the most recent snapshot for a campaign."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for i in range(3):
             snap = _make_snapshot(
                 campaign_id="camp-latest",

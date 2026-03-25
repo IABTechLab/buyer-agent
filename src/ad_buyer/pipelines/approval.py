@@ -37,9 +37,9 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -75,29 +75,19 @@ class ApprovalRequest(BaseModel):
         default_factory=lambda: str(uuid.uuid4()),
         description="Unique identifier for this approval request",
     )
-    campaign_id: str = Field(
-        ..., description="Campaign this approval belongs to"
-    )
-    stage: ApprovalStage = Field(
-        ..., description="Pipeline stage requiring approval"
-    )
+    campaign_id: str = Field(..., description="Campaign this approval belongs to")
+    stage: ApprovalStage = Field(..., description="Pipeline stage requiring approval")
     status: ApprovalStatus = Field(
         default=ApprovalStatus.PENDING,
         description="Current status of the request",
     )
     requested_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the approval was requested",
     )
-    decided_at: Optional[datetime] = Field(
-        default=None, description="When the decision was made"
-    )
-    reviewer: Optional[str] = Field(
-        default=None, description="Who made the decision"
-    )
-    notes: Optional[str] = Field(
-        default=None, description="Notes from the reviewer"
-    )
+    decided_at: datetime | None = Field(default=None, description="When the decision was made")
+    reviewer: str | None = Field(default=None, description="Who made the decision")
+    notes: str | None = Field(default=None, description="Notes from the reviewer")
     context: dict[str, Any] = Field(
         default_factory=dict,
         description="Additional context for the reviewer (e.g., plan summary)",
@@ -110,24 +100,14 @@ class ApprovalResult(BaseModel):
     Captures whether the request was approved, rejected, or timed out.
     """
 
-    approved: bool = Field(
-        ..., description="Whether the request was approved"
-    )
-    approval_request_id: str = Field(
-        ..., description="The approval request this result is for"
-    )
-    stage: ApprovalStage = Field(
-        ..., description="The pipeline stage"
-    )
-    timed_out: bool = Field(
-        default=False, description="Whether the wait timed out"
-    )
-    reviewer: Optional[str] = Field(
+    approved: bool = Field(..., description="Whether the request was approved")
+    approval_request_id: str = Field(..., description="The approval request this result is for")
+    stage: ApprovalStage = Field(..., description="The pipeline stage")
+    timed_out: bool = Field(default=False, description="Whether the wait timed out")
+    reviewer: str | None = Field(
         default=None, description="Who made the decision (if not timed out)"
     )
-    notes: Optional[str] = Field(
-        default=None, description="Reviewer notes (if any)"
-    )
+    notes: str | None = Field(default=None, description="Reviewer notes (if any)")
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +187,7 @@ class ApprovalGate:
                 status=ApprovalStatus(row["status"]),
                 requested_at=datetime.fromisoformat(row["requested_at"]),
                 decided_at=(
-                    datetime.fromisoformat(row["decided_at"])
-                    if row.get("decided_at")
-                    else None
+                    datetime.fromisoformat(row["decided_at"]) if row.get("decided_at") else None
                 ),
                 reviewer=row.get("reviewer"),
                 notes=row.get("notes"),
@@ -221,9 +199,7 @@ class ApprovalGate:
     # Public API
     # ------------------------------------------------------------------
 
-    def check_approval_required(
-        self, campaign_id: str, stage: ApprovalStage
-    ) -> bool:
+    def check_approval_required(self, campaign_id: str, stage: ApprovalStage) -> bool:
         """Check whether a campaign requires approval at the given stage.
 
         Reads the campaign's ``approval_config`` from the store. If the
@@ -252,7 +228,7 @@ class ApprovalGate:
         self,
         campaign_id: str,
         stage: ApprovalStage,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Create an approval request and emit an event.
 
@@ -309,7 +285,7 @@ class ApprovalGate:
         approval_request_id: str,
         approved: bool,
         reviewer: str,
-        notes: Optional[str] = None,
+        notes: str | None = None,
     ) -> None:
         """Record an approval or rejection decision.
 
@@ -328,9 +304,7 @@ class ApprovalGate:
             self._load_from_db()
             request = self._requests.get(approval_request_id)
             if request is None:
-                raise ValueError(
-                    f"Approval request {approval_request_id} not found"
-                )
+                raise ValueError(f"Approval request {approval_request_id} not found")
 
         if request.status != ApprovalStatus.PENDING:
             raise ValueError(
@@ -339,7 +313,7 @@ class ApprovalGate:
             )
 
         # Update the request
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         new_status = ApprovalStatus.APPROVED if approved else ApprovalStatus.REJECTED
         request.status = new_status
         request.decided_at = now
@@ -356,9 +330,7 @@ class ApprovalGate:
         )
 
         # Emit event
-        event_type = (
-            EventType.APPROVAL_GRANTED if approved else EventType.APPROVAL_REJECTED
-        )
+        event_type = EventType.APPROVAL_GRANTED if approved else EventType.APPROVAL_REJECTED
         event = Event(
             event_type=event_type,
             campaign_id=request.campaign_id,
@@ -398,9 +370,7 @@ class ApprovalGate:
             return False
         return request.status == ApprovalStatus.APPROVED
 
-    def get_approval_request(
-        self, approval_request_id: str
-    ) -> Optional[ApprovalRequest]:
+    def get_approval_request(self, approval_request_id: str) -> ApprovalRequest | None:
         """Retrieve an approval request by ID.
 
         Args:
@@ -418,9 +388,9 @@ class ApprovalGate:
 
     def list_approval_requests(
         self,
-        campaign_id: Optional[str] = None,
-        stage: Optional[ApprovalStage] = None,
-        status: Optional[ApprovalStatus] = None,
+        campaign_id: str | None = None,
+        stage: ApprovalStage | None = None,
+        status: ApprovalStatus | None = None,
     ) -> list[ApprovalRequest]:
         """List approval requests with optional filters.
 

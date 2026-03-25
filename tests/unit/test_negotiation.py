@@ -10,23 +10,22 @@ Covers:
 - Edge cases
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from ad_buyer.negotiation.strategy import NegotiationStrategy as NegotiationStrategyABC
-from ad_buyer.negotiation.strategy import NegotiationContext
-from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.negotiation.strategies.adaptive import AdaptiveStrategy
-from ad_buyer.negotiation.strategies.competitive import CompetitiveStrategy
+import pytest
+
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.models import (
-    NegotiationSession,
-    NegotiationRound,
-    NegotiationResult,
     NegotiationOutcome,
+    NegotiationResult,
+    NegotiationRound,
+    NegotiationSession,
 )
-
+from ad_buyer.negotiation.strategies.adaptive import AdaptiveStrategy
+from ad_buyer.negotiation.strategies.competitive import CompetitiveStrategy
+from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
+from ad_buyer.negotiation.strategy import NegotiationContext
+from ad_buyer.negotiation.strategy import NegotiationStrategy as NegotiationStrategyABC
 
 # =========================================================================
 # SimpleThresholdStrategy tests

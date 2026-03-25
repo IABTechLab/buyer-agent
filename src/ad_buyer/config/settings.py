@@ -4,7 +4,6 @@
 """Application settings loaded from environment variables."""
 
 from functools import lru_cache
-from typing import Optional
 
 from dotenv import find_dotenv
 from pydantic_settings import BaseSettings
@@ -33,8 +32,8 @@ class Settings(BaseSettings):
 
     # OpenDirect API Configuration (legacy single-server mode)
     opendirect_base_url: str = "http://localhost:3000/api/v2.1"
-    opendirect_token: Optional[str] = None
-    opendirect_api_key: Optional[str] = None
+    opendirect_token: str | None = None
+    opendirect_api_key: str | None = None
 
     def get_seller_endpoints(self) -> list[str]:
         """Parse seller endpoints from comma-separated string.
@@ -56,7 +55,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./ad_buyer.db"
 
     # Optional Redis
-    redis_url: Optional[str] = None
+    redis_url: str | None = None
 
     # CrewAI Settings
     crew_memory_enabled: bool = True

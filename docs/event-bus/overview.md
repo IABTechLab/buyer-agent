@@ -67,7 +67,7 @@ Every event is a Pydantic `Event` instance with the following fields:
 |-------|------|---------|-------------|
 | `event_id` | `str` | Auto-generated UUID | Unique identifier for this event |
 | `event_type` | `EventType` | *(required)* | Enum value identifying what happened |
-| `timestamp` | `datetime` | `datetime.utcnow()` | When the event was created |
+| `timestamp` | `datetime` | `datetime.now(timezone.utc)` | When the event was created |
 | `flow_id` | `str` | `""` | ID of the flow instance that produced this event |
 | `flow_type` | `str` | `""` | Type of flow (e.g., `"dsp_deal"`, `"deal_booking"`) |
 | `deal_id` | `str` | `""` | Associated deal ID, if applicable |

@@ -24,7 +24,7 @@ Usage:
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -75,45 +75,45 @@ class ManualDealEntry(BaseModel):
     )
 
     # Optional counterparty
-    seller_deal_id: Optional[str] = Field(
+    seller_deal_id: str | None = Field(
         default=None,
         description="Seller-assigned deal ID",
     )
-    seller_org: Optional[str] = Field(
+    seller_org: str | None = Field(
         default=None,
         description="Seller organization name",
     )
-    seller_domain: Optional[str] = Field(
+    seller_domain: str | None = Field(
         default=None,
         description="Seller domain (e.g., nbcuniversal.com)",
     )
-    seller_type: Optional[str] = Field(
+    seller_type: str | None = Field(
         default=None,
         description="Seller type: PUBLISHER, SSP, DSP, or INTERMEDIARY",
     )
-    buyer_org: Optional[str] = Field(
+    buyer_org: str | None = Field(
         default=None,
         description="Buyer organization name",
     )
-    buyer_id: Optional[str] = Field(
+    buyer_id: str | None = Field(
         default=None,
         description="Buyer identifier",
     )
 
     # Optional pricing
-    price: Optional[float] = Field(
+    price: float | None = Field(
         default=None,
         description="Deal price (CPM or flat rate depending on price_model)",
     )
-    fixed_price_cpm: Optional[float] = Field(
+    fixed_price_cpm: float | None = Field(
         default=None,
         description="Fixed CPM price",
     )
-    bid_floor_cpm: Optional[float] = Field(
+    bid_floor_cpm: float | None = Field(
         default=None,
         description="Bid floor CPM for auction-based deals",
     )
-    price_model: Optional[str] = Field(
+    price_model: str | None = Field(
         default=None,
         description="Pricing model: CPM, CPP, FLAT, or HYBRID",
     )
@@ -123,35 +123,35 @@ class ManualDealEntry(BaseModel):
     )
 
     # Optional inventory
-    media_type: Optional[str] = Field(
+    media_type: str | None = Field(
         default=None,
         description="Media type: DIGITAL, CTV, LINEAR_TV, AUDIO, or DOOH",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         description="Contracted impression volume",
     )
 
     # Optional dates
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Flight start date (ISO 8601, e.g. 2026-04-01)",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Flight end date (ISO 8601, e.g. 2026-06-30)",
     )
 
     # Optional metadata
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None,
         description="Free-text deal description",
     )
-    advertiser_id: Optional[str] = Field(
+    advertiser_id: str | None = Field(
         default=None,
         description="Advertiser identifier for portfolio tracking",
     )
-    tags: Optional[list[str]] = Field(
+    tags: list[str] | None = Field(
         default=None,
         description="Tags for categorization (e.g., ['premium', 'sports'])",
     )
@@ -172,8 +172,8 @@ class DealEntryResult:
     """
 
     success: bool
-    deal_data: Optional[dict[str, Any]] = None
-    metadata: Optional[dict[str, Any]] = None
+    deal_data: dict[str, Any] | None = None
+    metadata: dict[str, Any] | None = None
     errors: list[str] = field(default_factory=list)
 
 
@@ -201,8 +201,7 @@ def _validate_entry(entry: ManualDealEntry) -> list[str]:
     # status must be in valid set
     if entry.status not in VALID_STATUSES:
         errors.append(
-            f"Invalid status '{entry.status}'. "
-            f"Must be one of: {', '.join(sorted(VALID_STATUSES))}"
+            f"Invalid status '{entry.status}'. Must be one of: {', '.join(sorted(VALID_STATUSES))}"
         )
 
     # media_type validation (only if provided)

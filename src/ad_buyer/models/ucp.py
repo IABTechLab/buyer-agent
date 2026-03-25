@@ -10,9 +10,9 @@ matching between buyer and seller agents.
 Transport: HTTPS JSON with Content-Type: application/vnd.ucp.embedding+json; v=1
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -51,9 +51,7 @@ class UCPModelDescriptor(BaseModel):
 
     id: str = Field(..., description="Model identifier (e.g., 'ucp-embedding-v1')")
     version: str = Field(..., description="Model version (e.g., '1.0.0')")
-    dimension: int = Field(
-        ..., ge=256, le=1024, description="Embedding dimension (256-1024)"
-    )
+    dimension: int = Field(..., ge=256, le=1024, description="Embedding dimension (256-1024)")
     metric: SimilarityMetric = Field(
         default=SimilarityMetric.COSINE,
         description="Recommended similarity metric",
@@ -69,20 +67,14 @@ class UCPModelDescriptor(BaseModel):
 class UCPContextDescriptor(BaseModel):
     """Contextual information about the embedding source."""
 
-    url: Optional[str] = Field(default=None, description="Page URL if applicable")
-    page_title: Optional[str] = Field(
-        default=None, alias="pageTitle", description="Page title"
-    )
-    keywords: list[str] = Field(
-        default_factory=list, description="Content keywords"
-    )
+    url: str | None = Field(default=None, description="Page URL if applicable")
+    page_title: str | None = Field(default=None, alias="pageTitle", description="Page title")
+    keywords: list[str] = Field(default_factory=list, description="Content keywords")
     language: str = Field(default="en", description="Content language (ISO 639-1)")
-    device: Optional[str] = Field(
+    device: str | None = Field(
         default=None, description="Device type: desktop, mobile, ctv, tablet"
     )
-    geography: Optional[str] = Field(
-        default=None, description="Geography (ISO 3166-1 alpha-2)"
-    )
+    geography: str | None = Field(default=None, description="Geography (ISO 3166-1 alpha-2)")
     content_categories: list[str] = Field(
         default_factory=list,
         alias="contentCategories",
@@ -102,7 +94,7 @@ class UCPConsent(BaseModel):
         default="IAB-TCFv2",
         description="Consent framework (IAB-TCFv2, IAB-USPrivacy, etc.)",
     )
-    consent_string: Optional[str] = Field(
+    consent_string: str | None = Field(
         default=None,
         alias="consentString",
         description="Encoded consent string",
@@ -118,7 +110,7 @@ class UCPConsent(BaseModel):
         ge=0,
         description="Consent validity duration in seconds",
     )
-    vendor_id: Optional[str] = Field(
+    vendor_id: str | None = Field(
         default=None,
         alias="vendorId",
         description="Vendor ID for consent lookup",
@@ -136,24 +128,16 @@ class UCPEmbedding(BaseModel):
     embedding_type: EmbeddingType = Field(
         ..., alias="embeddingType", description="Type of embedding"
     )
-    signal_type: SignalType = Field(
-        ..., alias="signalType", description="UCP signal type"
-    )
+    signal_type: SignalType = Field(..., alias="signalType", description="UCP signal type")
     vector: list[float] = Field(
         ..., min_length=256, max_length=1024, description="Embedding vector"
     )
-    dimension: int = Field(
-        ..., ge=256, le=1024, description="Vector dimension"
-    )
+    dimension: int = Field(..., ge=256, le=1024, description="Vector dimension")
     model_descriptor: UCPModelDescriptor = Field(
         ..., alias="modelDescriptor", description="Model that generated this embedding"
     )
-    context: Optional[UCPContextDescriptor] = Field(
-        default=None, description="Contextual metadata"
-    )
-    consent: UCPConsent = Field(
-        ..., description="Consent information (required)"
-    )
+    context: UCPContextDescriptor | None = Field(default=None, description="Contextual metadata")
+    consent: UCPConsent = Field(..., description="Consent information (required)")
     timestamp: datetime = Field(
         default_factory=datetime.utcnow,
         description="When the embedding was generated",
@@ -169,9 +153,8 @@ class UCPEmbedding(BaseModel):
 
     def is_expired(self) -> bool:
         """Check if the embedding has expired."""
-        from datetime import timezone
 
-        age = (datetime.now(timezone.utc) - self.timestamp.replace(tzinfo=timezone.utc)).total_seconds()
+        age = (datetime.now(UTC) - self.timestamp.replace(tzinfo=UTC)).total_seconds()
         return age > self.ttl_seconds
 
 
@@ -185,10 +168,8 @@ class AudienceCapability(BaseModel):
         ..., alias="capabilityId", description="Unique capability identifier"
     )
     name: str = Field(..., description="Human-readable capability name")
-    description: Optional[str] = Field(default=None, description="Detailed description")
-    signal_type: SignalType = Field(
-        ..., alias="signalType", description="Type of signal provided"
-    )
+    description: str | None = Field(default=None, description="Detailed description")
+    signal_type: SignalType = Field(..., alias="signalType", description="Type of signal provided")
     coverage_percentage: float = Field(
         default=0.0,
         alias="coveragePercentage",
@@ -201,7 +182,7 @@ class AudienceCapability(BaseModel):
         alias="availableSegments",
         description="Available audience segment IDs",
     )
-    taxonomy: Optional[str] = Field(
+    taxonomy: str | None = Field(
         default=None, description="Audience taxonomy (e.g., 'IAB-1.0', 'custom')"
     )
     minimum_match_rate: float = Field(
@@ -216,7 +197,7 @@ class AudienceCapability(BaseModel):
         alias="ucpCompatible",
         description="Whether UCP embedding exchange is supported",
     )
-    embedding_dimension: Optional[int] = Field(
+    embedding_dimension: int | None = Field(
         default=None,
         alias="embeddingDimension",
         ge=256,
@@ -255,7 +236,7 @@ class AudienceValidationResult(BaseModel):
         default_factory=list,
         description="Alternative capabilities that could partially fulfill gaps",
     )
-    ucp_similarity_score: Optional[float] = Field(
+    ucp_similarity_score: float | None = Field(
         default=None,
         alias="ucpSimilarityScore",
         ge=0,
@@ -267,7 +248,7 @@ class AudienceValidationResult(BaseModel):
         alias="targetingCompatible",
         description="Whether targeting requirements can be fulfilled",
     )
-    estimated_reach: Optional[int] = Field(
+    estimated_reach: int | None = Field(
         default=None,
         alias="estimatedReach",
         ge=0,
@@ -294,7 +275,7 @@ class AudiencePlan(BaseModel):
     """
 
     plan_id: str = Field(..., alias="planId", description="Unique plan identifier")
-    campaign_id: Optional[str] = Field(
+    campaign_id: str | None = Field(
         default=None, alias="campaignId", description="Associated campaign ID"
     )
 
@@ -325,7 +306,7 @@ class AudiencePlan(BaseModel):
         alias="requestedSignalTypes",
         description="Signal types needed",
     )
-    query_embedding: Optional[UCPEmbedding] = Field(
+    query_embedding: UCPEmbedding | None = Field(
         default=None,
         alias="queryEmbedding",
         description="UCP embedding representing audience intent",
@@ -390,8 +371,6 @@ class CoverageEstimate(BaseModel):
         alias="limitingFactors",
         description="Factors limiting coverage",
     )
-    channel: Optional[str] = Field(
-        default=None, description="Channel if channel-specific"
-    )
+    channel: str | None = Field(default=None, description="Channel if channel-specific")
 
     model_config = {"populate_by_name": True}

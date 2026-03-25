@@ -4,9 +4,9 @@
 """DSP Deal Discovery Flow - workflow for obtaining Deal IDs for programmatic activation."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from crewai import Crew, Task
 from crewai.flow.flow import Flow, listen, start
@@ -14,17 +14,13 @@ from pydantic import BaseModel, Field
 
 from ..agents.level2.dsp_agent import create_dsp_agent
 from ..clients.unified_client import UnifiedClient
-from ..models.buyer_identity import (
-    AccessTier,
-    BuyerContext,
-    BuyerIdentity,
-    DealRequest,
-    DealResponse,
-    DealType,
-)
 from ..events.helpers import emit_event_sync
 from ..events.models import EventType
-from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
+from ..models.buyer_identity import (
+    BuyerContext,
+    BuyerIdentity,
+    DealType,
+)
 from ..storage.deal_store import DealStore
 from ..tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
@@ -49,10 +45,10 @@ class DiscoveredProduct(BaseModel):
     product_id: str
     product_name: str
     publisher: str
-    channel: Optional[str] = None
+    channel: str | None = None
     base_cpm: float
     tiered_cpm: float
-    available_impressions: Optional[int] = None
+    available_impressions: int | None = None
     targeting: list[str] = Field(default_factory=list)
     score: float = Field(default=0.0, description="Match score for the request")
 
@@ -66,25 +62,25 @@ class DSPFlowState(BaseModel):
         default=DealType.PREFERRED_DEAL,
         description="Requested deal type",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         description="Requested impression volume",
     )
-    max_cpm: Optional[float] = Field(
+    max_cpm: float | None = Field(
         default=None,
         description="Maximum CPM budget",
     )
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Deal start date",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Deal end date",
     )
 
     # Buyer context
-    buyer_context: Optional[dict[str, Any]] = Field(
+    buyer_context: dict[str, Any] | None = Field(
         default=None,
         description="Serialized buyer context",
     )
@@ -94,19 +90,19 @@ class DSPFlowState(BaseModel):
         default_factory=list,
         description="Products found during discovery",
     )
-    selected_product_id: Optional[str] = Field(
+    selected_product_id: str | None = Field(
         default=None,
         description="Product selected for deal creation",
     )
 
     # Pricing
-    pricing_details: Optional[dict[str, Any]] = Field(
+    pricing_details: dict[str, Any] | None = Field(
         default=None,
         description="Pricing information for selected product",
     )
 
     # Deal result
-    deal_response: Optional[dict[str, Any]] = Field(
+    deal_response: dict[str, Any] | None = Field(
         default=None,
         description="Created deal information",
     )
@@ -143,7 +139,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
         self,
         client: UnifiedClient,
         buyer_context: BuyerContext,
-        store: Optional[DealStore] = None,
+        store: DealStore | None = None,
     ):
         """Initialize the flow with client, buyer context, and optional persistence.
 
@@ -157,7 +153,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
         self._client = client
         self._buyer_context = buyer_context
         self._store = store
-        self._store_deal_id: Optional[str] = None
+        self._store_deal_id: str | None = None
 
         # Create tools
         self._discover_tool = DiscoverInventoryTool(
@@ -234,7 +230,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
         self.state.buyer_context = self._buyer_context.model_dump()
 
         self.state.status = DSPFlowStatus.REQUEST_RECEIVED
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = datetime.now(timezone.utc)
 
         # Emit quote.requested event
         emit_event_sync(
@@ -291,7 +287,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
             # Parse discovery results (simplified - in production would parse structured data)
             # For now, store raw results and let the agent process
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             # Emit inventory.discovered event
             emit_event_sync(
@@ -334,12 +330,12 @@ class DSPDealFlow(Flow[DSPFlowState]):
 for the following request: {self.state.request}
 
 Discovery results:
-{discovery_result.get('discovery_result', 'No results')}
+{discovery_result.get("discovery_result", "No results")}
 
 Criteria:
 - Deal type: {self.state.deal_type.value}
-- Max CPM: {self.state.max_cpm or 'No limit'}
-- Volume: {self.state.impressions or 'Flexible'}
+- Max CPM: {self.state.max_cpm or "No limit"}
+- Volume: {self.state.impressions or "Flexible"}
 
 Return the product_id of the best matching product and explain why.""",
                 expected_output="Product ID and selection rationale",
@@ -380,7 +376,7 @@ Return the product_id of the best matching product and explain why.""",
                 )
                 self.state.pricing_details = {"raw": pricing_result}
 
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             return {
                 "status": "success",
@@ -393,7 +389,7 @@ Return the product_id of the best matching product and explain why.""",
             self.state.status = DSPFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
-    def _extract_product_id(self, text: str) -> Optional[str]:
+    def _extract_product_id(self, text: str) -> str | None:
         """Extract product ID from agent response."""
         import re
 
@@ -438,7 +434,7 @@ Return the product_id of the best matching product and explain why.""",
             # Store deal response
             self.state.deal_response = {"raw": deal_result}
             self.state.status = DSPFlowStatus.DEAL_CREATED
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             # Persist deal creation status
             self._persist_deal_status("deal_created")
@@ -476,9 +472,7 @@ Return the product_id of the best matching product and explain why.""",
             "request": self.state.request,
             "deal_type": self.state.deal_type.value,
             "access_tier": (
-                self._buyer_context.get_access_tier().value
-                if self._buyer_context
-                else "unknown"
+                self._buyer_context.get_access_tier().value if self._buyer_context else "unknown"
             ),
             "selected_product_id": self.state.selected_product_id,
             "deal_response": self.state.deal_response,
@@ -491,12 +485,12 @@ async def run_dsp_deal_flow(
     request: str,
     buyer_identity: BuyerIdentity,
     deal_type: DealType = DealType.PREFERRED_DEAL,
-    impressions: Optional[int] = None,
-    max_cpm: Optional[float] = None,
-    flight_start: Optional[str] = None,
-    flight_end: Optional[str] = None,
-    base_url: Optional[str] = None,
-    store: Optional[DealStore] = None,
+    impressions: int | None = None,
+    max_cpm: float | None = None,
+    flight_start: str | None = None,
+    flight_end: str | None = None,
+    base_url: str | None = None,
+    store: DealStore | None = None,
 ) -> dict[str, Any]:
     """Convenience function to run the DSP deal flow.
 
@@ -517,6 +511,7 @@ async def run_dsp_deal_flow(
     # Resolve server URL from Settings if not provided
     if base_url is None:
         from ..config.settings import get_settings
+
         base_url = get_settings().iab_server_url
 
     # Create buyer context

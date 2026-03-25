@@ -12,17 +12,17 @@ Covers:
 - Cross-tier pricing consistency across tools and client
 """
 
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
+from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.flows.dsp_deal_flow import (
+    DiscoveredProduct,
     DSPDealFlow,
     DSPFlowState,
     DSPFlowStatus,
-    DiscoveredProduct,
 )
 from ad_buyer.models.buyer_identity import (
     AccessTier,
@@ -33,7 +33,6 @@ from ad_buyer.models.buyer_identity import (
     DealType,
 )
 from ad_buyer.tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
-
 
 # =============================================================================
 # Shared fixtures
@@ -175,9 +174,7 @@ class TestDiscoverInventoryFilters:
     @pytest.mark.asyncio
     async def test_discover_with_targeting_filter(self, mock_client, agency_context):
         """Targeting capabilities filter should be included."""
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=[_product()]
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=[_product()])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         await tool._arun(query="targeted", targeting=["household", "geo"])
         call_kwargs = mock_client.search_products.call_args
@@ -199,9 +196,7 @@ class TestDiscoverInventoryFilters:
     @pytest.mark.asyncio
     async def test_discover_includes_identity_context(self, mock_client, advertiser_context):
         """Buyer identity context should always be included in filters."""
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=[_product()]
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=[_product()])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=advertiser_context)
         await tool._arun(query="anything")
         call_kwargs = mock_client.search_products.call_args
@@ -216,9 +211,7 @@ class TestDiscoverInventoryFormatting:
     @pytest.mark.asyncio
     async def test_format_empty_results(self, mock_client, agency_context):
         """Empty result set should return a clear message."""
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=[]
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=[])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(query="nonexistent")
         assert "No inventory found" in result
@@ -242,9 +235,7 @@ class TestDiscoverInventoryFormatting:
             _product(product_id="p2", name="Product Beta"),
             _product(product_id="p3", name="Product Gamma"),
         ]
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=products
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=products)
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(query="multi")
         assert "Product Alpha" in result
@@ -280,9 +271,7 @@ class TestDiscoverInventoryFormatting:
         assert "Price negotiation: AVAILABLE" in result
 
     @pytest.mark.asyncio
-    async def test_format_public_tier_no_premium_or_negotiation(
-        self, mock_client, public_context
-    ):
+    async def test_format_public_tier_no_premium_or_negotiation(self, mock_client, public_context):
         """Public tier should not see premium or negotiation labels."""
         mock_client.list_products.return_value = MagicMock(
             success=True,
@@ -297,9 +286,7 @@ class TestDiscoverInventoryFormatting:
     async def test_format_product_without_optional_fields(self, mock_client, agency_context):
         """Products missing optional fields should not crash formatting."""
         sparse_product = {"id": "sparse_1", "name": "Sparse"}
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=[sparse_product]
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=[sparse_product])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(query="sparse")
         assert "Sparse" in result
@@ -320,9 +307,7 @@ class TestDiscoverInventoryTierDisplay:
     @pytest.mark.asyncio
     async def test_public_tier_shows_zero_discount(self, mock_client, public_context):
         """Public tier should show 0% discount."""
-        mock_client.list_products.return_value = MagicMock(
-            success=True, data=[_product()]
-        )
+        mock_client.list_products.return_value = MagicMock(success=True, data=[_product()])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=public_context)
         result = await tool._arun()
         assert "PUBLIC" in result
@@ -331,9 +316,7 @@ class TestDiscoverInventoryTierDisplay:
     @pytest.mark.asyncio
     async def test_seat_tier_shows_five_percent(self, mock_client, seat_context):
         """Seat tier should show 5% discount."""
-        mock_client.list_products.return_value = MagicMock(
-            success=True, data=[_product()]
-        )
+        mock_client.list_products.return_value = MagicMock(success=True, data=[_product()])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=seat_context)
         result = await tool._arun()
         assert "SEAT" in result
@@ -383,9 +366,7 @@ class TestGetPricingTierCalculations:
         assert "$18.00" in result
 
     @pytest.mark.asyncio
-    async def test_advertiser_tier_fifteen_percent_discount(
-        self, mock_client, advertiser_context
-    ):
+    async def test_advertiser_tier_fifteen_percent_discount(self, mock_client, advertiser_context):
         """Advertiser tier should get 15% discount."""
         mock_client.get_product.return_value = MagicMock(
             success=True, data=_product(base_price=20.0)
@@ -492,9 +473,7 @@ class TestGetPricingDealTypes:
     @pytest.mark.asyncio
     async def test_authenticated_tier_shows_all_deal_types(self, mock_client, agency_context):
         """Agency tier should see checkmarks for all deal types."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = GetPricingTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
         assert "Programmatic Guaranteed (PG)" in result
@@ -504,9 +483,7 @@ class TestGetPricingDealTypes:
     @pytest.mark.asyncio
     async def test_public_tier_shows_authenticate_prompt(self, mock_client, public_context):
         """Public tier should see a note to authenticate for fixed-price deals."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = GetPricingTool(client=mock_client, buyer_context=public_context)
         result = await tool._arun(product_id="prod_001")
         assert "Authenticate" in result or "authenticate" in result.lower()
@@ -528,9 +505,7 @@ class TestGetPricingNegotiationDisplay:
     @pytest.mark.asyncio
     async def test_seat_does_not_see_negotiation(self, mock_client, seat_context):
         """Seat tier should not see negotiation section."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = GetPricingTool(client=mock_client, buyer_context=seat_context)
         result = await tool._arun(product_id="prod_001")
         assert "Price negotiation is available" not in result
@@ -564,9 +539,7 @@ class TestGetPricingEdgeCases:
     @pytest.mark.asyncio
     async def test_product_not_found_returns_error(self, mock_client, agency_context):
         """Missing product should return error string."""
-        mock_client.get_product.return_value = MagicMock(
-            success=False, error="Product not found"
-        )
+        mock_client.get_product.return_value = MagicMock(success=False, error="Product not found")
         tool = GetPricingTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="ghost")
         assert "Error" in result or "error" in result.lower()
@@ -574,9 +547,7 @@ class TestGetPricingEdgeCases:
     @pytest.mark.asyncio
     async def test_product_returns_none_data(self, mock_client, agency_context):
         """Product with success=True but data=None should return not found."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=None
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=None)
         tool = GetPricingTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="null")
         assert "not found" in result.lower()
@@ -609,9 +580,7 @@ class TestRequestDealValidation:
     @pytest.mark.asyncio
     async def test_pg_without_impressions_rejected(self, mock_client, agency_context):
         """PG deals without impressions should be rejected."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001", deal_type="PG", impressions=None)
         assert "require" in result.lower() or "impressions" in result.lower()
@@ -619,22 +588,16 @@ class TestRequestDealValidation:
     @pytest.mark.asyncio
     async def test_pg_with_impressions_succeeds(self, mock_client, agency_context):
         """PG deals with impressions should succeed."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(
-            product_id="prod_001", deal_type="PG", impressions=2_000_000
-        )
+        result = await tool._arun(product_id="prod_001", deal_type="PG", impressions=2_000_000)
         assert "DEAL-" in result
         assert "Programmatic Guaranteed" in result
 
     @pytest.mark.asyncio
     async def test_deal_type_case_insensitive(self, mock_client, agency_context):
         """Deal type should be case-insensitive (pd, Pd, PD all work)."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001", deal_type="pd")
         assert "DEAL-" in result
@@ -643,9 +606,7 @@ class TestRequestDealValidation:
     @pytest.mark.asyncio
     async def test_product_not_found_returns_error(self, mock_client, agency_context):
         """Deal request for nonexistent product should error."""
-        mock_client.get_product.return_value = MagicMock(
-            success=False, error="Product not found"
-        )
+        mock_client.get_product.return_value = MagicMock(success=False, error="Product not found")
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="ghost")
         assert "Error" in result or "error" in result.lower()
@@ -657,9 +618,7 @@ class TestRequestDealNegotiation:
     @pytest.mark.asyncio
     async def test_public_cannot_negotiate(self, mock_client, public_context):
         """Public tier trying to negotiate should be denied."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=public_context)
         result = await tool._arun(product_id="prod_001", target_cpm=15.0)
         assert "tier" in result.lower() or "negotiation" in result.lower()
@@ -667,9 +626,7 @@ class TestRequestDealNegotiation:
     @pytest.mark.asyncio
     async def test_seat_cannot_negotiate(self, mock_client, seat_context):
         """Seat tier trying to negotiate should be denied."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=seat_context)
         result = await tool._arun(product_id="prod_001", target_cpm=15.0)
         assert "tier" in result.lower() or "negotiation" in result.lower()
@@ -728,9 +685,7 @@ class TestRequestDealPricing:
             success=True, data=_product(base_price=20.0)
         )
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(
-            product_id="prod_001", deal_type="PD", impressions=5_000_000
-        )
+        result = await tool._arun(product_id="prod_001", deal_type="PD", impressions=5_000_000)
         # Agency 10%: $20 * 0.90 = $18.00
         # Volume 5%: $18.00 * 0.95 = $17.10
         assert "$17.10" in result
@@ -742,9 +697,7 @@ class TestRequestDealPricing:
             success=True, data=_product(base_price=20.0)
         )
         tool = RequestDealTool(client=mock_client, buyer_context=advertiser_context)
-        result = await tool._arun(
-            product_id="prod_001", deal_type="PD", impressions=10_000_000
-        )
+        result = await tool._arun(product_id="prod_001", deal_type="PD", impressions=10_000_000)
         # Advertiser 15%: $20 * 0.85 = $17.00
         # Volume 10%: $17.00 * 0.90 = $15.30
         assert "$15.30" in result
@@ -756,9 +709,7 @@ class TestRequestDealPricing:
             success=True, data=_product(base_price=20.0)
         )
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(
-            product_id="prod_001", deal_type="PD", impressions=1_000_000
-        )
+        result = await tool._arun(product_id="prod_001", deal_type="PD", impressions=1_000_000)
         # Agency: $18.00 CPM, 1M impressions -> $18,000
         assert "$18,000.00" in result
 
@@ -779,9 +730,7 @@ class TestRequestDealOutput:
     @pytest.mark.asyncio
     async def test_deal_id_format(self, mock_client, agency_context):
         """Deal ID should follow DEAL-XXXXXXXX format."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
         # Deal ID: DEAL- followed by 8 hex characters
@@ -793,9 +742,7 @@ class TestRequestDealOutput:
     @pytest.mark.asyncio
     async def test_deal_includes_all_dsp_platforms(self, mock_client, agency_context):
         """Deal should include activation instructions for all major DSPs."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
         assert "TTD" in result or "Trade Desk" in result
@@ -807,9 +754,7 @@ class TestRequestDealOutput:
     @pytest.mark.asyncio
     async def test_deal_includes_flight_dates(self, mock_client, agency_context):
         """Deal should include flight start and end dates."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(
             product_id="prod_001",
@@ -822,9 +767,7 @@ class TestRequestDealOutput:
     @pytest.mark.asyncio
     async def test_deal_uses_default_flight_dates(self, mock_client, agency_context):
         """Deal without flight dates should use defaults (today + 30 days)."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
         today = datetime.now().strftime("%Y-%m-%d")
@@ -833,9 +776,7 @@ class TestRequestDealOutput:
     @pytest.mark.asyncio
     async def test_deal_shows_expiry(self, mock_client, agency_context):
         """Deal should include an expiration date."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
         assert "expires" in result.lower()
@@ -843,13 +784,9 @@ class TestRequestDealOutput:
     @pytest.mark.asyncio
     async def test_deal_shows_impression_count(self, mock_client, agency_context):
         """Deal with impressions should display the count."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(
-            product_id="prod_001", deal_type="PG", impressions=3_000_000
-        )
+        result = await tool._arun(product_id="prod_001", deal_type="PG", impressions=3_000_000)
         assert "3,000,000" in result
 
     @pytest.mark.asyncio
@@ -878,9 +815,7 @@ class TestRequestDealAllDealTypes:
     @pytest.mark.asyncio
     async def test_pd_deal_output(self, mock_client, agency_context):
         """Preferred Deal should be labeled correctly."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001", deal_type="PD")
         assert "Preferred Deal (PD)" in result
@@ -888,9 +823,7 @@ class TestRequestDealAllDealTypes:
     @pytest.mark.asyncio
     async def test_pa_deal_output(self, mock_client, agency_context):
         """Private Auction should be labeled correctly."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001", deal_type="PA")
         assert "Private Auction (PA)" in result
@@ -1105,9 +1038,7 @@ class TestDSPDealFlowDiscoverInventory:
 
     def test_discover_calls_tool_run(self, mock_client, agency_context):
         """discover_inventory should call the discover tool's _run method."""
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=[_product()]
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=[_product()])
         flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = "CTV inventory"
         flow.state.max_cpm = 30.0
@@ -1151,9 +1082,7 @@ class TestDSPDealFlowRequestDealId:
 
     def test_request_deal_creates_deal(self, mock_client, agency_context):
         """request_deal_id with valid product should create a deal."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.selected_product_id = "prod_001"
         flow.state.deal_type = DealType.PREFERRED_DEAL
@@ -1171,25 +1100,25 @@ class TestDSPDealFlowExtractProductId:
     def test_extract_from_product_id_format(self, mock_client, agency_context):
         """Should extract from 'product_id: xxx' format."""
         flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
-        result = flow._extract_product_id('product_id: ctv_premium_001')
+        result = flow._extract_product_id("product_id: ctv_premium_001")
         assert result == "ctv_premium_001"
 
     def test_extract_from_product_id_colon(self, mock_client, agency_context):
         """Should extract from 'Product ID: xxx' format."""
         flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
-        result = flow._extract_product_id('The best option is Product ID: display_001')
+        result = flow._extract_product_id("The best option is Product ID: display_001")
         assert result == "display_001"
 
     def test_extract_returns_none_when_not_found(self, mock_client, agency_context):
         """Should return None if no product ID pattern found."""
         flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
-        result = flow._extract_product_id('This text has no product reference at all.')
+        result = flow._extract_product_id("This text has no product reference at all.")
         assert result is None
 
     def test_extract_from_id_format(self, mock_client, agency_context):
         """Should extract from generic 'id: xxx' format."""
         flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
-        result = flow._extract_product_id('id: prod_abc')
+        result = flow._extract_product_id("id: prod_abc")
         assert result == "prod_abc"
 
 
@@ -1271,9 +1200,7 @@ class TestCrossTierPricingConsistency:
     async def test_higher_tier_always_gets_lower_price(self, mock_client):
         """Progressively higher tiers should always get lower or equal prices."""
         product = _product(base_price=50.0)
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=product
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=product)
 
         prices = {}
         for tier_name, identity in [
@@ -1304,14 +1231,12 @@ class TestCrossTierPricingConsistency:
     async def test_discount_percentages_match_tier(self, mock_client):
         """Discount percentages should exactly match tier definitions."""
         product = _product(base_price=100.0)
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=product
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=product)
 
         expected_final_prices = {
-            "public": 100.0,   # 0% discount
-            "seat": 95.0,      # 5% discount
-            "agency": 90.0,    # 10% discount
+            "public": 100.0,  # 0% discount
+            "seat": 95.0,  # 5% discount
+            "agency": 90.0,  # 10% discount
             "advertiser": 85.0,  # 15% discount
         }
 
@@ -1381,27 +1306,21 @@ class TestSynchronousWrappers:
 
     def test_discover_run_calls_arun(self, mock_client, agency_context):
         """DiscoverInventoryTool._run should delegate to _arun."""
-        mock_client.search_products.return_value = MagicMock(
-            success=True, data=[_product()]
-        )
+        mock_client.search_products.return_value = MagicMock(success=True, data=[_product()])
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = tool._run(query="test sync")
         assert "Test Product" in result
 
     def test_get_pricing_run_calls_arun(self, mock_client, agency_context):
         """GetPricingTool._run should delegate to _arun."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = GetPricingTool(client=mock_client, buyer_context=agency_context)
         result = tool._run(product_id="prod_001")
         assert "$18.00" in result
 
     def test_request_deal_run_calls_arun(self, mock_client, agency_context):
         """RequestDealTool._run should delegate to _arun."""
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=_product()
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = tool._run(product_id="prod_001")
         assert "DEAL-" in result

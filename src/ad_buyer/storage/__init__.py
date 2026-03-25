@@ -13,7 +13,7 @@ from typing import Optional
 from .deal_store import DealStore
 from .schema import SCHEMA_VERSION, create_tables, initialize_schema
 
-_store_instance: Optional[DealStore] = None
+_store_instance: DealStore | None = None
 
 
 def get_deal_store(database_url: str = "sqlite:///./ad_buyer.db") -> DealStore:

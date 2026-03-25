@@ -8,7 +8,6 @@ Supports both individual agent cards and lists of agents.
 """
 
 import time
-from typing import Optional
 
 from .models import AgentCard
 
@@ -28,7 +27,7 @@ class SellerCache:
         # key -> (timestamp, list[AgentCard])
         self._lists: dict[str, tuple[float, list[AgentCard]]] = {}
 
-    def get(self, key: str) -> Optional[AgentCard]:
+    def get(self, key: str) -> AgentCard | None:
         """Get a cached agent card by key.
 
         Returns None if the key is not found or the entry has expired.
@@ -46,7 +45,7 @@ class SellerCache:
         """Cache an agent card with the current timestamp."""
         self._cards[key] = (time.monotonic(), card)
 
-    def get_list(self, key: str) -> Optional[list[AgentCard]]:
+    def get_list(self, key: str) -> list[AgentCard] | None:
         """Get a cached list of agent cards by key.
 
         Returns None if the key is not found or the entry has expired.

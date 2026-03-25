@@ -20,7 +20,7 @@ Optionally persists results to a DealStore when one is attached.
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -29,7 +29,6 @@ from ..models.deals import (
     DealResponse,
     QuoteRequest,
     QuoteResponse,
-    SellerErrorResponse,
 )
 from ..models.linear_tv import CancellationRequest, MakegoodRequest
 
@@ -81,8 +80,8 @@ class DealsClient:
         self,
         seller_url: str,
         *,
-        api_key: Optional[str] = None,
-        bearer_token: Optional[str] = None,
+        api_key: str | None = None,
+        bearer_token: str | None = None,
         timeout: float = _DEFAULT_TIMEOUT,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         deal_store: Any = None,
@@ -304,7 +303,7 @@ class DealsClient:
         Raises:
             DealsClientError: On non-retryable errors or when retries are exhausted.
         """
-        last_error: Optional[DealsClientError] = None
+        last_error: DealsClientError | None = None
 
         for attempt in range(1, self._max_retries + 1):
             try:
@@ -318,7 +317,10 @@ class DealsClient:
                 if attempt < self._max_retries:
                     logger.warning(
                         "Timeout on attempt %d/%d for %s %s",
-                        attempt, self._max_retries, method, path,
+                        attempt,
+                        self._max_retries,
+                        method,
+                        path,
                     )
                     continue
                 raise last_error from exc
@@ -345,7 +347,11 @@ class DealsClient:
                 if attempt < self._max_retries:
                     logger.warning(
                         "Retryable error %d on attempt %d/%d for %s %s",
-                        response.status_code, attempt, self._max_retries, method, path,
+                        response.status_code,
+                        attempt,
+                        self._max_retries,
+                        method,
+                        path,
                     )
                     continue
                 raise last_error
@@ -410,11 +416,13 @@ class DealsClient:
                 impressions=quote.terms.impressions,
                 flight_start=quote.terms.flight_start,
                 flight_end=quote.terms.flight_end,
-                metadata=json.dumps({
-                    "quote_id": quote.quote_id,
-                    "buyer_tier": quote.buyer_tier,
-                    "expires_at": quote.expires_at,
-                }),
+                metadata=json.dumps(
+                    {
+                        "quote_id": quote.quote_id,
+                        "buyer_tier": quote.buyer_tier,
+                        "expires_at": quote.expires_at,
+                    }
+                ),
             )
         except Exception:
             logger.exception("Failed to persist quote %s to DealStore", quote.quote_id)
@@ -439,15 +447,17 @@ class DealsClient:
                 impressions=deal.terms.impressions,
                 flight_start=deal.terms.flight_start,
                 flight_end=deal.terms.flight_end,
-                metadata=json.dumps({
-                    "quote_id": deal.quote_id,
-                    "buyer_tier": deal.buyer_tier,
-                    "expires_at": deal.expires_at,
-                    "activation_instructions": deal.activation_instructions,
-                    "openrtb_params": (
-                        deal.openrtb_params.model_dump() if deal.openrtb_params else None
-                    ),
-                }),
+                metadata=json.dumps(
+                    {
+                        "quote_id": deal.quote_id,
+                        "buyer_tier": deal.buyer_tier,
+                        "expires_at": deal.expires_at,
+                        "activation_instructions": deal.activation_instructions,
+                        "openrtb_params": (
+                            deal.openrtb_params.model_dump() if deal.openrtb_params else None
+                        ),
+                    }
+                ),
             )
         except Exception:
             logger.exception("Failed to persist deal %s to DealStore", deal.deal_id)
@@ -472,6 +482,4 @@ class DealsClient:
                     )
                     break
         except Exception:
-            logger.exception(
-                "Failed to update stored deal status for %s", deal.deal_id
-            )
+            logger.exception("Failed to update stored deal status for %s", deal.deal_id)

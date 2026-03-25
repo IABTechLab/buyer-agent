@@ -31,13 +31,11 @@ access in the event bus audit trail.
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
-
-from ...storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +225,7 @@ class ListPortfolioTool(BaseTool):
 
         # Apply pagination
         total_count = len(deals)
-        deals = deals[offset: offset + limit]
+        deals = deals[offset : offset + limit]
 
         # Format output
         if not deals:
@@ -363,12 +361,7 @@ class PortfolioSummaryTool(BaseTool):
         deals = self.deal_store.list_deals(limit=10000)
 
         if not deals:
-            return (
-                "Portfolio Summary\n"
-                "=================\n"
-                "Total deals: 0\n"
-                "\nThe portfolio is empty."
-            )
+            return "Portfolio Summary\n=================\nTotal deals: 0\n\nThe portfolio is empty."
 
         total = len(deals)
 
@@ -395,9 +388,9 @@ class PortfolioSummaryTool(BaseTool):
         for deal in deals:
             seller = deal.get("seller_org") or deal.get("seller_domain") or "Unknown"
             seller_counts[seller] = seller_counts.get(seller, 0) + 1
-        top_sellers = sorted(
-            seller_counts.items(), key=lambda x: x[1], reverse=True
-        )[:top_sellers_count]
+        top_sellers = sorted(seller_counts.items(), key=lambda x: x[1], reverse=True)[
+            :top_sellers_count
+        ]
 
         # Total portfolio value: sum of (price * impressions / 1000) for CPM
         total_value = 0.0
@@ -408,7 +401,7 @@ class PortfolioSummaryTool(BaseTool):
                 total_value += price * impressions / 1000.0
 
         # Deals expiring within N days
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now + timedelta(days=expiring_within_days)
         cutoff_str = cutoff.strftime("%Y-%m-%d")
         now_str = now.strftime("%Y-%m-%d")
@@ -444,25 +437,20 @@ class PortfolioSummaryTool(BaseTool):
             lines.append(f"  {dt}: {count}")
 
         lines.append("")
-        lines.append(f"Top Sellers (by deal count):")
+        lines.append("Top Sellers (by deal count):")
         for seller, count in top_sellers:
             lines.append(f"  {seller}: {count} deal(s)")
 
         lines.append("")
         if expiring_deals:
             lines.append(
-                f"Deals expiring within {expiring_within_days} days: "
-                f"{len(expiring_deals)}"
+                f"Deals expiring within {expiring_within_days} days: {len(expiring_deals)}"
             )
             for deal in expiring_deals:
                 name = deal.get("display_name") or deal.get("product_name") or "?"
-                lines.append(
-                    f"  [{deal.get('id')}] {name} -- expires {deal.get('flight_end')}"
-                )
+                lines.append(f"  [{deal.get('id')}] {name} -- expires {deal.get('flight_end')}")
         else:
-            lines.append(
-                f"No active/draft deals expiring within {expiring_within_days} days."
-            )
+            lines.append(f"No active/draft deals expiring within {expiring_within_days} days.")
 
         return "\n".join(lines)
 
@@ -610,9 +598,7 @@ class InspectDealTool(BaseTool):
 
         return lines
 
-    def _format_metadata_section(
-        self, metadata: Optional[dict[str, Any]]
-    ) -> list[str]:
+    def _format_metadata_section(self, metadata: dict[str, Any] | None) -> list[str]:
         """Format the portfolio metadata section."""
         lines = ["", "Portfolio Metadata:"]
         if metadata is None:
@@ -632,9 +618,7 @@ class InspectDealTool(BaseTool):
 
         return lines
 
-    def _format_activations_section(
-        self, activations: list[dict[str, Any]]
-    ) -> list[str]:
+    def _format_activations_section(self, activations: list[dict[str, Any]]) -> list[str]:
         """Format the deal activations section."""
         lines = ["", "Deal Activations:"]
         if not activations:
@@ -647,15 +631,11 @@ class InspectDealTool(BaseTool):
             pid = act.get("platform_deal_id") or "N/A"
             status = act.get("activation_status") or "N/A"
             sync = act.get("last_sync_at") or "never"
-            lines.append(
-                f"  - {platform}: ID={pid}, Status={status}, Last Sync={sync}"
-            )
+            lines.append(f"  - {platform}: ID={pid}, Status={status}, Last Sync={sync}")
 
         return lines
 
-    def _format_performance_section(
-        self, perf: Optional[dict[str, Any]]
-    ) -> list[str]:
+    def _format_performance_section(self, perf: dict[str, Any] | None) -> list[str]:
         """Format the performance cache section."""
         lines = ["", "Performance Cache:"]
         if perf is None:

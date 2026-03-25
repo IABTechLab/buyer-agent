@@ -31,8 +31,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..events.models import Event, EventType
@@ -72,8 +73,8 @@ class InventoryRequirements:
     deal_types: list[str]
     content_categories: list[str] = field(default_factory=list)
     excluded_sellers: list[str] = field(default_factory=list)
-    min_impressions: Optional[int] = None
-    max_cpm: Optional[float] = None
+    min_impressions: int | None = None
+    max_cpm: float | None = None
 
 
 @dataclass
@@ -97,7 +98,7 @@ class DealParams:
     impressions: int
     flight_start: str
     flight_end: str
-    target_cpm: Optional[float] = None
+    target_cpm: float | None = None
     media_type: str = "digital"
 
 
@@ -118,9 +119,9 @@ class SellerQuoteResult:
 
     seller_id: str
     seller_url: str
-    quote: Optional[QuoteResponse]
+    quote: QuoteResponse | None
     deal_type: str
-    error: Optional[str]
+    error: str | None
 
 
 @dataclass
@@ -214,8 +215,8 @@ class MultiSellerOrchestrator:
         self,
         registry_client: Any,
         deals_client_factory: Callable[..., Any],
-        event_bus: Optional[Any] = None,
-        quote_normalizer: Optional[QuoteNormalizer] = None,
+        event_bus: Any | None = None,
+        quote_normalizer: QuoteNormalizer | None = None,
         quote_timeout: float = 30.0,
     ) -> None:
         self._registry = registry_client
@@ -231,7 +232,7 @@ class MultiSellerOrchestrator:
     async def _emit(
         self,
         event_type: EventType,
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Emit an event to the event bus.  Fail-open."""
@@ -245,17 +246,13 @@ class MultiSellerOrchestrator:
             )
             await self._event_bus.publish(event)
         except Exception as exc:
-            logger.warning(
-                "Failed to emit event %s: %s", event_type, exc
-            )
+            logger.warning("Failed to emit event %s: %s", event_type, exc)
 
     # ------------------------------------------------------------------
     # Stage 1: Discover sellers
     # ------------------------------------------------------------------
 
-    async def discover_sellers(
-        self, requirements: InventoryRequirements
-    ) -> list[AgentCard]:
+    async def discover_sellers(self, requirements: InventoryRequirements) -> list[AgentCard]:
         """Discover qualifying sellers from the agent registry.
 
         Queries the registry for sellers matching the media type and
@@ -278,16 +275,10 @@ class MultiSellerOrchestrator:
 
         # Filter out excluded sellers
         excluded_set = set(requirements.excluded_sellers)
-        sellers = [
-            s for s in sellers
-            if s.agent_id not in excluded_set
-        ]
+        sellers = [s for s in sellers if s.agent_id not in excluded_set]
 
         # Filter out blocked sellers
-        sellers = [
-            s for s in sellers
-            if s.trust_level != TrustLevel.BLOCKED
-        ]
+        sellers = [s for s in sellers if s.trust_level != TrustLevel.BLOCKED]
 
         # Emit discovery event
         await self._emit(
@@ -368,11 +359,9 @@ class MultiSellerOrchestrator:
                     error=None,
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 msg = f"Quote request timed out after {self._quote_timeout}s"
-                logger.warning(
-                    "Seller %s timed out on quote request", seller.agent_id
-                )
+                logger.warning("Seller %s timed out on quote request", seller.agent_id)
                 return SellerQuoteResult(
                     seller_id=seller.agent_id,
                     seller_url=seller_url,
@@ -429,7 +418,7 @@ class MultiSellerOrchestrator:
     async def evaluate_and_rank(
         self,
         quote_results: list[SellerQuoteResult],
-        max_cpm: Optional[float] = None,
+        max_cpm: float | None = None,
     ) -> list[NormalizedQuote]:
         """Normalize and rank collected quotes.
 
@@ -445,9 +434,7 @@ class MultiSellerOrchestrator:
             (best quote first).
         """
         # Filter to successful quotes only
-        valid_results = [
-            r for r in quote_results if r.quote is not None
-        ]
+        valid_results = [r for r in quote_results if r.quote is not None]
 
         if not valid_results:
             return []
@@ -462,10 +449,7 @@ class MultiSellerOrchestrator:
 
         # Apply max CPM filter
         if max_cpm is not None:
-            ranked = [
-                nq for nq in ranked
-                if nq.effective_cpm <= max_cpm
-            ]
+            ranked = [nq for nq in ranked if nq.effective_cpm <= max_cpm]
 
         logger.info(
             "Evaluated %d quotes, %d passed filters",
@@ -514,8 +498,7 @@ class MultiSellerOrchestrator:
             # Skip if minimum spend exceeds remaining budget
             if nq.minimum_spend > 0 and nq.minimum_spend > remaining_budget:
                 logger.info(
-                    "Skipping quote %s: minimum spend %.2f exceeds "
-                    "remaining budget %.2f",
+                    "Skipping quote %s: minimum spend %.2f exceeds remaining budget %.2f",
                     nq.quote_id,
                     nq.minimum_spend,
                     remaining_budget,
@@ -524,13 +507,13 @@ class MultiSellerOrchestrator:
 
             seller_url = quote_seller_map.get(nq.quote_id)
             if seller_url is None:
-                logger.warning(
-                    "No seller URL for quote %s, skipping", nq.quote_id
+                logger.warning("No seller URL for quote %s, skipping", nq.quote_id)
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": "No seller URL mapping found",
+                    }
                 )
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": "No seller URL mapping found",
-                })
                 continue
 
             try:
@@ -570,10 +553,12 @@ class MultiSellerOrchestrator:
                     nq.quote_id,
                     exc,
                 )
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": str(exc),
-                })
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": str(exc),
+                    }
+                )
 
         return DealSelection(
             booked_deals=booked_deals,

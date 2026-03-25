@@ -24,9 +24,9 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class AssetType(str, Enum):
@@ -54,7 +54,7 @@ def _default_uuid() -> str:
 
 def _now_utc() -> datetime:
     """Return current UTC datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 @dataclass
@@ -98,12 +98,18 @@ class CreativeAsset:
             "asset_id": self.asset_id,
             "campaign_id": self.campaign_id,
             "asset_name": self.asset_name,
-            "asset_type": self.asset_type.value if isinstance(self.asset_type, Enum) else self.asset_type,
+            "asset_type": self.asset_type.value
+            if isinstance(self.asset_type, Enum)
+            else self.asset_type,
             "format_spec": self.format_spec,
             "source_url": self.source_url,
-            "validation_status": self.validation_status.value if isinstance(self.validation_status, Enum) else self.validation_status,
+            "validation_status": self.validation_status.value
+            if isinstance(self.validation_status, Enum)
+            else self.validation_status,
             "validation_errors": list(self.validation_errors),
-            "created_at": self.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ") if isinstance(self.created_at, datetime) else self.created_at,
+            "created_at": self.created_at.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            if isinstance(self.created_at, datetime)
+            else self.created_at,
         }
 
     @classmethod
@@ -119,7 +125,7 @@ class CreativeAsset:
         created_at = data.get("created_at")
         if isinstance(created_at, str):
             # Parse ISO 8601 format
-            created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+            created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=UTC)
 
         return cls(
             asset_id=data["asset_id"],

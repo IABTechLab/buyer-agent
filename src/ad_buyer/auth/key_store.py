@@ -15,7 +15,6 @@ import base64
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class ApiKeyStore:
             Defaults to ``~/.ad_buyer/seller_keys.json``.
     """
 
-    def __init__(self, store_path: Optional[Path] = None) -> None:
+    def __init__(self, store_path: Path | None = None) -> None:
         self._path = store_path or _DEFAULT_STORE_PATH
         self._keys: dict[str, str] = {}
         self._load()
@@ -48,7 +47,7 @@ class ApiKeyStore:
         self._keys[url] = api_key
         self._save()
 
-    def get_key(self, seller_url: str) -> Optional[str]:
+    def get_key(self, seller_url: str) -> str | None:
         """Return the API key for *seller_url*, or ``None``."""
         url = self._normalize_url(seller_url)
         return self._keys.get(url)
@@ -81,8 +80,7 @@ class ApiKeyStore:
         try:
             raw = json.loads(self._path.read_text(encoding="utf-8"))
             self._keys = {
-                url: base64.b64decode(encoded.encode()).decode()
-                for url, encoded in raw.items()
+                url: base64.b64decode(encoded.encode()).decode() for url, encoded in raw.items()
             }
         except (json.JSONDecodeError, KeyError, UnicodeDecodeError, Exception) as exc:
             logger.warning("Could not load key store from %s: %s", self._path, exc)
@@ -91,10 +89,7 @@ class ApiKeyStore:
     def _save(self) -> None:
         """Persist keys to disk, encoding values as base64."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        encoded = {
-            url: base64.b64encode(key.encode()).decode()
-            for url, key in self._keys.items()
-        }
+        encoded = {url: base64.b64encode(key.encode()).decode() for url, key in self._keys.items()}
         self._path.write_text(
             json.dumps(encoded, indent=2, sort_keys=True),
             encoding="utf-8",

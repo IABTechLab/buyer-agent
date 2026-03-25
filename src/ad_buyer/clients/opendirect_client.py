@@ -3,7 +3,7 @@
 
 """HTTP client for IAB OpenDirect 2.1 API."""
 
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -25,8 +25,8 @@ class OpenDirectClient:
     def __init__(
         self,
         base_url: str,
-        api_key: Optional[str] = None,
-        oauth_token: Optional[str] = None,
+        api_key: str | None = None,
+        oauth_token: str | None = None,
         timeout: float = 30.0,
     ):
         """Initialize the client.
@@ -44,9 +44,7 @@ class OpenDirectClient:
             timeout=timeout,
         )
 
-    def _build_headers(
-        self, api_key: Optional[str], oauth_token: Optional[str]
-    ) -> dict[str, str]:
+    def _build_headers(self, api_key: str | None, oauth_token: str | None) -> dict[str, str]:
         """Build request headers."""
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if oauth_token:
@@ -59,9 +57,7 @@ class OpenDirectClient:
     # Products
     # -------------------------------------------------------------------------
 
-    async def list_products(
-        self, skip: int = 0, top: int = 50, **filters: Any
-    ) -> list[Product]:
+    async def list_products(self, skip: int = 0, top: int = 50, **filters: Any) -> list[Product]:
         """List available products with pagination.
 
         Args:
@@ -206,9 +202,7 @@ class OpenDirectClient:
         response.raise_for_status()
         return Order.model_validate(response.json())
 
-    async def list_orders(
-        self, account_id: str, skip: int = 0, top: int = 50
-    ) -> list[Order]:
+    async def list_orders(self, account_id: str, skip: int = 0, top: int = 50) -> list[Order]:
         """List orders for an account.
 
         Args:
@@ -220,9 +214,7 @@ class OpenDirectClient:
             List of Order objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders", params=params
-        )
+        response = await self._client.get(f"/accounts/{account_id}/orders", params=params)
         response.raise_for_status()
         data = response.json()
         orders = data.get("orders", data) if isinstance(data, dict) else data
@@ -250,9 +242,7 @@ class OpenDirectClient:
     # Lines
     # -------------------------------------------------------------------------
 
-    async def create_line(
-        self, account_id: str, order_id: str, line: Line
-    ) -> Line:
+    async def create_line(self, account_id: str, order_id: str, line: Line) -> Line:
         """Create a new line item under an order.
 
         Args:
@@ -310,9 +300,7 @@ class OpenDirectClient:
         lines = data.get("lines", data) if isinstance(data, dict) else data
         return [Line.model_validate(ln) for ln in lines]
 
-    async def reserve_line(
-        self, account_id: str, order_id: str, line_id: str
-    ) -> Line:
+    async def reserve_line(self, account_id: str, order_id: str, line_id: str) -> Line:
         """Reserve inventory for a line item.
 
         Args:
@@ -348,9 +336,7 @@ class OpenDirectClient:
         response.raise_for_status()
         return Line.model_validate(response.json())
 
-    async def cancel_line(
-        self, account_id: str, order_id: str, line_id: str
-    ) -> Line:
+    async def cancel_line(self, account_id: str, order_id: str, line_id: str) -> Line:
         """Cancel a line item.
 
         Args:
@@ -368,9 +354,7 @@ class OpenDirectClient:
         response.raise_for_status()
         return Line.model_validate(response.json())
 
-    async def get_line_stats(
-        self, account_id: str, order_id: str, line_id: str
-    ) -> LineStats:
+    async def get_line_stats(self, account_id: str, order_id: str, line_id: str) -> LineStats:
         """Get performance statistics for a line item.
 
         Args:
@@ -418,15 +402,11 @@ class OpenDirectClient:
         Returns:
             Creative object
         """
-        response = await self._client.get(
-            f"/accounts/{account_id}/creatives/{creative_id}"
-        )
+        response = await self._client.get(f"/accounts/{account_id}/creatives/{creative_id}")
         response.raise_for_status()
         return Creative.model_validate(response.json())
 
-    async def list_creatives(
-        self, account_id: str, skip: int = 0, top: int = 50
-    ) -> list[Creative]:
+    async def list_creatives(self, account_id: str, skip: int = 0, top: int = 50) -> list[Creative]:
         """List creatives for an account.
 
         Args:
@@ -438,9 +418,7 @@ class OpenDirectClient:
             List of Creative objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(
-            f"/accounts/{account_id}/creatives", params=params
-        )
+        response = await self._client.get(f"/accounts/{account_id}/creatives", params=params)
         response.raise_for_status()
         data = response.json()
         creatives = data.get("creatives", data) if isinstance(data, dict) else data

@@ -23,12 +23,12 @@ Pure Pydantic + stdlib -- no external dependencies.
 """
 
 import uuid
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Buyer Deal Status
@@ -136,7 +136,7 @@ class CampaignStatus(str, Enum):
     ACTIVE = "active"
 
     # Hold states
-    PAUSED = "paused"          # manual pause (human decision)
+    PAUSED = "paused"  # manual pause (human decision)
     PACING_HOLD = "pacing_hold"  # automated (pacing deviation threshold)
 
     # Terminal
@@ -168,7 +168,7 @@ class OrderAuditLog(BaseModel):
     transitions: list[StateTransition] = Field(default_factory=list)
 
     @property
-    def current_status(self) -> Optional[str]:
+    def current_status(self) -> str | None:
         if self.transitions:
             return self.transitions[-1].to_status
         return None
@@ -192,7 +192,7 @@ class TransitionRule(BaseModel):
 
     from_status: Any  # enum member
     to_status: Any  # enum member
-    guard: Optional[GuardFn] = Field(default=None, exclude=True)
+    guard: GuardFn | None = Field(default=None, exclude=True)
     description: str = ""
 
 
@@ -204,9 +204,7 @@ class TransitionRule(BaseModel):
 class InvalidTransitionError(Exception):
     """Raised when a state transition is not allowed."""
 
-    def __init__(
-        self, order_id: str, from_status: Any, to_status: Any, reason: str = ""
-    ):
+    def __init__(self, order_id: str, from_status: Any, to_status: Any, reason: str = ""):
         self.order_id = order_id
         self.from_status = from_status
         self.to_status = to_status
@@ -233,7 +231,7 @@ class _BaseStateMachine:
         self,
         order_id: str,
         initial_status: Any,
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ):
         self.order_id = order_id
         self._status = initial_status
@@ -259,14 +257,9 @@ class _BaseStateMachine:
 
     def allowed_transitions(self) -> list[Any]:
         """Return the list of states reachable from the current state."""
-        return [
-            to for (frm, to), _ in self._rule_index.items()
-            if frm == self._status
-        ]
+        return [to for (frm, to), _ in self._rule_index.items() if frm == self._status]
 
-    def can_transition(
-        self, to_status: Any, context: Optional[dict[str, Any]] = None
-    ) -> bool:
+    def can_transition(self, to_status: Any, context: dict[str, Any] | None = None) -> bool:
         """Check whether a transition is permitted (including guard)."""
         rule = self._rule_index.get((self._status, to_status))
         if rule is None:
@@ -281,8 +274,8 @@ class _BaseStateMachine:
         *,
         actor: str = "system",
         reason: str = "",
-        context: Optional[dict[str, Any]] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> StateTransition:
         """Execute a state transition.
 
@@ -358,13 +351,11 @@ def _build_deal_rules() -> list[TransitionRule]:
         (S.BOOKING, S.BOOKED, "Booking confirmed by seller"),
         (S.BOOKED, S.DELIVERING, "Campaign delivery started"),
         (S.DELIVERING, S.COMPLETED, "Campaign delivery completed"),
-
         # Failure from active states
         (S.QUOTED, S.FAILED, "Quote processing failed"),
         (S.NEGOTIATING, S.FAILED, "Negotiation failed"),
         (S.BOOKING, S.FAILED, "Booking failed"),
         (S.DELIVERING, S.FAILED, "Delivery failed"),
-
         # Cancellation from non-terminal states
         (S.QUOTED, S.CANCELLED, "Deal cancelled"),
         (S.NEGOTIATING, S.CANCELLED, "Deal cancelled during negotiation"),
@@ -372,11 +363,9 @@ def _build_deal_rules() -> list[TransitionRule]:
         (S.BOOKING, S.CANCELLED, "Deal cancelled during booking"),
         (S.BOOKED, S.CANCELLED, "Booked deal cancelled"),
         (S.DELIVERING, S.CANCELLED, "Delivery cancelled"),
-
         # Expiry
         (S.QUOTED, S.EXPIRED, "Quote expired"),
         (S.NEGOTIATING, S.EXPIRED, "Negotiation expired"),
-
         # Linear TV extensions
         (S.DELIVERING, S.MAKEGOOD_PENDING, "Makegood requested for under-delivery"),
         (S.MAKEGOOD_PENDING, S.DELIVERING, "Makegood resolved, delivery resumed"),
@@ -387,10 +376,7 @@ def _build_deal_rules() -> list[TransitionRule]:
         (S.PARTIALLY_CANCELED, S.CANCELLED, "Remaining units cancelled"),
     ]
 
-    return [
-        TransitionRule(from_status=f, to_status=t, description=d)
-        for f, t, d in transitions
-    ]
+    return [TransitionRule(from_status=f, to_status=t, description=d) for f, t, d in transitions]
 
 
 def _build_campaign_rules() -> list[TransitionRule]:
@@ -405,23 +391,18 @@ def _build_campaign_rules() -> list[TransitionRule]:
         (S.RESEARCHING, S.AWAITING_APPROVAL, "Recommendations ready for approval"),
         (S.AWAITING_APPROVAL, S.EXECUTING_BOOKINGS, "Approvals granted, executing"),
         (S.EXECUTING_BOOKINGS, S.COMPLETED, "All bookings executed"),
-
         # Failure from active states
         (S.BRIEF_RECEIVED, S.FAILED, "Brief processing failed"),
         (S.BUDGET_ALLOCATED, S.FAILED, "Budget allocation failed"),
         (S.RESEARCHING, S.FAILED, "Research failed"),
         (S.AWAITING_APPROVAL, S.FAILED, "Approval process failed"),
         (S.EXECUTING_BOOKINGS, S.FAILED, "Booking execution failed"),
-
         # Recovery
         (S.VALIDATION_FAILED, S.INITIALIZED, "Reset after validation failure"),
         (S.FAILED, S.INITIALIZED, "Reset after failure"),
     ]
 
-    return [
-        TransitionRule(from_status=f, to_status=t, description=d)
-        for f, t, d in transitions
-    ]
+    return [TransitionRule(from_status=f, to_status=t, description=d) for f, t, d in transitions]
 
 
 # ---------------------------------------------------------------------------
@@ -443,7 +424,7 @@ class DealStateMachine(_BaseStateMachine):
         self,
         order_id: str,
         initial_status: BuyerDealStatus = BuyerDealStatus.QUOTED,
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ):
         super().__init__(
             order_id=order_id,
@@ -455,7 +436,7 @@ class DealStateMachine(_BaseStateMachine):
     def from_dict(
         cls,
         data: dict[str, Any],
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ) -> "DealStateMachine":
         """Restore a machine from stored state."""
         machine = cls(
@@ -484,7 +465,7 @@ class CampaignStateMachine(_BaseStateMachine):
         self,
         order_id: str,
         initial_status: BuyerCampaignStatus = BuyerCampaignStatus.INITIALIZED,
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ):
         super().__init__(
             order_id=order_id,
@@ -496,7 +477,7 @@ class CampaignStateMachine(_BaseStateMachine):
     def from_dict(
         cls,
         data: dict[str, Any],
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ) -> "CampaignStateMachine":
         """Restore a machine from stored state."""
         machine = cls(
@@ -530,7 +511,6 @@ def _build_campaign_automation_rules() -> list[TransitionRule]:
         (S.BOOKING, S.READY, "All deals booked, creative validated"),
         (S.READY, S.ACTIVE, "Flight start date reached or manual activation"),
         (S.ACTIVE, S.COMPLETED, "Flight end date reached"),
-
         # Cancellation from non-terminal states
         (S.PLANNING, S.CANCELED, "Campaign canceled during planning"),
         (S.BOOKING, S.CANCELED, "Campaign canceled during booking"),
@@ -538,27 +518,20 @@ def _build_campaign_automation_rules() -> list[TransitionRule]:
         (S.ACTIVE, S.CANCELED, "Campaign terminated"),
         (S.PAUSED, S.CANCELED, "Paused campaign canceled"),
         (S.PACING_HOLD, S.CANCELED, "Pacing-held campaign canceled"),
-
         # Replanning
         (S.BOOKING, S.PLANNING, "Needs replanning"),
         (S.READY, S.PLANNING, "Needs replanning before start"),
-
         # Pause / hold from ACTIVE
         (S.ACTIVE, S.PAUSED, "Manual pause"),
         (S.ACTIVE, S.PACING_HOLD, "Automated pacing deviation threshold"),
-
         # Resume from PAUSED
         (S.PAUSED, S.ACTIVE, "Manual resume"),
-
         # Resume / escalate from PACING_HOLD
         (S.PACING_HOLD, S.ACTIVE, "Deviation resolved, auto-resume"),
         (S.PACING_HOLD, S.PAUSED, "Escalated to manual pause"),
     ]
 
-    return [
-        TransitionRule(from_status=f, to_status=t, description=d)
-        for f, t, d in transitions
-    ]
+    return [TransitionRule(from_status=f, to_status=t, description=d) for f, t, d in transitions]
 
 
 # ---------------------------------------------------------------------------
@@ -588,7 +561,7 @@ class CampaignAutomationStateMachine(_BaseStateMachine):
         self,
         order_id: str,
         initial_status: CampaignStatus = CampaignStatus.DRAFT,
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ):
         super().__init__(
             order_id=order_id,
@@ -596,9 +569,7 @@ class CampaignAutomationStateMachine(_BaseStateMachine):
             rules=rules if rules is not None else _build_campaign_automation_rules(),
         )
 
-    def validate_transition(
-        self, from_state: CampaignStatus, to_state: CampaignStatus
-    ) -> bool:
+    def validate_transition(self, from_state: CampaignStatus, to_state: CampaignStatus) -> bool:
         """Check whether a transition from from_state to to_state is valid.
 
         This is a static check against the transition rules -- it does not
@@ -611,7 +582,7 @@ class CampaignAutomationStateMachine(_BaseStateMachine):
     def from_dict(
         cls,
         data: dict[str, Any],
-        rules: Optional[list[TransitionRule]] = None,
+        rules: list[TransitionRule] | None = None,
     ) -> "CampaignAutomationStateMachine":
         """Restore a machine from stored state."""
         machine = cls(
@@ -627,10 +598,7 @@ class CampaignAutomationStateMachine(_BaseStateMachine):
 
 # Build class-level transition table for static access
 CampaignAutomationStateMachine.TRANSITION_TABLE = {
-    state: [
-        r.to_status for r in _build_campaign_automation_rules()
-        if r.from_status == state
-    ]
+    state: [r.to_status for r in _build_campaign_automation_rules() if r.from_status == state]
     for state in CampaignStatus
 }
 

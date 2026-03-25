@@ -12,19 +12,19 @@ Tests the integration of CampaignAutomationStateMachine with CampaignStore:
 """
 
 import json
+
 import pytest
 
 from ad_buyer.models.state_machine import (
-    CampaignAutomationStateMachine,
     CampaignStatus,
     InvalidTransitionError,
 )
 from ad_buyer.storage.campaign_store import CampaignStore
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def store():
@@ -55,6 +55,7 @@ def sample_brief():
 # ---------------------------------------------------------------------------
 # transition_campaign_status
 # ---------------------------------------------------------------------------
+
 
 class TestTransitionCampaignStatus:
     """Tests for CampaignStore.transition_campaign_status()."""
@@ -126,6 +127,7 @@ class TestTransitionCampaignStatus:
 # create_campaign
 # ---------------------------------------------------------------------------
 
+
 class TestCreateCampaign:
     """Tests for CampaignStore.create_campaign()."""
 
@@ -164,6 +166,7 @@ class TestCreateCampaign:
 # ---------------------------------------------------------------------------
 # Lifecycle methods
 # ---------------------------------------------------------------------------
+
 
 class TestStartPlanning:
     """Tests for CampaignStore.start_planning()."""
@@ -287,8 +290,12 @@ class TestPauseCampaign:
     def test_active_to_paused(self, store, sample_brief):
         """pause_campaign transitions ACTIVE -> PAUSED."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.pause_campaign(cid)
         assert store.get_campaign(cid)["status"] == CampaignStatus.PAUSED.value
@@ -306,8 +313,12 @@ class TestResumeCampaign:
     def test_paused_to_active(self, store, sample_brief):
         """resume_campaign transitions PAUSED -> ACTIVE."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.pause_campaign(cid)
         store.resume_campaign(cid)
@@ -316,8 +327,12 @@ class TestResumeCampaign:
     def test_emits_activated_event_on_resume(self, store, sample_brief):
         """resume_campaign emits a campaign.activated event."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.pause_campaign(cid)
         store.resume_campaign(cid)
@@ -339,8 +354,12 @@ class TestCompleteCampaign:
     def test_active_to_completed(self, store, sample_brief):
         """complete_campaign transitions ACTIVE -> COMPLETED."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.complete_campaign(cid)
         assert store.get_campaign(cid)["status"] == CampaignStatus.COMPLETED.value
@@ -348,8 +367,12 @@ class TestCompleteCampaign:
     def test_emits_completed_event(self, store, sample_brief):
         """complete_campaign emits a campaign.completed event."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.complete_campaign(cid)
         events = store.get_campaign_events(cid)
@@ -384,8 +407,7 @@ class TestCancelCampaign:
     def test_cancel_from_ready(self, store, sample_brief):
         """cancel_campaign from READY succeeds."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY]:
+        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING, CampaignStatus.READY]:
             store.transition_campaign_status(cid, s)
         store.cancel_campaign(cid)
         assert store.get_campaign(cid)["status"] == CampaignStatus.CANCELED.value
@@ -393,8 +415,12 @@ class TestCancelCampaign:
     def test_cancel_from_active(self, store, sample_brief):
         """cancel_campaign from ACTIVE succeeds."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.cancel_campaign(cid)
         assert store.get_campaign(cid)["status"] == CampaignStatus.CANCELED.value
@@ -402,9 +428,13 @@ class TestCancelCampaign:
     def test_cancel_from_paused(self, store, sample_brief):
         """cancel_campaign from PAUSED succeeds."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE,
-                   CampaignStatus.PAUSED]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+            CampaignStatus.PAUSED,
+        ]:
             store.transition_campaign_status(cid, s)
         store.cancel_campaign(cid)
         assert store.get_campaign(cid)["status"] == CampaignStatus.CANCELED.value
@@ -412,9 +442,13 @@ class TestCancelCampaign:
     def test_cancel_from_pacing_hold(self, store, sample_brief):
         """cancel_campaign from PACING_HOLD succeeds."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE,
-                   CampaignStatus.PACING_HOLD]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+            CampaignStatus.PACING_HOLD,
+        ]:
             store.transition_campaign_status(cid, s)
         store.cancel_campaign(cid)
         assert store.get_campaign(cid)["status"] == CampaignStatus.CANCELED.value
@@ -428,9 +462,13 @@ class TestCancelCampaign:
     def test_cancel_from_completed_raises(self, store, sample_brief):
         """cancel_campaign from COMPLETED raises (terminal state)."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE,
-                   CampaignStatus.COMPLETED]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+            CampaignStatus.COMPLETED,
+        ]:
             store.transition_campaign_status(cid, s)
         with pytest.raises(InvalidTransitionError):
             store.cancel_campaign(cid)
@@ -456,6 +494,7 @@ class TestCancelCampaign:
 # ---------------------------------------------------------------------------
 # Event tracking
 # ---------------------------------------------------------------------------
+
 
 class TestEventTracking:
     """Tests for event recording through the campaign lifecycle."""
@@ -501,8 +540,12 @@ class TestEventTracking:
     def test_pause_resume_events(self, store, sample_brief):
         """Pause and resume produce the correct event types."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.pause_campaign(cid)
         store.resume_campaign(cid)
@@ -522,6 +565,7 @@ class TestEventTracking:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     """Edge case and regression tests."""
@@ -556,8 +600,12 @@ class TestEdgeCases:
     def test_pacing_hold_from_active(self, store, sample_brief):
         """ACTIVE -> PACING_HOLD transition works."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+        ]:
             store.transition_campaign_status(cid, s)
         store.transition_campaign_status(cid, CampaignStatus.PACING_HOLD)
         assert store.get_campaign(cid)["status"] == CampaignStatus.PACING_HOLD.value
@@ -565,9 +613,13 @@ class TestEdgeCases:
     def test_pacing_hold_to_active(self, store, sample_brief):
         """PACING_HOLD -> ACTIVE (auto-resume) works."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE,
-                   CampaignStatus.PACING_HOLD]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+            CampaignStatus.PACING_HOLD,
+        ]:
             store.transition_campaign_status(cid, s)
         store.transition_campaign_status(cid, CampaignStatus.ACTIVE)
         assert store.get_campaign(cid)["status"] == CampaignStatus.ACTIVE.value
@@ -575,9 +627,13 @@ class TestEdgeCases:
     def test_pacing_hold_escalate_to_paused(self, store, sample_brief):
         """PACING_HOLD -> PAUSED (escalation) works."""
         cid = store.create_campaign(sample_brief)
-        for s in [CampaignStatus.PLANNING, CampaignStatus.BOOKING,
-                   CampaignStatus.READY, CampaignStatus.ACTIVE,
-                   CampaignStatus.PACING_HOLD]:
+        for s in [
+            CampaignStatus.PLANNING,
+            CampaignStatus.BOOKING,
+            CampaignStatus.READY,
+            CampaignStatus.ACTIVE,
+            CampaignStatus.PACING_HOLD,
+        ]:
             store.transition_campaign_status(cid, s)
         store.transition_campaign_status(cid, CampaignStatus.PAUSED)
         assert store.get_campaign(cid)["status"] == CampaignStatus.PAUSED.value

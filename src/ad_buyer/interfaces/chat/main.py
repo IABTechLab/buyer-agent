@@ -9,9 +9,9 @@ Each seller should implement IAB Tech Lab OpenDirect/AdCOM standards.
 
 import asyncio
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
-from crewai import Agent, Crew, LLM, Task
+from crewai import LLM, Agent, Crew, Task
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -33,7 +33,7 @@ class SellerConnection:
 
     url: str
     name: str = ""
-    client: Optional[SimpleMCPClient] = None
+    client: SimpleMCPClient | None = None
     capabilities: dict[str, Any] = field(default_factory=dict)
     connected: bool = False
     error: str = ""
@@ -42,6 +42,7 @@ class SellerConnection:
     def check_health(self) -> bool:
         """Synchronously check if seller is reachable and discover tools."""
         import httpx
+
         try:
             response = httpx.get(f"{self.url}/health", timeout=5.0)
             if response.status_code == 200:
@@ -73,7 +74,7 @@ class SellerConnection:
             self.connected = False
         return False
 
-    async def ensure_client(self) -> Optional[SimpleMCPClient]:
+    async def ensure_client(self) -> SimpleMCPClient | None:
         """Lazily create client on first use."""
         if self.client is None and self.connected:
             self.client = SimpleMCPClient(base_url=self.url)
@@ -110,9 +111,7 @@ class MultiSellerSearchTool(BaseTool):
 
     def _run(self, query: str = "", channel: str = "", max_cpm: float = 0) -> str:
         """Synchronous wrapper."""
-        return asyncio.get_event_loop().run_until_complete(
-            self._arun(query, channel, max_cpm)
-        )
+        return asyncio.get_event_loop().run_until_complete(self._arun(query, channel, max_cpm))
 
     async def _arun(self, query: str = "", channel: str = "", max_cpm: float = 0) -> str:
         """Search all sellers asynchronously."""
@@ -139,21 +138,31 @@ class MultiSellerSearchTool(BaseTool):
 
                     # Apply filters if specified
                     if channel and isinstance(products, list):
-                        products = [p for p in products if p.get("channel", "").lower() == channel.lower()]
+                        products = [
+                            p for p in products if p.get("channel", "").lower() == channel.lower()
+                        ]
                     if max_cpm > 0 and isinstance(products, list):
-                        products = [p for p in products if p.get("base_cpm", p.get("floor_cpm", 0)) <= max_cpm]
+                        products = [
+                            p
+                            for p in products
+                            if p.get("base_cpm", p.get("floor_cpm", 0)) <= max_cpm
+                        ]
 
-                    results.append({
+                    results.append(
+                        {
+                            "seller": seller.name,
+                            "url": seller.url,
+                            "products": products,
+                        }
+                    )
+            except Exception as e:
+                results.append(
+                    {
                         "seller": seller.name,
                         "url": seller.url,
-                        "products": products,
-                    })
-            except Exception as e:
-                results.append({
-                    "seller": seller.name,
-                    "url": seller.url,
-                    "error": str(e),
-                })
+                        "error": str(e),
+                    }
+                )
 
         if not results:
             return "No sellers connected. Configure SELLER_ENDPOINTS in .env"
@@ -170,12 +179,17 @@ class MultiSellerSearchTool(BaseTool):
                     for p in products[:5]:  # Limit to 5 per seller
                         name = p.get("name", "Unknown")
                         # Try various price field names
-                        price = p.get("base_cpm", p.get("floor_cpm", p.get("basePrice", p.get("price", "N/A"))))
+                        price = p.get(
+                            "base_cpm",
+                            p.get("floor_cpm", p.get("basePrice", p.get("price", "N/A"))),
+                        )
                         channel = p.get("channel", "")
                         publisher = p.get("publisher", "")
                         avail = p.get("available_impressions", 0)
-                        avail_str = f"{avail/1_000_000:.0f}M" if avail else ""
-                        output.append(f"  - {name} | {publisher} | {channel} | ${price} CPM | {avail_str} avail")
+                        avail_str = f"{avail / 1_000_000:.0f}M" if avail else ""
+                        output.append(
+                            f"  - {name} | {publisher} | {channel} | ${price} CPM | {avail_str} avail"
+                        )
                 else:
                     output.append(f"  {products}")
 
@@ -185,8 +199,12 @@ class MultiSellerSearchTool(BaseTool):
 class CallSellerToolInput(BaseModel):
     """Input for calling any tool on a seller."""
 
-    seller_name: str = Field(..., description="Name of the seller agent (e.g., 'Publisher Seller Agent')")
-    tool_name: str = Field(..., description="Name of the tool to call (e.g., 'book_programmatic_guaranteed')")
+    seller_name: str = Field(
+        ..., description="Name of the seller agent (e.g., 'Publisher Seller Agent')"
+    )
+    tool_name: str = Field(
+        ..., description="Name of the tool to call (e.g., 'book_programmatic_guaranteed')"
+    )
     arguments: str = Field(default="{}", description="JSON string of arguments to pass to the tool")
 
 
@@ -284,21 +302,46 @@ class BookPGDealTool(BaseTool):
         super().__init__(**kwargs)
         self._sellers = sellers
 
-    def _run(self, seller_name: str, product_id: str, impressions: int, cpm_price: float,
-             start_date: str = "", end_date: str = "", advertiser_name: str = "Demo Advertiser",
-             campaign_name: str = "Demo Campaign") -> str:
+    def _run(
+        self,
+        seller_name: str,
+        product_id: str,
+        impressions: int,
+        cpm_price: float,
+        start_date: str = "",
+        end_date: str = "",
+        advertiser_name: str = "Demo Advertiser",
+        campaign_name: str = "Demo Campaign",
+    ) -> str:
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         return loop.run_until_complete(
-            self._arun(seller_name, product_id, impressions, cpm_price, start_date, end_date, advertiser_name, campaign_name)
+            self._arun(
+                seller_name,
+                product_id,
+                impressions,
+                cpm_price,
+                start_date,
+                end_date,
+                advertiser_name,
+                campaign_name,
+            )
         )
 
-    async def _arun(self, seller_name: str, product_id: str, impressions: int, cpm_price: float,
-                    start_date: str = "", end_date: str = "", advertiser_name: str = "Demo Advertiser",
-                    campaign_name: str = "Demo Campaign") -> str:
+    async def _arun(
+        self,
+        seller_name: str,
+        product_id: str,
+        impressions: int,
+        cpm_price: float,
+        start_date: str = "",
+        end_date: str = "",
+        advertiser_name: str = "Demo Advertiser",
+        campaign_name: str = "Demo Campaign",
+    ) -> str:
         import json as json_module
         from datetime import datetime, timedelta
 
@@ -334,7 +377,7 @@ class BookPGDealTool(BaseTool):
             result = await client.call_tool("book_programmatic_guaranteed", args)
 
             if result.success:
-                return f"✓ PG DEAL BOOKED SUCCESSFULLY!\n\nSeller: {seller.name}\nProduct: {product_id}\nImpressions: {impressions:,}\nCPM: ${cpm_price}\nTotal Cost: ${(impressions/1000)*cpm_price:,.2f}\n\nBooking Details:\n{json_module.dumps(result.data, indent=2)}"
+                return f"✓ PG DEAL BOOKED SUCCESSFULLY!\n\nSeller: {seller.name}\nProduct: {product_id}\nImpressions: {impressions:,}\nCPM: ${cpm_price}\nTotal Cost: ${(impressions / 1000) * cpm_price:,.2f}\n\nBooking Details:\n{json_module.dumps(result.data, indent=2)}"
             else:
                 return f"✗ Failed to book PG deal: {result.error}"
         except Exception as e:
@@ -363,8 +406,14 @@ class CreatePMPDealTool(BaseTool):
         super().__init__(**kwargs)
         self._sellers = sellers
 
-    def _run(self, seller_name: str, product_id: str, floor_price: float,
-             impressions: int = 0, buyer_seat_id: str = "buyer-seat-001") -> str:
+    def _run(
+        self,
+        seller_name: str,
+        product_id: str,
+        floor_price: float,
+        impressions: int = 0,
+        buyer_seat_id: str = "buyer-seat-001",
+    ) -> str:
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
@@ -374,8 +423,14 @@ class CreatePMPDealTool(BaseTool):
             self._arun(seller_name, product_id, floor_price, impressions, buyer_seat_id)
         )
 
-    async def _arun(self, seller_name: str, product_id: str, floor_price: float,
-                    impressions: int = 0, buyer_seat_id: str = "buyer-seat-001") -> str:
+    async def _arun(
+        self,
+        seller_name: str,
+        product_id: str,
+        floor_price: float,
+        impressions: int = 0,
+        buyer_seat_id: str = "buyer-seat-001",
+    ) -> str:
         import json as json_module
 
         # Find seller
@@ -401,7 +456,11 @@ class CreatePMPDealTool(BaseTool):
 
             if result.success:
                 deal_data = result.data
-                deal_id = deal_data.get("deal", {}).get("deal_id", "N/A") if isinstance(deal_data, dict) else "N/A"
+                deal_id = (
+                    deal_data.get("deal", {}).get("deal_id", "N/A")
+                    if isinstance(deal_data, dict)
+                    else "N/A"
+                )
                 return f"✓ PMP DEAL CREATED!\n\nDeal ID: {deal_id}\nSeller: {seller.name}\nProduct: {product_id}\nFloor: ${floor_price} CPM\n\nFull Details:\n{json_module.dumps(deal_data, indent=2)}"
             else:
                 return f"✗ Failed to create PMP deal: {result.error}"
@@ -499,7 +558,11 @@ Provide specific, actionable recommendations based on user requirements.""",
         lines = []
         for i, seller in enumerate(self._sellers, 1):
             status = "Connected" if seller.connected else f"Failed: {seller.error}"
-            caps = ", ".join(seller.capabilities.get("tools", [])[:5]) if seller.capabilities else "N/A"
+            caps = (
+                ", ".join(seller.capabilities.get("tools", [])[:5])
+                if seller.capabilities
+                else "N/A"
+            )
             lines.append(f"{i}. {seller.url}")
             lines.append(f"   Status: {status}")
             if seller.connected:
@@ -516,9 +579,7 @@ Provide specific, actionable recommendations based on user requirements.""",
         Returns:
             The agent's response
         """
-        self.conversation_history.append(
-            ConversationMessage(role="user", content=user_message)
-        )
+        self.conversation_history.append(ConversationMessage(role="user", content=user_message))
 
         # Build context from conversation history
         history_text = self._format_history()
@@ -564,9 +625,7 @@ the user's requirements.
         response = str(result)
 
         # Store response
-        self.conversation_history.append(
-            ConversationMessage(role="assistant", content=response)
-        )
+        self.conversation_history.append(ConversationMessage(role="assistant", content=response))
 
         return response
 

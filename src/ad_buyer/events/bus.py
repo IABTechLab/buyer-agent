@@ -9,7 +9,7 @@ for development and testing. Pure stdlib + Pydantic, no external deps.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from .models import Event
 
@@ -35,15 +35,15 @@ class EventBus(ABC):
         """
 
     @abstractmethod
-    async def get_event(self, event_id: str) -> Optional[Event]:
+    async def get_event(self, event_id: str) -> Event | None:
         """Retrieve a persisted event by ID."""
 
     @abstractmethod
     async def list_events(
         self,
-        flow_id: Optional[str] = None,
-        event_type: Optional[str] = None,
-        session_id: Optional[str] = None,
+        flow_id: str | None = None,
+        event_type: str | None = None,
+        session_id: str | None = None,
         limit: int = 50,
     ) -> list[Event]:
         """List persisted events, optionally filtered."""
@@ -77,7 +77,7 @@ class InMemoryEventBus(EventBus):
     async def subscribe(self, event_type: str, callback: Subscriber) -> None:
         self._subscribers.setdefault(event_type, []).append(callback)
 
-    async def get_event(self, event_id: str) -> Optional[Event]:
+    async def get_event(self, event_id: str) -> Event | None:
         for ev in self._events:
             if ev.event_id == event_id:
                 return ev
@@ -85,9 +85,9 @@ class InMemoryEventBus(EventBus):
 
     async def list_events(
         self,
-        flow_id: Optional[str] = None,
-        event_type: Optional[str] = None,
-        session_id: Optional[str] = None,
+        flow_id: str | None = None,
+        event_type: str | None = None,
+        session_id: str | None = None,
         limit: int = 50,
     ) -> list[Event]:
         results = self._events
@@ -104,7 +104,7 @@ class InMemoryEventBus(EventBus):
 # Factory / singleton
 # ---------------------------------------------------------------------------
 
-_event_bus_instance: Optional[EventBus] = None
+_event_bus_instance: EventBus | None = None
 
 
 async def get_event_bus() -> EventBus:

@@ -13,8 +13,7 @@ import json
 import logging
 import sqlite3
 import threading
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from ..models.campaign import (
     ChannelSnapshot,
@@ -28,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def _now_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # Schema DDL for pacing snapshot tables
@@ -70,7 +69,7 @@ class PacingStore:
     def __init__(self, database_url: str) -> None:
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -80,9 +79,9 @@ class PacingStore:
     def _parse_url(url: str) -> str:
         """Extract the file path from a sqlite:/// URL."""
         if url.startswith("sqlite:///"):
-            return url[len("sqlite:///"):]
+            return url[len("sqlite:///") :]
         if url.startswith("sqlite://"):
-            path = url[len("sqlite://"):]
+            path = url[len("sqlite://") :]
             return path if path else ":memory:"
         return url
 
@@ -129,7 +128,7 @@ class PacingStore:
             "%Y-%m-%dT%H:%M:%S",
         ):
             try:
-                return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+                return datetime.strptime(s, fmt).replace(tzinfo=UTC)
             except ValueError:
                 continue
         raise ValueError(f"Cannot parse datetime: {s}")
@@ -187,22 +186,16 @@ class PacingStore:
                     snapshot.pacing_pct,
                     snapshot.expected_spend,
                     snapshot.deviation_pct,
-                    json.dumps(
-                        [ch.model_dump() for ch in snapshot.channel_snapshots]
-                    ),
-                    json.dumps(
-                        [ds.model_dump() for ds in snapshot.deal_snapshots]
-                    ),
-                    json.dumps(
-                        [rec.model_dump() for rec in snapshot.recommendations]
-                    ),
+                    json.dumps([ch.model_dump() for ch in snapshot.channel_snapshots]),
+                    json.dumps([ds.model_dump() for ds in snapshot.deal_snapshots]),
+                    json.dumps([rec.model_dump() for rec in snapshot.recommendations]),
                     _now_iso(),
                 ),
             )
             self._conn.commit()
         return snapshot.snapshot_id
 
-    def get_pacing_snapshot(self, snapshot_id: str) -> Optional[PacingSnapshot]:
+    def get_pacing_snapshot(self, snapshot_id: str) -> PacingSnapshot | None:
         """Retrieve a pacing snapshot by its ID.
 
         Args:
@@ -224,8 +217,8 @@ class PacingStore:
     def list_pacing_snapshots(
         self,
         campaign_id: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> list[PacingSnapshot]:
         """List pacing snapshots for a campaign, optionally filtered by time.
 
@@ -258,9 +251,7 @@ class PacingStore:
 
         return [self._row_to_snapshot(row) for row in rows]
 
-    def get_latest_pacing_snapshot(
-        self, campaign_id: str
-    ) -> Optional[PacingSnapshot]:
+    def get_latest_pacing_snapshot(self, campaign_id: str) -> PacingSnapshot | None:
         """Get the most recent pacing snapshot for a campaign.
 
         Args:

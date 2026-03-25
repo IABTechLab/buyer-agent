@@ -3,12 +3,12 @@
 
 """Tests for OpenDirect client."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import httpx
 
 from ad_buyer.clients.opendirect_client import OpenDirectClient
-from ad_buyer.models.opendirect import Product, Order, Line, RateType, DeliveryType
+from ad_buyer.models.opendirect import DeliveryType, Order
 
 
 class TestOpenDirectClient:
@@ -64,7 +64,7 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, 'get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_response
             products = await client.list_products(skip=0, top=10)
 
@@ -88,7 +88,7 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, 'get', new_callable=AsyncMock) as mock_get:
+        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = mock_response
             product = await client.get_product("prod_123")
 
@@ -123,7 +123,7 @@ class TestOpenDirectClient:
             end_date=datetime(2025, 2, 28),
         )
 
-        with patch.object(client._client, 'post', new_callable=AsyncMock) as mock_post:
+        with patch.object(client._client, "post", new_callable=AsyncMock) as mock_post:
             mock_post.return_value = mock_response
             result = await client.create_order("acct_123", order)
 
@@ -148,7 +148,7 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, 'patch', new_callable=AsyncMock) as mock_patch:
+        with patch.object(client._client, "patch", new_callable=AsyncMock) as mock_patch:
             mock_patch.return_value = mock_response
             result = await client.book_line("acct_123", "order_456", "line_123")
 

@@ -6,7 +6,6 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional
 
 # Load .env file before any other imports that might need env vars
 from dotenv import find_dotenv, load_dotenv
@@ -62,7 +61,7 @@ def book(
         "-y",
         help="Automatically approve all recommendations",
     ),
-    output: Optional[Path] = typer.Option(
+    output: Path | None = typer.Option(
         None,
         "--output",
         "-o",
@@ -164,9 +163,7 @@ def book(
         # Calculate totals
         total_imps = sum(r.impressions for r in flow.state.pending_approvals)
         total_cost = sum(r.cost for r in flow.state.pending_approvals)
-        console.print(
-            f"\n[bold]Total:[/bold] {total_imps:,} impressions, ${total_cost:,.2f}"
-        )
+        console.print(f"\n[bold]Total:[/bold] {total_imps:,} impressions, ${total_cost:,.2f}")
 
         # Handle approval
         if dry_run:
@@ -223,24 +220,24 @@ def _show_booking_result(result: dict) -> None:
 
 @app.command()
 def search(
-    channel: Optional[str] = typer.Option(
+    channel: str | None = typer.Option(
         None,
         "--channel",
         "-c",
         help="Channel: display, video, mobile, ctv",
     ),
-    format: Optional[str] = typer.Option(
+    format: str | None = typer.Option(
         None,
         "--format",
         "-f",
         help="Ad format: banner, video, interstitial",
     ),
-    min_price: Optional[float] = typer.Option(
+    min_price: float | None = typer.Option(
         None,
         "--min-price",
         help="Minimum CPM price",
     ),
-    max_price: Optional[float] = typer.Option(
+    max_price: float | None = typer.Option(
         None,
         "--max-price",
         help="Maximum CPM price",

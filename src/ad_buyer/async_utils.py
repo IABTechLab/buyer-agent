@@ -10,7 +10,8 @@ running loop raises RuntimeError.
 """
 
 import asyncio
-from typing import Any, Coroutine, TypeVar
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 import nest_asyncio
 

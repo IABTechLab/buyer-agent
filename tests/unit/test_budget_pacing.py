@@ -9,32 +9,27 @@ module before implementation.
 bead: buyer-9zz (2C: Budget Pacing & Reallocation)
 """
 
-import asyncio
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from ad_buyer.models.campaign import (
     ChannelSnapshot,
     DealSnapshot,
-    PacingRecommendation,
     PacingSnapshot,
-    RecommendationStatus,
     RecommendationType,
 )
 from ad_buyer.pacing.engine import (
     BudgetPacingEngine,
-    PacingAlert,
     PacingAlertLevel,
     PacingConfig,
     ReallocationProposal,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def pacing_config() -> PacingConfig:
@@ -57,18 +52,18 @@ def engine(pacing_config: PacingConfig) -> BudgetPacingEngine:
 
 @pytest.fixture
 def campaign_start() -> datetime:
-    return datetime(2025, 3, 1, tzinfo=timezone.utc)
+    return datetime(2025, 3, 1, tzinfo=UTC)
 
 
 @pytest.fixture
 def campaign_end() -> datetime:
-    return datetime(2025, 3, 31, tzinfo=timezone.utc)
+    return datetime(2025, 3, 31, tzinfo=UTC)
 
 
 @pytest.fixture
 def now_midway() -> datetime:
     """Now at the midpoint of the campaign (March 16)."""
-    return datetime(2025, 3, 16, tzinfo=timezone.utc)
+    return datetime(2025, 3, 16, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -80,8 +75,11 @@ class TestSpendTracking:
     """Test expected vs actual spend calculations."""
 
     def test_calculate_expected_spend_at_midpoint(
-        self, engine: BudgetPacingEngine, campaign_start: datetime,
-        campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """At the midpoint, expected spend should be ~50% of total budget."""
         total_budget = 100_000.0
@@ -96,7 +94,9 @@ class TestSpendTracking:
         assert expected == pytest.approx(50_000.0, rel=0.05)
 
     def test_calculate_expected_spend_at_start(
-        self, engine: BudgetPacingEngine, campaign_start: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
         campaign_end: datetime,
     ) -> None:
         """At flight start, expected spend should be 0."""
@@ -109,7 +109,9 @@ class TestSpendTracking:
         assert expected == 0.0
 
     def test_calculate_expected_spend_at_end(
-        self, engine: BudgetPacingEngine, campaign_start: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
         campaign_end: datetime,
     ) -> None:
         """At flight end, expected spend should be 100% of budget."""
@@ -122,7 +124,9 @@ class TestSpendTracking:
         assert expected == pytest.approx(100_000.0, rel=0.01)
 
     def test_calculate_expected_spend_before_start(
-        self, engine: BudgetPacingEngine, campaign_start: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
         campaign_end: datetime,
     ) -> None:
         """Before campaign start, expected spend should be 0."""
@@ -136,7 +140,9 @@ class TestSpendTracking:
         assert expected == 0.0
 
     def test_calculate_expected_spend_after_end(
-        self, engine: BudgetPacingEngine, campaign_start: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
         campaign_end: datetime,
     ) -> None:
         """After campaign end, expected spend should be full budget."""
@@ -150,37 +156,35 @@ class TestSpendTracking:
         assert expected == 100_000.0
 
     def test_calculate_pacing_percentage(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Pacing pct = (actual_spend / expected_spend) * 100."""
-        pct = engine.calculate_pacing_pct(
-            actual_spend=40_000.0, expected_spend=50_000.0
-        )
+        pct = engine.calculate_pacing_pct(actual_spend=40_000.0, expected_spend=50_000.0)
         assert pct == pytest.approx(80.0, rel=0.01)
 
     def test_calculate_pacing_percentage_zero_expected(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """If expected_spend is zero (campaign hasn't started), return 0."""
         pct = engine.calculate_pacing_pct(actual_spend=0.0, expected_spend=0.0)
         assert pct == 0.0
 
     def test_calculate_deviation_pct(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Deviation = pacing_pct - 100. Negative means underpacing."""
-        deviation = engine.calculate_deviation_pct(
-            actual_spend=40_000.0, expected_spend=50_000.0
-        )
+        deviation = engine.calculate_deviation_pct(actual_spend=40_000.0, expected_spend=50_000.0)
         assert deviation == pytest.approx(-20.0, rel=0.01)
 
     def test_calculate_deviation_overpacing(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Positive deviation means overpacing."""
-        deviation = engine.calculate_deviation_pct(
-            actual_spend=60_000.0, expected_spend=50_000.0
-        )
+        deviation = engine.calculate_deviation_pct(actual_spend=60_000.0, expected_spend=50_000.0)
         assert deviation == pytest.approx(20.0, rel=0.01)
 
 
@@ -193,7 +197,8 @@ class TestPacingDeviationDetection:
     """Test pacing alert/deviation detection logic."""
 
     def test_no_alert_when_on_pace(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """No alert generated when spend is within thresholds."""
         alert = engine.detect_deviation(
@@ -203,7 +208,8 @@ class TestPacingDeviationDetection:
         assert alert is None
 
     def test_warning_underpacing(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Warning when underpacing exceeds warning threshold (10%)."""
         alert = engine.detect_deviation(
@@ -215,7 +221,8 @@ class TestPacingDeviationDetection:
         assert alert.direction == "underpacing"
 
     def test_critical_underpacing(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Critical alert when underpacing exceeds critical threshold (25%)."""
         alert = engine.detect_deviation(
@@ -227,7 +234,8 @@ class TestPacingDeviationDetection:
         assert alert.direction == "underpacing"
 
     def test_warning_overpacing(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Warning when overpacing exceeds warning threshold (10%)."""
         alert = engine.detect_deviation(
@@ -239,7 +247,8 @@ class TestPacingDeviationDetection:
         assert alert.direction == "overpacing"
 
     def test_critical_overpacing(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Critical alert when overpacing exceeds critical threshold (25%)."""
         alert = engine.detect_deviation(
@@ -251,7 +260,8 @@ class TestPacingDeviationDetection:
         assert alert.direction == "overpacing"
 
     def test_threshold_boundary_no_alert(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Exactly at threshold boundary: no alert (threshold is exclusive)."""
         # 10% under: actual_spend = 45_000 / 50_000 = 90% pacing = -10% deviation
@@ -272,7 +282,8 @@ class TestCrossChannelReallocation:
     """Test budget reallocation proposals between channels."""
 
     def test_reallocate_from_underpacing_to_overpacing(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Shift budget from underpacing channels to overpacing ones."""
         channel_snapshots = [
@@ -316,7 +327,8 @@ class TestCrossChannelReallocation:
         assert "ctv" in targets
 
     def test_no_reallocation_when_all_on_pace(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """No reallocation proposals when all channels are on pace."""
         channel_snapshots = [
@@ -343,7 +355,8 @@ class TestCrossChannelReallocation:
         assert proposals == []
 
     def test_reallocation_respects_max_percentage(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """No single reallocation should exceed max_reallocation_pct of budget."""
         channel_snapshots = [
@@ -372,7 +385,8 @@ class TestCrossChannelReallocation:
             assert proposal.amount <= 100_000.0 * 0.30
 
     def test_reallocation_respects_min_amount(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """No reallocation below min_reallocation_amount ($100)."""
         channel_snapshots = [
@@ -426,8 +440,11 @@ class TestDealLevelSpendTracking:
     """Test deal-level pacing and spend monitoring."""
 
     def test_calculate_deal_pacing(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Calculate pacing for individual deals."""
         deal_snapshot = DealSnapshot(
@@ -451,8 +468,11 @@ class TestDealLevelSpendTracking:
         assert pacing_info["deviation_pct"] < 0  # underpacing
 
     def test_deal_level_alerts(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Deal-level alerts should fire based on same thresholds."""
         deal_snapshot = DealSnapshot(
@@ -482,8 +502,11 @@ class TestPacingSnapshotGeneration:
     """Test end-to-end pacing snapshot generation."""
 
     def test_generate_snapshot(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Generate a full pacing snapshot from channel and deal data."""
         channel_data = {
@@ -493,10 +516,30 @@ class TestPacingSnapshotGeneration:
         }
 
         deal_data = [
-            {"deal_id": "deal-001", "allocated_budget": 25_000.0, "spend": 10_000.0, "impressions": 500_000},
-            {"deal_id": "deal-002", "allocated_budget": 25_000.0, "spend": 10_000.0, "impressions": 500_000},
-            {"deal_id": "deal-003", "allocated_budget": 30_000.0, "spend": 18_000.0, "impressions": 600_000},
-            {"deal_id": "deal-004", "allocated_budget": 20_000.0, "spend": 8_000.0, "impressions": 400_000},
+            {
+                "deal_id": "deal-001",
+                "allocated_budget": 25_000.0,
+                "spend": 10_000.0,
+                "impressions": 500_000,
+            },
+            {
+                "deal_id": "deal-002",
+                "allocated_budget": 25_000.0,
+                "spend": 10_000.0,
+                "impressions": 500_000,
+            },
+            {
+                "deal_id": "deal-003",
+                "allocated_budget": 30_000.0,
+                "spend": 18_000.0,
+                "impressions": 600_000,
+            },
+            {
+                "deal_id": "deal-004",
+                "allocated_budget": 20_000.0,
+                "spend": 8_000.0,
+                "impressions": 400_000,
+            },
         ]
 
         snapshot = engine.generate_snapshot(
@@ -519,8 +562,11 @@ class TestPacingSnapshotGeneration:
         assert snapshot.expected_spend == pytest.approx(50_000.0, rel=0.05)
 
     def test_snapshot_includes_recommendations(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Snapshot should include reallocation recommendations when channels deviate."""
         channel_data = {
@@ -555,8 +601,11 @@ class TestPacingEventEmission:
 
     @pytest.mark.asyncio
     async def test_emit_snapshot_taken_event(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Should emit PACING_SNAPSHOT_TAKEN event when snapshot is generated."""
         from ad_buyer.events.bus import InMemoryEventBus
@@ -586,8 +635,11 @@ class TestPacingEventEmission:
 
     @pytest.mark.asyncio
     async def test_emit_deviation_detected_event(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Should emit PACING_DEVIATION_DETECTED when deviation exceeds threshold."""
         from ad_buyer.events.bus import InMemoryEventBus
@@ -615,8 +667,11 @@ class TestPacingEventEmission:
 
     @pytest.mark.asyncio
     async def test_emit_reallocation_events(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Should emit PACING_REALLOCATION_RECOMMENDED when proposing reallocations."""
         from ad_buyer.events.bus import InMemoryEventBus
@@ -640,15 +695,16 @@ class TestPacingEventEmission:
             deal_data=[],
         )
 
-        events = await event_bus.list_events(
-            event_type=ET.PACING_REALLOCATION_RECOMMENDED.value
-        )
+        events = await event_bus.list_events(event_type=ET.PACING_REALLOCATION_RECOMMENDED.value)
         assert len(events) >= 1
 
     @pytest.mark.asyncio
     async def test_no_deviation_event_when_on_pace(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """No deviation event when campaign is pacing normally."""
         from ad_buyer.events.bus import InMemoryEventBus
@@ -671,9 +727,7 @@ class TestPacingEventEmission:
             deal_data=[],
         )
 
-        events = await event_bus.list_events(
-            event_type=ET.PACING_DEVIATION_DETECTED.value
-        )
+        events = await event_bus.list_events(event_type=ET.PACING_DEVIATION_DETECTED.value)
         assert len(events) == 0
 
 
@@ -686,8 +740,11 @@ class TestEdgeCases:
     """Test edge cases for the pacing engine."""
 
     def test_zero_budget_campaign(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Handle zero-budget campaigns gracefully."""
         snapshot = engine.generate_snapshot(
@@ -704,12 +761,13 @@ class TestEdgeCases:
         assert snapshot.pacing_pct == 0.0
 
     def test_single_day_flight(
-        self, engine: BudgetPacingEngine,
+        self,
+        engine: BudgetPacingEngine,
     ) -> None:
         """Handle single-day flights."""
-        start = datetime(2025, 3, 15, tzinfo=timezone.utc)
-        end = datetime(2025, 3, 15, 23, 59, 59, tzinfo=timezone.utc)
-        now = datetime(2025, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
+        start = datetime(2025, 3, 15, tzinfo=UTC)
+        end = datetime(2025, 3, 15, 23, 59, 59, tzinfo=UTC)
+        now = datetime(2025, 3, 15, 12, 0, 0, tzinfo=UTC)
 
         expected = engine.calculate_expected_spend(
             total_budget=10_000.0,
@@ -721,8 +779,11 @@ class TestEdgeCases:
         assert expected == pytest.approx(5_000.0, rel=0.1)
 
     def test_no_channel_data(
-        self, engine: BudgetPacingEngine,
-        campaign_start: datetime, campaign_end: datetime, now_midway: datetime,
+        self,
+        engine: BudgetPacingEngine,
+        campaign_start: datetime,
+        campaign_end: datetime,
+        now_midway: datetime,
     ) -> None:
         """Handle empty channel data."""
         snapshot = engine.generate_snapshot(

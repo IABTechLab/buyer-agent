@@ -13,17 +13,16 @@ Covers:
 - Edge cases: missing fields, state transitions
 """
 
-import re
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ad_buyer.flows.dsp_deal_flow import (
+    DiscoveredProduct,
     DSPDealFlow,
     DSPFlowState,
     DSPFlowStatus,
-    DiscoveredProduct,
     run_dsp_deal_flow,
 )
 from ad_buyer.models.buyer_identity import (
@@ -32,7 +31,6 @@ from ad_buyer.models.buyer_identity import (
     BuyerIdentity,
     DealType,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -275,7 +273,7 @@ class TestExtractProductId:
 
     def test_product_id_colon_format(self, dsp_flow):
         """Extracts product_id from 'product_id: xxx' format."""
-        text = 'I recommend product_id: ctv_premium_001 because it matches.'
+        text = "I recommend product_id: ctv_premium_001 because it matches."
         result = dsp_flow._extract_product_id(text)
         assert result == "ctv_premium_001"
 
@@ -287,7 +285,7 @@ class TestExtractProductId:
 
     def test_product_id_title_case(self, dsp_flow):
         """Extracts from 'Product ID: xxx' format."""
-        text = 'The best option is Product ID: stream-hd-42'
+        text = "The best option is Product ID: stream-hd-42"
         result = dsp_flow._extract_product_id(text)
         assert result == "stream-hd-42"
 
@@ -304,7 +302,7 @@ class TestExtractProductId:
 
     def test_camel_case_format(self, dsp_flow):
         """Extracts from 'productId: xxx' format."""
-        text = 'The productId: test_prod_99 is the best.'
+        text = "The productId: test_prod_99 is the best."
         result = dsp_flow._extract_product_id(text)
         assert result == "test_prod_99"
 
@@ -590,9 +588,7 @@ class TestDSPFlowStateTransitions:
 
     def test_failed_transition_on_discovery_error(self, dsp_flow_with_request):
         """Discovery failure transitions to FAILED."""
-        dsp_flow_with_request._discover_tool._run = MagicMock(
-            side_effect=RuntimeError("error")
-        )
+        dsp_flow_with_request._discover_tool._run = MagicMock(side_effect=RuntimeError("error"))
         dsp_flow_with_request.discover_inventory({"status": "success"})
         assert dsp_flow_with_request.state.status == DSPFlowStatus.FAILED
 

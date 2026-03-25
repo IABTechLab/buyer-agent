@@ -16,12 +16,9 @@ Extended with linear TV support (Option C hybrid approach, bead buyer-6io):
 - GRP/demo fields on TermsInfo
 """
 
-from typing import Any, Optional
-
 from pydantic import BaseModel, Field
 
 from .linear_tv import LinearTVParams, LinearTVQuoteDetails
-
 
 # ---------------------------------------------------------------------------
 # Shared sub-models (nested objects in API responses)
@@ -34,10 +31,10 @@ class BuyerIdentityPayload(BaseModel):
     Maps to the ``buyer_identity`` object in the API contract.
     """
 
-    seat_id: Optional[str] = None
-    agency_id: Optional[str] = None
-    advertiser_id: Optional[str] = None
-    dsp_platform: Optional[str] = None
+    seat_id: str | None = None
+    agency_id: str | None = None
+    advertiser_id: str | None = None
+    dsp_platform: str | None = None
 
 
 class ProductInfo(BaseModel):
@@ -45,7 +42,7 @@ class ProductInfo(BaseModel):
 
     product_id: str
     name: str
-    inventory_type: Optional[str] = None
+    inventory_type: str | None = None
 
 
 class PricingInfo(BaseModel):
@@ -63,8 +60,8 @@ class PricingInfo(BaseModel):
     rationale: str = ""
 
     # Linear TV CPP pricing (None for digital/CTV)
-    base_cpp: Optional[float] = None
-    final_cpp: Optional[float] = None
+    base_cpp: float | None = None
+    final_cpp: float | None = None
 
 
 class TermsInfo(BaseModel):
@@ -73,23 +70,23 @@ class TermsInfo(BaseModel):
     Extended with GRP-based fields for linear TV.
     """
 
-    impressions: Optional[int] = None
-    flight_start: Optional[str] = None
-    flight_end: Optional[str] = None
+    impressions: int | None = None
+    flight_start: str | None = None
+    flight_end: str | None = None
     guaranteed: bool = False
 
     # Linear TV GRP-based terms (None for digital/CTV)
-    grps: Optional[int] = None
-    guaranteed_grps: Optional[int] = None
-    target_demo: Optional[str] = None
+    grps: int | None = None
+    guaranteed_grps: int | None = None
+    target_demo: str | None = None
 
 
 class AvailabilityInfo(BaseModel):
     """Inventory availability information in a quote."""
 
     inventory_available: bool = True
-    estimated_fill_rate: Optional[float] = None
-    competing_demand: Optional[str] = None
+    estimated_fill_rate: float | None = None
+    competing_demand: str | None = None
 
 
 class OpenRTBParams(BaseModel):
@@ -117,18 +114,18 @@ class QuoteRequest(BaseModel):
 
     product_id: str
     deal_type: str = "PD"
-    impressions: Optional[int] = None
-    flight_start: Optional[str] = None
-    flight_end: Optional[str] = None
-    target_cpm: Optional[float] = None
-    buyer_identity: Optional[BuyerIdentityPayload] = None
-    agent_url: Optional[str] = None
+    impressions: int | None = None
+    flight_start: str | None = None
+    flight_end: str | None = None
+    target_cpm: float | None = None
+    buyer_identity: BuyerIdentityPayload | None = None
+    agent_url: str | None = None
 
     # Media type discriminator (Option C hybrid approach)
     media_type: str = "digital"  # "digital", "ctv", "linear_tv"
 
     # Linear TV nested params (None for digital/CTV)
-    linear_tv: Optional[LinearTVParams] = None
+    linear_tv: LinearTVParams | None = None
 
 
 class DealBookingRequest(BaseModel):
@@ -138,8 +135,8 @@ class DealBookingRequest(BaseModel):
     """
 
     quote_id: str
-    buyer_identity: Optional[BuyerIdentityPayload] = None
-    notes: Optional[str] = None
+    buyer_identity: BuyerIdentityPayload | None = None
+    notes: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -159,17 +156,17 @@ class QuoteResponse(BaseModel):
     product: ProductInfo
     pricing: PricingInfo
     terms: TermsInfo
-    availability: Optional[AvailabilityInfo] = None
+    availability: AvailabilityInfo | None = None
     buyer_tier: str = "public"
-    expires_at: Optional[str] = None
-    seller_id: Optional[str] = None
-    created_at: Optional[str] = None
+    expires_at: str | None = None
+    seller_id: str | None = None
+    created_at: str | None = None
 
     # Media type (echoes the request)
     media_type: str = "digital"
 
     # Linear TV quote details (None for digital/CTV)
-    linear_tv: Optional[LinearTVQuoteDetails] = None
+    linear_tv: LinearTVQuoteDetails | None = None
 
 
 class DealResponse(BaseModel):
@@ -181,15 +178,15 @@ class DealResponse(BaseModel):
     deal_id: str
     deal_type: str
     status: str  # proposed, active, rejected, expired, completed
-    quote_id: Optional[str] = None
+    quote_id: str | None = None
     product: ProductInfo
     pricing: PricingInfo
     terms: TermsInfo
     buyer_tier: str = "public"
-    expires_at: Optional[str] = None
+    expires_at: str | None = None
     activation_instructions: dict[str, str] = Field(default_factory=dict)
-    openrtb_params: Optional[OpenRTBParams] = None
-    created_at: Optional[str] = None
+    openrtb_params: OpenRTBParams | None = None
+    created_at: str | None = None
 
 
 # ---------------------------------------------------------------------------

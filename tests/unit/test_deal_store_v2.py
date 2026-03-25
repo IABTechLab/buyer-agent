@@ -16,9 +16,8 @@ import sqlite3
 
 import pytest
 
-from ad_buyer.storage import DealStore, SCHEMA_VERSION
+from ad_buyer.storage import SCHEMA_VERSION, DealStore
 from ad_buyer.storage.schema import (
-    create_tables,
     get_schema_version,
     initialize_schema,
     migrate_v1_to_v2,
@@ -26,10 +25,10 @@ from ad_buyer.storage.schema import (
     set_schema_version,
 )
 
-
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
+
 
 @pytest.fixture
 def deal_store():
@@ -53,6 +52,7 @@ def raw_conn():
 # Schema Version Tests
 # -----------------------------------------------------------------------
 
+
 class TestSchemaV2Version:
     """Verify schema version reflects the latest migration (v4)."""
 
@@ -70,6 +70,7 @@ class TestSchemaV2Version:
 # Migration Function Tests
 # -----------------------------------------------------------------------
 
+
 class TestMigrationV1ToV2:
     """Tests for the migrate_v1_to_v2 migration function."""
 
@@ -77,14 +78,15 @@ class TestMigrationV1ToV2:
         """Create v1 schema (tables only, no v2 columns)."""
         # Import v1 table DDL directly
         from ad_buyer.storage.schema import (
-            DEALS_TABLE,
-            NEGOTIATION_ROUNDS_TABLE,
             BOOKING_RECORDS_TABLE,
-            JOBS_TABLE,
+            DEALS_TABLE,
             EVENTS_TABLE,
-            STATUS_TRANSITIONS_TABLE,
+            JOBS_TABLE,
+            NEGOTIATION_ROUNDS_TABLE,
             SCHEMA_VERSION_TABLE,
+            STATUS_TRANSITIONS_TABLE,
         )
+
         cursor = conn.cursor()
         cursor.execute(SCHEMA_VERSION_TABLE)
         for ddl in [
@@ -106,19 +108,44 @@ class TestMigrationV1ToV2:
 
         # Check that all new columns exist by inserting a row with them
         intrinsic_columns = [
-            "display_name", "description", "buyer_org", "buyer_id",
-            "seller_org", "seller_id", "seller_domain", "seller_type",
-            "price_model", "bid_floor_cpm", "fixed_price_cpm",
-            "cpp", "guaranteed_grps", "currency",
-            "fee_transparency", "media_type", "formats",
-            "content_categories", "publisher_domains", "geo_targets",
-            "dayparts", "programs", "networks", "audience_segments",
-            "estimated_volume", "deprecated_at", "deprecated_reason",
-            "parent_deal_id", "schain_complete", "schain_nodes",
-            "sellers_json_url", "is_direct", "hop_count",
+            "display_name",
+            "description",
+            "buyer_org",
+            "buyer_id",
+            "seller_org",
+            "seller_id",
+            "seller_domain",
+            "seller_type",
+            "price_model",
+            "bid_floor_cpm",
+            "fixed_price_cpm",
+            "cpp",
+            "guaranteed_grps",
+            "currency",
+            "fee_transparency",
+            "media_type",
+            "formats",
+            "content_categories",
+            "publisher_domains",
+            "geo_targets",
+            "dayparts",
+            "programs",
+            "networks",
+            "audience_segments",
+            "estimated_volume",
+            "deprecated_at",
+            "deprecated_reason",
+            "parent_deal_id",
+            "schain_complete",
+            "schain_nodes",
+            "sellers_json_url",
+            "is_direct",
+            "hop_count",
             "inventory_fingerprint",
-            "makegood_provisions", "cancellation_window",
-            "audience_guarantee", "preemption_rights",
+            "makegood_provisions",
+            "cancellation_window",
+            "audience_guarantee",
+            "preemption_rights",
             "agency_of_record_status",
         ]
 
@@ -142,8 +169,15 @@ class TestMigrationV1ToV2:
         # Check columns
         cursor = raw_conn.execute("PRAGMA table_info(portfolio_metadata)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "deal_id", "import_source", "import_date", "tags",
-                    "advertiser_id", "agency_id"}
+        expected = {
+            "id",
+            "deal_id",
+            "import_source",
+            "import_date",
+            "tags",
+            "advertiser_id",
+            "agency_id",
+        }
         assert expected.issubset(cols)
 
     def test_migrate_v1_to_v2_creates_deal_activations_table(self, raw_conn):
@@ -158,8 +192,14 @@ class TestMigrationV1ToV2:
 
         cursor = raw_conn.execute("PRAGMA table_info(deal_activations)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "deal_id", "platform", "platform_deal_id",
-                    "activation_status", "last_sync_at"}
+        expected = {
+            "id",
+            "deal_id",
+            "platform",
+            "platform_deal_id",
+            "activation_status",
+            "last_sync_at",
+        }
         assert expected.issubset(cols)
 
     def test_migrate_v1_to_v2_creates_performance_cache_table(self, raw_conn):
@@ -174,9 +214,18 @@ class TestMigrationV1ToV2:
 
         cursor = raw_conn.execute("PRAGMA table_info(performance_cache)")
         cols = {row[1] for row in cursor.fetchall()}
-        expected = {"id", "deal_id", "impressions_delivered", "spend_to_date",
-                    "fill_rate", "win_rate", "avg_effective_cpm",
-                    "last_delivery_at", "performance_trend", "cached_at"}
+        expected = {
+            "id",
+            "deal_id",
+            "impressions_delivered",
+            "spend_to_date",
+            "fill_rate",
+            "win_rate",
+            "avg_effective_cpm",
+            "last_delivery_at",
+            "performance_trend",
+            "cached_at",
+        }
         assert expected.issubset(cols)
 
     def test_migrate_v1_to_v2_creates_indexes(self, raw_conn):
@@ -271,15 +320,14 @@ class TestMigrationV1ToV2:
         )
         raw_conn.commit()
 
-        cursor = raw_conn.execute(
-            "SELECT currency FROM deals WHERE id = 'deal-new'"
-        )
+        cursor = raw_conn.execute("SELECT currency FROM deals WHERE id = 'deal-new'")
         assert cursor.fetchone()[0] == "USD"
 
 
 # -----------------------------------------------------------------------
 # Intrinsic Fields Tests (via DealStore)
 # -----------------------------------------------------------------------
+
 
 class TestIntrinsicFieldsViaStore:
     """Test that new intrinsic columns are accessible through DealStore."""
@@ -498,6 +546,7 @@ class TestIntrinsicFieldsViaStore:
 # Extrinsic Table Tests
 # -----------------------------------------------------------------------
 
+
 class TestPortfolioMetadata:
     """Tests for the portfolio_metadata extrinsic table."""
 
@@ -698,6 +747,7 @@ class TestPerformanceCache:
 # Backward Compatibility Tests
 # -----------------------------------------------------------------------
 
+
 class TestBackwardCompatibility:
     """Ensure v1 operations still work after schema v2 migration."""
 
@@ -822,5 +872,4 @@ class TestBackwardCompatibility:
                     f"SELECT COUNT(*) FROM {table} WHERE deal_id = ?",
                     (did,),
                 )
-                assert cursor.fetchone()[0] == 0, \
-                    f"Cascade delete failed for {table}"
+                assert cursor.fetchone()[0] == 0, f"Cascade delete failed for {table}"

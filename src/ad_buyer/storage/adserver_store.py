@@ -13,8 +13,7 @@ import json
 import logging
 import sqlite3
 import threading
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from ..models.campaign import (
     AdServerBinding,
@@ -22,7 +21,6 @@ from ..models.campaign import (
     AdServerCampaignStatus,
     AdServerDelivery,
     AdServerType,
-    BindingServingStatus,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def _now_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 # Schema DDL for ad server integration tables
@@ -70,7 +68,7 @@ class AdServerStore:
     def __init__(self, database_url: str) -> None:
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -80,9 +78,9 @@ class AdServerStore:
     def _parse_url(url: str) -> str:
         """Extract the file path from a sqlite:/// URL."""
         if url.startswith("sqlite:///"):
-            return url[len("sqlite:///"):]
+            return url[len("sqlite:///") :]
         if url.startswith("sqlite://"):
-            path = url[len("sqlite://"):]
+            path = url[len("sqlite://") :]
             return path if path else ":memory:"
         return url
 
@@ -128,7 +126,7 @@ class AdServerStore:
             "%Y-%m-%dT%H:%M:%S",
         ):
             try:
-                return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+                return datetime.strptime(s, fmt).replace(tzinfo=UTC)
             except ValueError:
                 continue
         raise ValueError(f"Cannot parse datetime: {s}")
@@ -153,9 +151,7 @@ class AdServerStore:
             result.append(AdServerBinding(**d))
         return result
 
-    def _serialize_delivery(
-        self, delivery: Optional[AdServerDelivery]
-    ) -> Optional[str]:
+    def _serialize_delivery(self, delivery: AdServerDelivery | None) -> str | None:
         """Serialize delivery data to JSON."""
         if delivery is None:
             return None
@@ -163,9 +159,7 @@ class AdServerStore:
         d["last_report_at"] = self._dt_to_iso(delivery.last_report_at)
         return json.dumps(d)
 
-    def _deserialize_delivery(
-        self, raw: Optional[str]
-    ) -> Optional[AdServerDelivery]:
+    def _deserialize_delivery(self, raw: str | None) -> AdServerDelivery | None:
         """Deserialize delivery JSON back to model."""
         if raw is None:
             return None
@@ -224,9 +218,7 @@ class AdServerStore:
             self._conn.commit()
         return record.id
 
-    def get_ad_server_campaign(
-        self, record_id: str
-    ) -> Optional[AdServerCampaign]:
+    def get_ad_server_campaign(self, record_id: str) -> AdServerCampaign | None:
         """Retrieve an ad server integration record by its ID.
 
         Args:
@@ -247,9 +239,9 @@ class AdServerStore:
 
     def list_ad_server_campaigns(
         self,
-        campaign_id: Optional[str] = None,
-        ad_server: Optional[AdServerType] = None,
-        status: Optional[AdServerCampaignStatus] = None,
+        campaign_id: str | None = None,
+        ad_server: AdServerType | None = None,
+        status: AdServerCampaignStatus | None = None,
     ) -> list[AdServerCampaign]:
         """List ad server integration records with optional filters.
 
@@ -291,10 +283,10 @@ class AdServerStore:
         self,
         record_id: str,
         *,
-        status: Optional[AdServerCampaignStatus] = None,
-        ad_server_campaign_id: Optional[str] = None,
-        bindings: Optional[list[AdServerBinding]] = None,
-        delivery: Optional[AdServerDelivery] = None,
+        status: AdServerCampaignStatus | None = None,
+        ad_server_campaign_id: str | None = None,
+        bindings: list[AdServerBinding] | None = None,
+        delivery: AdServerDelivery | None = None,
     ) -> None:
         """Update fields on an existing ad server integration record.
 
@@ -343,6 +335,4 @@ class AdServerStore:
             )
             self._conn.commit()
             if cursor.rowcount == 0:
-                raise ValueError(
-                    f"Ad server campaign record '{record_id}' not found"
-                )
+                raise ValueError(f"Ad server campaign record '{record_id}' not found")

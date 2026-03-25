@@ -31,19 +31,18 @@ bead: ar-llj4, ar-uxpw
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
 import random
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
-from ..events.bus import EventBus, InMemoryEventBus
+from ..events.bus import InMemoryEventBus
 from ..events.models import Event, EventType
 from ..models.campaign import (
     ChannelSnapshot,
@@ -51,12 +50,8 @@ from ..models.campaign import (
     PacingSnapshot,
 )
 from ..models.campaign_brief import (
-    CampaignBrief,
-    ChannelAllocation,
-    ChannelType,
     parse_campaign_brief,
 )
-from ..models.state_machine import CampaignStatus
 from ..pacing.engine import BudgetPacingEngine, PacingConfig
 from ..reporting.campaign_report import CampaignReporter
 from ..storage.campaign_store import CampaignStore
@@ -86,8 +81,16 @@ def _build_sample_briefs() -> list[dict[str, Any]]:
                 "flight_start": "2026-07-01",
                 "flight_end": "2026-09-30",
                 "channels": [
-                    {"channel": "CTV", "budget_pct": 60, "format_prefs": ["video_30s", "video_15s"]},
-                    {"channel": "DISPLAY", "budget_pct": 40, "format_prefs": ["300x250", "728x90", "160x600"]},
+                    {
+                        "channel": "CTV",
+                        "budget_pct": 60,
+                        "format_prefs": ["video_30s", "video_15s"],
+                    },
+                    {
+                        "channel": "DISPLAY",
+                        "budget_pct": 40,
+                        "format_prefs": ["300x250", "728x90", "160x600"],
+                    },
                 ],
                 "target_audience": ["IAB-AUD-1001", "IAB-AUD-1045"],
                 "kpis": [
@@ -137,7 +140,11 @@ def _build_sample_briefs() -> list[dict[str, Any]]:
                 "flight_start": "2026-10-01",
                 "flight_end": "2026-12-31",
                 "channels": [
-                    {"channel": "DISPLAY", "budget_pct": 100, "format_prefs": ["300x250", "320x50"]},
+                    {
+                        "channel": "DISPLAY",
+                        "budget_pct": 100,
+                        "format_prefs": ["300x250", "320x50"],
+                    },
                 ],
                 "target_audience": ["IAB-AUD-3001"],
                 "kpis": [
@@ -184,8 +191,9 @@ class DemoPipelineHelper:
         self._booking_results: dict[str, dict] = {}
         self._creative_results: dict[str, list] = {}
 
-    def _emit_sync(self, event_type: EventType, campaign_id: str = "",
-                   payload: Optional[dict] = None) -> None:
+    def _emit_sync(
+        self, event_type: EventType, campaign_id: str = "", payload: dict | None = None
+    ) -> None:
         """Emit an event synchronously to the InMemoryEventBus."""
         event = Event(
             event_type=event_type,
@@ -212,15 +220,11 @@ class DemoPipelineHelper:
             "currency": brief.currency,
             "flight_start": brief.flight_start.isoformat(),
             "flight_end": brief.flight_end.isoformat(),
-            "channels": json.dumps(
-                [ch.model_dump(mode="json") for ch in brief.channels]
-            ),
+            "channels": json.dumps([ch.model_dump(mode="json") for ch in brief.channels]),
             "target_audience": json.dumps(brief.target_audience),
         }
         if brief.kpis:
-            store_brief["kpis"] = json.dumps(
-                [k.model_dump(mode="json") for k in brief.kpis]
-            )
+            store_brief["kpis"] = json.dumps([k.model_dump(mode="json") for k in brief.kpis])
         if brief.approval_config:
             store_brief["approval_config"] = json.dumps(
                 brief.approval_config.model_dump(mode="json")
@@ -262,13 +266,20 @@ class DemoPipelineHelper:
 
         # Channel-to-media-type mapping
         media_type_map = {
-            "CTV": "ctv", "DISPLAY": "display", "AUDIO": "audio",
-            "NATIVE": "native", "DOOH": "dooh", "LINEAR_TV": "linear_tv",
+            "CTV": "ctv",
+            "DISPLAY": "display",
+            "AUDIO": "audio",
+            "NATIVE": "native",
+            "DOOH": "dooh",
+            "LINEAR_TV": "linear_tv",
         }
         deal_type_map = {
-            "CTV": ["PG", "PD"], "DISPLAY": ["PD", "PA"],
-            "AUDIO": ["PD", "PA"], "NATIVE": ["PD", "PA"],
-            "DOOH": ["PG", "PD"], "LINEAR_TV": ["PG"],
+            "CTV": ["PG", "PD"],
+            "DISPLAY": ["PD", "PA"],
+            "AUDIO": ["PD", "PA"],
+            "NATIVE": ["PD", "PA"],
+            "DOOH": ["PG", "PD"],
+            "LINEAR_TV": ["PG"],
         }
 
         channel_plans = []
@@ -277,14 +288,16 @@ class DemoPipelineHelper:
             budget_pct = ch.get("budget_pct", 0)
             budget = round(total_budget * budget_pct / 100.0, 2)
 
-            channel_plans.append({
-                "channel": channel,
-                "budget": budget,
-                "budget_pct": budget_pct,
-                "media_type": media_type_map.get(channel, channel.lower()),
-                "deal_types": deal_type_map.get(channel, ["PD"]),
-                "format_prefs": ch.get("format_prefs", []),
-            })
+            channel_plans.append(
+                {
+                    "channel": channel,
+                    "budget": budget,
+                    "budget_pct": budget_pct,
+                    "media_type": media_type_map.get(channel, channel.lower()),
+                    "deal_types": deal_type_map.get(channel, ["PD"]),
+                    "format_prefs": ch.get("format_prefs", []),
+                }
+            )
 
         plan = {
             "campaign_id": campaign_id,
@@ -301,8 +314,7 @@ class DemoPipelineHelper:
             campaign_id=campaign_id,
             payload={
                 "channels": [
-                    {"channel": cp["channel"], "budget": cp["budget"]}
-                    for cp in channel_plans
+                    {"channel": cp["channel"], "budget": cp["budget"]} for cp in channel_plans
                 ],
                 "total_budget": total_budget,
             },
@@ -382,15 +394,17 @@ class DemoPipelineHelper:
                 impressions = int((deal_budget / cpm) * 1000) if cpm > 0 else 0
                 deal_id = f"DEAL-{str(uuid.uuid4())[:8].upper()}"
 
-                channel_deals.append({
-                    "deal_id": deal_id,
-                    "seller": seller_name,
-                    "seller_domain": seller_domain,
-                    "deal_type": deal_type,
-                    "cpm": cpm,
-                    "impressions": impressions,
-                    "spend": round(deal_budget, 2),
-                })
+                channel_deals.append(
+                    {
+                        "deal_id": deal_id,
+                        "seller": seller_name,
+                        "seller_domain": seller_domain,
+                        "deal_type": deal_type,
+                        "cpm": cpm,
+                        "impressions": impressions,
+                        "spend": round(deal_budget, 2),
+                    }
+                )
                 channel_spend += deal_budget
                 remaining -= deal_budget
 
@@ -429,8 +443,18 @@ class DemoPipelineHelper:
         # Generate simulated creative assets matched to channels
         creative_specs = {
             "CTV": [
-                ("CTV Hero Spot 30s", "video", {"duration": "30s", "resolution": "1920x1080"}, "valid"),
-                ("CTV Bumper 15s", "video", {"duration": "15s", "resolution": "1920x1080"}, "valid"),
+                (
+                    "CTV Hero Spot 30s",
+                    "video",
+                    {"duration": "30s", "resolution": "1920x1080"},
+                    "valid",
+                ),
+                (
+                    "CTV Bumper 15s",
+                    "video",
+                    {"duration": "15s", "resolution": "1920x1080"},
+                    "valid",
+                ),
             ],
             "DISPLAY": [
                 ("Leaderboard 728x90", "display", {"width": 728, "height": 90}, "valid"),
@@ -441,7 +465,12 @@ class DemoPipelineHelper:
                 ("Audio Spot 30s", "audio", {"duration": "30s", "format": "mp3"}, "valid"),
             ],
             "NATIVE": [
-                ("Native Article Card", "native", {"headline_max": 50, "image": "1200x627"}, "valid"),
+                (
+                    "Native Article Card",
+                    "native",
+                    {"headline_max": 50, "image": "1200x627"},
+                    "valid",
+                ),
             ],
             "DOOH": [
                 ("DOOH Full Screen", "display", {"width": 1920, "height": 1080}, "valid"),
@@ -454,9 +483,12 @@ class DemoPipelineHelper:
         creatives = []
 
         for channel, deals in booking.items():
-            specs = creative_specs.get(channel, [
-                ("Generic Creative", "display", {"width": 300, "height": 250}, "valid"),
-            ])
+            specs = creative_specs.get(
+                channel,
+                [
+                    ("Generic Creative", "display", {"width": 300, "height": 250}, "valid"),
+                ],
+            )
 
             for spec_name, asset_type, format_spec, status in specs:
                 asset_id = self._store.save_creative_asset(
@@ -471,15 +503,17 @@ class DemoPipelineHelper:
                 # Match creative to deals in this channel
                 matched_deals = [d["deal_id"] for d in deals]
 
-                creatives.append({
-                    "asset_id": asset_id,
-                    "asset_name": spec_name,
-                    "asset_type": asset_type,
-                    "format_spec": format_spec,
-                    "validation_status": status,
-                    "channel": channel,
-                    "matched_deals": matched_deals,
-                })
+                creatives.append(
+                    {
+                        "asset_id": asset_id,
+                        "asset_name": spec_name,
+                        "asset_type": asset_type,
+                        "format_spec": format_spec,
+                        "validation_status": status,
+                        "channel": channel,
+                        "matched_deals": matched_deals,
+                    }
+                )
 
                 self._emit_sync(
                     EventType.CREATIVE_MATCHED,
@@ -515,30 +549,34 @@ class DemoPipelineHelper:
         for channel, deals in booking.items():
             ch_budget = sum(d["spend"] for d in deals)
 
-            channel_snapshots.append(ChannelSnapshot(
-                channel=channel,
-                allocated_budget=ch_budget,
-                spend=0.0,
-                pacing_pct=0.0,
-                impressions=0,
-                effective_cpm=0.0,
-                fill_rate=0.0,
-            ))
-
-            for d in deals:
-                deal_snapshots.append(DealSnapshot(
-                    deal_id=d["deal_id"],
-                    allocated_budget=d["spend"],
+            channel_snapshots.append(
+                ChannelSnapshot(
+                    channel=channel,
+                    allocated_budget=ch_budget,
                     spend=0.0,
+                    pacing_pct=0.0,
                     impressions=0,
                     effective_cpm=0.0,
                     fill_rate=0.0,
-                    win_rate=0.0,
-                ))
+                )
+            )
+
+            for d in deals:
+                deal_snapshots.append(
+                    DealSnapshot(
+                        deal_id=d["deal_id"],
+                        allocated_budget=d["spend"],
+                        spend=0.0,
+                        impressions=0,
+                        effective_cpm=0.0,
+                        fill_rate=0.0,
+                        win_rate=0.0,
+                    )
+                )
 
         snapshot = PacingSnapshot(
             campaign_id=campaign_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             total_budget=total_budget,
             total_spend=0.0,
             pacing_pct=0.0,
@@ -589,12 +627,8 @@ class DemoPipelineHelper:
         # Parse flight dates for pacing calculation
         flight_start_str = campaign["flight_start"]
         flight_end_str = campaign["flight_end"]
-        flight_start = datetime.fromisoformat(flight_start_str).replace(
-            tzinfo=timezone.utc
-        )
-        flight_end = datetime.fromisoformat(flight_end_str).replace(
-            tzinfo=timezone.utc
-        )
+        flight_start = datetime.fromisoformat(flight_start_str).replace(tzinfo=UTC)
+        flight_end = datetime.fromisoformat(flight_end_str).replace(tzinfo=UTC)
 
         # Simulate "current time" as 35% through the flight
         flight_duration = (flight_end - flight_start).total_seconds()
@@ -604,11 +638,11 @@ class DemoPipelineHelper:
         # Pre-defined pacing multipliers per channel to create varied scenarios.
         # Values <1.0 = underpacing, >1.0 = overpacing.
         pacing_multipliers = {
-            "CTV": 0.72,        # Underpacing (critical, -28%)
-            "DISPLAY": 1.35,    # Overpacing (critical, +35%)
-            "AUDIO": 0.88,      # Slightly underpacing (warning, -12%)
-            "NATIVE": 1.15,     # Slightly overpacing (warning, +15%)
-            "DOOH": 0.60,       # Heavily underpacing
+            "CTV": 0.72,  # Underpacing (critical, -28%)
+            "DISPLAY": 1.35,  # Overpacing (critical, +35%)
+            "AUDIO": 0.88,  # Slightly underpacing (warning, -12%)
+            "NATIVE": 1.15,  # Slightly overpacing (warning, +15%)
+            "DOOH": 0.60,  # Heavily underpacing
             "LINEAR_TV": 1.05,  # On pace
         }
 
@@ -657,15 +691,17 @@ class DemoPipelineHelper:
                 deal_win = round(rng.uniform(0.30, 0.85), 2)
                 deal_ecpm = round(d["cpm"] * rng.uniform(0.90, 1.10), 2)
 
-                deal_data.append({
-                    "deal_id": d["deal_id"],
-                    "allocated_budget": deal_budget,
-                    "spend": deal_spend,
-                    "impressions": deal_imps,
-                    "effective_cpm": deal_ecpm,
-                    "fill_rate": deal_fill,
-                    "win_rate": deal_win,
-                })
+                deal_data.append(
+                    {
+                        "deal_id": d["deal_id"],
+                        "allocated_budget": deal_budget,
+                        "spend": deal_spend,
+                        "impressions": deal_imps,
+                        "effective_cpm": deal_ecpm,
+                        "fill_rate": deal_fill,
+                        "win_rate": deal_win,
+                    }
+                )
 
         # Use BudgetPacingEngine to generate the official snapshot
         engine = BudgetPacingEngine(
@@ -705,9 +741,7 @@ def _extract_alerts(snapshot: PacingSnapshot) -> list:
     alerts: list[PacingAlert] = []
 
     # Campaign-level alert
-    campaign_alert = engine.detect_deviation(
-        snapshot.total_spend, snapshot.expected_spend
-    )
+    campaign_alert = engine.detect_deviation(snapshot.total_spend, snapshot.expected_spend)
     if campaign_alert is not None:
         alerts.append(campaign_alert)
 
@@ -715,9 +749,7 @@ def _extract_alerts(snapshot: PacingSnapshot) -> list:
     for ch in snapshot.channel_snapshots:
         if ch.allocated_budget <= 0 or snapshot.total_budget <= 0:
             continue
-        ch_expected = snapshot.expected_spend * (
-            ch.allocated_budget / snapshot.total_budget
-        )
+        ch_expected = snapshot.expected_spend * (ch.allocated_budget / snapshot.total_budget)
         ch_alert = engine.detect_deviation(ch.spend, ch_expected)
         if ch_alert is not None:
             # Add channel context to the message
@@ -812,10 +844,12 @@ def _register_routes(
     def api_sample_briefs():
         """Return pre-built sample briefs for the dropdown."""
         samples = _build_sample_briefs()
-        return jsonify({
-            "briefs": [s["brief"] for s in samples],
-            "names": [s["name"] for s in samples],
-        })
+        return jsonify(
+            {
+                "briefs": [s["brief"] for s in samples],
+                "names": [s["name"] for s in samples],
+            }
+        )
 
     # -- API: Submit brief (Stage 1) ---------------------------------------
 
@@ -833,12 +867,14 @@ def _register_routes(
 
         campaign = campaign_store.get_campaign(campaign_id)
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "status": campaign["status"].lower() if campaign else "draft",
-            "campaign_name": campaign["campaign_name"] if campaign else "",
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "status": campaign["status"].lower() if campaign else "draft",
+                "campaign_name": campaign["campaign_name"] if campaign else "",
+            }
+        )
 
     # -- API: Get campaign state -------------------------------------------
 
@@ -851,8 +887,14 @@ def _register_routes(
 
         # Parse JSON fields for the response
         result = dict(campaign)
-        for field in ("channels", "target_audience", "kpis", "approval_config",
-                      "target_geo", "brand_safety"):
+        for field in (
+            "channels",
+            "target_audience",
+            "kpis",
+            "approval_config",
+            "target_geo",
+            "brand_safety",
+        ):
             if result.get(field) and isinstance(result[field], str):
                 try:
                     result[field] = json.loads(result[field])
@@ -880,11 +922,13 @@ def _register_routes(
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "plan": plan,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "plan": plan,
+            }
+        )
 
     # -- API: Approve booking (Stage 3) ------------------------------------
 
@@ -904,11 +948,13 @@ def _register_routes(
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "deals": deals,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "deals": deals,
+            }
+        )
 
     # -- API: Approve creative (Stage 4) -----------------------------------
 
@@ -929,12 +975,14 @@ def _register_routes(
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "status": "ready",
-            "creatives": creatives,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "status": "ready",
+                "creatives": creatives,
+            }
+        )
 
     # -- API: Activate campaign (Stage 6) ----------------------------------
 
@@ -961,12 +1009,8 @@ def _register_routes(
             "expected_spend": snapshot.expected_spend,
             "pacing_pct": snapshot.pacing_pct,
             "deviation_pct": snapshot.deviation_pct,
-            "channel_snapshots": [
-                ch.model_dump() for ch in snapshot.channel_snapshots
-            ],
-            "deal_snapshots": [
-                ds.model_dump() for ds in snapshot.deal_snapshots
-            ],
+            "channel_snapshots": [ch.model_dump() for ch in snapshot.channel_snapshots],
+            "deal_snapshots": [ds.model_dump() for ds in snapshot.deal_snapshots],
             "alerts": [
                 {
                     "level": alert.level.value if hasattr(alert.level, "value") else alert.level,
@@ -976,17 +1020,17 @@ def _register_routes(
                 }
                 for alert in _extract_alerts(snapshot)
             ],
-            "recommendations": [
-                rec.model_dump() for rec in snapshot.recommendations
-            ],
+            "recommendations": [rec.model_dump() for rec in snapshot.recommendations],
         }
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "status": "active",
-            "pacing": pacing_data,
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "status": "active",
+                "pacing": pacing_data,
+            }
+        )
 
     # -- API: Pause campaign (Stage 6 control) -----------------------------
 
@@ -1009,11 +1053,13 @@ def _register_routes(
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "status": "paused",
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "status": "paused",
+            }
+        )
 
     # -- API: Resume campaign (Stage 6 control) ----------------------------
 
@@ -1036,11 +1082,13 @@ def _register_routes(
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "status": "active",
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "status": "active",
+            }
+        )
 
     # -- API: Complete campaign (Stage 6 control) --------------------------
 
@@ -1063,11 +1111,13 @@ def _register_routes(
         except Exception as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
-        return jsonify({
-            "success": True,
-            "campaign_id": campaign_id,
-            "status": "completed",
-        })
+        return jsonify(
+            {
+                "success": True,
+                "campaign_id": campaign_id,
+                "status": "completed",
+            }
+        )
 
     # -- API: Campaign report (Stage 5) ------------------------------------
 
@@ -1080,60 +1130,64 @@ def _register_routes(
 
         try:
             report = reporter.full_report(campaign_id)
-            return jsonify({
-                "campaign_id": campaign_id,
-                "status_summary": report.status_summary._to_dict(),
-                "pacing_dashboard": report.pacing_dashboard._to_dict(),
-                "creative_performance": report.creative_performance._to_dict(),
-                "deal_report": report.deal_report._to_dict(),
-            })
+            return jsonify(
+                {
+                    "campaign_id": campaign_id,
+                    "status_summary": report.status_summary._to_dict(),
+                    "pacing_dashboard": report.pacing_dashboard._to_dict(),
+                    "creative_performance": report.creative_performance._to_dict(),
+                    "deal_report": report.deal_report._to_dict(),
+                }
+            )
         except Exception as exc:
             logger.warning("Report generation failed: %s", exc)
             # Fall back to basic campaign data
-            return jsonify({
-                "campaign_id": campaign_id,
-                "status_summary": {
+            return jsonify(
+                {
                     "campaign_id": campaign_id,
-                    "campaign_name": campaign["campaign_name"],
-                    "advertiser_id": campaign["advertiser_id"],
-                    "status": campaign["status"].lower(),
-                    "total_budget": campaign["total_budget"],
-                    "currency": campaign.get("currency", "USD"),
-                    "total_spend": 0.0,
-                    "delivery_pct": 0.0,
-                    "pacing_pct": 0.0,
-                    "flight_start": campaign["flight_start"],
-                    "flight_end": campaign["flight_end"],
-                    "channels": [],
-                },
-                "pacing_dashboard": {
-                    "campaign_id": campaign_id,
-                    "total_budget": campaign["total_budget"],
-                    "total_spend": 0.0,
-                    "expected_spend": 0.0,
-                    "pacing_pct": 0.0,
-                    "deviation_pct": 0.0,
-                    "channel_pacing": [],
-                    "alerts": [],
-                },
-                "creative_performance": {
-                    "campaign_id": campaign_id,
-                    "creatives": [],
-                    "total_assets": 0,
-                    "valid_assets": 0,
-                    "pending_assets": 0,
-                    "invalid_assets": 0,
-                },
-                "deal_report": {
-                    "campaign_id": campaign_id,
-                    "deals": [],
-                    "total_deals": 0,
-                    "total_spend": 0.0,
-                    "total_impressions": 0,
-                    "avg_fill_rate": 0.0,
-                    "avg_win_rate": 0.0,
-                },
-            })
+                    "status_summary": {
+                        "campaign_id": campaign_id,
+                        "campaign_name": campaign["campaign_name"],
+                        "advertiser_id": campaign["advertiser_id"],
+                        "status": campaign["status"].lower(),
+                        "total_budget": campaign["total_budget"],
+                        "currency": campaign.get("currency", "USD"),
+                        "total_spend": 0.0,
+                        "delivery_pct": 0.0,
+                        "pacing_pct": 0.0,
+                        "flight_start": campaign["flight_start"],
+                        "flight_end": campaign["flight_end"],
+                        "channels": [],
+                    },
+                    "pacing_dashboard": {
+                        "campaign_id": campaign_id,
+                        "total_budget": campaign["total_budget"],
+                        "total_spend": 0.0,
+                        "expected_spend": 0.0,
+                        "pacing_pct": 0.0,
+                        "deviation_pct": 0.0,
+                        "channel_pacing": [],
+                        "alerts": [],
+                    },
+                    "creative_performance": {
+                        "campaign_id": campaign_id,
+                        "creatives": [],
+                        "total_assets": 0,
+                        "valid_assets": 0,
+                        "pending_assets": 0,
+                        "invalid_assets": 0,
+                    },
+                    "deal_report": {
+                        "campaign_id": campaign_id,
+                        "deals": [],
+                        "total_deals": 0,
+                        "total_spend": 0.0,
+                        "total_impressions": 0,
+                        "avg_fill_rate": 0.0,
+                        "avg_win_rate": 0.0,
+                    },
+                }
+            )
 
     # -- API: Events -------------------------------------------------------
 
@@ -1147,19 +1201,21 @@ def _register_routes(
         if campaign_id:
             events = [e for e in events if e.campaign_id == campaign_id]
 
-        return jsonify({
-            "events": [
-                {
-                    "event_id": e.event_id,
-                    "event_type": e.event_type.value,
-                    "campaign_id": e.campaign_id,
-                    "timestamp": e.timestamp.isoformat() if e.timestamp else "",
-                    "payload": e.payload,
-                }
-                for e in events
-            ],
-            "count": len(events),
-        })
+        return jsonify(
+            {
+                "events": [
+                    {
+                        "event_id": e.event_id,
+                        "event_type": e.event_type.value,
+                        "campaign_id": e.campaign_id,
+                        "timestamp": e.timestamp.isoformat() if e.timestamp else "",
+                        "payload": e.payload,
+                    }
+                    for e in events
+                ],
+                "count": len(events),
+            }
+        )
 
     # -- API: List campaigns -----------------------------------------------
 
@@ -1167,18 +1223,20 @@ def _register_routes(
     def api_list_campaigns():
         """List all campaigns."""
         campaigns = campaign_store.list_campaigns(limit=50)
-        return jsonify({
-            "campaigns": [
-                {
-                    "campaign_id": c["campaign_id"],
-                    "campaign_name": c["campaign_name"],
-                    "status": c["status"].lower(),
-                    "total_budget": c["total_budget"],
-                    "advertiser_id": c["advertiser_id"],
-                }
-                for c in campaigns
-            ],
-        })
+        return jsonify(
+            {
+                "campaigns": [
+                    {
+                        "campaign_id": c["campaign_id"],
+                        "campaign_name": c["campaign_name"],
+                        "status": c["status"].lower(),
+                        "total_budget": c["total_budget"],
+                        "advertiser_id": c["advertiser_id"],
+                    }
+                    for c in campaigns
+                ],
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1190,9 +1248,7 @@ def main() -> None:
     """Run the campaign demo development server."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    db_path = os.environ.get(
-        "CAMPAIGN_DEMO_DB", "sqlite:///campaign_demo.db"
-    )
+    db_path = os.environ.get("CAMPAIGN_DEMO_DB", "sqlite:///campaign_demo.db")
     app = create_campaign_demo_app(database_url=db_path)
 
     port = int(os.environ.get("CAMPAIGN_DEMO_PORT", "5055"))

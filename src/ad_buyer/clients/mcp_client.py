@@ -4,8 +4,8 @@
 """MCP client for IAB agentic-direct server using Streamable HTTP transport."""
 
 import json
-from dataclasses import dataclass, field
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -13,6 +13,7 @@ import httpx
 try:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
+
     MCP_SDK_AVAILABLE = True
 except ImportError:
     MCP_SDK_AVAILABLE = False
@@ -86,9 +87,17 @@ class SimpleMCPClient:
         # Final fallback: assume standard OpenDirect tools
         if not self._tools:
             standard_tools = [
-                "list_products", "get_product", "list_accounts", "create_account",
-                "list_orders", "create_order", "list_lines", "create_line",
-                "get_pricing", "book_programmatic_guaranteed", "create_pmp_deal",
+                "list_products",
+                "get_product",
+                "list_accounts",
+                "create_account",
+                "list_orders",
+                "create_order",
+                "list_lines",
+                "create_line",
+                "get_pricing",
+                "book_programmatic_guaranteed",
+                "create_pmp_deal",
             ]
             for name in standard_tools:
                 self._tools[name] = {"name": name}
@@ -178,7 +187,7 @@ class IABMCPClient:
         self.base_url = base_url.rstrip("/")
         self.mcp_url = f"{self.base_url}/mcp/sse"
         self._tools: dict[str, dict] = {}
-        self._session: Optional[ClientSession] = None
+        self._session: ClientSession | None = None
         self._client_ctx = None
         self._read_stream = None
         self._write_stream = None
@@ -231,7 +240,7 @@ class IABMCPClient:
         return self._tools
 
     @property
-    def session_id(self) -> Optional[str]:
+    def session_id(self) -> str | None:
         """Get the current session ID."""
         if self._get_session_id:
             return self._get_session_id()

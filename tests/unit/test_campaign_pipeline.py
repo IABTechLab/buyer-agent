@@ -11,33 +11,31 @@ import asyncio
 import json
 import uuid
 from datetime import date, timedelta
-from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-# We'll import the module under test once it exists.
-# For now these imports define the expected API.
-from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline, CampaignPlan, ChannelPlan
+from ad_buyer.events.bus import InMemoryEventBus
+from ad_buyer.events.models import EventType
 from ad_buyer.models.campaign_brief import (
-    CampaignBrief,
     ChannelType,
-    parse_campaign_brief,
 )
 from ad_buyer.models.state_machine import CampaignStatus
-from ad_buyer.events.models import Event, EventType
-from ad_buyer.events.bus import InMemoryEventBus
 from ad_buyer.orchestration.multi_seller import (
     DealSelection,
     MultiSellerOrchestrator,
     OrchestrationResult,
 )
-from ad_buyer.storage.campaign_store import CampaignStore
 
+# We'll import the module under test once it exists.
+# For now these imports define the expected API.
+from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline, CampaignPlan
 
 # ---------------------------------------------------------------------------
 # Helpers / Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_brief_dict(**overrides: Any) -> dict[str, Any]:
     """Return a valid campaign brief dict for testing."""
@@ -99,7 +97,7 @@ class FakeCampaignStore:
         }
         return campaign_id
 
-    def get_campaign(self, campaign_id: str) -> Optional[dict[str, Any]]:
+    def get_campaign(self, campaign_id: str) -> dict[str, Any] | None:
         return self._campaigns.get(campaign_id)
 
     def start_planning(self, campaign_id: str) -> None:
@@ -179,6 +177,7 @@ def pipeline(fake_store, mock_orchestrator, event_bus) -> CampaignPipeline:
 # Tests: ingest_brief
 # ---------------------------------------------------------------------------
 
+
 class TestIngestBrief:
     """Test CampaignPipeline.ingest_brief()."""
 
@@ -212,9 +211,7 @@ class TestIngestBrief:
 
     def test_ingest_brief_emits_campaign_created_event(self, pipeline, event_bus):
         """ingest_brief should emit a CAMPAIGN_CREATED event."""
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.ingest_brief(_make_brief_json())
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.ingest_brief(_make_brief_json()))
         events = asyncio.get_event_loop().run_until_complete(
             event_bus.list_events(event_type=EventType.CAMPAIGN_CREATED.value)
         )
@@ -234,6 +231,7 @@ class TestIngestBrief:
 # Tests: plan_campaign
 # ---------------------------------------------------------------------------
 
+
 class TestPlanCampaign:
     """Test CampaignPipeline.plan_campaign()."""
 
@@ -242,9 +240,7 @@ class TestPlanCampaign:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        plan = asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
+        plan = asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
         campaign = fake_store.get_campaign(campaign_id)
         assert campaign["status"] == CampaignStatus.PLANNING.value
 
@@ -253,9 +249,7 @@ class TestPlanCampaign:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        plan = asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
+        plan = asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
         assert isinstance(plan, CampaignPlan)
         assert len(plan.channel_plans) == 2  # CTV and DISPLAY
 
@@ -264,9 +258,7 @@ class TestPlanCampaign:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        plan = asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
+        plan = asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
         ctv_plan = next(cp for cp in plan.channel_plans if cp.channel == ChannelType.CTV)
         display_plan = next(cp for cp in plan.channel_plans if cp.channel == ChannelType.DISPLAY)
         assert ctv_plan.budget == 60_000.0  # 60% of 100k
@@ -277,9 +269,7 @@ class TestPlanCampaign:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
         events = asyncio.get_event_loop().run_until_complete(
             event_bus.list_events(event_type=EventType.CAMPAIGN_PLAN_GENERATED.value)
         )
@@ -288,14 +278,13 @@ class TestPlanCampaign:
     def test_plan_campaign_not_found_raises(self, pipeline):
         """plan_campaign for a non-existent campaign should raise KeyError."""
         with pytest.raises(KeyError):
-            asyncio.get_event_loop().run_until_complete(
-                pipeline.plan_campaign("nonexistent-id")
-            )
+            asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign("nonexistent-id"))
 
 
 # ---------------------------------------------------------------------------
 # Tests: execute_booking
 # ---------------------------------------------------------------------------
+
 
 class TestExecuteBooking:
     """Test CampaignPipeline.execute_booking()."""
@@ -305,12 +294,8 @@ class TestExecuteBooking:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        result = asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        result = asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
         campaign = fake_store.get_campaign(campaign_id)
         assert campaign["status"] == CampaignStatus.BOOKING.value
 
@@ -319,12 +304,8 @@ class TestExecuteBooking:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
         # Should have been called once per channel (2 channels: CTV, DISPLAY)
         assert mock_orchestrator.orchestrate.call_count == 2
 
@@ -333,12 +314,8 @@ class TestExecuteBooking:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        result = asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        result = asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
         assert isinstance(result, dict)
         assert len(result) == 2  # CTV and DISPLAY channels
 
@@ -347,12 +324,8 @@ class TestExecuteBooking:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
         events = asyncio.get_event_loop().run_until_complete(
             event_bus.list_events(event_type=EventType.CAMPAIGN_BOOKING_STARTED.value)
         )
@@ -363,12 +336,8 @@ class TestExecuteBooking:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
         events = asyncio.get_event_loop().run_until_complete(
             event_bus.list_events(event_type=EventType.CAMPAIGN_BOOKING_COMPLETED.value)
         )
@@ -377,14 +346,13 @@ class TestExecuteBooking:
     def test_booking_not_found_raises(self, pipeline):
         """execute_booking for a non-existent campaign should raise KeyError."""
         with pytest.raises(KeyError):
-            asyncio.get_event_loop().run_until_complete(
-                pipeline.execute_booking("nonexistent-id")
-            )
+            asyncio.get_event_loop().run_until_complete(pipeline.execute_booking("nonexistent-id"))
 
 
 # ---------------------------------------------------------------------------
 # Tests: finalize
 # ---------------------------------------------------------------------------
+
 
 class TestFinalize:
     """Test CampaignPipeline.finalize()."""
@@ -394,15 +362,9 @@ class TestFinalize:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.finalize(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.finalize(campaign_id))
         campaign = fake_store.get_campaign(campaign_id)
         assert campaign["status"] == CampaignStatus.READY.value
 
@@ -411,15 +373,9 @@ class TestFinalize:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.plan_campaign(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.execute_booking(campaign_id)
-        )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.finalize(campaign_id)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.finalize(campaign_id))
         events = asyncio.get_event_loop().run_until_complete(
             event_bus.list_events(event_type=EventType.CAMPAIGN_READY.value)
         )
@@ -428,50 +384,39 @@ class TestFinalize:
     def test_finalize_not_found_raises(self, pipeline):
         """finalize for non-existent campaign should raise KeyError."""
         with pytest.raises(KeyError):
-            asyncio.get_event_loop().run_until_complete(
-                pipeline.finalize("nonexistent-id")
-            )
+            asyncio.get_event_loop().run_until_complete(pipeline.finalize("nonexistent-id"))
 
 
 # ---------------------------------------------------------------------------
 # Tests: run (end-to-end)
 # ---------------------------------------------------------------------------
 
+
 class TestRunEndToEnd:
     """Test CampaignPipeline.run() end-to-end."""
 
     def test_run_returns_campaign_summary(self, pipeline, fake_store):
         """run should return a summary dict with campaign_id and status."""
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(_make_brief_json())
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(_make_brief_json()))
         assert "campaign_id" in summary
         assert summary["status"] == CampaignStatus.READY.value
 
     def test_run_goes_through_all_states(self, pipeline, fake_store):
         """run should transition DRAFT -> PLANNING -> BOOKING -> READY."""
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(_make_brief_json())
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(_make_brief_json()))
         campaign = fake_store.get_campaign(summary["campaign_id"])
         assert campaign["status"] == CampaignStatus.READY.value
 
     def test_run_includes_booked_deals(self, pipeline):
         """run summary should include booked deal info."""
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(_make_brief_json())
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(_make_brief_json()))
         assert "channels" in summary
         assert len(summary["channels"]) == 2  # CTV and DISPLAY
 
     def test_run_emits_all_lifecycle_events(self, pipeline, event_bus):
         """run should emit created, plan, booking_started, booking_completed, ready."""
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.run(_make_brief_json())
-        )
-        all_events = asyncio.get_event_loop().run_until_complete(
-            event_bus.list_events()
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.run(_make_brief_json()))
+        all_events = asyncio.get_event_loop().run_until_complete(event_bus.list_events())
         event_types = [e.event_type for e in all_events]
         assert EventType.CAMPAIGN_CREATED in event_types
         assert EventType.CAMPAIGN_PLAN_GENERATED in event_types
@@ -484,9 +429,7 @@ class TestRunEndToEnd:
         brief = _make_brief_dict(
             channels=[{"channel": "AUDIO", "budget_pct": 100}],
         )
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(brief)
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(brief))
         assert summary["status"] == CampaignStatus.READY.value
         assert mock_orchestrator.orchestrate.call_count == 1
 
@@ -499,23 +442,20 @@ class TestRunEndToEnd:
                 {"channel": "AUDIO", "budget_pct": 20},
             ],
         )
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(brief)
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(brief))
         assert summary["status"] == CampaignStatus.READY.value
         assert mock_orchestrator.orchestrate.call_count == 3
 
     def test_run_invalid_brief_raises(self, pipeline):
         """run should raise on an invalid brief."""
         with pytest.raises((ValueError, Exception)):
-            asyncio.get_event_loop().run_until_complete(
-                pipeline.run('{"bad": "data"}')
-            )
+            asyncio.get_event_loop().run_until_complete(pipeline.run('{"bad": "data"}'))
 
 
 # ---------------------------------------------------------------------------
 # Tests: Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
     """Test edge cases and error handling."""
@@ -523,11 +463,11 @@ class TestEdgeCases:
     def test_orchestrator_returns_no_deals(self, pipeline, fake_store, mock_orchestrator):
         """Pipeline should still finalize even if no deals are booked."""
         mock_orchestrator.orchestrate.return_value = _make_orchestration_result(
-            num_deals=0, total_spend=0, remaining_budget=60_000.0,
+            num_deals=0,
+            total_spend=0,
+            remaining_budget=60_000.0,
         )
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(_make_brief_json())
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(_make_brief_json()))
         # Pipeline still completes to READY even with no deals
         assert summary["status"] == CampaignStatus.READY.value
 
@@ -545,9 +485,7 @@ class TestEdgeCases:
                 raise RuntimeError("Seller unavailable")
 
         mock_orchestrator.orchestrate.side_effect = _side_effect
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(_make_brief_json())
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(_make_brief_json()))
         # Should still reach READY with partial results
         assert summary["status"] == CampaignStatus.READY.value
 
@@ -556,12 +494,15 @@ class TestEdgeCases:
         brief = _make_brief_dict(
             channels=[{"channel": "CTV", "budget_pct": 100}],
         )
-        asyncio.get_event_loop().run_until_complete(
-            pipeline.run(brief)
-        )
+        asyncio.get_event_loop().run_until_complete(pipeline.run(brief))
         call_args = mock_orchestrator.orchestrate.call_args
         # The inventory_requirements should have media_type derived from CTV
-        inv_req = call_args.kwargs.get("inventory_requirements") or call_args[1].get("inventory_requirements") if len(call_args) > 1 else None
+        inv_req = (
+            call_args.kwargs.get("inventory_requirements")
+            or call_args[1].get("inventory_requirements")
+            if len(call_args) > 1
+            else None
+        )
         if inv_req is None and call_args.args:
             inv_req = call_args.args[0]
         # Accept either keyword or positional form
@@ -573,9 +514,7 @@ class TestEdgeCases:
             preferred_sellers=["seller-a", "seller-b"],
             excluded_sellers=["seller-x"],
         )
-        summary = asyncio.get_event_loop().run_until_complete(
-            pipeline.run(brief)
-        )
+        summary = asyncio.get_event_loop().run_until_complete(pipeline.run(brief))
         campaign = fake_store.get_campaign(summary["campaign_id"])
         assert campaign is not None
         assert campaign["advertiser_id"] == "adv-001"

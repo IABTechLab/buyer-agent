@@ -5,7 +5,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -40,14 +40,14 @@ class ProductRecommendation(BaseModel):
     product_name: str = Field(..., alias="productName")
     publisher: str
     channel: str
-    format: Optional[str] = None
+    format: str | None = None
     impressions: int = Field(..., ge=0)
     cpm: float = Field(..., ge=0)
     cost: float = Field(..., ge=0)
-    targeting: Optional[dict[str, Any]] = None
+    targeting: dict[str, Any] | None = None
     priority: int = Field(default=0, ge=0)
     status: str = Field(default="pending")
-    rationale: Optional[str] = None
+    rationale: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -78,8 +78,8 @@ class CampaignBrief(BaseModel):
     end_date: str = Field(..., alias="endDate")
     target_audience: dict[str, Any] = Field(..., alias="targetAudience")
     kpis: dict[str, Any] = Field(default_factory=dict)
-    channels: Optional[list[str]] = None
-    constraints: Optional[dict[str, Any]] = None
+    channels: list[str] | None = None
+    constraints: dict[str, Any] | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -91,7 +91,7 @@ class BookingState(BaseModel):
     campaign_brief: dict[str, Any] = Field(default_factory=dict, alias="campaignBrief")
 
     # Audience planning (added for UCP integration)
-    audience_plan: Optional[dict[str, Any]] = Field(
+    audience_plan: dict[str, Any] | None = Field(
         default=None,
         alias="audiencePlan",
         description="Audience plan from Audience Planner Agent",

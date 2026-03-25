@@ -3,18 +3,13 @@
 
 """Tests for client-side API key authentication (outbound to sellers)."""
 
-import json
-import os
-import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
 from ad_buyer.auth.key_store import ApiKeyStore
 from ad_buyer.auth.middleware import AuthMiddleware
-
 
 # ---------------------------------------------------------------------------
 # ApiKeyStore tests

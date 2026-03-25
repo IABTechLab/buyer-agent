@@ -9,25 +9,20 @@ trust verification, and error propagation across module boundaries.
 """
 
 import time
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
-from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
+from ad_buyer.clients.unified_client import Protocol, UnifiedClient
 from ad_buyer.models.buyer_identity import (
-    AccessTier,
-    BuyerContext,
     BuyerIdentity,
-    DealType,
 )
 from ad_buyer.registry.cache import SellerCache
 from ad_buyer.registry.client import RegistryClient
 from ad_buyer.registry.models import (
     AgentCapability,
     AgentCard,
-    AgentTrustInfo,
     TrustLevel,
 )
 

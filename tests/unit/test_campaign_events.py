@@ -15,7 +15,6 @@ import json
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # EventType enum tests -- campaign.* events
 # ---------------------------------------------------------------------------
@@ -64,9 +63,7 @@ class TestCampaignEventTypes:
         from ad_buyer.events.models import EventType
 
         assert hasattr(EventType, "CAMPAIGN_BOOKING_COMPLETED")
-        assert (
-            EventType.CAMPAIGN_BOOKING_COMPLETED.value == "campaign.booking_completed"
-        )
+        assert EventType.CAMPAIGN_BOOKING_COMPLETED.value == "campaign.booking_completed"
 
     def test_campaign_ready_exists(self):
         """CAMPAIGN_READY event type must exist with correct value."""
@@ -151,29 +148,21 @@ class TestPacingEventTypes:
         from ad_buyer.events.models import EventType
 
         assert hasattr(EventType, "PACING_DEVIATION_DETECTED")
-        assert (
-            EventType.PACING_DEVIATION_DETECTED.value == "pacing.deviation_detected"
-        )
+        assert EventType.PACING_DEVIATION_DETECTED.value == "pacing.deviation_detected"
 
     def test_pacing_reallocation_recommended_exists(self):
         """PACING_REALLOCATION_RECOMMENDED event type must exist."""
         from ad_buyer.events.models import EventType
 
         assert hasattr(EventType, "PACING_REALLOCATION_RECOMMENDED")
-        assert (
-            EventType.PACING_REALLOCATION_RECOMMENDED.value
-            == "pacing.reallocation_recommended"
-        )
+        assert EventType.PACING_REALLOCATION_RECOMMENDED.value == "pacing.reallocation_recommended"
 
     def test_pacing_reallocation_applied_exists(self):
         """PACING_REALLOCATION_APPLIED event type must exist."""
         from ad_buyer.events.models import EventType
 
         assert hasattr(EventType, "PACING_REALLOCATION_APPLIED")
-        assert (
-            EventType.PACING_REALLOCATION_APPLIED.value
-            == "pacing.reallocation_applied"
-        )
+        assert EventType.PACING_REALLOCATION_APPLIED.value == "pacing.reallocation_applied"
 
     def test_all_pacing_types_in_enum(self):
         """All pacing.* event types must be in EventType."""
@@ -233,18 +222,14 @@ class TestCreativeEventTypes:
         from ad_buyer.events.models import EventType
 
         assert hasattr(EventType, "CREATIVE_ROTATION_UPDATED")
-        assert (
-            EventType.CREATIVE_ROTATION_UPDATED.value == "creative.rotation_updated"
-        )
+        assert EventType.CREATIVE_ROTATION_UPDATED.value == "creative.rotation_updated"
 
     def test_creative_ad_server_pushed_exists(self):
         """CREATIVE_AD_SERVER_PUSHED event type must exist with correct value."""
         from ad_buyer.events.models import EventType
 
         assert hasattr(EventType, "CREATIVE_AD_SERVER_PUSHED")
-        assert (
-            EventType.CREATIVE_AD_SERVER_PUSHED.value == "creative.ad_server_pushed"
-        )
+        assert EventType.CREATIVE_AD_SERVER_PUSHED.value == "creative.ad_server_pushed"
 
     def test_all_creative_types_in_enum(self):
         """All creative.* event types must be in EventType."""
@@ -714,9 +699,7 @@ class TestCampaignAutomationEventBus:
 
         received = []
         asyncio.get_event_loop().run_until_complete(
-            bus.subscribe(
-                "pacing.reallocation_recommended", lambda e: received.append(e)
-            )
+            bus.subscribe("pacing.reallocation_recommended", lambda e: received.append(e))
         )
 
         event = Event(
@@ -737,9 +720,7 @@ class TestCampaignAutomationEventBus:
             bus.subscribe("creative.matched", lambda e: received.append(e))
         )
 
-        event = Event(
-            event_type=EventType.CREATIVE_MATCHED, campaign_id="camp-512"
-        )
+        event = Event(event_type=EventType.CREATIVE_MATCHED, campaign_id="camp-512")
         asyncio.get_event_loop().run_until_complete(bus.publish(event))
 
         assert len(received) == 1
@@ -832,10 +813,12 @@ class TestCampaignAutomationEventPersistence:
         """pacing.snapshot_taken event should be persistable via DealStore."""
         event_id = store.save_event(
             event_type="pacing.snapshot_taken",
-            payload=json.dumps({
-                "campaign_id": "camp-601",
-                "pacing_pct": 95.0,
-            }),
+            payload=json.dumps(
+                {
+                    "campaign_id": "camp-601",
+                    "pacing_pct": 95.0,
+                }
+            ),
         )
         assert event_id
 
@@ -847,10 +830,12 @@ class TestCampaignAutomationEventPersistence:
         """creative.validated event should be persistable via DealStore."""
         event_id = store.save_event(
             event_type="creative.validated",
-            payload=json.dumps({
-                "creative_id": "cr-20",
-                "valid": True,
-            }),
+            payload=json.dumps(
+                {
+                    "creative_id": "cr-20",
+                    "valid": True,
+                }
+            ),
         )
         assert event_id
 
@@ -889,10 +874,9 @@ class TestCampaignAutomationEmitEvent:
 
     def test_emit_campaign_ready(self):
         """emit_event should handle CAMPAIGN_READY type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -909,10 +893,9 @@ class TestCampaignAutomationEmitEvent:
 
     def test_emit_pacing_deviation_detected(self):
         """emit_event should handle PACING_DEVIATION_DETECTED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -929,10 +912,9 @@ class TestCampaignAutomationEmitEvent:
 
     def test_emit_creative_matched(self):
         """emit_event should handle CREATIVE_MATCHED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -951,10 +933,9 @@ class TestCampaignAutomationEmitEvent:
 
     def test_emit_sync_campaign_activated(self):
         """emit_event_sync should handle CAMPAIGN_ACTIVATED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event_sync
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -969,10 +950,9 @@ class TestCampaignAutomationEmitEvent:
 
     def test_emit_sync_pacing_reallocation_applied(self):
         """emit_event_sync should handle PACING_REALLOCATION_APPLIED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event_sync
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 

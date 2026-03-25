@@ -25,17 +25,16 @@ import logging
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from ..models.state_machine import (
     CampaignAutomationStateMachine,
     CampaignStatus,
-    InvalidTransitionError,
 )
 from .schema import (
-    APPROVAL_REQUESTS_TABLE,
     APPROVAL_REQUESTS_INDEXES,
+    APPROVAL_REQUESTS_TABLE,
     initialize_schema,
 )
 
@@ -44,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 def _now_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 class CampaignStore:
@@ -61,7 +60,7 @@ class CampaignStore:
     def __init__(self, database_url: str) -> None:
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
-        self._conn: Optional[sqlite3.Connection] = None
+        self._conn: sqlite3.Connection | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -90,7 +89,7 @@ class CampaignStore:
         Supports ``sqlite:///path`` and ``sqlite:///:memory:`` formats.
         """
         if url.startswith("sqlite:///"):
-            return url[len("sqlite:///"):]
+            return url[len("sqlite:///") :]
         return url
 
     def _create_campaign_events_table(self) -> None:
@@ -112,8 +111,7 @@ class CampaignStore:
             "ON campaign_events(campaign_id)"
         )
         self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_campaign_events_timestamp "
-            "ON campaign_events(timestamp)"
+            "CREATE INDEX IF NOT EXISTS idx_campaign_events_timestamp ON campaign_events(timestamp)"
         )
         self._conn.commit()
 
@@ -121,9 +119,9 @@ class CampaignStore:
         self,
         campaign_id: str,
         event_type: str,
-        from_status: Optional[str] = None,
-        to_status: Optional[str] = None,
-        payload: Optional[str] = None,
+        from_status: str | None = None,
+        to_status: str | None = None,
+        payload: str | None = None,
     ) -> str:
         """Record a campaign lifecycle event.
 
@@ -146,8 +144,7 @@ class CampaignStore:
                    (event_id, campaign_id, event_type, timestamp,
                     from_status, to_status, payload)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (event_id, campaign_id, event_type, now,
-                 from_status, to_status, payload or "{}"),
+                (event_id, campaign_id, event_type, now, from_status, to_status, payload or "{}"),
             )
             self._conn.commit()
 
@@ -391,7 +388,7 @@ class CampaignStore:
     def save_campaign(
         self,
         *,
-        campaign_id: Optional[str] = None,
+        campaign_id: str | None = None,
         advertiser_id: str,
         campaign_name: str,
         status: str = "DRAFT",
@@ -399,12 +396,12 @@ class CampaignStore:
         currency: str = "USD",
         flight_start: str,
         flight_end: str,
-        channels: Optional[str] = None,
-        target_audience: Optional[str] = None,
-        target_geo: Optional[str] = None,
-        kpis: Optional[str] = None,
-        brand_safety: Optional[str] = None,
-        approval_config: Optional[str] = None,
+        channels: str | None = None,
+        target_audience: str | None = None,
+        target_geo: str | None = None,
+        kpis: str | None = None,
+        brand_safety: str | None = None,
+        approval_config: str | None = None,
     ) -> str:
         """Insert a new campaign record.
 
@@ -440,17 +437,29 @@ class CampaignStore:
                     brand_safety, approval_config, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    campaign_id, advertiser_id, campaign_name, status,
-                    total_budget, currency, flight_start, flight_end,
-                    channels, target_audience, target_geo, kpis,
-                    brand_safety, approval_config, now, now,
+                    campaign_id,
+                    advertiser_id,
+                    campaign_name,
+                    status,
+                    total_budget,
+                    currency,
+                    flight_start,
+                    flight_end,
+                    channels,
+                    target_audience,
+                    target_geo,
+                    kpis,
+                    brand_safety,
+                    approval_config,
+                    now,
+                    now,
                 ),
             )
             self._conn.commit()
 
         return campaign_id
 
-    def get_campaign(self, campaign_id: str) -> Optional[dict[str, Any]]:
+    def get_campaign(self, campaign_id: str) -> dict[str, Any] | None:
         """Retrieve a campaign by ID.
 
         Args:
@@ -470,8 +479,8 @@ class CampaignStore:
     def list_campaigns(
         self,
         *,
-        status: Optional[str] = None,
-        advertiser_id: Optional[str] = None,
+        status: str | None = None,
+        advertiser_id: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """List campaigns with optional filters.
@@ -554,9 +563,18 @@ class CampaignStore:
             True if the campaign was found and updated, False otherwise.
         """
         allowed = {
-            "campaign_name", "status", "total_budget", "currency",
-            "flight_start", "flight_end", "channels", "target_audience",
-            "target_geo", "kpis", "brand_safety", "approval_config",
+            "campaign_name",
+            "status",
+            "total_budget",
+            "currency",
+            "flight_start",
+            "flight_end",
+            "channels",
+            "target_audience",
+            "target_geo",
+            "kpis",
+            "brand_safety",
+            "approval_config",
             "advertiser_id",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
@@ -592,7 +610,7 @@ class CampaignStore:
     def save_pacing_snapshot(
         self,
         *,
-        snapshot_id: Optional[str] = None,
+        snapshot_id: str | None = None,
         campaign_id: str,
         timestamp: str,
         total_budget: float = 0.0,
@@ -634,19 +652,24 @@ class CampaignStore:
                     channel_snapshots, deal_snapshots, recommendations
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    snapshot_id, campaign_id, timestamp,
-                    total_budget, total_spend, pacing_pct,
-                    expected_spend, deviation_pct,
-                    channel_snapshots, deal_snapshots, recommendations,
+                    snapshot_id,
+                    campaign_id,
+                    timestamp,
+                    total_budget,
+                    total_spend,
+                    pacing_pct,
+                    expected_spend,
+                    deviation_pct,
+                    channel_snapshots,
+                    deal_snapshots,
+                    recommendations,
                 ),
             )
             self._conn.commit()
 
         return snapshot_id
 
-    def get_pacing_snapshot(
-        self, snapshot_id: str
-    ) -> Optional[dict[str, Any]]:
+    def get_pacing_snapshot(self, snapshot_id: str) -> dict[str, Any] | None:
         """Retrieve a pacing snapshot by ID.
 
         Args:
@@ -678,7 +701,9 @@ class CampaignStore:
         Returns:
             List of snapshot dicts ordered by timestamp descending.
         """
-        query = "SELECT * FROM pacing_snapshots WHERE campaign_id = ? ORDER BY timestamp DESC LIMIT ?"
+        query = (
+            "SELECT * FROM pacing_snapshots WHERE campaign_id = ? ORDER BY timestamp DESC LIMIT ?"
+        )
         params: list[Any] = [campaign_id, limit]
 
         with self._lock:
@@ -693,14 +718,14 @@ class CampaignStore:
     def save_creative_asset(
         self,
         *,
-        asset_id: Optional[str] = None,
+        asset_id: str | None = None,
         campaign_id: str,
         asset_name: str,
         asset_type: str,
-        format_spec: Optional[str] = None,
-        source_url: Optional[str] = None,
-        validation_status: Optional[str] = None,
-        validation_errors: Optional[str] = None,
+        format_spec: str | None = None,
+        source_url: str | None = None,
+        validation_status: str | None = None,
+        validation_errors: str | None = None,
     ) -> str:
         """Insert a new creative asset.
 
@@ -723,10 +748,24 @@ class CampaignStore:
 
         # Build column list dynamically so that omitted optional fields
         # (e.g. validation_status) use the DB DEFAULT value.
-        columns = ["asset_id", "campaign_id", "asset_name", "asset_type",
-                    "format_spec", "source_url", "created_at"]
-        values: list[Any] = [asset_id, campaign_id, asset_name, asset_type,
-                             format_spec, source_url, now]
+        columns = [
+            "asset_id",
+            "campaign_id",
+            "asset_name",
+            "asset_type",
+            "format_spec",
+            "source_url",
+            "created_at",
+        ]
+        values: list[Any] = [
+            asset_id,
+            campaign_id,
+            asset_name,
+            asset_type,
+            format_spec,
+            source_url,
+            now,
+        ]
 
         if validation_status is not None:
             columns.append("validation_status")
@@ -747,9 +786,7 @@ class CampaignStore:
 
         return asset_id
 
-    def get_creative_asset(
-        self, asset_id: str
-    ) -> Optional[dict[str, Any]]:
+    def get_creative_asset(self, asset_id: str) -> dict[str, Any] | None:
         """Retrieve a creative asset by ID.
 
         Args:
@@ -770,7 +807,7 @@ class CampaignStore:
         self,
         *,
         campaign_id: str,
-        asset_type: Optional[str] = None,
+        asset_type: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """List creative assets for a campaign.
@@ -814,8 +851,12 @@ class CampaignStore:
             True if the asset was found and updated, False otherwise.
         """
         allowed = {
-            "asset_name", "asset_type", "format_spec", "source_url",
-            "validation_status", "validation_errors",
+            "asset_name",
+            "asset_type",
+            "format_spec",
+            "source_url",
+            "validation_status",
+            "validation_errors",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
@@ -847,13 +888,13 @@ class CampaignStore:
     def save_ad_server_campaign(
         self,
         *,
-        binding_id: Optional[str] = None,
+        binding_id: str | None = None,
         campaign_id: str,
         ad_server: str,
-        external_campaign_id: Optional[str] = None,
+        external_campaign_id: str | None = None,
         status: str = "PENDING",
-        creative_assignments: Optional[str] = None,
-        last_sync_at: Optional[str] = None,
+        creative_assignments: str | None = None,
+        last_sync_at: str | None = None,
     ) -> str:
         """Insert a new ad server campaign binding.
 
@@ -881,18 +922,21 @@ class CampaignStore:
                     creative_assignments, last_sync_at, created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    binding_id, campaign_id, ad_server,
-                    external_campaign_id, status,
-                    creative_assignments, last_sync_at, now,
+                    binding_id,
+                    campaign_id,
+                    ad_server,
+                    external_campaign_id,
+                    status,
+                    creative_assignments,
+                    last_sync_at,
+                    now,
                 ),
             )
             self._conn.commit()
 
         return binding_id
 
-    def get_ad_server_campaign(
-        self, binding_id: str
-    ) -> Optional[dict[str, Any]]:
+    def get_ad_server_campaign(self, binding_id: str) -> dict[str, Any] | None:
         """Retrieve an ad server campaign binding by ID.
 
         Args:
@@ -913,7 +957,7 @@ class CampaignStore:
         self,
         *,
         campaign_id: str,
-        ad_server: Optional[str] = None,
+        ad_server: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
         """List ad server campaign bindings for a campaign.
@@ -957,8 +1001,11 @@ class CampaignStore:
             True if the binding was found and updated, False otherwise.
         """
         allowed = {
-            "ad_server", "external_campaign_id", "status",
-            "creative_assignments", "last_sync_at",
+            "ad_server",
+            "external_campaign_id",
+            "status",
+            "creative_assignments",
+            "last_sync_at",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
@@ -1008,7 +1055,7 @@ class CampaignStore:
         stage: str,
         status: str,
         requested_at: str,
-        context: Optional[str] = None,
+        context: str | None = None,
     ) -> str:
         """Insert a new approval request.
 
@@ -1030,8 +1077,12 @@ class CampaignStore:
                     requested_at, context)
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (
-                    approval_request_id, campaign_id, stage, status,
-                    requested_at, context or "{}",
+                    approval_request_id,
+                    campaign_id,
+                    stage,
+                    status,
+                    requested_at,
+                    context or "{}",
                 ),
             )
             self._conn.commit()
@@ -1062,25 +1113,21 @@ class CampaignStore:
 
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT approval_request_id FROM approval_requests "
-                "WHERE approval_request_id = ?",
+                "SELECT approval_request_id FROM approval_requests WHERE approval_request_id = ?",
                 (approval_request_id,),
             )
             if cursor.fetchone() is None:
                 return False
 
             self._conn.execute(
-                f"UPDATE approval_requests SET {set_clause} "
-                f"WHERE approval_request_id = ?",
+                f"UPDATE approval_requests SET {set_clause} WHERE approval_request_id = ?",
                 values,
             )
             self._conn.commit()
 
         return True
 
-    def get_approval_request(
-        self, approval_request_id: str
-    ) -> Optional[dict[str, Any]]:
+    def get_approval_request(self, approval_request_id: str) -> dict[str, Any] | None:
         """Retrieve an approval request by ID.
 
         Args:
@@ -1091,8 +1138,7 @@ class CampaignStore:
         """
         with self._lock:
             cursor = self._conn.execute(
-                "SELECT * FROM approval_requests "
-                "WHERE approval_request_id = ?",
+                "SELECT * FROM approval_requests WHERE approval_request_id = ?",
                 (approval_request_id,),
             )
             row = cursor.fetchone()
@@ -1101,9 +1147,9 @@ class CampaignStore:
     def list_approval_requests(
         self,
         *,
-        campaign_id: Optional[str] = None,
-        stage: Optional[str] = None,
-        status: Optional[str] = None,
+        campaign_id: str | None = None,
+        stage: str | None = None,
+        status: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """List approval requests with optional filters.
@@ -1131,10 +1177,7 @@ class CampaignStore:
             params.append(status)
 
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
-        query = (
-            f"SELECT * FROM approval_requests {where} "
-            f"ORDER BY requested_at DESC LIMIT ?"
-        )
+        query = f"SELECT * FROM approval_requests {where} ORDER BY requested_at DESC LIMIT ?"
         params.append(limit)
 
         with self._lock:

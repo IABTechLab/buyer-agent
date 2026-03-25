@@ -4,7 +4,7 @@
 """Simple mock OpenDirect REST server for testing."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -278,7 +278,7 @@ def get_line_stats(account_id: str, order_id: str, line_id: str):
         "vcr": 78.5,
         "viewability": 72.3,
         "ctr": 0.08,
-        "lastUpdated": datetime.utcnow().isoformat(),
+        "lastUpdated": datetime.now(timezone.utc).isoformat(),
     }
 
 

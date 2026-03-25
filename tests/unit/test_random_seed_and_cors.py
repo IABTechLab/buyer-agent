@@ -5,9 +5,6 @@
 
 import random
 
-import pytest
-from unittest.mock import patch, MagicMock
-
 from ad_buyer.config.settings import Settings
 
 
@@ -38,9 +35,7 @@ class TestSyntheticEmbeddingRandomIsolation:
 
         # Global state should still yield the same value
         after = random.random()
-        assert before == after, (
-            "_generate_synthetic_embedding mutated global random state"
-        )
+        assert before == after, "_generate_synthetic_embedding mutated global random state"
 
     def test_deterministic_output(self):
         """Same inputs should produce the same embedding."""

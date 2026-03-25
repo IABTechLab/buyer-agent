@@ -12,6 +12,12 @@ Tests written first (TDD) per bead buyer-6io.
 
 import pytest
 
+from ad_buyer.models.deals import (
+    PricingInfo,
+    QuoteRequest,
+    QuoteResponse,
+    TermsInfo,
+)
 from ad_buyer.models.linear_tv import (
     CancellationRequest,
     CancellationTerms,
@@ -19,13 +25,6 @@ from ad_buyer.models.linear_tv import (
     LinearTVQuoteDetails,
     MakegoodRequest,
 )
-from ad_buyer.models.deals import (
-    PricingInfo,
-    QuoteRequest,
-    QuoteResponse,
-    TermsInfo,
-)
-
 
 # ---------------------------------------------------------------------------
 # LinearTVParams tests
@@ -91,9 +90,7 @@ class TestLinearTVParams:
     def test_measurement_currency_options(self):
         """Measurement currency accepts supported values."""
         for currency in ["nielsen", "comscore", "videoamp"]:
-            params = LinearTVParams(
-                target_demo="A18-49", measurement_currency=currency
-            )
+            params = LinearTVParams(target_demo="A18-49", measurement_currency=currency)
             assert params.measurement_currency == currency
 
     def test_serialization_excludes_none(self):
@@ -531,7 +528,7 @@ class TestCPMCPPConversion:
 
     def test_roundtrip_conversion(self):
         """CPP -> CPM -> CPP should roundtrip."""
-        from ad_buyer.models.linear_tv import cpp_to_cpm, cpm_to_cpp
+        from ad_buyer.models.linear_tv import cpm_to_cpp, cpp_to_cpm
 
         original_cpp = 45000.0
         universe = 120000000

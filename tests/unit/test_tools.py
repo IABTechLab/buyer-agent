@@ -3,19 +3,17 @@
 
 """Tests for CrewAI tools."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-from ad_buyer.tools.research.product_search import ProductSearchTool, ProductSearchInput
-from ad_buyer.tools.research.avails_check import AvailsCheckTool, AvailsCheckInput
-from ad_buyer.tools.execution.order_management import CreateOrderTool, CreateOrderInput
+import pytest
+
+from ad_buyer.models.opendirect import AvailsResponse, DeliveryType, Product, RateType
 from ad_buyer.tools.execution.line_management import (
-    CreateLineTool,
     BookLineTool,
-    CreateLineInput,
 )
-from ad_buyer.tools.reporting.stats_retrieval import GetStatsTool
-from ad_buyer.models.opendirect import Product, RateType, DeliveryType, AvailsResponse
+from ad_buyer.tools.execution.order_management import CreateOrderTool
+from ad_buyer.tools.research.avails_check import AvailsCheckTool
+from ad_buyer.tools.research.product_search import ProductSearchInput, ProductSearchTool
 
 
 class TestProductSearchTool:

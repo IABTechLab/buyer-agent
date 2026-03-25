@@ -9,7 +9,6 @@ when browsing seller inventory.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -22,7 +21,7 @@ class PackageSummary:
 
     package_id: str
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     ad_formats: list[str] = field(default_factory=list)
     device_types: list[int] = field(default_factory=list)
     cat: list[str] = field(default_factory=list)
@@ -33,7 +32,7 @@ class PackageSummary:
     rate_type: str = "cpm"
     is_featured: bool = False
     # Set when aggregating across sellers
-    seller_url: Optional[str] = None
+    seller_url: str | None = None
 
 
 @dataclass
@@ -55,8 +54,8 @@ class PackageDetail(PackageSummary):
     and negotiation info. Only available with API key auth.
     """
 
-    exact_price: Optional[float] = None
-    floor_price: Optional[float] = None
+    exact_price: float | None = None
+    floor_price: float | None = None
     currency: str = "USD"
     placements: list[PlacementDetail] = field(default_factory=list)
     audience_segment_ids: list[str] = field(default_factory=list)
@@ -88,8 +87,8 @@ class SearchFilter:
 
     query: str = ""
     buyer_tier: str = "public"
-    agency_id: Optional[str] = None
-    advertiser_id: Optional[str] = None
+    agency_id: str | None = None
+    advertiser_id: str | None = None
 
 
 class MediaKitError(Exception):

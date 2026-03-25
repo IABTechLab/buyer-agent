@@ -19,45 +19,36 @@ Reference: Campaign Automation Strategic Plan, Section 7.2
 Bead: buyer-8ih (2A: Multi-Seller Deal Orchestration)
 """
 
-import asyncio
-from dataclasses import dataclass
-from typing import Any, Optional
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ad_buyer.booking.quote_normalizer import (
     NormalizedQuote,
     QuoteNormalizer,
-    SupplyPathInfo,
 )
 from ad_buyer.models.deals import (
     AvailabilityInfo,
-    DealBookingRequest,
     DealResponse,
     OpenRTBParams,
     PricingInfo,
     ProductInfo,
-    QuoteRequest,
     QuoteResponse,
     TermsInfo,
 )
-from ad_buyer.registry.models import AgentCapability, AgentCard, TrustLevel
-
 
 # ---------------------------------------------------------------------------
 # Import the module under test (will fail until implemented)
 # ---------------------------------------------------------------------------
-
 from ad_buyer.orchestration.multi_seller import (
-    MultiSellerOrchestrator,
-    InventoryRequirements,
     DealParams,
+    DealSelection,
+    InventoryRequirements,
+    MultiSellerOrchestrator,
     OrchestrationResult,
     SellerQuoteResult,
-    DealSelection,
 )
-
+from ad_buyer.registry.models import AgentCapability, AgentCard, TrustLevel
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -79,10 +70,7 @@ def _make_seller_card(
         name=name,
         url=url,
         protocols=["a2a", "deals-api-v1"],
-        capabilities=[
-            AgentCapability(name=c, description=f"{c} inventory")
-            for c in caps
-        ],
+        capabilities=[AgentCapability(name=c, description=f"{c} inventory") for c in caps],
         trust_level=trust_level,
     )
 
@@ -144,9 +132,7 @@ def _make_deal_response(
         pricing=PricingInfo(base_cpm=15.0, final_cpm=final_cpm),
         terms=TermsInfo(impressions=500_000, guaranteed=(deal_type == "PG")),
         buyer_tier="agency",
-        openrtb_params=OpenRTBParams(
-            id=deal_id, bidfloor=final_cpm, bidfloorcur="USD"
-        ),
+        openrtb_params=OpenRTBParams(id=deal_id, bidfloor=final_cpm, bidfloorcur="USD"),
     )
 
 
@@ -289,9 +275,7 @@ class TestDiscoverSellers:
     """Test discover_sellers method."""
 
     @pytest.mark.asyncio
-    async def test_discover_returns_matching_sellers(
-        self, orchestrator, mock_registry_client
-    ):
+    async def test_discover_returns_matching_sellers(self, orchestrator, mock_registry_client):
         """discover_sellers returns sellers matching inventory requirements."""
         sellers = [
             _make_seller_card(agent_id="seller-a", capabilities=["ctv"]),
@@ -306,9 +290,7 @@ class TestDiscoverSellers:
         mock_registry_client.discover_sellers.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_discover_filters_excluded_sellers(
-        self, orchestrator, mock_registry_client
-    ):
+    async def test_discover_filters_excluded_sellers(self, orchestrator, mock_registry_client):
         """Excluded sellers are filtered out from discovery results."""
         sellers = [
             _make_seller_card(agent_id="seller-a"),
@@ -327,9 +309,7 @@ class TestDiscoverSellers:
         assert result[0].agent_id == "seller-a"
 
     @pytest.mark.asyncio
-    async def test_discover_filters_blocked_sellers(
-        self, orchestrator, mock_registry_client
-    ):
+    async def test_discover_filters_blocked_sellers(self, orchestrator, mock_registry_client):
         """Sellers with BLOCKED trust level are excluded."""
         sellers = [
             _make_seller_card(agent_id="seller-a", trust_level=TrustLevel.VERIFIED),
@@ -344,9 +324,7 @@ class TestDiscoverSellers:
         assert result[0].agent_id == "seller-a"
 
     @pytest.mark.asyncio
-    async def test_discover_empty_when_no_sellers(
-        self, orchestrator, mock_registry_client
-    ):
+    async def test_discover_empty_when_no_sellers(self, orchestrator, mock_registry_client):
         """Returns empty list when no sellers match."""
         mock_registry_client.discover_sellers.return_value = []
 
@@ -356,9 +334,7 @@ class TestDiscoverSellers:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_discover_emits_event(
-        self, orchestrator, mock_registry_client, mock_event_bus
-    ):
+    async def test_discover_emits_event(self, orchestrator, mock_registry_client, mock_event_bus):
         """discover_sellers emits an INVENTORY_DISCOVERED event."""
         sellers = [_make_seller_card(agent_id="seller-a")]
         mock_registry_client.discover_sellers.return_value = sellers
@@ -381,9 +357,7 @@ class TestRequestQuotesParallel:
     """Test request_quotes_parallel method."""
 
     @pytest.mark.asyncio
-    async def test_requests_quotes_from_all_sellers(
-        self, orchestrator, mock_deals_client_factory
-    ):
+    async def test_requests_quotes_from_all_sellers(self, orchestrator, mock_deals_client_factory):
         """Sends quote requests to all provided sellers concurrently."""
         sellers = [
             _make_seller_card(agent_id="seller-a", url="http://seller-a.example.com"),
@@ -414,9 +388,7 @@ class TestRequestQuotesParallel:
         client_b.request_quote.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_handles_seller_failure_gracefully(
-        self, orchestrator, mock_deals_client_factory
-    ):
+    async def test_handles_seller_failure_gracefully(self, orchestrator, mock_deals_client_factory):
         """If one seller fails, the other's quotes are still collected."""
         sellers = [
             _make_seller_card(agent_id="seller-a", url="http://seller-a.example.com"),
@@ -447,16 +419,14 @@ class TestRequestQuotesParallel:
         assert successful[0].seller_id == "seller-a"
 
     @pytest.mark.asyncio
-    async def test_handles_timeout_gracefully(
-        self, orchestrator, mock_deals_client_factory
-    ):
+    async def test_handles_timeout_gracefully(self, orchestrator, mock_deals_client_factory):
         """Seller that times out is recorded as failure, not crash."""
         sellers = [
             _make_seller_card(agent_id="seller-slow", url="http://seller-slow.example.com"),
         ]
 
         client = mock_deals_client_factory("http://seller-slow.example.com")
-        client.request_quote.side_effect = asyncio.TimeoutError()
+        client.request_quote.side_effect = TimeoutError()
 
         params = DealParams(
             product_id="prod-ctv",
@@ -609,9 +579,7 @@ class TestEvaluateAndRank:
             ),
         ]
 
-        ranked = await orchestrator.evaluate_and_rank(
-            quote_results, max_cpm=20.0
-        )
+        ranked = await orchestrator.evaluate_and_rank(quote_results, max_cpm=20.0)
 
         assert len(ranked) == 1
         assert ranked[0].quote_id == "q-a"
@@ -647,9 +615,7 @@ class TestSelectAndBook:
     """Test select_and_book method."""
 
     @pytest.mark.asyncio
-    async def test_selects_within_budget(
-        self, orchestrator, mock_deals_client_factory
-    ):
+    async def test_selects_within_budget(self, orchestrator, mock_deals_client_factory):
         """Selects deals that fit within the total budget."""
         ranked = [
             NormalizedQuote(
@@ -700,9 +666,7 @@ class TestSelectAndBook:
         assert len(selection.booked_deals) == 2
 
     @pytest.mark.asyncio
-    async def test_respects_count_limit(
-        self, orchestrator, mock_deals_client_factory
-    ):
+    async def test_respects_count_limit(self, orchestrator, mock_deals_client_factory):
         """Does not book more deals than the count parameter."""
         ranked = [
             NormalizedQuote(
@@ -725,9 +689,7 @@ class TestSelectAndBook:
                 deal_id=f"deal-{i}", quote_id=f"q-{i}"
             )
 
-        quote_seller_map = {
-            f"q-{i}": f"http://seller-{i}.example.com" for i in range(5)
-        }
+        quote_seller_map = {f"q-{i}": f"http://seller-{i}.example.com" for i in range(5)}
 
         selection = await orchestrator.select_and_book(
             ranked_quotes=ranked,
@@ -786,9 +748,7 @@ class TestSelectAndBook:
         assert selection.booked_deals[0].deal_id == "deal-b"
 
     @pytest.mark.asyncio
-    async def test_handles_booking_failure(
-        self, orchestrator, mock_deals_client_factory
-    ):
+    async def test_handles_booking_failure(self, orchestrator, mock_deals_client_factory):
         """If booking fails for one deal, continues with the next."""
         ranked = [
             NormalizedQuote(
@@ -904,12 +864,8 @@ class TestOrchestrate:
         mock_registry_client.discover_sellers.return_value = sellers
 
         # Setup quotes
-        quote_a = _make_quote_response(
-            quote_id="q-a", seller_id="seller-a", final_cpm=10.0
-        )
-        quote_b = _make_quote_response(
-            quote_id="q-b", seller_id="seller-b", final_cpm=15.0
-        )
+        quote_a = _make_quote_response(quote_id="q-a", seller_id="seller-a", final_cpm=10.0)
+        quote_b = _make_quote_response(quote_id="q-b", seller_id="seller-b", final_cpm=15.0)
         client_a = mock_deals_client_factory("http://seller-a.example.com")
         client_a.request_quote.return_value = quote_a
         client_b = mock_deals_client_factory("http://seller-b.example.com")
@@ -945,9 +901,7 @@ class TestOrchestrate:
         assert result.selection.booked_deals[0].deal_id == "deal-a"
 
     @pytest.mark.asyncio
-    async def test_orchestration_with_no_sellers(
-        self, orchestrator, mock_registry_client
-    ):
+    async def test_orchestration_with_no_sellers(self, orchestrator, mock_registry_client):
         """Orchestration with no discovered sellers returns empty result."""
         mock_registry_client.discover_sellers.return_value = []
 

@@ -15,7 +15,6 @@ placements, audience segments, and negotiation flags.
 
 import asyncio
 import logging
-from typing import Optional
 
 import httpx
 
@@ -41,7 +40,7 @@ class MediaKitClient:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: float = 30.0,
     ):
         self.api_key = api_key
@@ -167,7 +166,9 @@ class MediaKitClient:
         data = await self._handle_response(resp, seller_url)
 
         featured = [self._parse_package_summary(p, seller_url) for p in data.get("featured", [])]
-        all_packages = [self._parse_package_summary(p, seller_url) for p in data.get("all_packages", [])]
+        all_packages = [
+            self._parse_package_summary(p, seller_url) for p in data.get("all_packages", [])
+        ]
 
         return MediaKit(
             seller_url=seller_url,
@@ -180,7 +181,7 @@ class MediaKitClient:
     async def list_packages(
         self,
         seller_url: str,
-        layer: Optional[str] = None,
+        layer: str | None = None,
         featured_only: bool = False,
     ) -> list[PackageSummary]:
         """List available packages from a seller.
@@ -207,7 +208,9 @@ class MediaKitClient:
             params["featured_only"] = featured_only
 
         try:
-            resp = await self._http.get(f"{base}/media-kit/packages", headers=headers, params=params)
+            resp = await self._http.get(
+                f"{base}/media-kit/packages", headers=headers, params=params
+            )
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise MediaKitError(
                 message=f"Failed to connect to {seller_url}: {exc}",
@@ -256,7 +259,7 @@ class MediaKitClient:
         self,
         seller_url: str,
         query: str,
-        filters: Optional[SearchFilter] = None,
+        filters: SearchFilter | None = None,
     ) -> list[PackageSummary]:
         """Search a seller's media kit packages.
 

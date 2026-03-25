@@ -3,48 +3,18 @@
 
 """Shared fixtures for integration tests."""
 
-import json
-import os
-import tempfile
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ad_buyer.auth.key_store import ApiKeyStore
-from ad_buyer.auth.middleware import AuthMiddleware
-from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
-from ad_buyer.identity.strategy import (
-    CampaignGoal,
-    DealContext,
-    IdentityStrategy,
-    SellerRelationship,
-)
 from ad_buyer.models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     BuyerIdentity,
     DealType,
 )
-from ad_buyer.models.flow_state import (
-    BookedLine,
-    BookingState,
-    ChannelAllocation,
-    ExecutionStatus,
-    ProductRecommendation,
-)
-from ad_buyer.negotiation.models import (
-    NegotiationOutcome,
-    NegotiationResult,
-    NegotiationRound,
-    NegotiationSession,
-)
-from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.registry.cache import SellerCache
 from ad_buyer.registry.models import AgentCapability, AgentCard, TrustLevel
-
 
 # --- Buyer identity fixtures ---
 
@@ -177,7 +147,9 @@ def seller_agent_cards() -> list[AgentCard]:
             url="http://seller-streaming.example.com",
             protocols=["mcp", "a2a"],
             capabilities=[
-                AgentCapability(name="ctv", description="CTV inventory", tags=["video", "streaming"]),
+                AgentCapability(
+                    name="ctv", description="CTV inventory", tags=["video", "streaming"]
+                ),
             ],
             trust_level=TrustLevel.VERIFIED,
         ),
@@ -187,7 +159,9 @@ def seller_agent_cards() -> list[AgentCard]:
             url="http://seller-news.example.com",
             protocols=["mcp"],
             capabilities=[
-                AgentCapability(name="display", description="Display inventory", tags=["banner", "native"]),
+                AgentCapability(
+                    name="display", description="Display inventory", tags=["banner", "native"]
+                ),
             ],
             trust_level=TrustLevel.REGISTERED,
         ),

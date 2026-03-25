@@ -17,12 +17,11 @@ Run with:
     # Opens on http://localhost:5050
 """
 
-import io
 import json
 import logging
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -32,12 +31,12 @@ from ..storage.deal_store import DealStore
 from ..storage.schema import SCHEMA_VERSION
 from ..tools.deal_import import parse_csv_deals
 from ..tools.deal_jockey.deal_entry import (
-    ManualDealEntry,
-    create_manual_deal,
     VALID_DEAL_TYPES,
     VALID_MEDIA_TYPES,
     VALID_PRICE_MODELS,
     VALID_SELLER_TYPES,
+    ManualDealEntry,
+    create_manual_deal,
 )
 from .seed_data import seed_demo_data
 
@@ -102,9 +101,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
     def api_schema():
         """Return schema version and table info."""
         conn = store._conn
-        cursor = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = []
         for row in cursor.fetchall():
             name = row["name"] if isinstance(row, dict) else row[0]
@@ -114,15 +111,16 @@ def _register_routes(app: Flask, store: DealStore) -> None:
 
         # v2 columns on deals table
         col_cursor = conn.execute("PRAGMA table_info(deals)")
-        all_cols = [r[1] if not isinstance(r, dict) else r["name"]
-                    for r in col_cursor.fetchall()]
+        all_cols = [r[1] if not isinstance(r, dict) else r["name"] for r in col_cursor.fetchall()]
         v2_cols = [c for c in all_cols if c in store._V2_DEAL_COLUMNS]
 
-        return jsonify({
-            "schema_version": SCHEMA_VERSION,
-            "tables": tables,
-            "v2_columns": v2_cols,
-        })
+        return jsonify(
+            {
+                "schema_version": SCHEMA_VERSION,
+                "tables": tables,
+                "v2_columns": v2_cols,
+            }
+        )
 
     # -- API: Deals ---------------------------------------------------------
 
@@ -150,12 +148,14 @@ def _register_routes(app: Flask, store: DealStore) -> None:
         activations = store.get_deal_activations(deal_id)
         perf = store.get_performance_cache(deal_id)
 
-        return jsonify({
-            "deal": deal,
-            "portfolio_metadata": metadata,
-            "activations": activations,
-            "performance_cache": perf,
-        })
+        return jsonify(
+            {
+                "deal": deal,
+                "portfolio_metadata": metadata,
+                "activations": activations,
+                "performance_cache": perf,
+            }
+        )
 
     # -- API: Create deal (manual entry) ------------------------------------
 
@@ -212,7 +212,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
             store.save_portfolio_metadata(
                 deal_id=deal_id,
                 import_source=result.metadata.get("import_source", "MANUAL"),
-                import_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                import_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                 tags=tags_val,
                 advertiser_id=result.metadata.get("advertiser_id"),
             )
@@ -221,10 +221,12 @@ def _register_routes(app: Flask, store: DealStore) -> None:
         store.save_event(
             event_type="deal.imported",
             deal_id=deal_id,
-            payload=json.dumps({
-                "import_source": "MANUAL",
-                "display_name": data.get("display_name", ""),
-            }),
+            payload=json.dumps(
+                {
+                    "import_source": "MANUAL",
+                    "display_name": data.get("display_name", ""),
+                }
+            ),
         )
 
         return jsonify({"success": True, "deal_id": deal_id})
@@ -242,9 +244,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
             return jsonify({"error": "Empty filename"}), 400
 
         # Save to a temp file for parse_csv_deals
-        with tempfile.NamedTemporaryFile(
-            mode="wb", suffix=".csv", delete=False
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:
             uploaded.save(tmp)
             tmp_path = tmp.name
 
@@ -263,14 +263,16 @@ def _register_routes(app: Flask, store: DealStore) -> None:
             for e in result.errors
         ]
 
-        return jsonify({
-            "total_rows": result.total_rows,
-            "successful": result.successful,
-            "failed": result.failed,
-            "skipped": result.skipped,
-            "deals": result.deals,
-            "errors": errors_list,
-        })
+        return jsonify(
+            {
+                "total_rows": result.total_rows,
+                "successful": result.successful,
+                "failed": result.failed,
+                "skipped": result.skipped,
+                "deals": result.deals,
+                "errors": errors_list,
+            }
+        )
 
     @app.route("/api/import/save", methods=["POST"])
     def api_import_save():
@@ -317,28 +319,32 @@ def _register_routes(app: Flask, store: DealStore) -> None:
                 store.save_portfolio_metadata(
                     deal_id=deal_id,
                     import_source="CSV",
-                    import_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    import_date=datetime.now(UTC).strftime("%Y-%m-%d"),
                 )
 
                 # Emit event
                 store.save_event(
                     event_type="deal.imported",
                     deal_id=deal_id,
-                    payload=json.dumps({
-                        "import_source": "CSV",
-                        "display_name": display_name,
-                    }),
+                    payload=json.dumps(
+                        {
+                            "import_source": "CSV",
+                            "display_name": display_name,
+                        }
+                    ),
                 )
 
                 saved_ids.append(deal_id)
             except Exception as exc:
                 save_errors.append({"index": i, "error": str(exc)})
 
-        return jsonify({
-            "saved": len(saved_ids),
-            "errors": save_errors,
-            "deal_ids": saved_ids,
-        })
+        return jsonify(
+            {
+                "saved": len(saved_ids),
+                "errors": save_errors,
+                "deal_ids": saved_ids,
+            }
+        )
 
     # -- API: Search --------------------------------------------------------
 
@@ -352,8 +358,11 @@ def _register_routes(app: Flask, store: DealStore) -> None:
         query_lower = query.lower()
         deals = store.list_deals(limit=10000)
         search_fields = [
-            "display_name", "product_name", "description",
-            "seller_org", "seller_domain",
+            "display_name",
+            "product_name",
+            "description",
+            "seller_org",
+            "seller_domain",
         ]
 
         matches = []
@@ -401,19 +410,19 @@ def _register_routes(app: Flask, store: DealStore) -> None:
             if imps is not None:
                 total_impressions += imps
 
-        top_sellers = sorted(
-            seller_counts.items(), key=lambda x: x[1], reverse=True
-        )[:5]
+        top_sellers = sorted(seller_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
-        return jsonify({
-            "total_deals": total,
-            "total_value": round(total_value, 2),
-            "total_impressions": total_impressions,
-            "by_status": status_counts,
-            "by_media_type": media_counts,
-            "by_deal_type": type_counts,
-            "top_sellers": [{"seller": s, "count": c} for s, c in top_sellers],
-        })
+        return jsonify(
+            {
+                "total_deals": total,
+                "total_value": round(total_value, 2),
+                "total_impressions": total_impressions,
+                "by_status": status_counts,
+                "by_media_type": media_counts,
+                "by_deal_type": type_counts,
+                "top_sellers": [{"seller": s, "count": c} for s, c in top_sellers],
+            }
+        )
 
     # -- API: Events --------------------------------------------------------
 
@@ -430,10 +439,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
 
         # Fetch all recent events and filter client-side for Phase 1 types
         all_events = store.list_events(limit=limit * 4)
-        events = [
-            e for e in all_events
-            if e.get("event_type") in phase1_types
-        ][:limit]
+        events = [e for e in all_events if e.get("event_type") in phase1_types][:limit]
 
         return jsonify({"events": events, "count": len(events)})
 
@@ -443,7 +449,6 @@ def _register_routes(app: Flask, store: DealStore) -> None:
     def api_agent_info():
         """Return DealJockey agent configuration (static, no instantiation)."""
         # Read from the module docstring and create_deal_jockey_agent
-        from ..agents.level2.deal_jockey_agent import create_deal_jockey_agent
 
         # Extract the Agent kwargs without actually creating the agent
         # (which would require LLM config). Instead, read the source.
@@ -465,13 +470,26 @@ def _register_routes(app: Flask, store: DealStore) -> None:
             ),
             "l1_routing": {
                 "deal_jockey_keywords": [
-                    "portfolio", "existing deals", "my deals", "migrate",
-                    "clone", "deprecate", "compare prices", "import",
-                    "catalog", "gap analysis", "sunset",
+                    "portfolio",
+                    "existing deals",
+                    "my deals",
+                    "migrate",
+                    "clone",
+                    "deprecate",
+                    "compare prices",
+                    "import",
+                    "catalog",
+                    "gap analysis",
+                    "sunset",
                 ],
                 "campaign_flow_keywords": [
-                    "campaign", "book for campaign", "budget",
-                    "target audience", "pacing", "flight dates", "launch",
+                    "campaign",
+                    "book for campaign",
+                    "budget",
+                    "target audience",
+                    "pacing",
+                    "flight dates",
+                    "launch",
                 ],
                 "ambiguous_response": (
                     "Are you looking to manage your existing deal portfolio, "
@@ -479,13 +497,18 @@ def _register_routes(app: Flask, store: DealStore) -> None:
                 ),
             },
             "phase1_tools": [
-                "list_portfolio", "search_portfolio",
-                "portfolio_summary", "inspect_deal",
-                "manual_deal_entry", "csv_deal_import",
+                "list_portfolio",
+                "search_portfolio",
+                "portfolio_summary",
+                "inspect_deal",
+                "manual_deal_entry",
+                "csv_deal_import",
             ],
             "phase1_event_types": [
-                "deal.imported", "deal.template_created",
-                "portfolio.inspected", "deal.manual_action_required",
+                "deal.imported",
+                "deal.template_created",
+                "portfolio.inspected",
+                "deal.manual_action_required",
             ],
         }
         return jsonify(info)
@@ -495,13 +518,15 @@ def _register_routes(app: Flask, store: DealStore) -> None:
     @app.route("/api/enums")
     def api_enums():
         """Return valid enum values for form dropdowns."""
-        return jsonify({
-            "deal_types": sorted(VALID_DEAL_TYPES),
-            "media_types": sorted(VALID_MEDIA_TYPES),
-            "price_models": sorted(VALID_PRICE_MODELS),
-            "seller_types": sorted(VALID_SELLER_TYPES),
-            "statuses": ["draft", "active", "paused"],
-        })
+        return jsonify(
+            {
+                "deal_types": sorted(VALID_DEAL_TYPES),
+                "media_types": sorted(VALID_MEDIA_TYPES),
+                "price_models": sorted(VALID_PRICE_MODELS),
+                "seller_types": sorted(VALID_SELLER_TYPES),
+                "statuses": ["draft", "active", "paused"],
+            }
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -513,9 +538,7 @@ def main() -> None:
     """Run the dashboard development server."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    db_path = os.environ.get(
-        "DASHBOARD_DB", "sqlite:///dealjockey_demo.db"
-    )
+    db_path = os.environ.get("DASHBOARD_DB", "sqlite:///dealjockey_demo.db")
     app = create_app(database_url=db_path)
 
     port = int(os.environ.get("DASHBOARD_PORT", "5050"))

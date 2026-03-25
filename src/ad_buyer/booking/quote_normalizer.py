@@ -22,11 +22,9 @@ Bead: buyer-lae (blocks buyer-8ih).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from ..models.deals import QuoteResponse
-
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -80,7 +78,7 @@ class NormalizedQuote:
     fee_estimate: float
     minimum_spend: float
     score: float
-    fill_rate_estimate: Optional[float] = None
+    fill_rate_estimate: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +179,7 @@ class QuoteNormalizer:
         effective_cpm = adjusted_cpm + fee_estimate
 
         # Step 4: Extract fill-rate if available
-        fill_rate: Optional[float] = None
+        fill_rate: float | None = None
         if quote.availability and quote.availability.estimated_fill_rate is not None:
             fill_rate = quote.availability.estimated_fill_rate
 
@@ -242,9 +240,7 @@ class QuoteNormalizer:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _apply_deal_type_adjustment(
-        self, raw_cpm: float, deal_type: str
-    ) -> float:
+    def _apply_deal_type_adjustment(self, raw_cpm: float, deal_type: str) -> float:
         """Adjust CPM based on deal type.
 
         PG and PD: no adjustment (price is the price).
@@ -270,7 +266,7 @@ class QuoteNormalizer:
         self,
         effective_cpm: float,
         deal_type: str,
-        fill_rate: Optional[float],
+        fill_rate: float | None,
     ) -> float:
         """Compute a composite score (0-100, higher = better).
 

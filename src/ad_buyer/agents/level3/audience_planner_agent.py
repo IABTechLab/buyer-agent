@@ -9,7 +9,7 @@ for real-time audience matching with seller inventory.
 
 from typing import Any
 
-from crewai import Agent, LLM
+from crewai import LLM, Agent
 
 from ...config import get_settings
 

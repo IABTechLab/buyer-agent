@@ -17,7 +17,7 @@ Design decisions (from LINEAR_TV_DEAL_FLOW_RESEARCH.md):
 - Nielsen measurement currency only for v1
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -40,13 +40,13 @@ class LinearTVParams(BaseModel):
     )
 
     # Volume specification (in GRPs, alternative to impressions)
-    grps_requested: Optional[int] = Field(
+    grps_requested: int | None = Field(
         default=None,
         description="Requested volume in Gross Rating Points.",
     )
 
     # Inventory targeting
-    dayparts: Optional[list[str]] = Field(
+    dayparts: list[str] | None = Field(
         default=None,
         description=(
             "Target dayparts. Standard values: "
@@ -54,11 +54,11 @@ class LinearTVParams(BaseModel):
             '"early_fringe", "prime_access", "overnight", "weekend".'
         ),
     )
-    networks: Optional[list[str]] = Field(
+    networks: list[str] | None = Field(
         default=None,
         description='Target networks (e.g., ["NBC", "CBS", "ESPN"]).',
     )
-    dmas: Optional[list[str]] = Field(
+    dmas: list[str] | None = Field(
         default=None,
         description=(
             "Nielsen DMA codes for local buying. None means national. "
@@ -73,7 +73,7 @@ class LinearTVParams(BaseModel):
     )
 
     # Pricing target
-    target_cpp: Optional[float] = Field(
+    target_cpp: float | None = Field(
         default=None,
         description="Buyer's desired Cost Per Point (CPP).",
     )
@@ -90,10 +90,7 @@ class LinearTVParams(BaseModel):
     # Rotation type
     rotation: str = Field(
         default="ros",
-        description=(
-            "Spot rotation type. "
-            '"ros" (run of schedule), "fixed", "program_specific".'
-        ),
+        description=('Spot rotation type. "ros" (run of schedule), "fixed", "program_specific".'),
     )
 
 
@@ -114,7 +111,7 @@ class CancellationTerms(BaseModel):
         le=1.0,
         description="Portion of the deal that can be cancelled (0.0 to 1.0).",
     )
-    deadline: Optional[str] = Field(
+    deadline: str | None = Field(
         default=None,
         description="Absolute deadline for cancellation (ISO date string).",
     )
@@ -144,16 +141,13 @@ class LinearTVQuoteDetails(BaseModel):
     measurement_currency: str
     audience_estimate: dict[str, Any] = Field(
         description=(
-            "Audience size estimates. Expected keys: "
-            '"demo", "universe", "impressions_equiv".'
+            'Audience size estimates. Expected keys: "demo", "universe", "impressions_equiv".'
         ),
     )
-    cancellation_terms: Optional[CancellationTerms] = None
-    makegood_policy: Optional[str] = Field(
+    cancellation_terms: CancellationTerms | None = None
+    makegood_policy: str | None = Field(
         default=None,
-        description=(
-            'Makegood policy: "standard" (ADU), "negotiated", or "none".'
-        ),
+        description=('Makegood policy: "standard" (ADU), "negotiated", or "none".'),
     )
 
 
@@ -177,11 +171,11 @@ class MakegoodRequest(BaseModel):
         ...,
         description="Target demographic for makegood inventory.",
     )
-    preferred_dayparts: Optional[list[str]] = Field(
+    preferred_dayparts: list[str] | None = Field(
         default=None,
         description="Buyer's preferred dayparts for replacement inventory.",
     )
-    notes: Optional[str] = Field(
+    notes: str | None = Field(
         default=None,
         description="Additional context about the makegood request.",
     )
@@ -205,7 +199,7 @@ class CancellationRequest(BaseModel):
         ...,
         description="Reason for cancellation.",
     )
-    effective_date: Optional[str] = Field(
+    effective_date: str | None = Field(
         default=None,
         description="Requested effective date for cancellation (ISO date).",
     )

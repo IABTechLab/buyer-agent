@@ -9,24 +9,23 @@ bead: buyer-uoz (Ad server integration record storage)
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
 
 import pytest
 
-from ad_buyer.storage.adserver_store import AdServerStore
 from ad_buyer.models.campaign import (
-    AdServerCampaign,
     AdServerBinding,
+    AdServerCampaign,
+    AdServerCampaignStatus,
     AdServerDelivery,
     AdServerType,
-    AdServerCampaignStatus,
     BindingServingStatus,
 )
-
+from ad_buyer.storage.adserver_store import AdServerStore
 
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
+
 
 @pytest.fixture
 def adserver_store():
@@ -66,6 +65,7 @@ def _make_binding(**overrides) -> AdServerBinding:
 # -----------------------------------------------------------------------
 # Model Tests
 # -----------------------------------------------------------------------
+
 
 class TestAdServerCampaignModel:
     """Tests for the AdServerCampaign Pydantic model."""
@@ -145,6 +145,7 @@ class TestAdServerCampaignModel:
 # CRUD Tests
 # -----------------------------------------------------------------------
 
+
 class TestAdServerStoreSave:
     """Tests for save_ad_server_campaign."""
 
@@ -216,26 +217,18 @@ class TestAdServerStoreList:
         adserver_store.save_ad_server_campaign(rec_inv)
         adserver_store.save_ad_server_campaign(rec_ft)
 
-        results = adserver_store.list_ad_server_campaigns(
-            ad_server=AdServerType.INNOVID
-        )
+        results = adserver_store.list_ad_server_campaigns(ad_server=AdServerType.INNOVID)
         assert len(results) == 1
         assert results[0].ad_server == AdServerType.INNOVID
 
     def test_list_by_status(self, adserver_store):
         """Filter by status."""
-        rec_pending = _make_adserver_campaign(
-            status=AdServerCampaignStatus.PENDING
-        )
-        rec_active = _make_adserver_campaign(
-            status=AdServerCampaignStatus.ACTIVE
-        )
+        rec_pending = _make_adserver_campaign(status=AdServerCampaignStatus.PENDING)
+        rec_active = _make_adserver_campaign(status=AdServerCampaignStatus.ACTIVE)
         adserver_store.save_ad_server_campaign(rec_pending)
         adserver_store.save_ad_server_campaign(rec_active)
 
-        results = adserver_store.list_ad_server_campaigns(
-            status=AdServerCampaignStatus.ACTIVE
-        )
+        results = adserver_store.list_ad_server_campaigns(status=AdServerCampaignStatus.ACTIVE)
         assert len(results) == 1
         assert results[0].status == AdServerCampaignStatus.ACTIVE
 
@@ -270,9 +263,7 @@ class TestAdServerStoreList:
 
     def test_list_empty(self, adserver_store):
         """List returns empty when no records match."""
-        results = adserver_store.list_ad_server_campaigns(
-            campaign_id="no-such-campaign"
-        )
+        results = adserver_store.list_ad_server_campaigns(campaign_id="no-such-campaign")
         assert results == []
 
 
@@ -284,9 +275,7 @@ class TestAdServerStoreUpdate:
         rec = _make_adserver_campaign(status=AdServerCampaignStatus.PENDING)
         adserver_store.save_ad_server_campaign(rec)
 
-        adserver_store.update_ad_server_campaign(
-            rec.id, status=AdServerCampaignStatus.ACTIVE
-        )
+        adserver_store.update_ad_server_campaign(rec.id, status=AdServerCampaignStatus.ACTIVE)
         updated = adserver_store.get_ad_server_campaign(rec.id)
         assert updated.status == AdServerCampaignStatus.ACTIVE
 
@@ -295,9 +284,7 @@ class TestAdServerStoreUpdate:
         rec = _make_adserver_campaign(ad_server_campaign_id="old-id")
         adserver_store.save_ad_server_campaign(rec)
 
-        adserver_store.update_ad_server_campaign(
-            rec.id, ad_server_campaign_id="new-id"
-        )
+        adserver_store.update_ad_server_campaign(rec.id, ad_server_campaign_id="new-id")
         updated = adserver_store.get_ad_server_campaign(rec.id)
         assert updated.ad_server_campaign_id == "new-id"
 
@@ -307,9 +294,7 @@ class TestAdServerStoreUpdate:
         adserver_store.save_ad_server_campaign(rec)
 
         new_binding = _make_binding(deal_id="deal-new")
-        adserver_store.update_ad_server_campaign(
-            rec.id, bindings=[new_binding]
-        )
+        adserver_store.update_ad_server_campaign(rec.id, bindings=[new_binding])
         updated = adserver_store.get_ad_server_campaign(rec.id)
         assert len(updated.bindings) == 1
         assert updated.bindings[0].deal_id == "deal-new"

@@ -4,7 +4,7 @@
 """Line item management tools for booking inventory."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -29,7 +29,7 @@ class CreateLineInput(BaseModel):
     )
     rate: float = Field(..., description="Rate/price for the line", gt=0)
     quantity: int = Field(..., description="Target impressions or units", gt=0)
-    targeting: Optional[dict[str, Any]] = Field(
+    targeting: dict[str, Any] | None = Field(
         default=None,
         description="Targeting parameters (geo, demographic, etc.)",
     )
@@ -77,7 +77,7 @@ Returns:
         rate_type: str = "CPM",
         rate: float = 0,
         quantity: int = 0,
-        targeting: Optional[dict[str, Any]] = None,
+        targeting: dict[str, Any] | None = None,
     ) -> str:
         """Synchronous wrapper for async line creation."""
         return run_async(
@@ -106,7 +106,7 @@ Returns:
         rate_type: str = "CPM",
         rate: float = 0,
         quantity: int = 0,
-        targeting: Optional[dict[str, Any]] = None,
+        targeting: dict[str, Any] | None = None,
     ) -> str:
         """Create a new line item."""
         try:
@@ -118,7 +118,9 @@ Returns:
             try:
                 rt = RateType(rate_type)
             except ValueError:
-                return f"Invalid rate type: {rate_type}. Valid options: CPM, CPMV, CPC, CPD, FlatRate"
+                return (
+                    f"Invalid rate type: {rate_type}. Valid options: CPM, CPMV, CPC, CPD, FlatRate"
+                )
 
             # Build line
             line = Line(

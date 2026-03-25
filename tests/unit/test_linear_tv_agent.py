@@ -9,8 +9,6 @@ Tests written first (TDD) per bead buyer-6io.
 
 import os
 
-import pytest
-
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
@@ -38,11 +36,11 @@ class TestLinearTVAgent:
     def test_linear_tv_agent_with_custom_tools(self):
         """Test Linear TV agent accepts custom tools."""
         from crewai.tools import BaseTool
-        from pydantic import Field as PydanticField
 
         class DummyTool(BaseTool):
             name: str = "dummy"
             description: str = "A dummy tool"
+
             def _run(self, **kwargs):
                 return "ok"
 

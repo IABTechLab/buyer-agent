@@ -12,7 +12,6 @@ Tests cover:
 - SellerCache hit/miss/expiry behavior
 """
 
-import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,7 +26,6 @@ from ad_buyer.registry.models import (
     AgentTrustInfo,
     TrustLevel,
 )
-
 
 # =============================================================================
 # Model Tests
@@ -154,9 +152,7 @@ class TestSellerCache:
 
     def test_cache_put_and_get(self):
         cache = SellerCache(ttl_seconds=60)
-        card = AgentCard(
-            agent_id="s1", name="Seller 1", url="https://s1.example.com"
-        )
+        card = AgentCard(agent_id="s1", name="Seller 1", url="https://s1.example.com")
         cache.put("s1", card)
         result = cache.get("s1")
         assert result is not None
@@ -169,9 +165,7 @@ class TestSellerCache:
 
     def test_cache_expiry(self):
         cache = SellerCache(ttl_seconds=0.1)
-        card = AgentCard(
-            agent_id="s1", name="Seller 1", url="https://s1.example.com"
-        )
+        card = AgentCard(agent_id="s1", name="Seller 1", url="https://s1.example.com")
         cache.put("s1", card)
         # Should be available immediately
         assert cache.get("s1") is not None

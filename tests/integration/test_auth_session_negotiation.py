@@ -8,27 +8,21 @@ and negotiation client modules. Verifies that authentication flows
 through to session creation and negotiation execution.
 """
 
-import json
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
 from ad_buyer.auth.key_store import ApiKeyStore
-from ad_buyer.auth.middleware import AuthMiddleware, AuthResponse
+from ad_buyer.auth.middleware import AuthMiddleware
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.models import (
     NegotiationOutcome,
-    NegotiationResult,
-    NegotiationRound,
-    NegotiationSession,
 )
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
 from ad_buyer.sessions.session_manager import SessionManager
-from ad_buyer.sessions.session_store import SessionRecord, SessionStore
+from ad_buyer.sessions.session_store import SessionRecord
 
 
 class TestAuthToSessionFlow:
@@ -110,9 +104,7 @@ class TestSessionManagerIntegration:
     """Tests session manager with mock HTTP endpoints."""
 
     @pytest.mark.asyncio
-    async def test_create_session_stores_record(
-        self, tmp_session_store_path: str
-    ):
+    async def test_create_session_stores_record(self, tmp_session_store_path: str):
         """create_session should persist the session record to the store."""
         manager = SessionManager(store_path=tmp_session_store_path)
         seller_url = "http://seller.example.com"
@@ -121,8 +113,8 @@ class TestSessionManagerIntegration:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "session_id": "sess-abc-123",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         with patch("httpx.AsyncClient") as MockAsyncClient:
@@ -143,9 +135,7 @@ class TestSessionManagerIntegration:
         assert record.session_id == "sess-abc-123"
 
     @pytest.mark.asyncio
-    async def test_get_or_create_reuses_active_session(
-        self, tmp_session_store_path: str
-    ):
+    async def test_get_or_create_reuses_active_session(self, tmp_session_store_path: str):
         """get_or_create_session should reuse an active session from the store."""
         manager = SessionManager(store_path=tmp_session_store_path)
         seller_url = "http://seller.example.com"
@@ -154,8 +144,8 @@ class TestSessionManagerIntegration:
         record = SessionRecord(
             session_id="existing-sess-001",
             seller_url=seller_url,
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -164,9 +154,7 @@ class TestSessionManagerIntegration:
         assert session_id == "existing-sess-001"
 
     @pytest.mark.asyncio
-    async def test_session_expiry_triggers_recreation(
-        self, tmp_session_store_path: str
-    ):
+    async def test_session_expiry_triggers_recreation(self, tmp_session_store_path: str):
         """Expired session should trigger creation of a new one."""
         manager = SessionManager(store_path=tmp_session_store_path)
         seller_url = "http://seller.example.com"
@@ -175,8 +163,8 @@ class TestSessionManagerIntegration:
         record = SessionRecord(
             session_id="expired-sess",
             seller_url=seller_url,
-            created_at=(datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
-            expires_at=(datetime.now(timezone.utc) - timedelta(days=3)).isoformat(),
+            created_at=(datetime.now(UTC) - timedelta(days=10)).isoformat(),
+            expires_at=(datetime.now(UTC) - timedelta(days=3)).isoformat(),
         )
         manager.store.save(record)
 
@@ -185,8 +173,8 @@ class TestSessionManagerIntegration:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "session_id": "new-sess-002",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         with patch("httpx.AsyncClient") as MockAsyncClient:
@@ -200,9 +188,7 @@ class TestSessionManagerIntegration:
         assert session_id == "new-sess-002"
 
     @pytest.mark.asyncio
-    async def test_send_message_with_session_renewal(
-        self, tmp_session_store_path: str
-    ):
+    async def test_send_message_with_session_renewal(self, tmp_session_store_path: str):
         """send_message should auto-renew when seller returns 404 (expired)."""
         manager = SessionManager(store_path=tmp_session_store_path)
         seller_url = "http://seller.example.com"
@@ -211,8 +197,8 @@ class TestSessionManagerIntegration:
         record = SessionRecord(
             session_id="stale-sess",
             seller_url=seller_url,
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=1)).isoformat(),
         )
         manager.store.save(record)
 
@@ -224,8 +210,8 @@ class TestSessionManagerIntegration:
         new_session_response.status_code = 201
         new_session_response.json.return_value = {
             "session_id": "renewed-sess",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         success_response = MagicMock()
@@ -397,8 +383,8 @@ class TestAuthSessionNegotiationChain:
         session_create_resp.status_code = 201
         session_create_resp.json.return_value = {
             "session_id": "sess-chain-001",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         with patch("httpx.AsyncClient") as MockAsyncClient:

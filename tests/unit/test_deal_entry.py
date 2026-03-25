@@ -9,9 +9,6 @@ function, and the CrewAI ManualDealEntryTool wrapper.
 
 import json
 
-import pytest
-
-
 # ---------------------------------------------------------------------------
 # ManualDealEntry model tests
 # ---------------------------------------------------------------------------
@@ -593,10 +590,12 @@ class TestManualDealEntryTool:
 
         tool = ManualDealEntryTool()
         result = tool._run(
-            deal_params=json.dumps({
-                "display_name": "ESPN Sports PMP",
-                "seller_url": "https://espn.seller.example.com",
-            })
+            deal_params=json.dumps(
+                {
+                    "display_name": "ESPN Sports PMP",
+                    "seller_url": "https://espn.seller.example.com",
+                }
+            )
         )
 
         # Should return a string with success indication
@@ -609,11 +608,13 @@ class TestManualDealEntryTool:
 
         tool = ManualDealEntryTool()
         result = tool._run(
-            deal_params=json.dumps({
-                "display_name": "",
-                "seller_url": "https://seller.example.com",
-                "deal_type": "INVALID",
-            })
+            deal_params=json.dumps(
+                {
+                    "display_name": "",
+                    "seller_url": "https://seller.example.com",
+                    "deal_type": "INVALID",
+                }
+            )
         )
 
         assert "error" in result.lower() or "invalid" in result.lower()
@@ -633,9 +634,11 @@ class TestManualDealEntryTool:
 
         tool = ManualDealEntryTool()
         result = tool._run(
-            deal_params=json.dumps({
-                "deal_type": "PD",
-            })
+            deal_params=json.dumps(
+                {
+                    "deal_type": "PD",
+                }
+            )
         )
 
         assert "error" in result.lower()

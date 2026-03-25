@@ -5,18 +5,17 @@
 
 import pytest
 
-from ad_buyer.models.buyer_identity import (
-    AccessTier,
-    BuyerIdentity,
-    DealType,
-)
 from ad_buyer.identity.strategy import (
     CampaignGoal,
     DealContext,
     IdentityStrategy,
     SellerRelationship,
 )
-
+from ad_buyer.models.buyer_identity import (
+    AccessTier,
+    BuyerIdentity,
+    DealType,
+)
 
 # --- Fixtures ---
 
@@ -289,18 +288,14 @@ class TestEstimateSavings:
         """Upgrading from public to advertiser should give 15% savings."""
         strategy = IdentityStrategy()
         base_price = 20.0
-        savings = strategy.estimate_savings(
-            base_price, AccessTier.PUBLIC, AccessTier.ADVERTISER
-        )
+        savings = strategy.estimate_savings(base_price, AccessTier.PUBLIC, AccessTier.ADVERTISER)
         assert savings == pytest.approx(3.0)  # 15% of $20
 
     def test_savings_from_seat_to_agency(self):
         """Upgrading from seat to agency should give 5% incremental savings."""
         strategy = IdentityStrategy()
         base_price = 20.0
-        savings = strategy.estimate_savings(
-            base_price, AccessTier.SEAT, AccessTier.AGENCY
-        )
+        savings = strategy.estimate_savings(base_price, AccessTier.SEAT, AccessTier.AGENCY)
         assert savings == pytest.approx(1.0)  # (10% - 5%) of $20
 
     def test_savings_same_tier_is_zero(self):
@@ -312,25 +307,19 @@ class TestEstimateSavings:
     def test_savings_downgrade_is_zero(self):
         """Downgrading tiers should return zero savings (no negative savings)."""
         strategy = IdentityStrategy()
-        savings = strategy.estimate_savings(
-            20.0, AccessTier.ADVERTISER, AccessTier.PUBLIC
-        )
+        savings = strategy.estimate_savings(20.0, AccessTier.ADVERTISER, AccessTier.PUBLIC)
         assert savings == 0.0
 
     def test_savings_from_public_to_seat(self):
         """Upgrading from public to seat should give 5% savings."""
         strategy = IdentityStrategy()
-        savings = strategy.estimate_savings(
-            100.0, AccessTier.PUBLIC, AccessTier.SEAT
-        )
+        savings = strategy.estimate_savings(100.0, AccessTier.PUBLIC, AccessTier.SEAT)
         assert savings == pytest.approx(5.0)
 
     def test_savings_zero_price(self):
         """Zero base price should return zero savings."""
         strategy = IdentityStrategy()
-        savings = strategy.estimate_savings(
-            0.0, AccessTier.PUBLIC, AccessTier.ADVERTISER
-        )
+        savings = strategy.estimate_savings(0.0, AccessTier.PUBLIC, AccessTier.ADVERTISER)
         assert savings == 0.0
 
 
