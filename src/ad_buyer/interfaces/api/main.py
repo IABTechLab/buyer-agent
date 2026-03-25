@@ -22,6 +22,7 @@ from ...config.settings import settings
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
 from ...storage import DealStore
+from ...storage.order_store import OrderStore
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,43 @@ def _get_store() -> Optional[DealStore]:
     except (sqlite3.Error, OSError, ValueError, AttributeError):
         logger.exception("Failed to initialise DealStore; running without persistence")
         return None
+
+
+# Lazy OrderStore singleton
+_order_store: Optional[OrderStore] = None
+
+
+def _get_order_store() -> Optional[OrderStore]:
+    """Return a lazily-initialised OrderStore singleton.
+
+    Returns None (and logs a warning) if initialisation fails so that
+    the API can continue operating without order persistence.
+    """
+    global _order_store
+    if _order_store is not None:
+        return _order_store
+    try:
+        current = _current_settings()
+        _order_store = OrderStore(current.database_url)
+        _order_store.connect()
+        return _order_store
+    except (sqlite3.Error, OSError, ValueError, AttributeError):
+        logger.exception("Failed to initialise OrderStore; running without order persistence")
+        return None
+
+
+# Mount buyer order status/audit endpoints
+from .order_endpoints import create_order_router as _create_order_router
+
+
+@app.on_event("startup")
+async def _mount_order_router() -> None:
+    """Mount order router once the OrderStore is available at startup."""
+    store = _get_order_store()
+    if store is not None:
+        app.include_router(_create_order_router(store))
+    else:
+        logger.warning("OrderStore unavailable at startup; order endpoints not mounted")
 
 
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
