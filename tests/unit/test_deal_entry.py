@@ -435,8 +435,10 @@ class TestDealDataStructure:
         assert data["flight_start"] == "2026-04-01"
         assert data["flight_end"] == "2026-06-30"
 
-    def test_deal_data_includes_v2_fields_in_metadata(self):
-        """V2 deal library fields should be included in deal_data metadata JSON."""
+    def test_deal_data_includes_v2_fields_as_top_level_keys(self):
+        """V2 deal library fields should be top-level keys in deal_data,
+        not buried in a metadata JSON blob, so they survive the
+        save_deal/get_deal roundtrip."""
         from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
@@ -460,20 +462,21 @@ class TestDealDataStructure:
         result = create_manual_deal(entry)
 
         data = result.deal_data
-        # V2 fields should be present as top-level metadata JSON keys
-        metadata = json.loads(data["metadata"])
-        assert metadata["display_name"] == "V2 Deal"
-        assert metadata["seller_org"] == "NBCUniversal"
-        assert metadata["seller_domain"] == "nbcuniversal.com"
-        assert metadata["seller_type"] == "PUBLISHER"
-        assert metadata["buyer_org"] == "MediaCo"
-        assert metadata["buyer_id"] == "buyer-001"
-        assert metadata["price_model"] == "CPM"
-        assert metadata["fixed_price_cpm"] == 15.50
-        assert metadata["bid_floor_cpm"] == 12.00
-        assert metadata["currency"] == "EUR"
-        assert metadata["media_type"] == "CTV"
-        assert metadata["description"] == "Premium CTV"
+        # V2 fields must be top-level keys (not inside metadata JSON)
+        assert data["display_name"] == "V2 Deal"
+        assert data["seller_org"] == "NBCUniversal"
+        assert data["seller_domain"] == "nbcuniversal.com"
+        assert data["seller_type"] == "PUBLISHER"
+        assert data["buyer_org"] == "MediaCo"
+        assert data["buyer_id"] == "buyer-001"
+        assert data["price_model"] == "CPM"
+        assert data["fixed_price_cpm"] == 15.50
+        assert data["bid_floor_cpm"] == 12.00
+        assert data["currency"] == "EUR"
+        assert data["media_type"] == "CTV"
+        assert data["description"] == "Premium CTV"
+        # metadata key should no longer be present
+        assert "metadata" not in data
 
 
 # ---------------------------------------------------------------------------

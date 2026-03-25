@@ -239,46 +239,13 @@ def _validate_entry(entry: ManualDealEntry) -> list[str]:
 def _build_deal_data(entry: ManualDealEntry) -> dict[str, Any]:
     """Build a deal dict compatible with DealStore.save_deal() kwargs.
 
-    Maps ManualDealEntry fields to save_deal() parameters. V2 deal library
-    fields that don't have direct save_deal() parameters are packed into
-    the metadata JSON string.
+    Maps ManualDealEntry fields to save_deal() parameters.  V2 deal library
+    fields are passed as top-level keys so they are stored in dedicated
+    columns and survive the save/load roundtrip (instead of being buried
+    in the metadata JSON blob where inspect_deal cannot find them).
     """
-    # V2 extension fields packed into metadata JSON
-    v2_metadata: dict[str, Any] = {}
-
-    # Always include display_name in metadata for v2 column population
-    v2_metadata["display_name"] = entry.display_name
-
-    # Counterparty fields
-    if entry.seller_org is not None:
-        v2_metadata["seller_org"] = entry.seller_org
-    if entry.seller_domain is not None:
-        v2_metadata["seller_domain"] = entry.seller_domain
-    if entry.seller_type is not None:
-        v2_metadata["seller_type"] = entry.seller_type
-    if entry.buyer_org is not None:
-        v2_metadata["buyer_org"] = entry.buyer_org
-    if entry.buyer_id is not None:
-        v2_metadata["buyer_id"] = entry.buyer_id
-
-    # Pricing detail fields
-    if entry.price_model is not None:
-        v2_metadata["price_model"] = entry.price_model
-    if entry.fixed_price_cpm is not None:
-        v2_metadata["fixed_price_cpm"] = entry.fixed_price_cpm
-    if entry.bid_floor_cpm is not None:
-        v2_metadata["bid_floor_cpm"] = entry.bid_floor_cpm
-    v2_metadata["currency"] = entry.currency
-
-    # Inventory fields
-    if entry.media_type is not None:
-        v2_metadata["media_type"] = entry.media_type
-
-    # Description
-    if entry.description is not None:
-        v2_metadata["description"] = entry.description
-
-    # Build the deal dict matching DealStore.save_deal() parameters
+    # Build the deal dict matching DealStore.save_deal() parameters.
+    # V1 core fields:
     deal_data: dict[str, Any] = {
         "seller_url": entry.seller_url,
         "product_id": entry.product_id,
@@ -290,8 +257,33 @@ def _build_deal_data(entry: ManualDealEntry) -> dict[str, Any]:
         "impressions": entry.impressions,
         "flight_start": entry.flight_start,
         "flight_end": entry.flight_end,
-        "metadata": json.dumps(v2_metadata),
     }
+
+    # V2 intrinsic fields -- passed as top-level kwargs to save_deal()
+    # so they are stored in their dedicated columns.
+    deal_data["display_name"] = entry.display_name
+    deal_data["currency"] = entry.currency
+
+    if entry.seller_org is not None:
+        deal_data["seller_org"] = entry.seller_org
+    if entry.seller_domain is not None:
+        deal_data["seller_domain"] = entry.seller_domain
+    if entry.seller_type is not None:
+        deal_data["seller_type"] = entry.seller_type
+    if entry.buyer_org is not None:
+        deal_data["buyer_org"] = entry.buyer_org
+    if entry.buyer_id is not None:
+        deal_data["buyer_id"] = entry.buyer_id
+    if entry.price_model is not None:
+        deal_data["price_model"] = entry.price_model
+    if entry.fixed_price_cpm is not None:
+        deal_data["fixed_price_cpm"] = entry.fixed_price_cpm
+    if entry.bid_floor_cpm is not None:
+        deal_data["bid_floor_cpm"] = entry.bid_floor_cpm
+    if entry.media_type is not None:
+        deal_data["media_type"] = entry.media_type
+    if entry.description is not None:
+        deal_data["description"] = entry.description
 
     return deal_data
 
