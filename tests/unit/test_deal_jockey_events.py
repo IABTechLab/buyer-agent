@@ -13,7 +13,6 @@ import json
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # EventType enum tests - Phase 1 DealJockey events
 # ---------------------------------------------------------------------------
@@ -52,10 +51,7 @@ class TestDealJockeyEventTypes:
 
         assert hasattr(EventType, "DEAL_MANUAL_ACTION_REQUIRED")
         assert EventType.DEAL_MANUAL_ACTION_REQUIRED == "deal.manual_action_required"
-        assert (
-            EventType.DEAL_MANUAL_ACTION_REQUIRED.value
-            == "deal.manual_action_required"
-        )
+        assert EventType.DEAL_MANUAL_ACTION_REQUIRED.value == "deal.manual_action_required"
 
     def test_all_phase1_types_in_enum(self):
         """All four Phase 1 DealJockey event types must be in EventType."""
@@ -238,9 +234,7 @@ class TestDealJockeyEventBus:
 
         received = []
         asyncio.get_event_loop().run_until_complete(
-            bus.subscribe(
-                "deal.manual_action_required", lambda e: received.append(e)
-            )
+            bus.subscribe("deal.manual_action_required", lambda e: received.append(e))
         )
 
         event = Event(event_type=EventType.DEAL_MANUAL_ACTION_REQUIRED)
@@ -385,10 +379,9 @@ class TestDealJockeyEmitEvent:
 
     def test_emit_deal_imported(self):
         """emit_event should handle DEAL_IMPORTED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -407,10 +400,9 @@ class TestDealJockeyEmitEvent:
 
     def test_emit_portfolio_inspected(self):
         """emit_event should handle PORTFOLIO_INSPECTED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -427,10 +419,9 @@ class TestDealJockeyEmitEvent:
 
     def test_emit_deal_manual_action_required(self):
         """emit_event should handle DEAL_MANUAL_ACTION_REQUIRED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -448,10 +439,9 @@ class TestDealJockeyEmitEvent:
 
     def test_emit_sync_deal_imported(self):
         """emit_event_sync should handle DEAL_IMPORTED type."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event_sync
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 

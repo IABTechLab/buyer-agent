@@ -3,7 +3,7 @@
 
 """Channel Specialist Crews for inventory research and booking."""
 
-from typing import Any, Optional
+from typing import Any
 
 from crewai import Crew, Process, Task
 
@@ -13,14 +13,13 @@ from ..agents.level2.mobile_app_agent import create_mobile_app_agent
 from ..agents.level2.performance_agent import create_performance_agent
 from ..agents.level3.execution_agent import create_execution_agent
 from ..agents.level3.research_agent import create_research_agent
-from ..agents.level3.audience_planner_agent import create_audience_planner_agent
 from ..clients.opendirect_client import OpenDirectClient
 from ..config.settings import settings
+from ..tools.audience import AudienceDiscoveryTool, AudienceMatchingTool, CoverageEstimationTool
 from ..tools.execution.line_management import BookLineTool, CreateLineTool, ReserveLineTool
 from ..tools.execution.order_management import CreateOrderTool
 from ..tools.research.avails_check import AvailsCheckTool
 from ..tools.research.product_search import ProductSearchTool
-from ..tools.audience import AudienceDiscoveryTool, AudienceMatchingTool, CoverageEstimationTool
 
 
 def _create_research_tools(client: OpenDirectClient) -> list[Any]:
@@ -50,7 +49,7 @@ def _create_audience_tools() -> list[Any]:
     ]
 
 
-def _format_audience_context(audience_plan: Optional[dict[str, Any]]) -> str:
+def _format_audience_context(audience_plan: dict[str, Any] | None) -> str:
     """Format audience plan as context for research tasks."""
     if not audience_plan:
         return ""
@@ -67,7 +66,9 @@ def _format_audience_context(audience_plan: Optional[dict[str, Any]]) -> str:
         context_parts.append(f"- Behaviors: {', '.join(audience_plan['target_behaviors'])}")
 
     if audience_plan.get("requested_signal_types"):
-        context_parts.append(f"- Required Signals: {', '.join(audience_plan['requested_signal_types'])}")
+        context_parts.append(
+            f"- Required Signals: {', '.join(audience_plan['requested_signal_types'])}"
+        )
 
     if audience_plan.get("exclusions"):
         context_parts.append(f"- Exclusions: {', '.join(audience_plan['exclusions'])}")
@@ -80,7 +81,7 @@ def _format_audience_context(audience_plan: Optional[dict[str, Any]]) -> str:
 def create_branding_crew(
     client: OpenDirectClient,
     channel_brief: dict[str, Any],
-    audience_plan: Optional[dict[str, Any]] = None,
+    audience_plan: dict[str, Any] | None = None,
 ) -> Crew:
     """Create the Branding Specialist crew.
 
@@ -110,10 +111,10 @@ def create_branding_crew(
         description=f"""
 Research premium display and video inventory for a branding campaign:
 
-Budget: ${channel_brief.get('budget', 0):,.2f}
-Flight: {channel_brief.get('start_date')} to {channel_brief.get('end_date')}
-Target Audience: {channel_brief.get('target_audience', {})}
-Objectives: {channel_brief.get('objectives', [])}
+Budget: ${channel_brief.get("budget", 0):,.2f}
+Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
+Target Audience: {channel_brief.get("target_audience", {})}
+Objectives: {channel_brief.get("objectives", [])}
 Quality Requirements: Viewability > 70%, Brand Safety verified
 {audience_context}
 
@@ -179,7 +180,7 @@ Finalize your recommendations for approval.
 def create_mobile_crew(
     client: OpenDirectClient,
     channel_brief: dict[str, Any],
-    audience_plan: Optional[dict[str, Any]] = None,
+    audience_plan: dict[str, Any] | None = None,
 ) -> Crew:
     """Create the Mobile App Install Specialist crew.
 
@@ -209,10 +210,10 @@ def create_mobile_crew(
         description=f"""
 Research mobile app install inventory:
 
-Budget: ${channel_brief.get('budget', 0):,.2f}
-Flight: {channel_brief.get('start_date')} to {channel_brief.get('end_date')}
-Target Audience: {channel_brief.get('target_audience', {})}
-Objectives: {channel_brief.get('objectives', [])}
+Budget: ${channel_brief.get("budget", 0):,.2f}
+Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
+Target Audience: {channel_brief.get("target_audience", {})}
+Objectives: {channel_brief.get("objectives", [])}
 {audience_context}
 
 Search for:
@@ -252,7 +253,7 @@ Prioritize quality over scale - low fraud and proper attribution are critical.
 def create_ctv_crew(
     client: OpenDirectClient,
     channel_brief: dict[str, Any],
-    audience_plan: Optional[dict[str, Any]] = None,
+    audience_plan: dict[str, Any] | None = None,
 ) -> Crew:
     """Create the CTV Specialist crew.
 
@@ -282,10 +283,10 @@ def create_ctv_crew(
         description=f"""
 Research Connected TV and streaming inventory:
 
-Budget: ${channel_brief.get('budget', 0):,.2f}
-Flight: {channel_brief.get('start_date')} to {channel_brief.get('end_date')}
-Target Audience: {channel_brief.get('target_audience', {})}
-Objectives: {channel_brief.get('objectives', [])}
+Budget: ${channel_brief.get("budget", 0):,.2f}
+Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
+Target Audience: {channel_brief.get("target_audience", {})}
+Objectives: {channel_brief.get("objectives", [])}
 {audience_context}
 
 Search for:
@@ -325,7 +326,7 @@ Balance reach with frequency management across devices.
 def create_performance_crew(
     client: OpenDirectClient,
     channel_brief: dict[str, Any],
-    audience_plan: Optional[dict[str, Any]] = None,
+    audience_plan: dict[str, Any] | None = None,
 ) -> Crew:
     """Create the Performance/Remarketing Specialist crew.
 
@@ -355,11 +356,11 @@ def create_performance_crew(
         description=f"""
 Research performance and remarketing inventory:
 
-Budget: ${channel_brief.get('budget', 0):,.2f}
-Flight: {channel_brief.get('start_date')} to {channel_brief.get('end_date')}
-Target Audience: {channel_brief.get('target_audience', {})}
-Objectives: {channel_brief.get('objectives', [])}
-KPIs: {channel_brief.get('kpis', {})}
+Budget: ${channel_brief.get("budget", 0):,.2f}
+Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
+Target Audience: {channel_brief.get("target_audience", {})}
+Objectives: {channel_brief.get("objectives", [])}
+KPIs: {channel_brief.get("kpis", {})}
 {audience_context}
 
 Search for:

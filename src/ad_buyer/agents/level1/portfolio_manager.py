@@ -5,7 +5,7 @@
 
 from typing import Any
 
-from crewai import Agent, LLM
+from crewai import LLM, Agent
 
 from ...config.settings import settings
 

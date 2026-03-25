@@ -8,7 +8,6 @@ error handling, and import result reporting.
 """
 
 import csv
-import io
 import os
 import tempfile
 from pathlib import Path
@@ -16,12 +15,8 @@ from pathlib import Path
 import pytest
 
 from ad_buyer.tools.deal_import import (
-    COLUMN_MAPPINGS,
-    ImportError as DealImportError,
-    ImportResult,
     parse_csv_deals,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

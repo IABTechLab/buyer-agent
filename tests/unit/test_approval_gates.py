@@ -22,13 +22,11 @@ Test categories:
 
 import asyncio
 import json
-import time
-import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ad_buyer.events.bus import InMemoryEventBus
+from ad_buyer.events.models import EventType
 from ad_buyer.models.campaign_brief import ApprovalConfig, ApprovalStage
 from ad_buyer.pipelines.approval import (
     ApprovalGate,
@@ -36,10 +34,7 @@ from ad_buyer.pipelines.approval import (
     ApprovalResult,
     ApprovalStatus,
 )
-from ad_buyer.events.bus import InMemoryEventBus
-from ad_buyer.events.models import Event, EventType
 from ad_buyer.storage.campaign_store import CampaignStore
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -87,9 +82,7 @@ def sample_brief():
 @pytest.fixture
 def campaign_with_default_approval(store, sample_brief):
     """Create a campaign with default approval config (plan_review + booking)."""
-    sample_brief["approval_config"] = json.dumps(
-        ApprovalConfig().model_dump()
-    )
+    sample_brief["approval_config"] = json.dumps(ApprovalConfig().model_dump())
     return store.create_campaign(sample_brief)
 
 
@@ -190,70 +183,52 @@ class TestApprovalRequest:
 class TestCheckApprovalRequired:
     """Tests for ApprovalGate.check_approval_required()."""
 
-    def test_default_config_requires_plan_review(
-        self, gate, campaign_with_default_approval
-    ):
+    def test_default_config_requires_plan_review(self, gate, campaign_with_default_approval):
         """Default config requires approval for PLAN_REVIEW."""
         required = gate.check_approval_required(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
         assert required is True
 
-    def test_default_config_requires_booking(
-        self, gate, campaign_with_default_approval
-    ):
+    def test_default_config_requires_booking(self, gate, campaign_with_default_approval):
         """Default config requires approval for BOOKING."""
         required = gate.check_approval_required(
             campaign_with_default_approval, ApprovalStage.BOOKING
         )
         assert required is True
 
-    def test_default_config_does_not_require_creative(
-        self, gate, campaign_with_default_approval
-    ):
+    def test_default_config_does_not_require_creative(self, gate, campaign_with_default_approval):
         """Default config does NOT require approval for CREATIVE."""
         required = gate.check_approval_required(
             campaign_with_default_approval, ApprovalStage.CREATIVE
         )
         assert required is False
 
-    def test_default_config_does_not_require_pacing(
-        self, gate, campaign_with_default_approval
-    ):
+    def test_default_config_does_not_require_pacing(self, gate, campaign_with_default_approval):
         """Default config does NOT require approval for PACING_ADJUSTMENT."""
         required = gate.check_approval_required(
             campaign_with_default_approval, ApprovalStage.PACING_ADJUSTMENT
         )
         assert required is False
 
-    def test_fully_automated_requires_nothing(
-        self, gate, campaign_fully_automated
-    ):
+    def test_fully_automated_requires_nothing(self, gate, campaign_fully_automated):
         """A fully automated campaign requires no approvals."""
         for stage in ApprovalStage:
-            required = gate.check_approval_required(
-                campaign_fully_automated, stage
-            )
+            required = gate.check_approval_required(campaign_fully_automated, stage)
             assert required is False, f"Stage {stage} should not require approval"
 
     def test_all_gates_enabled(self, gate, campaign_all_gates):
         """A campaign with all gates enabled requires all approvals."""
         for stage in ApprovalStage:
-            required = gate.check_approval_required(
-                campaign_all_gates, stage
-            )
+            required = gate.check_approval_required(campaign_all_gates, stage)
             assert required is True, f"Stage {stage} should require approval"
 
     def test_campaign_not_found_returns_false(self, gate):
         """check_approval_required returns False for nonexistent campaign."""
-        required = gate.check_approval_required(
-            "nonexistent-campaign", ApprovalStage.PLAN_REVIEW
-        )
+        required = gate.check_approval_required("nonexistent-campaign", ApprovalStage.PLAN_REVIEW)
         assert required is False
 
-    def test_campaign_without_approval_config_uses_defaults(
-        self, gate, store, sample_brief
-    ):
+    def test_campaign_without_approval_config_uses_defaults(self, gate, store, sample_brief):
         """Campaign without explicit approval_config uses defaults."""
         # Create campaign without setting approval_config
         cid = store.create_campaign(sample_brief)
@@ -272,9 +247,7 @@ class TestRequestApproval:
     """Tests for ApprovalGate.request_approval()."""
 
     @pytest.mark.asyncio
-    async def test_creates_approval_request(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_creates_approval_request(self, gate, campaign_with_default_approval):
         """request_approval creates and returns an approval request ID."""
         request_id = await gate.request_approval(
             campaign_with_default_approval,
@@ -286,9 +259,7 @@ class TestRequestApproval:
         assert len(request_id) > 0
 
     @pytest.mark.asyncio
-    async def test_approval_request_is_retrievable(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_approval_request_is_retrievable(self, gate, campaign_with_default_approval):
         """After requesting, the approval request can be retrieved."""
         request_id = await gate.request_approval(
             campaign_with_default_approval,
@@ -310,9 +281,7 @@ class TestRequestApproval:
         def capture(event):
             events_received.append(event)
 
-        await event_bus.subscribe(
-            EventType.APPROVAL_REQUESTED.value, capture
-        )
+        await event_bus.subscribe(EventType.APPROVAL_REQUESTED.value, capture)
 
         await gate.request_approval(
             campaign_with_default_approval,
@@ -326,9 +295,7 @@ class TestRequestApproval:
         assert event.payload["stage"] == ApprovalStage.PLAN_REVIEW.value
 
     @pytest.mark.asyncio
-    async def test_request_with_context_stored(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_request_with_context_stored(self, gate, campaign_with_default_approval):
         """Context passed to request_approval is stored on the request."""
         context = {"deal_count": 3, "estimated_cpm": 12.50}
         request_id = await gate.request_approval(
@@ -340,16 +307,10 @@ class TestRequestApproval:
         assert req.context == context
 
     @pytest.mark.asyncio
-    async def test_multiple_requests_for_same_campaign(
-        self, gate, campaign_all_gates
-    ):
+    async def test_multiple_requests_for_same_campaign(self, gate, campaign_all_gates):
         """Multiple approval requests can exist for different stages."""
-        id1 = await gate.request_approval(
-            campaign_all_gates, ApprovalStage.PLAN_REVIEW
-        )
-        id2 = await gate.request_approval(
-            campaign_all_gates, ApprovalStage.BOOKING
-        )
+        id1 = await gate.request_approval(campaign_all_gates, ApprovalStage.PLAN_REVIEW)
+        id2 = await gate.request_approval(campaign_all_gates, ApprovalStage.BOOKING)
         assert id1 != id2
         req1 = gate.get_approval_request(id1)
         req2 = gate.get_approval_request(id2)
@@ -366,16 +327,12 @@ class TestRecordApproval:
     """Tests for ApprovalGate.record_approval()."""
 
     @pytest.mark.asyncio
-    async def test_approve_request(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_approve_request(self, gate, campaign_with_default_approval):
         """record_approval with approved=True marks request as approved."""
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=True, reviewer="user-123", notes="LGTM"
-        )
+        await gate.record_approval(request_id, approved=True, reviewer="user-123", notes="LGTM")
         req = gate.get_approval_request(request_id)
         assert req.status == ApprovalStatus.APPROVED
         assert req.reviewer == "user-123"
@@ -383,9 +340,7 @@ class TestRecordApproval:
         assert req.decided_at is not None
 
     @pytest.mark.asyncio
-    async def test_reject_request(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_reject_request(self, gate, campaign_with_default_approval):
         """record_approval with approved=False marks request as rejected."""
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.BOOKING
@@ -411,16 +366,12 @@ class TestRecordApproval:
         def capture(event):
             events_received.append(event)
 
-        await event_bus.subscribe(
-            EventType.APPROVAL_GRANTED.value, capture
-        )
+        await event_bus.subscribe(EventType.APPROVAL_GRANTED.value, capture)
 
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=True, reviewer="user-1"
-        )
+        await gate.record_approval(request_id, approved=True, reviewer="user-1")
 
         assert len(events_received) == 1
         event = events_received[0]
@@ -439,16 +390,12 @@ class TestRecordApproval:
         def capture(event):
             events_received.append(event)
 
-        await event_bus.subscribe(
-            EventType.APPROVAL_REJECTED.value, capture
-        )
+        await event_bus.subscribe(EventType.APPROVAL_REJECTED.value, capture)
 
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.BOOKING
         )
-        await gate.record_approval(
-            request_id, approved=False, reviewer="user-2", notes="No"
-        )
+        await gate.record_approval(request_id, approved=False, reviewer="user-2", notes="No")
 
         assert len(events_received) == 1
         event = events_received[0]
@@ -459,9 +406,7 @@ class TestRecordApproval:
     async def test_record_approval_nonexistent_request_raises(self, gate):
         """record_approval raises ValueError for unknown request ID."""
         with pytest.raises(ValueError, match="not found"):
-            await gate.record_approval(
-                "nonexistent-id", approved=True, reviewer="user-1"
-            )
+            await gate.record_approval("nonexistent-id", approved=True, reviewer="user-1")
 
     @pytest.mark.asyncio
     async def test_record_approval_already_decided_raises(
@@ -471,13 +416,9 @@ class TestRecordApproval:
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=True, reviewer="user-1"
-        )
+        await gate.record_approval(request_id, approved=True, reviewer="user-1")
         with pytest.raises(ValueError, match="already decided"):
-            await gate.record_approval(
-                request_id, approved=False, reviewer="user-2"
-            )
+            await gate.record_approval(request_id, approved=False, reviewer="user-2")
 
 
 # ---------------------------------------------------------------------------
@@ -489,9 +430,7 @@ class TestIsApproved:
     """Tests for ApprovalGate.is_approved()."""
 
     @pytest.mark.asyncio
-    async def test_pending_is_not_approved(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_pending_is_not_approved(self, gate, campaign_with_default_approval):
         """A pending request is not approved."""
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
@@ -499,29 +438,21 @@ class TestIsApproved:
         assert gate.is_approved(request_id) is False
 
     @pytest.mark.asyncio
-    async def test_approved_is_approved(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_approved_is_approved(self, gate, campaign_with_default_approval):
         """An approved request is approved."""
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=True, reviewer="user-1"
-        )
+        await gate.record_approval(request_id, approved=True, reviewer="user-1")
         assert gate.is_approved(request_id) is True
 
     @pytest.mark.asyncio
-    async def test_rejected_is_not_approved(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_rejected_is_not_approved(self, gate, campaign_with_default_approval):
         """A rejected request is not approved."""
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=False, reviewer="user-1"
-        )
+        await gate.record_approval(request_id, approved=False, reviewer="user-1")
         assert gate.is_approved(request_id) is False
 
     def test_nonexistent_is_not_approved(self, gate):
@@ -538,58 +469,32 @@ class TestListApprovalRequests:
     """Tests for ApprovalGate.list_approval_requests()."""
 
     @pytest.mark.asyncio
-    async def test_list_by_campaign(
-        self, gate, campaign_with_default_approval, campaign_all_gates
-    ):
+    async def test_list_by_campaign(self, gate, campaign_with_default_approval, campaign_all_gates):
         """list_approval_requests filters by campaign_id."""
-        await gate.request_approval(
-            campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
-        )
-        await gate.request_approval(
-            campaign_all_gates, ApprovalStage.BOOKING
-        )
-        results = gate.list_approval_requests(
-            campaign_id=campaign_with_default_approval
-        )
+        await gate.request_approval(campaign_with_default_approval, ApprovalStage.PLAN_REVIEW)
+        await gate.request_approval(campaign_all_gates, ApprovalStage.BOOKING)
+        results = gate.list_approval_requests(campaign_id=campaign_with_default_approval)
         assert len(results) == 1
         assert results[0].campaign_id == campaign_with_default_approval
 
     @pytest.mark.asyncio
-    async def test_list_by_stage(
-        self, gate, campaign_all_gates
-    ):
+    async def test_list_by_stage(self, gate, campaign_all_gates):
         """list_approval_requests filters by stage."""
-        await gate.request_approval(
-            campaign_all_gates, ApprovalStage.PLAN_REVIEW
-        )
-        await gate.request_approval(
-            campaign_all_gates, ApprovalStage.BOOKING
-        )
-        results = gate.list_approval_requests(
-            stage=ApprovalStage.BOOKING
-        )
+        await gate.request_approval(campaign_all_gates, ApprovalStage.PLAN_REVIEW)
+        await gate.request_approval(campaign_all_gates, ApprovalStage.BOOKING)
+        results = gate.list_approval_requests(stage=ApprovalStage.BOOKING)
         assert len(results) == 1
         assert results[0].stage == ApprovalStage.BOOKING
 
     @pytest.mark.asyncio
-    async def test_list_by_status(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_list_by_status(self, gate, campaign_with_default_approval):
         """list_approval_requests filters by status."""
-        id1 = await gate.request_approval(
-            campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
-        )
-        await gate.request_approval(
-            campaign_with_default_approval, ApprovalStage.BOOKING
-        )
+        id1 = await gate.request_approval(campaign_with_default_approval, ApprovalStage.PLAN_REVIEW)
+        await gate.request_approval(campaign_with_default_approval, ApprovalStage.BOOKING)
         await gate.record_approval(id1, approved=True, reviewer="user-1")
 
-        pending = gate.list_approval_requests(
-            status=ApprovalStatus.PENDING
-        )
-        approved = gate.list_approval_requests(
-            status=ApprovalStatus.APPROVED
-        )
+        pending = gate.list_approval_requests(status=ApprovalStatus.PENDING)
+        approved = gate.list_approval_requests(status=ApprovalStatus.APPROVED)
         assert len(pending) == 1
         assert len(approved) == 1
         assert approved[0].stage == ApprovalStage.PLAN_REVIEW
@@ -617,9 +522,7 @@ class TestWaitForApproval:
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=True, reviewer="user-1"
-        )
+        await gate.record_approval(request_id, approved=True, reviewer="user-1")
         result = await gate.wait_for_approval(request_id, timeout=1.0)
         assert result.approved is True
         assert result.timed_out is False
@@ -632,17 +535,13 @@ class TestWaitForApproval:
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=False, reviewer="user-1"
-        )
+        await gate.record_approval(request_id, approved=False, reviewer="user-1")
         result = await gate.wait_for_approval(request_id, timeout=1.0)
         assert result.approved is False
         assert result.timed_out is False
 
     @pytest.mark.asyncio
-    async def test_times_out_when_pending(
-        self, gate, campaign_with_default_approval
-    ):
+    async def test_times_out_when_pending(self, gate, campaign_with_default_approval):
         """wait_for_approval times out if no decision within timeout."""
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
@@ -662,9 +561,7 @@ class TestWaitForApproval:
 
         async def approve_later():
             await asyncio.sleep(0.05)
-            await gate.record_approval(
-                request_id, approved=True, reviewer="user-1"
-            )
+            await gate.record_approval(request_id, approved=True, reviewer="user-1")
 
         # Run approval in background while waiting
         task = asyncio.create_task(approve_later())
@@ -699,9 +596,7 @@ class TestApprovalStorage:
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
         # Verify by reading directly from the store
-        rows = store.list_approval_requests(
-            campaign_id=campaign_with_default_approval
-        )
+        rows = store.list_approval_requests(campaign_id=campaign_with_default_approval)
         assert len(rows) == 1
         assert rows[0]["approval_request_id"] == request_id
         assert rows[0]["stage"] == ApprovalStage.PLAN_REVIEW.value
@@ -715,12 +610,8 @@ class TestApprovalStorage:
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate.record_approval(
-            request_id, approved=True, reviewer="user-1", notes="OK"
-        )
-        rows = store.list_approval_requests(
-            campaign_id=campaign_with_default_approval
-        )
+        await gate.record_approval(request_id, approved=True, reviewer="user-1", notes="OK")
+        rows = store.list_approval_requests(campaign_id=campaign_with_default_approval)
         assert rows[0]["status"] == ApprovalStatus.APPROVED.value
         assert rows[0]["reviewer"] == "user-1"
         assert rows[0]["notes"] == "OK"
@@ -735,9 +626,7 @@ class TestApprovalStorage:
         request_id = await gate1.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
         )
-        await gate1.record_approval(
-            request_id, approved=True, reviewer="user-1"
-        )
+        await gate1.record_approval(request_id, approved=True, reviewer="user-1")
 
         # Create a new ApprovalGate -- should load from same store
         gate2 = ApprovalGate(event_bus=event_bus, campaign_store=store)
@@ -769,16 +658,12 @@ class TestEventBusIntegration:
         await event_bus.subscribe("*", capture_all)
 
         # Request approval
-        id1 = await gate.request_approval(
-            campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
-        )
+        id1 = await gate.request_approval(campaign_with_default_approval, ApprovalStage.PLAN_REVIEW)
         # Approve it
         await gate.record_approval(id1, approved=True, reviewer="user-1")
 
         # Request another
-        id2 = await gate.request_approval(
-            campaign_with_default_approval, ApprovalStage.BOOKING
-        )
+        id2 = await gate.request_approval(campaign_with_default_approval, ApprovalStage.BOOKING)
         # Reject it
         await gate.record_approval(id2, approved=False, reviewer="user-2")
 
@@ -798,9 +683,7 @@ class TestEventBusIntegration:
         def capture(event):
             events_received.append(event)
 
-        await event_bus.subscribe(
-            EventType.APPROVAL_REQUESTED.value, capture
-        )
+        await event_bus.subscribe(EventType.APPROVAL_REQUESTED.value, capture)
 
         request_id = await gate.request_approval(
             campaign_with_default_approval, ApprovalStage.PLAN_REVIEW
@@ -834,16 +717,10 @@ class TestEdgeCases:
         assert req.stage == ApprovalStage.CREATIVE
 
     @pytest.mark.asyncio
-    async def test_multiple_pending_requests_for_same_stage(
-        self, gate, campaign_all_gates
-    ):
+    async def test_multiple_pending_requests_for_same_stage(self, gate, campaign_all_gates):
         """Multiple pending requests for the same stage are allowed."""
-        id1 = await gate.request_approval(
-            campaign_all_gates, ApprovalStage.PLAN_REVIEW
-        )
-        id2 = await gate.request_approval(
-            campaign_all_gates, ApprovalStage.PLAN_REVIEW
-        )
+        id1 = await gate.request_approval(campaign_all_gates, ApprovalStage.PLAN_REVIEW)
+        id2 = await gate.request_approval(campaign_all_gates, ApprovalStage.PLAN_REVIEW)
         assert id1 != id2
         # Both should be retrievable
         assert gate.get_approval_request(id1) is not None

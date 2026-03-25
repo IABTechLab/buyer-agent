@@ -5,6 +5,7 @@
 
 from typing import Any, Optional, Type
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -67,7 +68,7 @@ class AudienceDiscoveryTool(BaseTool):
 
         try:
             capabilities = await client.discover_capabilities(seller_endpoint)
-        except Exception as e:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             return f"Error discovering capabilities: {e}"
         finally:
             await client.close()

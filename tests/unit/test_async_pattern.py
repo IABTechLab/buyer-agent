@@ -41,6 +41,7 @@ async def test_run_async_inside_running_loop():
 
 def test_run_async_propagates_exceptions():
     """run_async propagates exceptions from the coroutine."""
+
     async def _failing():
         raise ValueError("test error")
 
@@ -51,6 +52,7 @@ def test_run_async_propagates_exceptions():
 @pytest.mark.asyncio
 async def test_run_async_propagates_exceptions_in_running_loop():
     """run_async propagates exceptions even inside a running loop."""
+
     async def _failing():
         raise ValueError("test error")
 

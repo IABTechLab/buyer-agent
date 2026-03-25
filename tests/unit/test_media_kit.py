@@ -12,7 +12,6 @@ Tests cover:
 - Error handling (seller down, 404, timeouts)
 """
 
-import asyncio
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -26,7 +25,6 @@ from ad_buyer.media_kit.models import (
     PackageSummary,
     SearchFilter,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures: sample seller responses
@@ -270,7 +268,9 @@ class TestListPackages:
         client = MediaKitClient()
         mock_resp = _mock_response(SAMPLE_PACKAGES_RESPONSE)
 
-        with patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_resp) as mock_get:
+        with patch.object(
+            client._http, "get", new_callable=AsyncMock, return_value=mock_resp
+        ) as mock_get:
             await client.list_packages(SELLER_URL, layer="curated", featured_only=True)
 
         # Check that params were passed
@@ -361,7 +361,9 @@ class TestSearchPackages:
             agency_id="agency-1",
         )
 
-        with patch.object(client._http, "post", new_callable=AsyncMock, return_value=mock_resp) as mock_post:
+        with patch.object(
+            client._http, "post", new_callable=AsyncMock, return_value=mock_resp
+        ) as mock_post:
             await client.search_packages(SELLER_URL, query="sports", filters=search_filter)
 
         call_kwargs = mock_post.call_args
@@ -376,7 +378,9 @@ class TestSearchPackages:
         client = MediaKitClient(api_key="secret-key")
         mock_resp = _mock_response(SAMPLE_SEARCH_RESPONSE)
 
-        with patch.object(client._http, "post", new_callable=AsyncMock, return_value=mock_resp) as mock_post:
+        with patch.object(
+            client._http, "post", new_callable=AsyncMock, return_value=mock_resp
+        ) as mock_post:
             await client.search_packages(SELLER_URL, query="sports")
 
         call_kwargs = mock_post.call_args
@@ -397,40 +401,44 @@ class TestAggregateAcrossSellers:
         """Should query multiple sellers in parallel and merge results."""
         client = MediaKitClient()
 
-        resp1 = _mock_response({
-            "packages": [
-                {
-                    "package_id": "pkg-s1-001",
-                    "name": "Seller 1 Package",
-                    "ad_formats": ["banner"],
-                    "device_types": [2],
-                    "cat": [],
-                    "cattax": 2,
-                    "geo_targets": ["US"],
-                    "tags": [],
-                    "price_range": "$10-$15 CPM",
-                    "rate_type": "cpm",
-                    "is_featured": False,
-                }
-            ]
-        })
-        resp2 = _mock_response({
-            "packages": [
-                {
-                    "package_id": "pkg-s2-001",
-                    "name": "Seller 2 Package",
-                    "ad_formats": ["video"],
-                    "device_types": [3],
-                    "cat": [],
-                    "cattax": 2,
-                    "geo_targets": ["UK"],
-                    "tags": [],
-                    "price_range": "$20-$30 CPM",
-                    "rate_type": "cpm",
-                    "is_featured": True,
-                }
-            ]
-        })
+        resp1 = _mock_response(
+            {
+                "packages": [
+                    {
+                        "package_id": "pkg-s1-001",
+                        "name": "Seller 1 Package",
+                        "ad_formats": ["banner"],
+                        "device_types": [2],
+                        "cat": [],
+                        "cattax": 2,
+                        "geo_targets": ["US"],
+                        "tags": [],
+                        "price_range": "$10-$15 CPM",
+                        "rate_type": "cpm",
+                        "is_featured": False,
+                    }
+                ]
+            }
+        )
+        resp2 = _mock_response(
+            {
+                "packages": [
+                    {
+                        "package_id": "pkg-s2-001",
+                        "name": "Seller 2 Package",
+                        "ad_formats": ["video"],
+                        "device_types": [3],
+                        "cat": [],
+                        "cattax": 2,
+                        "geo_targets": ["UK"],
+                        "tags": [],
+                        "price_range": "$20-$30 CPM",
+                        "rate_type": "cpm",
+                        "is_featured": True,
+                    }
+                ]
+            }
+        )
 
         call_count = 0
 
@@ -454,23 +462,25 @@ class TestAggregateAcrossSellers:
         """Should return results from reachable sellers, skip failed ones."""
         client = MediaKitClient()
 
-        resp_ok = _mock_response({
-            "packages": [
-                {
-                    "package_id": "pkg-ok",
-                    "name": "OK Package",
-                    "ad_formats": [],
-                    "device_types": [],
-                    "cat": [],
-                    "cattax": 2,
-                    "geo_targets": [],
-                    "tags": [],
-                    "price_range": "$10 CPM",
-                    "rate_type": "cpm",
-                    "is_featured": False,
-                }
-            ]
-        })
+        resp_ok = _mock_response(
+            {
+                "packages": [
+                    {
+                        "package_id": "pkg-ok",
+                        "name": "OK Package",
+                        "ad_formats": [],
+                        "device_types": [],
+                        "cat": [],
+                        "cattax": 2,
+                        "geo_targets": [],
+                        "tags": [],
+                        "price_range": "$10 CPM",
+                        "rate_type": "cpm",
+                        "is_featured": False,
+                    }
+                ]
+            }
+        )
 
         async def mock_get(url, **kwargs):
             if SELLER_URL in url:
@@ -505,7 +515,9 @@ class TestAuthBehavior:
         client = MediaKitClient()  # no api_key
         mock_resp = _mock_response(SAMPLE_PACKAGES_RESPONSE)
 
-        with patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_resp) as mock_get:
+        with patch.object(
+            client._http, "get", new_callable=AsyncMock, return_value=mock_resp
+        ) as mock_get:
             await client.list_packages(SELLER_URL)
 
         call_kwargs = mock_get.call_args
@@ -518,7 +530,9 @@ class TestAuthBehavior:
         client = MediaKitClient(api_key="my-key")
         mock_resp = _mock_response(SAMPLE_MEDIA_KIT_RESPONSE)
 
-        with patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_resp) as mock_get:
+        with patch.object(
+            client._http, "get", new_callable=AsyncMock, return_value=mock_resp
+        ) as mock_get:
             await client.get_media_kit(SELLER_URL)
 
         call_kwargs = mock_get.call_args
@@ -547,4 +561,7 @@ class TestTimeoutHandling:
         ):
             with pytest.raises(MediaKitError) as exc_info:
                 await client.get_media_kit(SELLER_URL)
-            assert "timed out" in str(exc_info.value).lower() or "timeout" in str(exc_info.value).lower()
+            assert (
+                "timed out" in str(exc_info.value).lower()
+                or "timeout" in str(exc_info.value).lower()
+            )

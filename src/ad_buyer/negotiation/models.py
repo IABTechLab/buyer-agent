@@ -10,7 +10,6 @@ session state and outcome.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -45,7 +44,7 @@ class NegotiationSession(BaseModel):
     seller_url: str
     negotiation_id: str
     current_seller_price: float
-    our_last_offer: Optional[float] = None
+    our_last_offer: float | None = None
     rounds: list[NegotiationRound] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -55,7 +54,7 @@ class NegotiationResult(BaseModel):
 
     proposal_id: str
     outcome: NegotiationOutcome
-    final_price: Optional[float] = None
+    final_price: float | None = None
     rounds_count: int = 0
     rounds: list[NegotiationRound] = Field(default_factory=list)
     completed_at: datetime = Field(default_factory=datetime.utcnow)

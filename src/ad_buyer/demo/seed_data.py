@@ -11,14 +11,14 @@ for selected deals to demonstrate the full v2 schema.
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ..storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
 
 # Convenience timestamp
-_NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+_NOW = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def seed_demo_data(store: DealStore) -> list[str]:
@@ -82,10 +82,12 @@ def seed_demo_data(store: DealStore) -> list[str]:
         store.save_event(
             event_type="deal.imported",
             deal_id=deal_id,
-            payload=json.dumps({
-                "import_source": "SEED",
-                "display_name": spec.get("display_name", spec.get("product_name", "")),
-            }),
+            payload=json.dumps(
+                {
+                    "import_source": "SEED",
+                    "display_name": spec.get("display_name", spec.get("product_name", "")),
+                }
+            ),
         )
 
     logger.info("Seeded %d demo deals", len(created_ids))
@@ -125,8 +127,16 @@ def _build_deals() -> list[dict]:
                 "import_source": "CSV",
             },
             "_activations": [
-                {"platform": "TTD", "platform_deal_id": "TTD-ESPN-7890", "activation_status": "ACTIVE"},
-                {"platform": "DV360", "platform_deal_id": "DV-ESPN-4521", "activation_status": "ACTIVE"},
+                {
+                    "platform": "TTD",
+                    "platform_deal_id": "TTD-ESPN-7890",
+                    "activation_status": "ACTIVE",
+                },
+                {
+                    "platform": "DV360",
+                    "platform_deal_id": "DV-ESPN-4521",
+                    "activation_status": "ACTIVE",
+                },
             ],
             "_performance_cache": {
                 "impressions_delivered": 3250000,
@@ -165,7 +175,11 @@ def _build_deals() -> list[dict]:
                 "import_source": "CSV",
             },
             "_activations": [
-                {"platform": "TTD", "platform_deal_id": "TTD-NYT-1234", "activation_status": "ACTIVE"},
+                {
+                    "platform": "TTD",
+                    "platform_deal_id": "TTD-NYT-1234",
+                    "activation_status": "ACTIVE",
+                },
             ],
             "_performance_cache": {
                 "impressions_delivered": 800000,
@@ -254,8 +268,16 @@ def _build_deals() -> list[dict]:
                 "import_source": "CSV",
             },
             "_activations": [
-                {"platform": "TTD", "platform_deal_id": "TTD-HULU-5678", "activation_status": "ACTIVE"},
-                {"platform": "DV360", "platform_deal_id": "DV-HULU-9012", "activation_status": "PENDING"},
+                {
+                    "platform": "TTD",
+                    "platform_deal_id": "TTD-HULU-5678",
+                    "activation_status": "ACTIVE",
+                },
+                {
+                    "platform": "DV360",
+                    "platform_deal_id": "DV-HULU-9012",
+                    "activation_status": "PENDING",
+                },
             ],
             "_performance_cache": {
                 "impressions_delivered": 420000,
@@ -405,7 +427,11 @@ def _build_deals() -> list[dict]:
                 "import_source": "CSV",
             },
             "_activations": [
-                {"platform": "TTD", "platform_deal_id": "TTD-SPOT-3456", "activation_status": "PAUSED"},
+                {
+                    "platform": "TTD",
+                    "platform_deal_id": "TTD-SPOT-3456",
+                    "activation_status": "PAUSED",
+                },
             ],
             "_performance_cache": {
                 "impressions_delivered": 650000,
@@ -489,7 +515,11 @@ def _build_deals() -> list[dict]:
             "description": "Political news and analysis sections, high engagement.",
             "content_categories": "IAB11,IAB11-4",
             "_activations": [
-                {"platform": "DV360", "platform_deal_id": "DV-WAPO-6789", "activation_status": "ACTIVE"},
+                {
+                    "platform": "DV360",
+                    "platform_deal_id": "DV-WAPO-6789",
+                    "activation_status": "ACTIVE",
+                },
             ],
             "_performance_cache": {
                 "impressions_delivered": 1100000,
@@ -524,10 +554,12 @@ def _build_deals() -> list[dict]:
             "description": "Roku Channel CTV supply via Magnite SSP.",
             "formats": "video_15s,video_30s",
             "schain_complete": 1,
-            "schain_nodes": json.dumps([
-                {"asi": "magnite.com", "sid": "12345", "hp": 1},
-                {"asi": "roku.com", "sid": "67890", "hp": 1},
-            ]),
+            "schain_nodes": json.dumps(
+                [
+                    {"asi": "magnite.com", "sid": "12345", "hp": 1},
+                    {"asi": "roku.com", "sid": "67890", "hp": 1},
+                ]
+            ),
             "is_direct": 0,
             "hop_count": 2,
             "_portfolio_metadata": {
@@ -536,7 +568,11 @@ def _build_deals() -> list[dict]:
                 "import_source": "TTD_API",
             },
             "_activations": [
-                {"platform": "TTD", "platform_deal_id": "TTD-ROKU-MAG-111", "activation_status": "ACTIVE"},
+                {
+                    "platform": "TTD",
+                    "platform_deal_id": "TTD-ROKU-MAG-111",
+                    "activation_status": "ACTIVE",
+                },
             ],
             "_performance_cache": {
                 "impressions_delivered": 950000,

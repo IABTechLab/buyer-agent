@@ -9,22 +9,20 @@ All tests use in-memory SQLite (`:memory:`) for speed and isolation.
 import json
 import sqlite3
 import threading
-import time
-from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ad_buyer.storage import DealStore, SCHEMA_VERSION, create_tables, initialize_schema
+from ad_buyer.storage import SCHEMA_VERSION, DealStore, create_tables, initialize_schema
 from ad_buyer.storage.schema import (
     get_schema_version,
     run_migrations,
     set_schema_version,
 )
 
-
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
+
 
 @pytest.fixture
 def deal_store():
@@ -48,15 +46,14 @@ def raw_conn():
 # Schema Tests
 # -----------------------------------------------------------------------
 
+
 class TestSchema:
     """Tests for schema creation and migration."""
 
     def test_create_tables_creates_all_tables(self, raw_conn):
         """All 6 tables (5 domain + schema_version) are created."""
         create_tables(raw_conn)
-        cursor = raw_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
-        )
+        cursor = raw_conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
         tables = {row[0] for row in cursor.fetchall()}
         expected = {
             "schema_version",
@@ -125,6 +122,7 @@ class TestSchema:
 # DealStore Lifecycle Tests
 # -----------------------------------------------------------------------
 
+
 class TestDealStoreLifecycle:
     """Tests for DealStore connect/disconnect."""
 
@@ -133,9 +131,7 @@ class TestDealStoreLifecycle:
         store = DealStore("sqlite:///:memory:")
         store.connect()
         # Verify by listing tables
-        cursor = store._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        cursor = store._conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row[0] for row in cursor.fetchall()}
         assert "deals" in tables
         assert "jobs" in tables
@@ -182,6 +178,7 @@ class TestDealStoreLifecycle:
 # -----------------------------------------------------------------------
 # Deal CRUD Tests
 # -----------------------------------------------------------------------
+
 
 class TestDealCRUD:
     """Tests for deal creation, retrieval, listing, and status updates."""
@@ -267,12 +264,8 @@ class TestDealCRUD:
 
     def test_list_deals_filter_by_status(self, deal_store):
         """list_deals filters by status."""
-        deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1", status="draft"
-        )
-        deal_store.save_deal(
-            seller_url="http://b.com", product_id="p2", status="booked"
-        )
+        deal_store.save_deal(seller_url="http://a.com", product_id="p1", status="draft")
+        deal_store.save_deal(seller_url="http://b.com", product_id="p2", status="booked")
         drafts = deal_store.list_deals(status="draft")
         assert len(drafts) == 1
         assert drafts[0]["status"] == "draft"
@@ -288,20 +281,14 @@ class TestDealCRUD:
     def test_list_deals_limit(self, deal_store):
         """list_deals respects the limit parameter."""
         for i in range(5):
-            deal_store.save_deal(
-                seller_url="http://a.com", product_id=f"p{i}"
-            )
+            deal_store.save_deal(seller_url="http://a.com", product_id=f"p{i}")
         results = deal_store.list_deals(limit=3)
         assert len(results) == 3
 
     def test_list_deals_ordered_by_created_at_desc(self, deal_store):
         """list_deals returns newest first."""
-        d1 = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
-        d2 = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p2"
-        )
+        d1 = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
+        d2 = deal_store.save_deal(seller_url="http://a.com", product_id="p2")
         results = deal_store.list_deals()
         # Most recently created should come first
         assert results[0]["id"] == d2
@@ -309,9 +296,7 @@ class TestDealCRUD:
 
     def test_update_deal_status(self, deal_store):
         """update_deal_status changes the status and logs transition."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1", status="draft"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1", status="draft")
         result = deal_store.update_deal_status(did, "negotiating")
         assert result is True
 
@@ -330,9 +315,7 @@ class TestDealCRUD:
 
     def test_update_deal_status_with_triggered_by(self, deal_store):
         """update_deal_status records triggered_by in transition."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1", status="draft"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1", status="draft")
         deal_store.update_deal_status(
             did, "delivering", triggered_by="seller_push", notes="Seller confirmed"
         )
@@ -346,14 +329,13 @@ class TestDealCRUD:
 # Negotiation Round Tests
 # -----------------------------------------------------------------------
 
+
 class TestNegotiationRounds:
     """Tests for negotiation round persistence."""
 
     def test_save_and_get_rounds(self, deal_store):
         """save_negotiation_round and get_negotiation_history round-trip."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         deal_store.save_negotiation_round(
             deal_id=did,
             proposal_id="prop_1",
@@ -383,17 +365,23 @@ class TestNegotiationRounds:
 
     def test_negotiation_round_ordered_by_round_number(self, deal_store):
         """Rounds are returned in ascending order."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         # Insert out of order
         deal_store.save_negotiation_round(
-            deal_id=did, proposal_id="prop_1", round_number=3,
-            buyer_price=12.0, seller_price=13.0, action="accept",
+            deal_id=did,
+            proposal_id="prop_1",
+            round_number=3,
+            buyer_price=12.0,
+            seller_price=13.0,
+            action="accept",
         )
         deal_store.save_negotiation_round(
-            deal_id=did, proposal_id="prop_1", round_number=1,
-            buyer_price=10.0, seller_price=15.0, action="counter",
+            deal_id=did,
+            proposal_id="prop_1",
+            round_number=1,
+            buyer_price=10.0,
+            seller_price=15.0,
+            action="counter",
         )
         history = deal_store.get_negotiation_history(did)
         assert history[0]["round_number"] == 1
@@ -401,24 +389,28 @@ class TestNegotiationRounds:
 
     def test_duplicate_round_number_raises(self, deal_store):
         """UNIQUE(deal_id, round_number) prevents duplicate rounds."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         deal_store.save_negotiation_round(
-            deal_id=did, proposal_id="prop_1", round_number=1,
-            buyer_price=10.0, seller_price=15.0, action="counter",
+            deal_id=did,
+            proposal_id="prop_1",
+            round_number=1,
+            buyer_price=10.0,
+            seller_price=15.0,
+            action="counter",
         )
         with pytest.raises(sqlite3.IntegrityError):
             deal_store.save_negotiation_round(
-                deal_id=did, proposal_id="prop_1", round_number=1,
-                buyer_price=11.0, seller_price=14.0, action="counter",
+                deal_id=did,
+                proposal_id="prop_1",
+                round_number=1,
+                buyer_price=11.0,
+                seller_price=14.0,
+                action="counter",
             )
 
     def test_empty_negotiation_history(self, deal_store):
         """get_negotiation_history returns empty list for deal with no rounds."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         assert deal_store.get_negotiation_history(did) == []
 
 
@@ -426,14 +418,13 @@ class TestNegotiationRounds:
 # Booking Record Tests
 # -----------------------------------------------------------------------
 
+
 class TestBookingRecords:
     """Tests for booking record persistence."""
 
     def test_save_and_get_booking(self, deal_store):
         """save_booking_record and get_booking_records round-trip."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         rid = deal_store.save_booking_record(
             deal_id=did,
             order_id="order_1",
@@ -454,44 +445,49 @@ class TestBookingRecords:
 
     def test_multiple_bookings_per_deal(self, deal_store):
         """A deal can have multiple booking records."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
+        deal_store.save_booking_record(
+            deal_id=did,
+            line_id="line_1",
+            channel="branding",
+            impressions=500000,
+            cost=7500.0,
         )
         deal_store.save_booking_record(
-            deal_id=did, line_id="line_1", channel="branding",
-            impressions=500000, cost=7500.0,
-        )
-        deal_store.save_booking_record(
-            deal_id=did, line_id="line_2", channel="ctv",
-            impressions=200000, cost=6000.0,
+            deal_id=did,
+            line_id="line_2",
+            channel="ctv",
+            impressions=200000,
+            cost=6000.0,
         )
         records = deal_store.get_booking_records(did)
         assert len(records) == 2
 
     def test_duplicate_line_id_raises(self, deal_store):
         """UNIQUE(deal_id, line_id) prevents duplicate line bookings."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         deal_store.save_booking_record(
-            deal_id=did, line_id="line_1", channel="branding",
+            deal_id=did,
+            line_id="line_1",
+            channel="branding",
         )
         with pytest.raises(sqlite3.IntegrityError):
             deal_store.save_booking_record(
-                deal_id=did, line_id="line_1", channel="ctv",
+                deal_id=did,
+                line_id="line_1",
+                channel="ctv",
             )
 
     def test_empty_booking_records(self, deal_store):
         """get_booking_records returns empty list for deal with no bookings."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         assert deal_store.get_booking_records(did) == []
 
 
 # -----------------------------------------------------------------------
 # Job Tests
 # -----------------------------------------------------------------------
+
 
 class TestJobCRUD:
     """Tests for job upsert and retrieval."""
@@ -589,6 +585,7 @@ class TestJobCRUD:
 # Status Transition Tests
 # -----------------------------------------------------------------------
 
+
 class TestStatusTransitions:
     """Tests for the append-only status transition audit log."""
 
@@ -634,12 +631,16 @@ class TestStatusTransitions:
     def test_separate_entity_types(self, deal_store):
         """Transitions for different entity types are isolated."""
         deal_store.record_status_transition(
-            entity_type="deal", entity_id="x1",
-            from_status=None, to_status="draft",
+            entity_type="deal",
+            entity_id="x1",
+            from_status=None,
+            to_status="draft",
         )
         deal_store.record_status_transition(
-            entity_type="booking", entity_id="x1",
-            from_status=None, to_status="pending",
+            entity_type="booking",
+            entity_id="x1",
+            from_status=None,
+            to_status="pending",
         )
 
         deal_history = deal_store.get_status_history("deal", "x1")
@@ -655,6 +656,7 @@ class TestStatusTransitions:
 # -----------------------------------------------------------------------
 # Thread Safety Tests
 # -----------------------------------------------------------------------
+
 
 class TestThreadSafety:
     """Tests for concurrent access from multiple threads."""
@@ -715,9 +717,7 @@ class TestThreadSafety:
 
     def test_concurrent_status_transitions(self, deal_store):
         """Multiple threads can record transitions simultaneously."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         errors = []
 
         def record_transition(n):
@@ -731,10 +731,7 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(str(e))
 
-        threads = [
-            threading.Thread(target=record_transition, args=(i,))
-            for i in range(20)
-        ]
+        threads = [threading.Thread(target=record_transition, args=(i,)) for i in range(20)]
         for t in threads:
             t.start()
         for t in threads:
@@ -749,6 +746,7 @@ class TestThreadSafety:
 # -----------------------------------------------------------------------
 # Flow Integration Tests (store=None backward compatibility)
 # -----------------------------------------------------------------------
+
 
 class TestFlowIntegration:
     """Tests for flow-level store injection patterns."""
@@ -786,9 +784,7 @@ class TestFlowIntegration:
         flow_completed = False
         try:
             try:
-                deal_store.save_deal(
-                    seller_url="http://a.com", product_id="p1"
-                )
+                deal_store.save_deal(seller_url="http://a.com", product_id="p1")
             except Exception:
                 pass  # Flow catches and logs, doesn't re-raise
             flow_completed = True
@@ -802,13 +798,13 @@ class TestFlowIntegration:
 # API Job Tracking Migration Tests
 # -----------------------------------------------------------------------
 
+
 class TestAPIJobMigration:
     """Tests verifying DealStore can replace the in-memory jobs dict."""
 
     def test_job_lifecycle_matches_api_pattern(self, deal_store):
         """DealStore job lifecycle mirrors the api/main.py pattern."""
         import uuid as uuid_mod
-        from datetime import datetime as dt
 
         job_id = str(uuid_mod.uuid4())
         brief = {"name": "Test Campaign", "budget": 50000}
@@ -882,6 +878,7 @@ class TestAPIJobMigration:
 # Edge Case / Constraint Tests
 # -----------------------------------------------------------------------
 
+
 class TestEdgeCases:
     """Tests for edge cases and data integrity."""
 
@@ -924,12 +921,14 @@ class TestEdgeCases:
 
     def test_foreign_key_cascade_on_negotiation(self, deal_store):
         """Deleting a deal cascades to negotiation_rounds."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         deal_store.save_negotiation_round(
-            deal_id=did, proposal_id="prop_1", round_number=1,
-            buyer_price=10.0, seller_price=15.0, action="counter",
+            deal_id=did,
+            proposal_id="prop_1",
+            round_number=1,
+            buyer_price=10.0,
+            seller_price=15.0,
+            action="counter",
         )
         # Delete the deal
         with deal_store._lock:
@@ -941,11 +940,11 @@ class TestEdgeCases:
 
     def test_foreign_key_cascade_on_booking(self, deal_store):
         """Deleting a deal cascades to booking_records."""
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         deal_store.save_booking_record(
-            deal_id=did, line_id="line_1", channel="branding",
+            deal_id=did,
+            line_id="line_1",
+            channel="branding",
         )
         # Delete the deal
         with deal_store._lock:
@@ -957,9 +956,7 @@ class TestEdgeCases:
     def test_list_deals_created_after_filter(self, deal_store):
         """list_deals created_after filter works correctly."""
         # Create a deal, then filter by a time before it
-        did = deal_store.save_deal(
-            seller_url="http://a.com", product_id="p1"
-        )
+        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         # Filter with a very old date should include it
         results = deal_store.list_deals(created_after="2000-01-01T00:00:00Z")
         assert len(results) == 1

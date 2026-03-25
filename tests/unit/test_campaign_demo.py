@@ -25,7 +25,6 @@ import pytest
 from ad_buyer.demo.campaign_demo import create_campaign_demo_app
 from ad_buyer.storage.campaign_store import CampaignStore
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -136,9 +135,15 @@ class TestSampleBriefs:
         data = resp.get_json()
         brief = data["briefs"][0]
         required_fields = [
-            "advertiser_id", "campaign_name", "objective",
-            "total_budget", "currency", "flight_start", "flight_end",
-            "channels", "target_audience",
+            "advertiser_id",
+            "campaign_name",
+            "objective",
+            "total_budget",
+            "currency",
+            "flight_start",
+            "flight_end",
+            "channels",
+            "target_audience",
         ]
         for field in required_fields:
             assert field in brief, f"Missing field: {field}"

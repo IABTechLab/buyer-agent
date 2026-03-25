@@ -3,42 +3,42 @@
 
 """Inventory discovery tool for DSP workflows."""
 
-from typing import Any, Optional
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ...async_utils import run_async
-from ...clients.unified_client import Protocol, UnifiedClient
+from ...clients.unified_client import UnifiedClient
 from ...models.buyer_identity import BuyerContext
 
 
 class DiscoverInventoryInput(BaseModel):
     """Input schema for inventory discovery tool."""
 
-    query: Optional[str] = Field(
+    query: str | None = Field(
         default=None,
         description="Natural language query for inventory (e.g., 'CTV inventory under $25 CPM')",
     )
-    channel: Optional[str] = Field(
+    channel: str | None = Field(
         default=None,
         description="Channel filter (e.g., 'ctv', 'display', 'video', 'mobile')",
     )
-    max_cpm: Optional[float] = Field(
+    max_cpm: float | None = Field(
         default=None,
         description="Maximum CPM price filter",
         ge=0,
     )
-    min_impressions: Optional[int] = Field(
+    min_impressions: int | None = Field(
         default=None,
         description="Minimum available impressions filter",
         ge=0,
     )
-    targeting: Optional[list[str]] = Field(
+    targeting: list[str] | None = Field(
         default=None,
         description="Required targeting capabilities (e.g., ['household', 'geo', 'demographic'])",
     )
-    publisher: Optional[str] = Field(
+    publisher: str | None = Field(
         default=None,
         description="Specific publisher to search",
     )
@@ -94,12 +94,12 @@ Returns:
 
     def _run(
         self,
-        query: Optional[str] = None,
-        channel: Optional[str] = None,
-        max_cpm: Optional[float] = None,
-        min_impressions: Optional[int] = None,
-        targeting: Optional[list[str]] = None,
-        publisher: Optional[str] = None,
+        query: str | None = None,
+        channel: str | None = None,
+        max_cpm: float | None = None,
+        min_impressions: int | None = None,
+        targeting: list[str] | None = None,
+        publisher: str | None = None,
     ) -> str:
         """Synchronous wrapper for async discovery."""
         return run_async(
@@ -115,12 +115,12 @@ Returns:
 
     async def _arun(
         self,
-        query: Optional[str] = None,
-        channel: Optional[str] = None,
-        max_cpm: Optional[float] = None,
-        min_impressions: Optional[int] = None,
-        targeting: Optional[list[str]] = None,
-        publisher: Optional[str] = None,
+        query: str | None = None,
+        channel: str | None = None,
+        max_cpm: float | None = None,
+        min_impressions: int | None = None,
+        targeting: list[str] | None = None,
+        publisher: str | None = None,
     ) -> str:
         """Discover inventory with buyer identity context."""
         try:
@@ -155,7 +155,7 @@ Returns:
 
             return self._format_results(result.data, identity_context)
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error discovering inventory: {e}"
 
     def _format_results(
@@ -171,7 +171,7 @@ Returns:
         discount = self._buyer_context.identity.get_discount_percentage()
 
         output_lines = [
-            f"Inventory Discovery Results",
+            "Inventory Discovery Results",
             f"Access Tier: {tier.upper()} ({discount}% discount)",
             "-" * 50,
             "",
@@ -187,7 +187,9 @@ Returns:
                 publisher = product.get("publisherId", product.get("publisher", "Unknown"))
                 base_price = product.get("basePrice", product.get("price", 0))
                 channel = product.get("channel", product.get("deliveryType", "N/A"))
-                impressions = product.get("availableImpressions", product.get("available_impressions", "N/A"))
+                impressions = product.get(
+                    "availableImpressions", product.get("available_impressions", "N/A")
+                )
                 targeting = product.get("targeting", product.get("availableTargeting", []))
 
                 # Calculate tiered price
@@ -195,18 +197,26 @@ Returns:
                     tiered_price = base_price * (1 - discount / 100)
                     price_display = f"${tiered_price:.2f} (was ${base_price:.2f})"
                 else:
-                    price_display = f"${base_price:.2f}" if isinstance(base_price, (int, float)) else str(base_price)
+                    price_display = (
+                        f"${base_price:.2f}"
+                        if isinstance(base_price, (int, float))
+                        else str(base_price)
+                    )
 
-                output_lines.extend([
-                    f"{i}. {name}",
-                    f"   Product ID: {product_id}",
-                    f"   Publisher: {publisher}",
-                    f"   Channel: {channel}",
-                    f"   CPM: {price_display}",
-                    f"   Available: {impressions:,}" if isinstance(impressions, int) else f"   Available: {impressions}",
-                    f"   Targeting: {', '.join(targeting) if targeting else 'Standard'}",
-                    "",
-                ])
+                output_lines.extend(
+                    [
+                        f"{i}. {name}",
+                        f"   Product ID: {product_id}",
+                        f"   Publisher: {publisher}",
+                        f"   Channel: {channel}",
+                        f"   CPM: {price_display}",
+                        f"   Available: {impressions:,}"
+                        if isinstance(impressions, int)
+                        else f"   Available: {impressions}",
+                        f"   Targeting: {', '.join(targeting) if targeting else 'Standard'}",
+                        "",
+                    ]
+                )
             else:
                 output_lines.append(f"{i}. {product}")
                 output_lines.append("")

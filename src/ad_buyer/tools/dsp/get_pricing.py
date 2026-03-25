@@ -3,14 +3,14 @@
 
 """Tiered pricing tool for DSP workflows."""
 
-from typing import Any, Optional
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ...async_utils import run_async
-from ...clients.unified_client import Protocol, UnifiedClient
-from ...models.buyer_identity import AccessTier, BuyerContext, DealType
+from ...clients.unified_client import UnifiedClient
+from ...models.buyer_identity import AccessTier, BuyerContext
 
 
 class GetPricingInput(BaseModel):
@@ -20,20 +20,20 @@ class GetPricingInput(BaseModel):
         ...,
         description="Product ID to get pricing for",
     )
-    volume: Optional[int] = Field(
+    volume: int | None = Field(
         default=None,
         description="Requested impression volume (may unlock volume discounts)",
         ge=0,
     )
-    deal_type: Optional[str] = Field(
+    deal_type: str | None = Field(
         default=None,
         description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",
     )
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Flight start date (YYYY-MM-DD)",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Flight end date (YYYY-MM-DD)",
     )
@@ -90,10 +90,10 @@ Returns:
     def _run(
         self,
         product_id: str,
-        volume: Optional[int] = None,
-        deal_type: Optional[str] = None,
-        flight_start: Optional[str] = None,
-        flight_end: Optional[str] = None,
+        volume: int | None = None,
+        deal_type: str | None = None,
+        flight_start: str | None = None,
+        flight_end: str | None = None,
     ) -> str:
         """Synchronous wrapper for async pricing."""
         return run_async(
@@ -109,10 +109,10 @@ Returns:
     async def _arun(
         self,
         product_id: str,
-        volume: Optional[int] = None,
-        deal_type: Optional[str] = None,
-        flight_start: Optional[str] = None,
-        flight_end: Optional[str] = None,
+        volume: int | None = None,
+        deal_type: str | None = None,
+        flight_start: str | None = None,
+        flight_end: str | None = None,
     ) -> str:
         """Get tier-specific pricing for the product."""
         try:
@@ -128,16 +128,16 @@ Returns:
 
             return self._format_pricing(product, volume, deal_type, flight_start, flight_end)
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error getting pricing: {e}"
 
     def _format_pricing(
         self,
         product: dict,
-        volume: Optional[int],
-        deal_type: Optional[str],
-        flight_start: Optional[str],
-        flight_end: Optional[str],
+        volume: int | None,
+        deal_type: str | None,
+        flight_start: str | None,
+        flight_end: str | None,
     ) -> str:
         """Format pricing response with tier calculations."""
         tier = self._buyer_context.identity.get_access_tier()
@@ -185,12 +185,16 @@ Returns:
         if volume_discount > 0:
             output_lines.append(f"Volume Discount: {volume_discount}%")
 
-        output_lines.extend([
-            "",
-            "Pricing Breakdown",
-            "-" * 20,
-            f"Base {rate_type}: ${base_price:.2f}" if isinstance(base_price, (int, float)) else f"Base {rate_type}: {base_price}",
-        ])
+        output_lines.extend(
+            [
+                "",
+                "Pricing Breakdown",
+                "-" * 20,
+                f"Base {rate_type}: ${base_price:.2f}"
+                if isinstance(base_price, (int, float))
+                else f"Base {rate_type}: {base_price}",
+            ]
+        )
 
         if discount > 0:
             output_lines.append(f"After Tier Discount: ${tiered_price:.2f}")
@@ -198,28 +202,34 @@ Returns:
         if volume_discount > 0:
             output_lines.append(f"After Volume Discount: ${final_price:.2f}")
 
-        output_lines.extend([
-            "",
-            f"Final {rate_type}: ${final_price:.2f}",
-        ])
+        output_lines.extend(
+            [
+                "",
+                f"Final {rate_type}: ${final_price:.2f}",
+            ]
+        )
 
         # Cost projection if volume provided
         if volume:
             total_cost = (final_price / 1000) * volume
-            output_lines.extend([
-                "",
-                "Cost Projection",
-                "-" * 20,
-                f"Impressions: {volume:,}",
-                f"Estimated Cost: ${total_cost:,.2f}",
-            ])
+            output_lines.extend(
+                [
+                    "",
+                    "Cost Projection",
+                    "-" * 20,
+                    f"Impressions: {volume:,}",
+                    f"Estimated Cost: ${total_cost:,.2f}",
+                ]
+            )
 
         # Deal type information
-        output_lines.extend([
-            "",
-            "Available Deal Types",
-            "-" * 20,
-        ])
+        output_lines.extend(
+            [
+                "",
+                "Available Deal Types",
+                "-" * 20,
+            ]
+        )
 
         deal_options = self._get_deal_options(tier, final_price, deal_type)
         for deal_opt in deal_options:
@@ -229,13 +239,15 @@ Returns:
         # AND the seller's package has negotiation_enabled=True (ar-9xi)
         package_negotiation_enabled = product.get("negotiation_enabled", False)
         if self._buyer_context.can_negotiate() and package_negotiation_enabled:
-            output_lines.extend([
-                "",
-                "Negotiation",
-                "-" * 20,
-                "Price negotiation is available at your tier.",
-                "Contact seller or use request_deal tool with target_cpm parameter.",
-            ])
+            output_lines.extend(
+                [
+                    "",
+                    "Negotiation",
+                    "-" * 20,
+                    "Price negotiation is available at your tier.",
+                    "Contact seller or use request_deal tool with target_cpm parameter.",
+                ]
+            )
 
         return "\n".join(output_lines)
 
@@ -243,14 +255,16 @@ Returns:
         self,
         tier: AccessTier,
         price: float,
-        requested_type: Optional[str],
+        requested_type: str | None,
     ) -> list[str]:
         """Get available deal options based on tier."""
         options = []
 
         # PG - available to all tiers
         pg_available = "✓" if tier != AccessTier.PUBLIC else "○"
-        options.append(f"{pg_available} Programmatic Guaranteed (PG): ${price:.2f} CPM, guaranteed delivery")
+        options.append(
+            f"{pg_available} Programmatic Guaranteed (PG): ${price:.2f} CPM, guaranteed delivery"
+        )
 
         # PD - available to all authenticated tiers
         pd_available = "✓" if tier != AccessTier.PUBLIC else "○"

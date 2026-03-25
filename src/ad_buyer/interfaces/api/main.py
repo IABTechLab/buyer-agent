@@ -5,6 +5,7 @@
 
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime
 from typing import Any, Optional
@@ -111,7 +112,7 @@ def _get_store() -> Optional[DealStore]:
         _deal_store = DealStore(current.database_url)
         _deal_store.connect()
         return _deal_store
-    except Exception:
+    except (sqlite3.Error, OSError, ValueError, AttributeError):
         logger.exception("Failed to initialise DealStore; running without persistence")
         return None
 
@@ -141,7 +142,7 @@ def _persist_job(job_id: str, job: dict[str, Any]) -> None:
             booked_lines=json.dumps(job.get("booked_lines", [])),
             errors=json.dumps(job.get("errors", [])),
         )
-    except Exception:
+    except (sqlite3.Error, OSError, ValueError, AttributeError):
         logger.exception("Failed to persist job %s", job_id)
 
 
@@ -493,7 +494,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["updated_at"] = datetime.utcnow().isoformat()
         _persist_job(job_id, job)
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - top-level background task handler; must record any failure
         job["status"] = "failed"
         job["errors"].append(str(e))
         job["updated_at"] = datetime.utcnow().isoformat()

@@ -244,7 +244,7 @@ class MultiSellerOrchestrator:
                 metadata=kwargs,
             )
             await self._event_bus.publish(event)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
             logger.warning(
                 "Failed to emit event %s: %s", event_type, exc
             )
@@ -380,7 +380,7 @@ class MultiSellerOrchestrator:
                     deal_type=deal_params.deal_type,
                     error=msg,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - per-seller isolation; one failure must not block others
                 msg = f"Quote request failed: {exc}"
                 logger.warning(
                     "Seller %s quote request failed: %s",
@@ -564,7 +564,7 @@ class MultiSellerOrchestrator:
                     deal.pricing.final_cpm,
                 )
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - per-deal isolation; continue booking remaining deals
                 logger.warning(
                     "Failed to book deal from quote %s: %s",
                     nq.quote_id,

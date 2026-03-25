@@ -51,7 +51,7 @@ class SellerConnection:
                     if info_response.status_code == 200:
                         info = info_response.json()
                         self.name = info.get("name", f"Seller ({self.url})")
-                except Exception:
+                except (httpx.HTTPError, ValueError):
                     self.name = f"Seller ({self.url})"
 
                 # Try to get tools from /mcp/tools
@@ -63,12 +63,12 @@ class SellerConnection:
                         if isinstance(tools, list):
                             tool_names = [t.get("name") for t in tools if t.get("name")]
                             self.capabilities = {"tools": tool_names}
-                except Exception:
+                except (httpx.HTTPError, ValueError):
                     self.capabilities = {"tools": ["list_products", "get_pricing"]}
 
                 self.connected = True
                 return True
-        except Exception as e:
+        except httpx.HTTPError as e:
             self.error = str(e)
             self.connected = False
         return False
@@ -148,7 +148,7 @@ class MultiSellerSearchTool(BaseTool):
                         "url": seller.url,
                         "products": products,
                     })
-            except Exception as e:
+            except (OSError, ValueError, KeyError) as e:
                 results.append({
                     "seller": seller.name,
                     "url": seller.url,
@@ -254,7 +254,7 @@ class CallSellerToolTool(BaseTool):
                 return f"SUCCESS - {seller.name} - {tool_name}:\n{json_module.dumps(result.data, indent=2)}"
             else:
                 return f"FAILED - {seller.name} - {tool_name}: {result.error}"
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error calling {tool_name} on {seller.name}: {e}"
 
 
@@ -337,7 +337,7 @@ class BookPGDealTool(BaseTool):
                 return f"✓ PG DEAL BOOKED SUCCESSFULLY!\n\nSeller: {seller.name}\nProduct: {product_id}\nImpressions: {impressions:,}\nCPM: ${cpm_price}\nTotal Cost: ${(impressions/1000)*cpm_price:,.2f}\n\nBooking Details:\n{json_module.dumps(result.data, indent=2)}"
             else:
                 return f"✗ Failed to book PG deal: {result.error}"
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error booking PG deal: {e}"
 
 
@@ -405,7 +405,7 @@ class CreatePMPDealTool(BaseTool):
                 return f"✓ PMP DEAL CREATED!\n\nDeal ID: {deal_id}\nSeller: {seller.name}\nProduct: {product_id}\nFloor: ${floor_price} CPM\n\nFull Details:\n{json_module.dumps(deal_data, indent=2)}"
             else:
                 return f"✗ Failed to create PMP deal: {result.error}"
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error creating PMP deal: {e}"
 
 

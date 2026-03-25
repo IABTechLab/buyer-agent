@@ -5,6 +5,7 @@
 
 from typing import Any, Optional, Type
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -118,7 +119,7 @@ class AudienceMatchingTool(BaseTool):
                 seller_endpoint=seller_endpoint,
                 consent=consent,
             )
-        except Exception as e:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             # Return mock result for demonstration
             validation = self._get_mock_validation(requirements)
         finally:

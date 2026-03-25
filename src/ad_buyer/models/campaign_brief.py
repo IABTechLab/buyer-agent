@@ -30,10 +30,9 @@ from __future__ import annotations
 import json
 from datetime import date
 from enum import Enum
-from typing import Any, Optional, Union
+from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-
+from pydantic import BaseModel, Field, model_validator
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -124,11 +123,17 @@ class ChannelAllocation(BaseModel):
     """
 
     channel: ChannelType
-    budget_pct: float = Field(..., gt=0, le=100, description="Percentage of total budget (0 < pct <= 100)")
-    format_prefs: list[str] = Field(default_factory=list, description="Preferred ad formats for this channel")
+    budget_pct: float = Field(
+        ..., gt=0, le=100, description="Percentage of total budget (0 < pct <= 100)"
+    )
+    format_prefs: list[str] = Field(
+        default_factory=list, description="Preferred ad formats for this channel"
+    )
 
     # Computed after model validation on the parent
-    budget_amount: Optional[float] = Field(default=None, description="Computed: total_budget * budget_pct / 100")
+    budget_amount: float | None = Field(
+        default=None, description="Computed: total_budget * budget_pct / 100"
+    )
 
 
 class KPI(BaseModel):
@@ -142,7 +147,9 @@ class GeoTarget(BaseModel):
     """A geographic targeting criterion."""
 
     geo_type: GeoType
-    geo_value: str = Field(..., min_length=1, description="Geographic value (country code, DMA ID, etc.)")
+    geo_value: str = Field(
+        ..., min_length=1, description="Geographic value (country code, DMA ID, etc.)"
+    )
 
 
 class BrandSafety(BaseModel):
@@ -159,7 +166,9 @@ class BrandSafety(BaseModel):
 class FrequencyCap(BaseModel):
     """Cross-channel frequency cap specification."""
 
-    max_impressions: int = Field(..., gt=0, description="Max impressions per user within the period")
+    max_impressions: int = Field(
+        ..., gt=0, description="Max impressions per user within the period"
+    )
     period_hours: int = Field(..., gt=0, description="Period length in hours")
 
 
@@ -174,7 +183,9 @@ class ApprovalConfig(BaseModel):
     plan_review: bool = Field(default=True, description="Require approval for the campaign plan")
     booking: bool = Field(default=True, description="Require approval before booking deals")
     creative: bool = Field(default=False, description="Require approval for creative assignments")
-    pacing_adjustment: bool = Field(default=False, description="Require approval for budget reallocations")
+    pacing_adjustment: bool = Field(
+        default=False, description="Require approval for budget reallocations"
+    )
 
     def approval_stages(self) -> list[ApprovalStage]:
         """Return a list of stages that require human approval."""
@@ -193,9 +204,13 @@ class ApprovalConfig(BaseModel):
 class DealPreferences(BaseModel):
     """Deal-level preferences for the campaign."""
 
-    preferred_deal_types: list[str] = Field(default_factory=list, description="Preferred deal types: PG, PD, PA")
-    max_cpm: Optional[float] = Field(default=None, gt=0, description="Maximum acceptable CPM")
-    min_impressions: Optional[int] = Field(default=None, gt=0, description="Minimum impressions per deal")
+    preferred_deal_types: list[str] = Field(
+        default_factory=list, description="Preferred deal types: PG, PD, PA"
+    )
+    max_cpm: float | None = Field(default=None, gt=0, description="Maximum acceptable CPM")
+    min_impressions: int | None = Field(
+        default=None, gt=0, description="Minimum impressions per deal"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -218,27 +233,47 @@ class CampaignBrief(BaseModel):
     campaign_name: str = Field(..., min_length=1, description="Human-readable campaign name")
     objective: CampaignObjective = Field(..., description="Campaign objective")
     total_budget: float = Field(..., gt=0, description="Total campaign budget (must be > 0)")
-    currency: str = Field(..., min_length=3, max_length=3, pattern=r"^[A-Z]{3}$", description="ISO 4217 currency code")
+    currency: str = Field(
+        ..., min_length=3, max_length=3, pattern=r"^[A-Z]{3}$", description="ISO 4217 currency code"
+    )
     flight_start: date = Field(..., description="Campaign start date (YYYY-MM-DD)")
     flight_end: date = Field(..., description="Campaign end date (YYYY-MM-DD)")
-    channels: list[ChannelAllocation] = Field(..., min_length=1, description="Channel allocations (at least one)")
-    target_audience: list[str] = Field(..., min_length=1, description="IAB Audience Taxonomy segment IDs")
+    channels: list[ChannelAllocation] = Field(
+        ..., min_length=1, description="Channel allocations (at least one)"
+    )
+    target_audience: list[str] = Field(
+        ..., min_length=1, description="IAB Audience Taxonomy segment IDs"
+    )
 
     # --- Optional fields ---
-    agency_id: Optional[str] = Field(default=None, description="Agency identifier")
-    description: Optional[str] = Field(default=None, description="Campaign objective/notes")
-    target_geo: list[GeoTarget] = Field(default_factory=list, description="Geographic targeting (defaults to national)")
+    agency_id: str | None = Field(default=None, description="Agency identifier")
+    description: str | None = Field(default=None, description="Campaign objective/notes")
+    target_geo: list[GeoTarget] = Field(
+        default_factory=list, description="Geographic targeting (defaults to national)"
+    )
     kpis: list[KPI] = Field(default_factory=list, description="Performance targets")
-    brand_safety: Optional[BrandSafety] = Field(default=None, description="Brand safety / content exclusions")
-    frequency_cap: Optional[FrequencyCap] = Field(default=None, description="Cross-channel frequency cap")
+    brand_safety: BrandSafety | None = Field(
+        default=None, description="Brand safety / content exclusions"
+    )
+    frequency_cap: FrequencyCap | None = Field(
+        default=None, description="Cross-channel frequency cap"
+    )
     pacing_model: PacingModel = Field(default=PacingModel.EVEN, description="Budget pacing model")
-    preferred_sellers: list[str] = Field(default_factory=list, description="Seller IDs to prioritize")
+    preferred_sellers: list[str] = Field(
+        default_factory=list, description="Seller IDs to prioritize"
+    )
     excluded_sellers: list[str] = Field(default_factory=list, description="Seller IDs to avoid")
-    creative_ids: list[str] = Field(default_factory=list, description="Pre-uploaded creative asset IDs")
-    approval_config: ApprovalConfig = Field(default_factory=ApprovalConfig, description="Human approval gates (D-3)")
-    deal_preferences: Optional[DealPreferences] = Field(default=None, description="Deal-level preferences")
+    creative_ids: list[str] = Field(
+        default_factory=list, description="Pre-uploaded creative asset IDs"
+    )
+    approval_config: ApprovalConfig = Field(
+        default_factory=ApprovalConfig, description="Human approval gates (D-3)"
+    )
+    deal_preferences: DealPreferences | None = Field(
+        default=None, description="Deal-level preferences"
+    )
     exclusion_list: list[str] = Field(default_factory=list, description="Domains/brands to exclude")
-    notes: Optional[str] = Field(default=None, description="Free-text notes")
+    notes: str | None = Field(default=None, description="Free-text notes")
 
     # --- Validators ---
 
@@ -252,9 +287,7 @@ class CampaignBrief(BaseModel):
         # Channel budget_pct values must sum to 100
         total_pct = sum(ch.budget_pct for ch in self.channels)
         if abs(total_pct - 100.0) > 0.01:
-            raise ValueError(
-                f"Channel budget_pct values must sum to 100 (got {total_pct:.2f})"
-            )
+            raise ValueError(f"Channel budget_pct values must sum to 100 (got {total_pct:.2f})")
 
         # No duplicate channel types
         channel_types = [ch.channel for ch in self.channels]
@@ -265,9 +298,7 @@ class CampaignBrief(BaseModel):
                 if ct in seen:
                     dupes.append(ct.value)
                 seen.add(ct)
-            raise ValueError(
-                f"Duplicate channel types are not allowed: {', '.join(dupes)}"
-            )
+            raise ValueError(f"Duplicate channel types are not allowed: {', '.join(dupes)}")
 
         # Compute budget_amount for each channel
         for ch in self.channels:
@@ -281,7 +312,7 @@ class CampaignBrief(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def parse_campaign_brief(input_data: Union[str, dict[str, Any]]) -> CampaignBrief:
+def parse_campaign_brief(input_data: str | dict[str, Any]) -> CampaignBrief:
     """Parse and validate a campaign brief from a JSON string or dict.
 
     Args:

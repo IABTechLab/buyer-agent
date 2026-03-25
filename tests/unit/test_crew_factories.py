@@ -9,19 +9,20 @@ specifically that manager_agent is NOT included in the agents list
 """
 
 import os
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
-from ad_buyer.crews.portfolio_crew import create_portfolio_crew
 from ad_buyer.crews.channel_crews import (
     create_branding_crew,
     create_ctv_crew,
     create_mobile_crew,
     create_performance_crew,
 )
+from ad_buyer.crews.portfolio_crew import create_portfolio_crew
 
 
 @pytest.fixture

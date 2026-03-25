@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, ValidationError
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
-from crewai import Agent, Process
+from crewai import Agent
 from crewai.tools import BaseTool
 
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
@@ -48,18 +48,20 @@ from ad_buyer.crews.channel_crews import (
 )
 from ad_buyer.crews.portfolio_crew import create_portfolio_crew
 
-
 # ---------------------------------------------------------------------------
 # Helper: create valid BaseTool instances for injection tests
 # ---------------------------------------------------------------------------
 
+
 class _StubToolInput(BaseModel):
     """Minimal input schema for stub tools."""
+
     x: str = Field(default="", description="unused")
 
 
 class _StubTool(BaseTool):
     """A valid CrewAI BaseTool for use in injection tests."""
+
     name: str = "stub"
     description: str = "Stub tool"
     args_schema: type[BaseModel] = _StubToolInput
@@ -647,9 +649,7 @@ class TestHierarchyInvariants:
         l3_temps = [factory(verbose=False).llm.temperature for factory in self.L3_FACTORIES]
         avg_l2 = sum(l2_temps) / len(l2_temps)
         avg_l3 = sum(l3_temps) / len(l3_temps)
-        assert avg_l3 <= avg_l2, (
-            f"L3 avg temp ({avg_l3}) should be <= L2 avg temp ({avg_l2})"
-        )
+        assert avg_l3 <= avg_l2, f"L3 avg temp ({avg_l3}) should be <= L2 avg temp ({avg_l2})"
 
     def test_empty_tools_list_when_none_provided(self):
         """All factories produce agents with empty tools when None is passed."""
@@ -763,8 +763,8 @@ class TestToolFactoryFunctions:
 
     def test_research_tools_types(self, mock_opendirect_client):
         """Research tools are ProductSearchTool and AvailsCheckTool."""
-        from ad_buyer.tools.research.product_search import ProductSearchTool
         from ad_buyer.tools.research.avails_check import AvailsCheckTool
+        from ad_buyer.tools.research.product_search import ProductSearchTool
 
         tools = _create_research_tools(mock_opendirect_client)
         tool_types = {type(t) for t in tools}
@@ -773,12 +773,12 @@ class TestToolFactoryFunctions:
 
     def test_execution_tools_types(self, mock_opendirect_client):
         """Execution tools include all four management tools."""
-        from ad_buyer.tools.execution.order_management import CreateOrderTool
         from ad_buyer.tools.execution.line_management import (
+            BookLineTool,
             CreateLineTool,
             ReserveLineTool,
-            BookLineTool,
         )
+        from ad_buyer.tools.execution.order_management import CreateOrderTool
 
         tools = _create_execution_tools(mock_opendirect_client)
         tool_types = {type(t) for t in tools}
@@ -819,9 +819,7 @@ class TestPortfolioCrewKnownIssue:
     manager_agent=, which newer crewai rejects. This test documents the bug.
     """
 
-    def test_creation_raises_manager_in_agents_error(
-        self, mock_opendirect_client, campaign_brief
-    ):
+    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, campaign_brief):
         """Portfolio crew creation currently fails due to manager-in-agents bug."""
         with pytest.raises(ValidationError, match="Manager agent should not be included"):
             create_portfolio_crew(mock_opendirect_client, campaign_brief)
@@ -830,9 +828,7 @@ class TestPortfolioCrewKnownIssue:
 class TestBrandingCrewKnownIssue:
     """Documents the manager-in-agents validation issue for branding crew."""
 
-    def test_creation_raises_manager_in_agents_error(
-        self, mock_opendirect_client, channel_brief
-    ):
+    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
         with pytest.raises(ValidationError, match="Manager agent should not be included"):
             create_branding_crew(mock_opendirect_client, channel_brief)
 
@@ -840,9 +836,7 @@ class TestBrandingCrewKnownIssue:
 class TestMobileCrewKnownIssue:
     """Documents the manager-in-agents validation issue for mobile crew."""
 
-    def test_creation_raises_manager_in_agents_error(
-        self, mock_opendirect_client, channel_brief
-    ):
+    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
         with pytest.raises(ValidationError, match="Manager agent should not be included"):
             create_mobile_crew(mock_opendirect_client, channel_brief)
 
@@ -850,9 +844,7 @@ class TestMobileCrewKnownIssue:
 class TestCTVCrewKnownIssue:
     """Documents the manager-in-agents validation issue for CTV crew."""
 
-    def test_creation_raises_manager_in_agents_error(
-        self, mock_opendirect_client, channel_brief
-    ):
+    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
         with pytest.raises(ValidationError, match="Manager agent should not be included"):
             create_ctv_crew(mock_opendirect_client, channel_brief)
 
@@ -860,9 +852,7 @@ class TestCTVCrewKnownIssue:
 class TestPerformanceCrewKnownIssue:
     """Documents the manager-in-agents validation issue for performance crew."""
 
-    def test_creation_raises_manager_in_agents_error(
-        self, mock_opendirect_client, channel_brief
-    ):
+    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
         with pytest.raises(ValidationError, match="Manager agent should not be included"):
             create_performance_crew(mock_opendirect_client, channel_brief)
 
@@ -899,6 +889,7 @@ class TestModuleImports:
 
     def test_level1_init_exports(self):
         from ad_buyer.agents.level1 import create_portfolio_manager as pm
+
         assert callable(pm)
 
     def test_level2_init_exports(self):
@@ -909,6 +900,7 @@ class TestModuleImports:
             create_mobile_app_agent,
             create_performance_agent,
         )
+
         for fn in [
             create_branding_agent,
             create_ctv_agent,
@@ -925,6 +917,7 @@ class TestModuleImports:
             create_reporting_agent,
             create_research_agent,
         )
+
         for fn in [
             create_audience_planner_agent,
             create_execution_agent,
@@ -941,6 +934,7 @@ class TestModuleImports:
             create_performance_crew,
             create_portfolio_crew,
         )
+
         for fn in [
             create_branding_crew,
             create_ctv_crew,

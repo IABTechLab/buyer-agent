@@ -8,12 +8,9 @@ and InspectDealTool -- the CrewAI tools DealJockey uses to view,
 filter, search, and aggregate portfolio views.
 """
 
-import json
-
 import pytest
 
 from ad_buyer.storage.deal_store import DealStore
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -210,8 +207,7 @@ class TestListPortfolioTool:
         assert "deal-002" in result or "Hulu" in result
         # Should contain all 5 deals
         assert "5 deal" in result.lower() or all(
-            name in result
-            for name in ["ESPN", "Hulu", "TTD", "NBCU", "Spotify"]
+            name in result for name in ["ESPN", "Hulu", "TTD", "NBCU", "Spotify"]
         )
 
     def test_filter_by_status(self, populated_store):
@@ -300,9 +296,7 @@ class TestListPortfolioTool:
         )
 
         tool = ListPortfolioTool(deal_store=populated_store)
-        result = tool._run(
-            filters_json='{"status": "active", "media_type": "DIGITAL"}'
-        )
+        result = tool._run(filters_json='{"status": "active", "media_type": "DIGITAL"}')
 
         assert "ESPN" in result
         # NBCU is active but LINEAR_TV, not DIGITAL
@@ -330,7 +324,7 @@ class TestListPortfolioTool:
 
         tool = ListPortfolioTool(deal_store=populated_store)
         # Get all results first
-        all_result = tool._run(filters_json='{}')
+        all_result = tool._run(filters_json="{}")
         # Get offset results
         offset_result = tool._run(filters_json='{"offset": 2, "limit": 2}')
 
@@ -344,9 +338,7 @@ class TestListPortfolioTool:
         )
 
         tool = ListPortfolioTool(deal_store=populated_store)
-        result = tool._run(
-            filters_json='{"sort_by": "price", "sort_order": "asc"}'
-        )
+        result = tool._run(filters_json='{"sort_by": "price", "sort_order": "asc"}')
 
         # Spotify ($6) should appear before ESPN ($12.50)
         spotify_pos = result.find("Spotify")
@@ -361,9 +353,7 @@ class TestListPortfolioTool:
         )
 
         tool = ListPortfolioTool(deal_store=populated_store)
-        result = tool._run(
-            filters_json='{"sort_by": "price", "sort_order": "desc"}'
-        )
+        result = tool._run(filters_json='{"sort_by": "price", "sort_order": "desc"}')
 
         # NBCU ($45) should appear before ESPN ($12.50)
         nbcu_pos = result.find("NBCU")
@@ -378,9 +368,7 @@ class TestListPortfolioTool:
         )
 
         tool = ListPortfolioTool(deal_store=populated_store)
-        result = tool._run(
-            filters_json='{"sort_by": "display_name", "sort_order": "asc"}'
-        )
+        result = tool._run(filters_json='{"sort_by": "display_name", "sort_order": "asc"}')
 
         # ESPN should appear before Hulu (alphabetical)
         espn_pos = result.find("ESPN")
@@ -397,7 +385,9 @@ class TestListPortfolioTool:
         tool = ListPortfolioTool(deal_store=deal_store)
         result = tool._run(filters_json="{}")
 
-        assert "no deal" in result.lower() or "0 deal" in result.lower() or "empty" in result.lower()
+        assert (
+            "no deal" in result.lower() or "0 deal" in result.lower() or "empty" in result.lower()
+        )
 
     def test_invalid_json_input(self, deal_store):
         """Handle invalid JSON gracefully."""

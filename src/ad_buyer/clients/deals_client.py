@@ -20,6 +20,7 @@ Optionally persists results to a DealStore when one is attached.
 
 import json
 import logging
+import sqlite3
 from typing import Any, Optional
 
 import httpx
@@ -416,7 +417,7 @@ class DealsClient:
                     "expires_at": quote.expires_at,
                 }),
             )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist quote %s to DealStore", quote.quote_id)
 
     def _persist_deal(self, deal: DealResponse) -> None:
@@ -449,7 +450,7 @@ class DealsClient:
                     ),
                 }),
             )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist deal %s to DealStore", deal.deal_id)
 
     def _update_stored_deal_status(self, deal: DealResponse) -> None:
@@ -471,7 +472,7 @@ class DealsClient:
                         notes=f"Updated from GET /api/v1/deals/{deal.deal_id}",
                     )
                     break
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception(
                 "Failed to update stored deal status for %s", deal.deal_id
             )

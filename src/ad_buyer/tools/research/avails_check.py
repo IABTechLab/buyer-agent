@@ -4,8 +4,9 @@
 """Availability check tool for inventory pricing."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -29,11 +30,11 @@ class AvailsCheckInput(BaseModel):
         ...,
         description="Campaign end date (YYYY-MM-DD)",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         description="Desired impression volume",
     )
-    budget: Optional[float] = Field(
+    budget: float | None = Field(
         default=None,
         description="Total budget in USD",
     )
@@ -70,8 +71,8 @@ Returns:
         product_id: str,
         start_date: str,
         end_date: str,
-        impressions: Optional[int] = None,
-        budget: Optional[float] = None,
+        impressions: int | None = None,
+        budget: float | None = None,
     ) -> str:
         """Synchronous wrapper for async avails check."""
         return run_async(
@@ -89,8 +90,8 @@ Returns:
         product_id: str,
         start_date: str,
         end_date: str,
-        impressions: Optional[int] = None,
-        budget: Optional[float] = None,
+        impressions: int | None = None,
+        budget: float | None = None,
     ) -> str:
         """Check availability for the specified product."""
         try:
@@ -114,7 +115,7 @@ Returns:
 
         except ValueError as e:
             return f"Error parsing dates: {e}. Please use YYYY-MM-DD format."
-        except Exception as e:
+        except (httpx.HTTPError, OSError) as e:
             return f"Error checking availability: {e}"
 
     def _format_results(
@@ -130,9 +131,7 @@ Returns:
             targeting_str = ", ".join(avails.available_targeting)
 
         guaranteed_str = (
-            f"{avails.guaranteed_impressions:,}"
-            if avails.guaranteed_impressions
-            else "N/A"
+            f"{avails.guaranteed_impressions:,}" if avails.guaranteed_impressions else "N/A"
         )
 
         confidence_str = (

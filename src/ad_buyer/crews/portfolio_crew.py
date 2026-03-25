@@ -44,12 +44,12 @@ def create_portfolio_crew(
         description=f"""
 Analyze the campaign brief and allocate budget across channels:
 
-Campaign Name: {campaign_brief.get('name', 'Unnamed Campaign')}
-Campaign Objectives: {campaign_brief.get('objectives', [])}
-Total Budget: ${campaign_brief.get('budget', 0):,.2f}
-Flight Dates: {campaign_brief.get('start_date')} to {campaign_brief.get('end_date')}
-Target Audience: {campaign_brief.get('target_audience', {})}
-KPIs: {campaign_brief.get('kpis', {})}
+Campaign Name: {campaign_brief.get("name", "Unnamed Campaign")}
+Campaign Objectives: {campaign_brief.get("objectives", [])}
+Total Budget: ${campaign_brief.get("budget", 0):,.2f}
+Flight Dates: {campaign_brief.get("start_date")} to {campaign_brief.get("end_date")}
+Target Audience: {campaign_brief.get("target_audience", {})}
+KPIs: {campaign_brief.get("kpis", {})}
 
 Determine the optimal budget split across:
 1. Branding (display/video) - for awareness objectives

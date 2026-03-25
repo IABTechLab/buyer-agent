@@ -5,6 +5,7 @@
 
 from typing import Any
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -75,9 +76,7 @@ Returns:
             )
             ctr_str = f"{stats.ctr:.3f}%" if stats.ctr is not None else "N/A"
             pacing_str = stats.pacing_status or "N/A"
-            last_updated_str = (
-                stats.last_updated.isoformat() if stats.last_updated else "N/A"
-            )
+            last_updated_str = stats.last_updated.isoformat() if stats.last_updated else "N/A"
 
             # Determine pacing health
             pacing_health = "On track"
@@ -114,5 +113,5 @@ Analysis:
   {"Budget pacing is on track." if abs(stats.delivery_rate - stats.budget_utilization) < 10 else "Consider adjusting pacing."}
 """
 
-        except Exception as e:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             return f"Error retrieving stats: {e}"

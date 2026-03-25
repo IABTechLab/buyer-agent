@@ -177,7 +177,7 @@ class CampaignPipeline:
                 payload=payload or {},
             )
             await self._event_bus.publish(event)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
             logger.warning(
                 "Failed to emit event %s: %s", event_type, exc
             )
@@ -440,7 +440,7 @@ class CampaignPipeline:
                     result.selection.total_spend,
                 )
 
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - per-channel isolation; one failure must not abort pipeline
                 logger.warning(
                     "Channel %s booking failed: %s", channel_key, exc
                 )

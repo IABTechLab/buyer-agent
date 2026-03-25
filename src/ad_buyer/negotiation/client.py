@@ -8,7 +8,7 @@ and drives the negotiation loop using a pluggable NegotiationStrategy.
 """
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -45,7 +45,7 @@ class NegotiationClient:
     def __init__(
         self,
         timeout: float = 30.0,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ) -> None:
         """Initialize the negotiation client.
 
@@ -100,9 +100,7 @@ class NegotiationClient:
         payload = {"price": initial_price}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                url, json=payload, headers=self._build_headers()
-            )
+            response = await client.post(url, json=payload, headers=self._build_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -152,9 +150,7 @@ class NegotiationClient:
         payload = {"price": price}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                url, json=payload, headers=self._build_headers()
-            )
+            response = await client.post(url, json=payload, headers=self._build_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -199,9 +195,7 @@ class NegotiationClient:
         }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                url, json=payload, headers=self._build_headers()
-            )
+            response = await client.post(url, json=payload, headers=self._build_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -222,9 +216,7 @@ class NegotiationClient:
         payload = {"action": "decline"}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                url, json=payload, headers=self._build_headers()
-            )
+            response = await client.post(url, json=payload, headers=self._build_headers())
             response.raise_for_status()
 
         logger.info("Negotiation declined: %s", session.negotiation_id)
@@ -343,9 +335,7 @@ class NegotiationClient:
                 our_last_offer=session.our_last_offer,
                 seller_previous_price=seller_previous_price,
             )
-            next_price = strategy.next_offer(
-                session.current_seller_price, offer_context
-            )
+            next_price = strategy.next_offer(session.current_seller_price, offer_context)
 
             # Track previous seller price before getting new response
             seller_previous_price = session.current_seller_price

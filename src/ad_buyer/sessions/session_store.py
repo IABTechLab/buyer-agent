@@ -5,9 +5,8 @@
 
 import json
 import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -34,9 +33,9 @@ class SessionRecord:
         """
         expires = datetime.fromisoformat(self.expires_at)
         # Ensure timezone-aware comparison
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
+            expires = expires.replace(tzinfo=UTC)
         return now >= expires
 
     def to_dict(self) -> dict:
@@ -87,12 +86,9 @@ class SessionStore:
             self._sessions = {}
             return
         try:
-            with open(self._path, "r") as f:
+            with open(self._path) as f:
                 data = json.load(f)
-            self._sessions = {
-                url: SessionRecord.from_dict(rec)
-                for url, rec in data.items()
-            }
+            self._sessions = {url: SessionRecord.from_dict(rec) for url, rec in data.items()}
         except (json.JSONDecodeError, KeyError):
             self._sessions = {}
 
@@ -106,7 +102,7 @@ class SessionStore:
                 indent=2,
             )
 
-    def get(self, seller_url: str) -> Optional[SessionRecord]:
+    def get(self, seller_url: str) -> SessionRecord | None:
         """Get the active session for a seller, if one exists and is not expired.
 
         Args:
@@ -155,9 +151,7 @@ class SessionStore:
         Returns:
             Number of expired sessions removed.
         """
-        expired_urls = [
-            url for url, rec in self._sessions.items() if rec.is_expired()
-        ]
+        expired_urls = [url for url, rec in self._sessions.items() if rec.is_expired()]
         for url in expired_urls:
             del self._sessions[url]
         if expired_urls:

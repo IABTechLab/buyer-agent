@@ -4,11 +4,9 @@
 """Tests verifying no hardcoded server URLs remain in client code."""
 
 import ast
-import inspect
 import os
 
 import pytest
-
 
 # Source files that must not contain hardcoded Cloud Run URLs
 CLIENT_SOURCE_FILES = [

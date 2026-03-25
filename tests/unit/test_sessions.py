@@ -3,17 +3,13 @@
 
 """Tests for session persistence client."""
 
-import json
-import os
-import tempfile
-import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ad_buyer.sessions.session_store import SessionRecord, SessionStore
 from ad_buyer.sessions.session_manager import SessionManager
+from ad_buyer.sessions.session_store import SessionRecord, SessionStore
 
 
 class TestSessionRecord:
@@ -24,8 +20,8 @@ class TestSessionRecord:
         record = SessionRecord(
             session_id="sess-123",
             seller_url="http://seller1.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         assert record.session_id == "sess-123"
         assert record.seller_url == "http://seller1.example.com"
@@ -35,8 +31,8 @@ class TestSessionRecord:
         record = SessionRecord(
             session_id="sess-123",
             seller_url="http://seller1.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         assert record.is_expired() is False
 
@@ -45,15 +41,15 @@ class TestSessionRecord:
         record = SessionRecord(
             session_id="sess-123",
             seller_url="http://seller1.example.com",
-            created_at=(datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
-            expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            created_at=(datetime.now(UTC) - timedelta(days=8)).isoformat(),
+            expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
         )
         assert record.is_expired() is True
 
     def test_to_dict_and_from_dict(self):
         """Test round-trip serialization."""
-        now = datetime.now(timezone.utc).isoformat()
-        expires = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+        now = datetime.now(UTC).isoformat()
+        expires = (datetime.now(UTC) + timedelta(days=7)).isoformat()
         record = SessionRecord(
             session_id="sess-456",
             seller_url="http://seller2.example.com",
@@ -90,8 +86,8 @@ class TestSessionStore:
         record = SessionRecord(
             session_id="sess-abc",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store.save(record)
         retrieved = store.get("http://seller.example.com")
@@ -107,8 +103,8 @@ class TestSessionStore:
         record = SessionRecord(
             session_id="sess-del",
             seller_url="http://seller-del.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store.save(record)
         store.remove("http://seller-del.example.com")
@@ -124,8 +120,8 @@ class TestSessionStore:
             record = SessionRecord(
                 session_id=f"sess-{i}",
                 seller_url=f"http://seller{i}.example.com",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
             )
             store.save(record)
         sessions = store.list_sessions()
@@ -137,8 +133,8 @@ class TestSessionStore:
         record = SessionRecord(
             session_id="sess-persist",
             seller_url="http://persistent.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store1.save(record)
 
@@ -153,8 +149,8 @@ class TestSessionStore:
         record = SessionRecord(
             session_id="sess-expired",
             seller_url="http://expired.example.com",
-            created_at=(datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
-            expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            created_at=(datetime.now(UTC) - timedelta(days=8)).isoformat(),
+            expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
         )
         store.save(record)
         assert store.get("http://expired.example.com") is None
@@ -165,14 +161,14 @@ class TestSessionStore:
         valid = SessionRecord(
             session_id="sess-valid",
             seller_url="http://valid.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         expired = SessionRecord(
             session_id="sess-expired",
             seller_url="http://expired.example.com",
-            created_at=(datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
-            expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            created_at=(datetime.now(UTC) - timedelta(days=8)).isoformat(),
+            expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
         )
         store.save(valid)
         store.save(expired)
@@ -200,8 +196,8 @@ class TestSessionManager:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "session_id": "sess-new-123",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
@@ -228,8 +224,8 @@ class TestSessionManager:
         record = SessionRecord(
             session_id="sess-existing",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -247,8 +243,8 @@ class TestSessionManager:
         record = SessionRecord(
             session_id="sess-old",
             seller_url="http://seller.example.com",
-            created_at=(datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
-            expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            created_at=(datetime.now(UTC) - timedelta(days=8)).isoformat(),
+            expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
         )
         manager.store.save(record)
 
@@ -256,8 +252,8 @@ class TestSessionManager:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "session_id": "sess-new-456",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
@@ -280,8 +276,8 @@ class TestSessionManager:
         record = SessionRecord(
             session_id="sess-msg",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -313,8 +309,8 @@ class TestSessionManager:
         record = SessionRecord(
             session_id="sess-stale",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -328,8 +324,8 @@ class TestSessionManager:
         mock_create.status_code = 201
         mock_create.json.return_value = {
             "session_id": "sess-renewed",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         # Retry with new session succeeds
@@ -364,8 +360,8 @@ class TestSessionManager:
         record = SessionRecord(
             session_id="sess-close",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -393,8 +389,8 @@ class TestSessionManager:
             record = SessionRecord(
                 session_id=f"sess-{i}",
                 seller_url=f"http://seller{i}.example.com",
-                created_at=datetime.now(timezone.utc).isoformat(),
-                expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+                created_at=datetime.now(UTC).isoformat(),
+                expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
             )
             manager.store.save(record)
 
@@ -402,8 +398,8 @@ class TestSessionManager:
         expired = SessionRecord(
             session_id="sess-expired",
             seller_url="http://expired.example.com",
-            created_at=(datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
-            expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            created_at=(datetime.now(UTC) - timedelta(days=8)).isoformat(),
+            expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
         )
         manager.store.save(expired)
 

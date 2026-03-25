@@ -10,10 +10,8 @@ and the CRUD methods on DealStore (save, get, list, update, delete).
 bead: ar-pw8u
 """
 
-import json
-import sqlite3
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -23,7 +21,6 @@ from ad_buyer.models.creative_asset import (
     ValidationStatus,
 )
 from ad_buyer.storage import DealStore
-
 
 # -----------------------------------------------------------------------
 # Fixtures
@@ -85,7 +82,7 @@ class TestCreativeAssetModel:
             source_url="https://example.com/video.mp4",
             validation_status=ValidationStatus.VALID,
             validation_errors=[],
-            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
         assert asset.asset_id == "custom-id-123"
         assert asset.asset_type == AssetType.VIDEO

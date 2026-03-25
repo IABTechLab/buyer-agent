@@ -3,8 +3,6 @@
 
 """Tests for buyer identity models."""
 
-import pytest
-
 from ad_buyer.models.buyer_identity import (
     AccessTier,
     BuyerContext,

@@ -15,15 +15,12 @@ Covers:
 import csv
 import io
 import json
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from ad_buyer.demo.dealjockey_dashboard import create_app
 from ad_buyer.demo.seed_data import seed_demo_data
 from ad_buyer.storage.deal_store import DealStore
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -105,37 +102,26 @@ class TestSeedData:
     def test_seed_creates_portfolio_metadata(self, store):
         """Some seeded deals should have portfolio metadata."""
         ids = seed_demo_data(store)
-        meta_count = sum(
-            1 for did in ids
-            if store.get_portfolio_metadata(did) is not None
-        )
+        meta_count = sum(1 for did in ids if store.get_portfolio_metadata(did) is not None)
         assert meta_count >= 8  # at least 8 deals have metadata
 
     def test_seed_creates_activations(self, store):
         """Some seeded deals should have deal activations."""
         ids = seed_demo_data(store)
-        act_count = sum(
-            1 for did in ids
-            if len(store.get_deal_activations(did)) > 0
-        )
+        act_count = sum(1 for did in ids if len(store.get_deal_activations(did)) > 0)
         assert act_count >= 5  # at least 5 deals have activations
 
     def test_seed_creates_performance_cache(self, store):
         """Some seeded deals should have performance cache entries."""
         ids = seed_demo_data(store)
-        perf_count = sum(
-            1 for did in ids
-            if store.get_performance_cache(did) is not None
-        )
+        perf_count = sum(1 for did in ids if store.get_performance_cache(did) is not None)
         assert perf_count >= 5  # at least 5 deals have perf data
 
     def test_seed_emits_events(self, store):
         """Each seeded deal should emit a deal.imported event."""
         ids = seed_demo_data(store)
         events = store.list_events(limit=100)
-        import_events = [
-            e for e in events if e["event_type"] == "deal.imported"
-        ]
+        import_events = [e for e in events if e["event_type"] == "deal.imported"]
         assert len(import_events) >= len(ids)
 
 
@@ -156,6 +142,7 @@ class TestAPIRoutes:
     def test_api_schema(self, client):
         """GET /api/schema should return version and table info."""
         from ad_buyer.storage.schema import SCHEMA_VERSION as CURRENT_VERSION
+
         resp = client.get("/api/schema")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -243,8 +230,10 @@ class TestAPIRoutes:
         assert "events" in data
         # All returned events should be Phase 1 types
         phase1_types = {
-            "deal.imported", "deal.template_created",
-            "portfolio.inspected", "deal.manual_action_required",
+            "deal.imported",
+            "deal.template_created",
+            "portfolio.inspected",
+            "deal.manual_action_required",
         }
         for event in data["events"]:
             assert event["event_type"] in phase1_types
@@ -288,11 +277,40 @@ class TestCSVImport:
 
     def test_import_valid_csv(self, client):
         """POST /api/import with valid CSV should parse deals."""
-        csv_data = self._make_csv_bytes([
-            ["deal_id", "name", "publisher", "deal_type", "media_type", "cpm", "start_date", "end_date"],
-            ["TEST-001", "Test Deal 1", "TestPub", "PG", "DIGITAL", "15.00", "2026-04-01", "2026-06-30"],
-            ["TEST-002", "Test Deal 2", "TestPub2", "PD", "CTV", "25.00", "2026-05-01", "2026-07-31"],
-        ])
+        csv_data = self._make_csv_bytes(
+            [
+                [
+                    "deal_id",
+                    "name",
+                    "publisher",
+                    "deal_type",
+                    "media_type",
+                    "cpm",
+                    "start_date",
+                    "end_date",
+                ],
+                [
+                    "TEST-001",
+                    "Test Deal 1",
+                    "TestPub",
+                    "PG",
+                    "DIGITAL",
+                    "15.00",
+                    "2026-04-01",
+                    "2026-06-30",
+                ],
+                [
+                    "TEST-002",
+                    "Test Deal 2",
+                    "TestPub2",
+                    "PD",
+                    "CTV",
+                    "25.00",
+                    "2026-05-01",
+                    "2026-07-31",
+                ],
+            ]
+        )
 
         data = {
             "file": (io.BytesIO(csv_data), "test_deals.csv"),
@@ -306,11 +324,13 @@ class TestCSVImport:
 
     def test_import_csv_with_errors(self, client):
         """POST /api/import with invalid rows should report errors."""
-        csv_data = self._make_csv_bytes([
-            ["deal_id", "name", "publisher", "deal_type"],
-            # Missing seller info (no publisher value)
-            ["ERR-001", "Bad Deal", "", "PG"],
-        ])
+        csv_data = self._make_csv_bytes(
+            [
+                ["deal_id", "name", "publisher", "deal_type"],
+                # Missing seller info (no publisher value)
+                ["ERR-001", "Bad Deal", "", "PG"],
+            ]
+        )
 
         data = {
             "file": (io.BytesIO(csv_data), "bad_deals.csv"),
@@ -362,13 +382,15 @@ class TestManualEntry:
         """POST /api/deals with valid data should create a deal."""
         resp = client.post(
             "/api/deals",
-            data=json.dumps({
-                "display_name": "Manual Test Deal",
-                "seller_url": "https://test.seller.example.com",
-                "deal_type": "PD",
-                "media_type": "DIGITAL",
-                "status": "draft",
-            }),
+            data=json.dumps(
+                {
+                    "display_name": "Manual Test Deal",
+                    "seller_url": "https://test.seller.example.com",
+                    "deal_type": "PD",
+                    "media_type": "DIGITAL",
+                    "status": "draft",
+                }
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 200
@@ -380,9 +402,11 @@ class TestManualEntry:
         """POST /api/deals missing required fields should return 400."""
         resp = client.post(
             "/api/deals",
-            data=json.dumps({
-                "deal_type": "PD",
-            }),
+            data=json.dumps(
+                {
+                    "deal_type": "PD",
+                }
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 400
@@ -393,11 +417,13 @@ class TestManualEntry:
         """POST /api/deals with invalid deal_type should return 400."""
         resp = client.post(
             "/api/deals",
-            data=json.dumps({
-                "display_name": "Bad Type Deal",
-                "seller_url": "https://test.seller.example.com",
-                "deal_type": "INVALID",
-            }),
+            data=json.dumps(
+                {
+                    "display_name": "Bad Type Deal",
+                    "seller_url": "https://test.seller.example.com",
+                    "deal_type": "INVALID",
+                }
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 400
@@ -409,14 +435,16 @@ class TestManualEntry:
         """POST /api/deals with tags and advertiser should succeed."""
         resp = client.post(
             "/api/deals",
-            data=json.dumps({
-                "display_name": "Tagged Deal",
-                "seller_url": "https://test.seller.example.com",
-                "deal_type": "PG",
-                "media_type": "CTV",
-                "tags": ["premium", "test"],
-                "advertiser_id": "ADV-TEST-001",
-            }),
+            data=json.dumps(
+                {
+                    "display_name": "Tagged Deal",
+                    "seller_url": "https://test.seller.example.com",
+                    "deal_type": "PG",
+                    "media_type": "CTV",
+                    "tags": ["premium", "test"],
+                    "advertiser_id": "ADV-TEST-001",
+                }
+            ),
             content_type="application/json",
         )
         assert resp.status_code == 200

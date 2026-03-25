@@ -3,10 +3,9 @@
 
 """A2A (Agent-to-Agent) client for IAB agentic-direct server."""
 
-import asyncio
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 

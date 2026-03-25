@@ -4,20 +4,18 @@
 """Tests for agent creation."""
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
 
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent
-from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
+from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.performance_agent import create_performance_agent
-from ad_buyer.agents.level3.research_agent import create_research_agent
 from ad_buyer.agents.level3.execution_agent import create_execution_agent
 from ad_buyer.agents.level3.reporting_agent import create_reporting_agent
+from ad_buyer.agents.level3.research_agent import create_research_agent
 
 
 class TestLevel1Agents:

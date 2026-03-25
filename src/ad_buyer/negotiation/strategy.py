@@ -10,7 +10,6 @@ negotiation strategies (e.g., threshold-based, adaptive, competitive).
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -24,8 +23,8 @@ class NegotiationContext(BaseModel):
 
     rounds_completed: int
     seller_last_price: float
-    our_last_offer: Optional[float] = None
-    seller_previous_price: Optional[float] = None
+    our_last_offer: float | None = None
+    seller_previous_price: float | None = None
     started_at: datetime = Field(default_factory=datetime.utcnow)
 
 

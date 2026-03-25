@@ -4,9 +4,8 @@
 """Tests for buyer event bus: models, bus, helpers, and API endpoints."""
 
 import asyncio
-import uuid
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -125,9 +124,7 @@ class TestInMemoryEventBus:
         received = []
         callback = lambda e: received.append(e)
 
-        asyncio.get_event_loop().run_until_complete(
-            bus.subscribe("deal.booked", callback)
-        )
+        asyncio.get_event_loop().run_until_complete(bus.subscribe("deal.booked", callback))
 
         event = Event(event_type=EventType.DEAL_BOOKED)
         asyncio.get_event_loop().run_until_complete(bus.publish(event))
@@ -158,9 +155,7 @@ class TestInMemoryEventBus:
         def bad_callback(e):
             raise RuntimeError("boom")
 
-        asyncio.get_event_loop().run_until_complete(
-            bus.subscribe("deal.booked", bad_callback)
-        )
+        asyncio.get_event_loop().run_until_complete(bus.subscribe("deal.booked", bad_callback))
 
         event = Event(event_type=EventType.DEAL_BOOKED)
         # Should not raise
@@ -174,17 +169,13 @@ class TestInMemoryEventBus:
         event = Event(event_type=EventType.BUDGET_ALLOCATED)
         asyncio.get_event_loop().run_until_complete(bus.publish(event))
 
-        found = asyncio.get_event_loop().run_until_complete(
-            bus.get_event(event.event_id)
-        )
+        found = asyncio.get_event_loop().run_until_complete(bus.get_event(event.event_id))
         assert found is not None
         assert found.event_id == event.event_id
 
     def test_get_event_not_found(self, bus):
         """Should return None for unknown event ID."""
-        result = asyncio.get_event_loop().run_until_complete(
-            bus.get_event("nonexistent")
-        )
+        result = asyncio.get_event_loop().run_until_complete(bus.get_event("nonexistent"))
         assert result is None
 
     def test_list_events_no_filter(self, bus):
@@ -210,9 +201,7 @@ class TestInMemoryEventBus:
             bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f2"))
         )
 
-        events = asyncio.get_event_loop().run_until_complete(
-            bus.list_events(flow_id="f1")
-        )
+        events = asyncio.get_event_loop().run_until_complete(bus.list_events(flow_id="f1"))
         assert len(events) == 1
         assert events[0].flow_id == "f1"
 
@@ -243,9 +232,7 @@ class TestInMemoryEventBus:
             bus.publish(Event(event_type=EventType.SESSION_CLOSED, session_id="s2"))
         )
 
-        events = asyncio.get_event_loop().run_until_complete(
-            bus.list_events(session_id="s1")
-        )
+        events = asyncio.get_event_loop().run_until_complete(bus.list_events(session_id="s1"))
         assert len(events) == 1
 
     def test_list_events_limit(self, bus):
@@ -271,11 +258,10 @@ class TestEmitEvent:
 
     def test_emit_event_success(self):
         """emit_event should publish and return the Event."""
-        from ad_buyer.events.helpers import emit_event
-        from ad_buyer.events.models import EventType
-
         # Reset singleton
         import ad_buyer.events.bus as bus_mod
+        from ad_buyer.events.helpers import emit_event
+        from ad_buyer.events.models import EventType
 
         bus_mod._event_bus_instance = None
 
@@ -296,10 +282,9 @@ class TestEmitEvent:
 
     def test_emit_event_fail_open(self):
         """emit_event should return None on failure, not raise."""
+        import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
         from ad_buyer.events.models import EventType
-
-        import ad_buyer.events.bus as bus_mod
 
         bus_mod._event_bus_instance = None
 
@@ -325,9 +310,8 @@ class TestGetEventBus:
 
     def test_returns_in_memory_bus(self):
         """Should return an InMemoryEventBus by default."""
-        from ad_buyer.events.bus import InMemoryEventBus, get_event_bus
-
         import ad_buyer.events.bus as bus_mod
+        from ad_buyer.events.bus import InMemoryEventBus, get_event_bus
 
         bus_mod._event_bus_instance = None
 
@@ -338,9 +322,8 @@ class TestGetEventBus:
 
     def test_returns_same_instance(self):
         """Should return the same singleton instance."""
-        from ad_buyer.events.bus import get_event_bus
-
         import ad_buyer.events.bus as bus_mod
+        from ad_buyer.events.bus import get_event_bus
 
         bus_mod._event_bus_instance = None
 
@@ -352,9 +335,8 @@ class TestGetEventBus:
 
     def test_close_resets_singleton(self):
         """close_event_bus should reset the singleton."""
-        from ad_buyer.events.bus import close_event_bus, get_event_bus
-
         import ad_buyer.events.bus as bus_mod
+        from ad_buyer.events.bus import close_event_bus, get_event_bus
 
         bus_mod._event_bus_instance = None
 

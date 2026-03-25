@@ -27,7 +27,6 @@ from ad_buyer.models.deals import (
     TermsInfo,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -204,16 +203,10 @@ class TestNormalizeSingleQuote:
         # PA effective CPM should be higher than raw due to auction markup
         assert result.effective_cpm > result.raw_cpm
 
-    def test_supply_path_fees_applied(
-        self, normalizer_with_supply_paths: QuoteNormalizer
-    ):
+    def test_supply_path_fees_applied(self, normalizer_with_supply_paths: QuoteNormalizer):
         """When supply-path data exists, fees are added to effective CPM."""
-        quote = _make_quote(
-            seller_id="seller-a", deal_type="PD", final_cpm=10.0
-        )
-        result = normalizer_with_supply_paths.normalize_quote(
-            quote, deal_type="PD"
-        )
+        quote = _make_quote(seller_id="seller-a", deal_type="PD", final_cpm=10.0)
+        result = normalizer_with_supply_paths.normalize_quote(quote, deal_type="PD")
 
         assert result.raw_cpm == 10.0
         # seller-a: 5% intermediary + $0.50 tech fee
@@ -221,16 +214,10 @@ class TestNormalizeSingleQuote:
         assert result.fee_estimate == pytest.approx(1.0, abs=0.01)
         assert result.effective_cpm == pytest.approx(11.0, abs=0.01)
 
-    def test_high_fee_seller(
-        self, normalizer_with_supply_paths: QuoteNormalizer
-    ):
+    def test_high_fee_seller(self, normalizer_with_supply_paths: QuoteNormalizer):
         """High-fee seller has higher effective CPM even with same raw CPM."""
-        quote = _make_quote(
-            seller_id="seller-b", deal_type="PD", final_cpm=10.0
-        )
-        result = normalizer_with_supply_paths.normalize_quote(
-            quote, deal_type="PD"
-        )
+        quote = _make_quote(seller_id="seller-b", deal_type="PD", final_cpm=10.0)
+        result = normalizer_with_supply_paths.normalize_quote(quote, deal_type="PD")
 
         # seller-b: 12% intermediary + $1.00 tech fee
         # fee = 10.0 * 0.12 + 1.00 = 2.20
@@ -239,12 +226,8 @@ class TestNormalizeSingleQuote:
 
     def test_minimum_spend_from_terms(self, normalizer: QuoteNormalizer):
         """Minimum spend is computed from guaranteed impressions * CPM."""
-        quote = _make_quote(
-            deal_type="PG", final_cpm=20.0, impressions=1_000_000
-        )
-        result = normalizer.normalize_quote(
-            quote, deal_type="PG", minimum_spend=10_000.0
-        )
+        quote = _make_quote(deal_type="PG", final_cpm=20.0, impressions=1_000_000)
+        result = normalizer.normalize_quote(quote, deal_type="PG", minimum_spend=10_000.0)
 
         assert result.minimum_spend == 10_000.0
 
@@ -276,16 +259,10 @@ class TestNormalizeSingleQuote:
 
         assert result.quote_id == "q-unique-123"
 
-    def test_unknown_seller_no_supply_path(
-        self, normalizer_with_supply_paths: QuoteNormalizer
-    ):
+    def test_unknown_seller_no_supply_path(self, normalizer_with_supply_paths: QuoteNormalizer):
         """A seller not in supply_paths gets zero fee estimate."""
-        quote = _make_quote(
-            seller_id="seller-unknown", deal_type="PD", final_cpm=10.0
-        )
-        result = normalizer_with_supply_paths.normalize_quote(
-            quote, deal_type="PD"
-        )
+        quote = _make_quote(seller_id="seller-unknown", deal_type="PD", final_cpm=10.0)
+        result = normalizer_with_supply_paths.normalize_quote(quote, deal_type="PD")
 
         assert result.fee_estimate == 0.0
         assert result.effective_cpm == 10.0
@@ -299,9 +276,7 @@ class TestNormalizeSingleQuote:
 class TestCompareQuotes:
     """Test compare_quotes() ranking logic."""
 
-    def test_lower_effective_cpm_ranks_higher(
-        self, normalizer: QuoteNormalizer
-    ):
+    def test_lower_effective_cpm_ranks_higher(self, normalizer: QuoteNormalizer):
         """Quotes with lower effective CPM rank higher (lower is better)."""
         quotes = [
             (
@@ -359,9 +334,7 @@ class TestCompareQuotes:
         # PG should rank higher due to guaranteed delivery bonus
         assert ranked[0].quote_id == "q-pg"
 
-    def test_fee_aware_ranking(
-        self, normalizer_with_supply_paths: QuoteNormalizer
-    ):
+    def test_fee_aware_ranking(self, normalizer_with_supply_paths: QuoteNormalizer):
         """A seller with lower raw CPM but higher fees may rank lower."""
         quotes = [
             # seller-a: raw $11, fee 5% + $0.50 => eff $12.05
@@ -488,9 +461,7 @@ class TestEdgeCases:
 
     def test_no_impressions_in_terms(self, normalizer: QuoteNormalizer):
         """Quote with no impressions in terms still normalizes."""
-        quote = _make_quote(
-            deal_type="PD", final_cpm=10.0, impressions=None
-        )
+        quote = _make_quote(deal_type="PD", final_cpm=10.0, impressions=None)
         result = normalizer.normalize_quote(quote, deal_type="PD")
 
         assert result.raw_cpm == 10.0
@@ -503,16 +474,10 @@ class TestEdgeCases:
 
         assert result.seller_id == "unknown"
 
-    def test_pa_with_supply_path_fees(
-        self, normalizer_with_supply_paths: QuoteNormalizer
-    ):
+    def test_pa_with_supply_path_fees(self, normalizer_with_supply_paths: QuoteNormalizer):
         """PA quote with supply path fees compounds both adjustments."""
-        quote = _make_quote(
-            seller_id="seller-a", deal_type="PA", final_cpm=10.0
-        )
-        result = normalizer_with_supply_paths.normalize_quote(
-            quote, deal_type="PA"
-        )
+        quote = _make_quote(seller_id="seller-a", deal_type="PA", final_cpm=10.0)
+        result = normalizer_with_supply_paths.normalize_quote(quote, deal_type="PA")
 
         # PA markup applied to raw CPM, then fees added
         assert result.effective_cpm > 10.0

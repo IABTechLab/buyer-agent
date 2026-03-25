@@ -11,13 +11,12 @@ Registry URL is configurable; defaults to localhost for testing.
 """
 
 import logging
-from typing import Optional
 
 import httpx
 from pydantic import ValidationError
 
 from .cache import SellerCache
-from .models import AgentCapability, AgentCard, AgentTrustInfo, TrustLevel
+from .models import AgentCard, AgentTrustInfo, TrustLevel
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +43,7 @@ class RegistryClient:
 
     async def discover_sellers(
         self,
-        capabilities_filter: Optional[list[str]] = None,
+        capabilities_filter: list[str] | None = None,
     ) -> list[AgentCard]:
         """Discover seller agents from the registry.
 
@@ -102,7 +101,7 @@ class RegistryClient:
             logger.warning("Failed to discover sellers: %s", e)
             return []
 
-    async def fetch_agent_card(self, agent_url: str) -> Optional[AgentCard]:
+    async def fetch_agent_card(self, agent_url: str) -> AgentCard | None:
         """Fetch an agent's card from its .well-known/agent.json endpoint.
 
         Results are cached by agent URL to avoid repeated fetches.
@@ -125,9 +124,7 @@ class RegistryClient:
                 response = await client.get(url)
 
             if response.status_code != 200:
-                logger.debug(
-                    "Agent card not found at %s (status %d)", url, response.status_code
-                )
+                logger.debug("Agent card not found at %s (status %d)", url, response.status_code)
                 return None
 
             card = AgentCard(**response.json())
@@ -167,9 +164,7 @@ class RegistryClient:
                 )
                 return True
 
-            logger.warning(
-                "Failed to register buyer (status %d)", response.status_code
-            )
+            logger.warning("Failed to register buyer (status %d)", response.status_code)
             return False
 
         except httpx.HTTPError as e:

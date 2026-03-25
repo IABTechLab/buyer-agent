@@ -3,8 +3,9 @@
 
 """Product search tool for inventory discovery."""
 
-from typing import Any, Optional
+from typing import Any
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -15,31 +16,31 @@ from ...clients.opendirect_client import OpenDirectClient
 class ProductSearchInput(BaseModel):
     """Input schema for product search tool."""
 
-    channel: Optional[str] = Field(
+    channel: str | None = Field(
         default=None,
         description="Channel type: display, video, mobile, ctv, native",
     )
-    format: Optional[str] = Field(
+    format: str | None = Field(
         default=None,
         description="Ad format: banner, video, interstitial, rewarded",
     )
-    min_price: Optional[float] = Field(
+    min_price: float | None = Field(
         default=None,
         description="Minimum CPM price in USD",
     )
-    max_price: Optional[float] = Field(
+    max_price: float | None = Field(
         default=None,
         description="Maximum CPM price in USD",
     )
-    publisher_ids: Optional[list[str]] = Field(
+    publisher_ids: list[str] | None = Field(
         default=None,
         description="Specific publisher IDs to search",
     )
-    targeting_capabilities: Optional[list[str]] = Field(
+    targeting_capabilities: list[str] | None = Field(
         default=None,
         description="Required targeting: geo, demographic, behavioral, contextual",
     )
-    delivery_type: Optional[str] = Field(
+    delivery_type: str | None = Field(
         default=None,
         description="Delivery type: Exclusive, Guaranteed, PMP",
     )
@@ -82,13 +83,13 @@ Returns:
 
     def _run(
         self,
-        channel: Optional[str] = None,
-        format: Optional[str] = None,
-        min_price: Optional[float] = None,
-        max_price: Optional[float] = None,
-        publisher_ids: Optional[list[str]] = None,
-        targeting_capabilities: Optional[list[str]] = None,
-        delivery_type: Optional[str] = None,
+        channel: str | None = None,
+        format: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        publisher_ids: list[str] | None = None,
+        targeting_capabilities: list[str] | None = None,
+        delivery_type: str | None = None,
         limit: int = 10,
     ) -> str:
         """Synchronous wrapper for async search."""
@@ -107,13 +108,13 @@ Returns:
 
     async def _arun(
         self,
-        channel: Optional[str] = None,
-        format: Optional[str] = None,
-        min_price: Optional[float] = None,
-        max_price: Optional[float] = None,
-        publisher_ids: Optional[list[str]] = None,
-        targeting_capabilities: Optional[list[str]] = None,
-        delivery_type: Optional[str] = None,
+        channel: str | None = None,
+        format: str | None = None,
+        min_price: float | None = None,
+        max_price: float | None = None,
+        publisher_ids: list[str] | None = None,
+        targeting_capabilities: list[str] | None = None,
+        delivery_type: str | None = None,
         limit: int = 10,
     ) -> str:
         """Search for products matching the criteria."""
@@ -136,7 +137,7 @@ Returns:
                 products = await self._client.search_products(filters)
             else:
                 products = await self._client.list_products(top=limit)
-        except Exception as e:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             return f"Error searching products: {e}"
 
         # Filter by price client-side if needed
@@ -170,8 +171,8 @@ Returns:
 {i}. {p.name}
    Product ID: {p.id}
    Publisher ID: {p.publisher_id}
-   Channel: {getattr(p, 'channel', 'N/A')}
-   Format: {getattr(p, 'ad_format', 'N/A')}
+   Channel: {getattr(p, "channel", "N/A")}
+   Format: {getattr(p, "ad_format", "N/A")}
    Base CPM: ${p.base_price:.2f}
    Rate Type: {p.rate_type.value}
    Delivery Type: {p.delivery_type.value}

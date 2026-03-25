@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from ..storage.campaign_store import CampaignStore
 from ..storage.pacing_store import PacingStore
@@ -132,7 +132,7 @@ class PacingAlert:
 
     severity: str  # "warning" or "critical"
     message: str
-    channel: Optional[str] = None
+    channel: str | None = None
     deviation_pct: float = 0.0
 
     def _to_dict(self) -> dict[str, Any]:
@@ -202,7 +202,7 @@ class PacingDashboard:
     deviation_pct: float
     channel_pacing: list[ChannelPacingData] = field(default_factory=list)
     alerts: list[PacingAlert] = field(default_factory=list)
-    snapshot_timestamp: Optional[str] = None
+    snapshot_timestamp: str | None = None
 
     def to_json(self) -> str:
         """Serialize to JSON string."""
@@ -285,8 +285,8 @@ class CreativeStats:
     asset_name: str
     asset_type: str
     validation_status: str
-    format_spec: Optional[dict[str, Any]] = None
-    source_url: Optional[str] = None
+    format_spec: dict[str, Any] | None = None
+    source_url: str | None = None
 
     def _to_dict(self) -> dict[str, Any]:
         return {
@@ -338,15 +338,10 @@ class CreativePerformanceReport:
 
         if self.creatives:
             lines.append("")
-            lines.append(
-                f"  {'Name':<30} {'Type':<12} {'Status':<10}"
-            )
+            lines.append(f"  {'Name':<30} {'Type':<12} {'Status':<10}")
             lines.append("  " + "-" * 52)
             for c in self.creatives:
-                lines.append(
-                    f"  {c.asset_name:<30} {c.asset_type:<12} "
-                    f"{c.validation_status:<10}"
-                )
+                lines.append(f"  {c.asset_name:<30} {c.asset_type:<12} {c.validation_status:<10}")
 
         lines.append("=" * 60)
         return "\n".join(lines)
@@ -546,9 +541,7 @@ class CampaignReporter:
     # Campaign Status Summary
     # ------------------------------------------------------------------
 
-    def campaign_status_summary(
-        self, campaign_id: str
-    ) -> CampaignStatusSummary:
+    def campaign_status_summary(self, campaign_id: str) -> CampaignStatusSummary:
         """Generate a campaign status summary.
 
         Args:
@@ -639,27 +632,25 @@ class CampaignReporter:
         # Build per-channel pacing data
         channel_pacing = []
         for ch in latest.channel_snapshots:
-            channel_pacing.append(ChannelPacingData(
-                channel=ch.channel,
-                allocated_budget=ch.allocated_budget,
-                spend=ch.spend,
-                pacing_pct=ch.pacing_pct,
-                impressions=ch.impressions,
-                effective_cpm=ch.effective_cpm,
-                fill_rate=ch.fill_rate,
-            ))
+            channel_pacing.append(
+                ChannelPacingData(
+                    channel=ch.channel,
+                    allocated_budget=ch.allocated_budget,
+                    spend=ch.spend,
+                    pacing_pct=ch.pacing_pct,
+                    impressions=ch.impressions,
+                    effective_cpm=ch.effective_cpm,
+                    fill_rate=ch.fill_rate,
+                )
+            )
 
         # Generate alerts for channels exceeding deviation threshold
-        alerts = self._generate_pacing_alerts(
-            latest, deviation_threshold
-        )
+        alerts = self._generate_pacing_alerts(latest, deviation_threshold)
 
         # Format snapshot timestamp
         snapshot_ts = None
         if latest.timestamp:
-            snapshot_ts = latest.timestamp.strftime(
-                "%Y-%m-%dT%H:%M:%S.%fZ"
-            )
+            snapshot_ts = latest.timestamp.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
         return PacingDashboard(
             campaign_id=campaign_id,
@@ -693,19 +684,14 @@ class CampaignReporter:
         overall_dev = abs(snapshot.deviation_pct)
         if overall_dev >= threshold:
             direction = "over" if snapshot.deviation_pct > 0 else "under"
-            severity = (
-                "critical"
-                if overall_dev >= _CRITICAL_DEVIATION_THRESHOLD
-                else "warning"
+            severity = "critical" if overall_dev >= _CRITICAL_DEVIATION_THRESHOLD else "warning"
+            alerts.append(
+                PacingAlert(
+                    severity=severity,
+                    message=(f"Campaign is {direction}-pacing by {overall_dev:.1f}%"),
+                    deviation_pct=snapshot.deviation_pct,
+                )
             )
-            alerts.append(PacingAlert(
-                severity=severity,
-                message=(
-                    f"Campaign is {direction}-pacing by "
-                    f"{overall_dev:.1f}%"
-                ),
-                deviation_pct=snapshot.deviation_pct,
-            ))
 
         # Per-channel deviation
         for ch in snapshot.channel_snapshots:
@@ -713,20 +699,15 @@ class CampaignReporter:
             ch_dev = abs(ch.pacing_pct - 100.0)
             if ch_dev >= threshold:
                 direction = "over" if ch.pacing_pct > 100 else "under"
-                severity = (
-                    "critical"
-                    if ch_dev >= _CRITICAL_DEVIATION_THRESHOLD
-                    else "warning"
+                severity = "critical" if ch_dev >= _CRITICAL_DEVIATION_THRESHOLD else "warning"
+                alerts.append(
+                    PacingAlert(
+                        severity=severity,
+                        message=(f"{ch.channel} is {direction}-pacing by {ch_dev:.1f}%"),
+                        channel=ch.channel,
+                        deviation_pct=ch.pacing_pct - 100.0,
+                    )
                 )
-                alerts.append(PacingAlert(
-                    severity=severity,
-                    message=(
-                        f"{ch.channel} is {direction}-pacing by "
-                        f"{ch_dev:.1f}%"
-                    ),
-                    channel=ch.channel,
-                    deviation_pct=ch.pacing_pct - 100.0,
-                ))
 
         return alerts
 
@@ -734,9 +715,7 @@ class CampaignReporter:
     # Creative Performance Report
     # ------------------------------------------------------------------
 
-    def creative_performance_report(
-        self, campaign_id: str
-    ) -> CreativePerformanceReport:
+    def creative_performance_report(self, campaign_id: str) -> CreativePerformanceReport:
         """Generate a creative performance report for a campaign.
 
         Lists all creative assets with their type and validation status,
@@ -748,9 +727,7 @@ class CampaignReporter:
         Returns:
             CreativePerformanceReport with per-creative stats.
         """
-        assets = self._campaign_store.list_creative_assets(
-            campaign_id=campaign_id
-        )
+        assets = self._campaign_store.list_creative_assets(campaign_id=campaign_id)
 
         creatives = []
         valid_count = 0
@@ -768,14 +745,16 @@ class CampaignReporter:
 
             validation_status = asset.get("validation_status", "pending")
 
-            creatives.append(CreativeStats(
-                asset_id=asset["asset_id"],
-                asset_name=asset["asset_name"],
-                asset_type=asset["asset_type"],
-                validation_status=validation_status,
-                format_spec=format_spec,
-                source_url=asset.get("source_url"),
-            ))
+            creatives.append(
+                CreativeStats(
+                    asset_id=asset["asset_id"],
+                    asset_name=asset["asset_name"],
+                    asset_type=asset["asset_type"],
+                    validation_status=validation_status,
+                    format_spec=format_spec,
+                    source_url=asset.get("source_url"),
+                )
+            )
 
             if validation_status == "valid":
                 valid_count += 1
@@ -821,15 +800,17 @@ class CampaignReporter:
         win_rates = []
 
         for ds in latest.deal_snapshots:
-            deals.append(DealStats(
-                deal_id=ds.deal_id,
-                allocated_budget=ds.allocated_budget,
-                spend=ds.spend,
-                impressions=ds.impressions,
-                effective_cpm=ds.effective_cpm,
-                fill_rate=ds.fill_rate,
-                win_rate=ds.win_rate,
-            ))
+            deals.append(
+                DealStats(
+                    deal_id=ds.deal_id,
+                    allocated_budget=ds.allocated_budget,
+                    spend=ds.spend,
+                    impressions=ds.impressions,
+                    effective_cpm=ds.effective_cpm,
+                    fill_rate=ds.fill_rate,
+                    win_rate=ds.win_rate,
+                )
+            )
             total_spend += ds.spend
             total_impressions += ds.impressions
             fill_rates.append(ds.fill_rate)
@@ -875,11 +856,7 @@ class CampaignReporter:
         return CampaignReport(
             campaign_id=campaign_id,
             status_summary=self.campaign_status_summary(campaign_id),
-            pacing_dashboard=self.pacing_dashboard(
-                campaign_id, deviation_threshold
-            ),
-            creative_performance=self.creative_performance_report(
-                campaign_id
-            ),
+            pacing_dashboard=self.pacing_dashboard(campaign_id, deviation_threshold),
+            creative_performance=self.creative_performance_report(campaign_id),
             deal_report=self.deal_report(campaign_id),
         )

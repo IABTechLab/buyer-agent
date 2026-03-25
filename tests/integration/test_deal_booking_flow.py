@@ -10,17 +10,11 @@ module interactions.
 """
 
 import json
-from datetime import datetime
-from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from ad_buyer.clients.opendirect_client import OpenDirectClient
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.flow_state import (
-    BookedLine,
-    BookingState,
     ChannelAllocation,
     ExecutionStatus,
     ProductRecommendation,
@@ -64,13 +58,16 @@ class TestDealBookingFlowValidation:
         """Brief with zero budget should fail validation."""
         client = OpenDirectClient(base_url="http://fake.test")
         flow = DealBookingFlow(client)
-        _set_flow_brief(flow, {
-            "objectives": ["reach"],
-            "budget": 0,
-            "start_date": "2025-03-01",
-            "end_date": "2025-03-31",
-            "target_audience": {"geo": ["US"]},
-        })
+        _set_flow_brief(
+            flow,
+            {
+                "objectives": ["reach"],
+                "budget": 0,
+                "start_date": "2025-03-01",
+                "end_date": "2025-03-31",
+                "target_audience": {"geo": ["US"]},
+            },
+        )
 
         result = flow.receive_campaign_brief()
 
@@ -105,13 +102,16 @@ class TestAudiencePlanningIntegration:
         """No target_audience should skip audience planning gracefully."""
         client = OpenDirectClient(base_url="http://fake.test")
         flow = DealBookingFlow(client)
-        _set_flow_brief(flow, {
-            "objectives": ["reach"],
-            "budget": 50000,
-            "start_date": "2025-03-01",
-            "end_date": "2025-03-31",
-            "target_audience": {},
-        })
+        _set_flow_brief(
+            flow,
+            {
+                "objectives": ["reach"],
+                "budget": 50000,
+                "start_date": "2025-03-01",
+                "end_date": "2025-03-31",
+                "target_audience": {},
+            },
+        )
 
         brief_result = flow.receive_campaign_brief()
         audience_result = flow.plan_audience(brief_result)
@@ -142,12 +142,22 @@ class TestBudgetAllocationIntegration:
         _set_flow_brief(flow, sample_campaign_brief)
 
         # Mock the portfolio crew to return JSON allocations
-        crew_result = json.dumps({
-            "branding": {"budget": 40000, "percentage": 40, "rationale": "Display for awareness"},
-            "performance": {"budget": 35000, "percentage": 35, "rationale": "SEM and remarketing"},
-            "ctv": {"budget": 25000, "percentage": 25, "rationale": "CTV for reach"},
-            "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
-        })
+        crew_result = json.dumps(
+            {
+                "branding": {
+                    "budget": 40000,
+                    "percentage": 40,
+                    "rationale": "Display for awareness",
+                },
+                "performance": {
+                    "budget": 35000,
+                    "percentage": 35,
+                    "rationale": "SEM and remarketing",
+                },
+                "ctv": {"budget": 25000, "percentage": 25, "rationale": "CTV for reach"},
+                "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
+            }
+        )
 
         mock_crew = MagicMock()
         mock_crew.kickoff.return_value = crew_result
@@ -199,9 +209,7 @@ class TestBudgetAllocationIntegration:
 class TestRecommendationConsolidation:
     """Tests recommendation consolidation and approval flow."""
 
-    def _make_flow_with_allocations(
-        self, campaign_brief: dict
-    ) -> DealBookingFlow:
+    def _make_flow_with_allocations(self, campaign_brief: dict) -> DealBookingFlow:
         """Create a flow with pre-set budget allocations."""
         client = OpenDirectClient(base_url="http://fake.test")
         flow = DealBookingFlow(client)

@@ -5,14 +5,14 @@
 
 import json
 import logging
+import sqlite3
 import uuid
-from datetime import datetime
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any
 
 from crewai.flow.flow import Flow, listen, or_, start
 
 from ..clients.opendirect_client import OpenDirectClient
-from ..clients.ucp_client import UCPClient
 from ..crews.channel_crews import (
     create_branding_crew,
     create_ctv_crew,
@@ -20,6 +20,8 @@ from ..crews.channel_crews import (
     create_performance_crew,
 )
 from ..crews.portfolio_crew import create_portfolio_crew
+from ..events.helpers import emit_event_sync
+from ..events.models import EventType
 from ..models.flow_state import (
     BookingState,
     ChannelAllocation,
@@ -27,10 +29,7 @@ from ..models.flow_state import (
     ExecutionStatus,
     ProductRecommendation,
 )
-from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
-from ..models.ucp import AudiencePlan, SignalType, UCPConsent
-from ..events.helpers import emit_event_sync
-from ..events.models import EventType
+from ..models.ucp import SignalType
 from ..storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
@@ -52,7 +51,7 @@ class DealBookingFlow(Flow[BookingState]):
     def __init__(
         self,
         client: OpenDirectClient,
-        store: Optional[DealStore] = None,
+        store: DealStore | None = None,
     ):
         """Initialize the flow with OpenDirect client and optional persistence.
 
@@ -91,7 +90,7 @@ class DealBookingFlow(Flow[BookingState]):
                 cost=getattr(booked_line, "cost", 0.0),
                 booking_status=getattr(booked_line, "booking_status", "pending"),
             )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist booking for deal %s", deal_id)
 
     def _persist_deal_status(self, deal_id: str, new_status: str) -> None:
@@ -114,7 +113,7 @@ class DealBookingFlow(Flow[BookingState]):
                     new_status,
                     deal_id,
                 )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception(
                 "Failed to persist status change to %s for deal %s",
                 new_status,
@@ -142,7 +141,7 @@ class DealBookingFlow(Flow[BookingState]):
             return {"status": "failed", "errors": self.state.errors}
 
         self.state.execution_status = ExecutionStatus.BRIEF_RECEIVED
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = datetime.now(timezone.utc)
 
         # Emit campaign.created event
         emit_event_sync(
@@ -172,7 +171,11 @@ class DealBookingFlow(Flow[BookingState]):
 
         if not target_audience:
             # No audience targeting specified - skip planning
-            return {"status": "success", "audience_plan": None, "message": "No audience targeting specified"}
+            return {
+                "status": "success",
+                "audience_plan": None,
+                "message": "No audience targeting specified",
+            }
 
         try:
             # Create audience plan from campaign requirements
@@ -187,7 +190,7 @@ class DealBookingFlow(Flow[BookingState]):
             gaps = self._identify_audience_gaps(target_audience, coverage_estimates)
             self.state.audience_gaps = gaps
 
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             return {
                 "status": "success",
@@ -196,7 +199,7 @@ class DealBookingFlow(Flow[BookingState]):
                 "gaps": gaps,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - audience planning is optional; must not fail the flow
             # Don't fail the flow - audience planning is optional
             self.state.errors.append(f"Audience planning warning: {e}")
             return {"status": "success", "audience_plan": None, "error": str(e)}
@@ -316,7 +319,7 @@ class DealBookingFlow(Flow[BookingState]):
                     )
 
             self.state.execution_status = ExecutionStatus.BUDGET_ALLOCATED
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             # Emit budget.allocated event
             emit_event_sync(
@@ -330,10 +333,12 @@ class DealBookingFlow(Flow[BookingState]):
 
             return {
                 "status": "success",
-                "allocations": {k: v.model_dump() for k, v in self.state.budget_allocations.items()},
+                "allocations": {
+                    k: v.model_dump() for k, v in self.state.budget_allocations.items()
+                },
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Budget allocation failed: {e}")
             self.state.execution_status = ExecutionStatus.FAILED
             return {"status": "failed", "error": str(e)}
@@ -354,9 +359,21 @@ class DealBookingFlow(Flow[BookingState]):
         # Default allocations if parsing fails
         total_budget = self.state.campaign_brief.get("budget", 0)
         return {
-            "branding": {"budget": total_budget * 0.4, "percentage": 40, "rationale": "Default allocation"},
-            "performance": {"budget": total_budget * 0.4, "percentage": 40, "rationale": "Default allocation"},
-            "ctv": {"budget": total_budget * 0.2, "percentage": 20, "rationale": "Default allocation"},
+            "branding": {
+                "budget": total_budget * 0.4,
+                "percentage": 40,
+                "rationale": "Default allocation",
+            },
+            "performance": {
+                "budget": total_budget * 0.4,
+                "percentage": 40,
+                "rationale": "Default allocation",
+            },
+            "ctv": {
+                "budget": total_budget * 0.2,
+                "percentage": 20,
+                "rationale": "Default allocation",
+            },
             "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not allocated"},
         }
 
@@ -383,11 +400,11 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "branding")
             self.state.channel_recommendations["branding"] = recommendations
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             return {"channel": "branding", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Branding research failed: {e}")
             return {"channel": "branding", "status": "failed", "error": str(e)}
 
@@ -412,11 +429,11 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "ctv")
             self.state.channel_recommendations["ctv"] = recommendations
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             return {"channel": "ctv", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"CTV research failed: {e}")
             return {"channel": "ctv", "status": "failed", "error": str(e)}
 
@@ -441,11 +458,11 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
             self.state.channel_recommendations["mobile_app"] = recommendations
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             return {"channel": "mobile_app", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Mobile research failed: {e}")
             return {"channel": "mobile_app", "status": "failed", "error": str(e)}
 
@@ -470,17 +487,15 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "performance")
             self.state.channel_recommendations["performance"] = recommendations
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = datetime.now(timezone.utc)
 
             return {"channel": "performance", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Performance research failed: {e}")
             return {"channel": "performance", "status": "failed", "error": str(e)}
 
-    def _create_channel_brief(
-        self, channel: str, allocation: ChannelAllocation
-    ) -> dict[str, Any]:
+    def _create_channel_brief(self, channel: str, allocation: ChannelAllocation) -> dict[str, Any]:
         """Create a channel-specific brief from campaign brief and allocation."""
         return ChannelBrief(
             channel=channel,
@@ -492,9 +507,7 @@ class DealBookingFlow(Flow[BookingState]):
             kpis=self.state.campaign_brief.get("kpis", {}),
         ).model_dump(by_alias=True)
 
-    def _parse_recommendations(
-        self, result_str: str, channel: str
-    ) -> list[ProductRecommendation]:
+    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
         """Parse recommendations from crew result."""
         recommendations = []
 
@@ -530,8 +543,7 @@ class DealBookingFlow(Flow[BookingState]):
         """Consolidate all channel recommendations for approval."""
         # Check if all active channels have reported
         active_channels = [
-            ch for ch, alloc in self.state.budget_allocations.items()
-            if alloc.budget > 0
+            ch for ch, alloc in self.state.budget_allocations.items() if alloc.budget > 0
         ]
         completed_channels = list(self.state.channel_recommendations.keys())
 
@@ -549,7 +561,7 @@ class DealBookingFlow(Flow[BookingState]):
                 self.state.pending_approvals.append(rec)
 
         self.state.execution_status = ExecutionStatus.AWAITING_APPROVAL
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = datetime.now(timezone.utc)
 
         # Persist awaiting-approval status for each recommendation's deal
         if self._store is not None:
@@ -565,7 +577,7 @@ class DealBookingFlow(Flow[BookingState]):
                     # Stash the store deal_id on the recommendation for
                     # later use when booking
                     rec._store_deal_id = deal_id  # type: ignore[attr-defined]
-                except Exception:
+                except (sqlite3.Error, OSError, ValueError, AttributeError):
                     logger.exception(
                         "Failed to persist deal for recommendation %s",
                         rec.product_id,
@@ -599,7 +611,7 @@ class DealBookingFlow(Flow[BookingState]):
                 rec.status = "rejected"
 
         self.state.execution_status = ExecutionStatus.EXECUTING_BOOKINGS
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = datetime.now(timezone.utc)
 
         return self._execute_bookings()
 
@@ -616,10 +628,7 @@ class DealBookingFlow(Flow[BookingState]):
         """Execute bookings for all approved recommendations."""
         from ..models.flow_state import BookedLine
 
-        approved = [
-            rec for rec in self.state.pending_approvals
-            if rec.status == "approved"
-        ]
+        approved = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
 
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
@@ -637,7 +646,7 @@ class DealBookingFlow(Flow[BookingState]):
                 impressions=rec.impressions,
                 cost=rec.cost,
                 booking_status="pending_execution",
-                booked_at=datetime.utcnow(),
+                booked_at=datetime.now(timezone.utc),
             )
             self.state.booked_lines.append(booked)
 
@@ -648,7 +657,7 @@ class DealBookingFlow(Flow[BookingState]):
                 self._persist_deal_status(deal_id, "booked")
 
         self.state.execution_status = ExecutionStatus.COMPLETED
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = datetime.now(timezone.utc)
 
         # Emit deal.booked event for each booked line
         for booked in self.state.booked_lines:

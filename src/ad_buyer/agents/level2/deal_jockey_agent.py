@@ -32,7 +32,7 @@ these heuristics (from DEAL_JOCKEY_STRATEGIC_PLAN.md Section 5.4):
 
 from typing import Any
 
-from crewai import Agent, LLM
+from crewai import LLM, Agent
 
 from ...config.settings import settings
 

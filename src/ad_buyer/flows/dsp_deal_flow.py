@@ -4,6 +4,7 @@
 """DSP Deal Discovery Flow - workflow for obtaining Deal IDs for programmatic activation."""
 
 import logging
+import sqlite3
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
@@ -189,7 +190,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
             return
         try:
             self._store_deal_id = self._store.save_deal(**deal_data)
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist deal %s", deal_data.get("product_id"))
 
     def _persist_deal_status(self, new_status: str) -> None:
@@ -213,7 +214,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
                     new_status,
                     self._store_deal_id,
                 )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception(
                 "Failed to persist status %s for deal %s",
                 new_status,
@@ -305,7 +306,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
                 "discovery_result": discovery_result,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Inventory discovery failed: {e}")
             self.state.status = DSPFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
@@ -388,7 +389,7 @@ Return the product_id of the best matching product and explain why.""",
                 "selection_rationale": result_str,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Product selection failed: {e}")
             self.state.status = DSPFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
@@ -459,7 +460,7 @@ Return the product_id of the best matching product and explain why.""",
                 "deal_result": deal_result,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Deal request failed: {e}")
             self.state.status = DSPFlowStatus.FAILED
             self._persist_deal_status("failed")

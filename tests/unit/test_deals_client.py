@@ -24,7 +24,6 @@ from ad_buyer.models.deals import (
     SellerErrorResponse,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures and helpers
 # ---------------------------------------------------------------------------
@@ -317,6 +316,7 @@ class TestRequestQuote:
     @pytest.mark.asyncio
     async def test_request_quote_success(self):
         """Successful quote request returns QuoteResponse."""
+
         def handler(request):
             return _json_response(200, _quote_response_json())
 
@@ -432,6 +432,7 @@ class TestGetQuote:
     @pytest.mark.asyncio
     async def test_get_quote_success(self):
         """Successful quote retrieval returns QuoteResponse."""
+
         def handler(request):
             return _json_response(200, _quote_response_json())
 
@@ -510,6 +511,7 @@ class TestBookDeal:
     @pytest.mark.asyncio
     async def test_book_deal_success(self):
         """Successful booking returns DealResponse."""
+
         def handler(request):
             return _json_response(201, _deal_response_json())
 
@@ -643,6 +645,7 @@ class TestGetDeal:
     @pytest.mark.asyncio
     async def test_get_deal_success(self):
         """Successful deal retrieval returns DealResponse."""
+
         def handler(request):
             return _json_response(200, _deal_response_json())
 
@@ -701,6 +704,7 @@ class TestServerErrors:
     @pytest.mark.asyncio
     async def test_500_raises_deals_client_error(self):
         """500 from seller raises DealsClientError."""
+
         def handler(request):
             return _json_response(500, {"error": "internal_error", "detail": "Server failed"})
 
@@ -715,6 +719,7 @@ class TestServerErrors:
     @pytest.mark.asyncio
     async def test_non_json_error_response(self):
         """Non-JSON error response still raises DealsClientError."""
+
         def handler(request):
             return httpx.Response(
                 status_code=502,
@@ -742,6 +747,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_timeout_error_raises_deals_client_error(self):
         """httpx.TimeoutException is wrapped in DealsClientError."""
+
         def handler(request):
             raise httpx.TimeoutException("Connection timed out")
 
@@ -756,6 +762,7 @@ class TestTimeout:
     @pytest.mark.asyncio
     async def test_connect_error_raises_deals_client_error(self):
         """httpx.ConnectError is wrapped in DealsClientError."""
+
         def handler(request):
             raise httpx.ConnectError("Connection refused")
 
@@ -804,11 +811,14 @@ class TestRetry:
         def handler(request):
             nonlocal call_count
             call_count += 1
-            return _json_response(400, {
-                "error": "invalid_deal_type",
-                "detail": "Bad request",
-                "status_code": 400,
-            })
+            return _json_response(
+                400,
+                {
+                    "error": "invalid_deal_type",
+                    "detail": "Bad request",
+                    "status_code": 400,
+                },
+            )
 
         c = _make_client_with_transport(handler)
         quote_req = QuoteRequest(product_id="test", deal_type="BAD")
@@ -821,6 +831,7 @@ class TestRetry:
     @pytest.mark.asyncio
     async def test_retry_exhausted_raises_error(self):
         """When all retries are exhausted, DealsClientError is raised."""
+
         def handler(request):
             return _json_response(503, {"error": "service_unavailable"})
 
@@ -884,6 +895,7 @@ class TestDealStoreIntegration:
     @pytest.mark.asyncio
     async def test_no_store_no_error(self):
         """Client works fine without a DealStore attached."""
+
         def handler(request):
             return _json_response(200, _quote_response_json())
 
@@ -900,7 +912,7 @@ class TestDealStoreIntegration:
     async def test_store_error_does_not_fail_request(self):
         """If DealStore raises, the API result is still returned."""
         mock_store = MagicMock()
-        mock_store.save_deal.side_effect = Exception("DB connection lost")
+        mock_store.save_deal.side_effect = OSError("DB connection lost")
 
         def handler(request):
             return _json_response(200, _quote_response_json())

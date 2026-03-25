@@ -9,7 +9,7 @@ expired or revoked credentials.
 """
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 from urllib.parse import urlparse
 
 import httpx

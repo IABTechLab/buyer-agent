@@ -17,10 +17,10 @@ Covers lines and branches NOT covered by the existing test_media_kit.py:
 - Partial data / missing fields
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import pytest
 
 from ad_buyer.media_kit.client import MediaKitClient
 from ad_buyer.media_kit.models import (
@@ -31,7 +31,6 @@ from ad_buyer.media_kit.models import (
     PlacementDetail,
     SearchFilter,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper
@@ -85,7 +84,10 @@ class TestGetPackageErrors:
         ):
             with pytest.raises(MediaKitError) as exc_info:
                 await client.get_package(SELLER_URL, "pkg-timeout")
-            assert "timed out" in str(exc_info.value).lower() or "timeout" in str(exc_info.value).lower()
+            assert (
+                "timed out" in str(exc_info.value).lower()
+                or "timeout" in str(exc_info.value).lower()
+            )
 
 
 # =========================================================================
@@ -124,7 +126,10 @@ class TestSearchPackagesErrors:
         ):
             with pytest.raises(MediaKitError) as exc_info:
                 await client.search_packages(SELLER_URL, query="news")
-            assert "timed out" in str(exc_info.value).lower() or "timeout" in str(exc_info.value).lower()
+            assert (
+                "timed out" in str(exc_info.value).lower()
+                or "timeout" in str(exc_info.value).lower()
+            )
 
 
 # =========================================================================
@@ -637,12 +642,14 @@ class TestEmptyResponses:
     async def test_media_kit_empty_packages(self):
         """get_media_kit with no packages should return empty lists."""
         client = MediaKitClient()
-        mock_resp = _mock_response({
-            "seller_name": "Empty Publisher",
-            "total_packages": 0,
-            "featured": [],
-            "all_packages": [],
-        })
+        mock_resp = _mock_response(
+            {
+                "seller_name": "Empty Publisher",
+                "total_packages": 0,
+                "featured": [],
+                "all_packages": [],
+            }
+        )
 
         with patch.object(client._http, "get", new_callable=AsyncMock, return_value=mock_resp):
             kit = await client.get_media_kit(SELLER_URL)
@@ -761,12 +768,14 @@ class TestUrlNormalizationInCalls:
     async def test_trailing_slash_stripped_in_get_media_kit(self):
         """get_media_kit should strip trailing slash from URL."""
         client = MediaKitClient()
-        mock_resp = _mock_response({
-            "seller_name": "Test",
-            "total_packages": 0,
-            "featured": [],
-            "all_packages": [],
-        })
+        mock_resp = _mock_response(
+            {
+                "seller_name": "Test",
+                "total_packages": 0,
+                "featured": [],
+                "all_packages": [],
+            }
+        )
 
         with patch.object(
             client._http, "get", new_callable=AsyncMock, return_value=mock_resp

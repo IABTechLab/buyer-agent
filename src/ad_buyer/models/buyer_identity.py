@@ -4,7 +4,6 @@
 """Buyer identity models for tiered pricing access in DSP workflows."""
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -36,35 +35,35 @@ class BuyerIdentity(BaseModel):
     - Advertiser ID: Advertiser tier, 15% discount + volume discounts
     """
 
-    seat_id: Optional[str] = Field(
+    seat_id: str | None = Field(
         default=None,
         description="DSP seat identifier (e.g., 'ttd-seat-123')",
     )
-    seat_name: Optional[str] = Field(
+    seat_name: str | None = Field(
         default=None,
         description="DSP platform name (e.g., 'The Trade Desk')",
     )
-    agency_id: Optional[str] = Field(
+    agency_id: str | None = Field(
         default=None,
         description="Agency identifier (e.g., 'omnicom-456')",
     )
-    agency_name: Optional[str] = Field(
+    agency_name: str | None = Field(
         default=None,
         description="Agency display name (e.g., 'OMD')",
     )
-    agency_holding_company: Optional[str] = Field(
+    agency_holding_company: str | None = Field(
         default=None,
         description="Agency holding company (e.g., 'Omnicom', 'WPP', 'Publicis')",
     )
-    advertiser_id: Optional[str] = Field(
+    advertiser_id: str | None = Field(
         default=None,
         description="Advertiser identifier (e.g., 'coca-cola-789')",
     )
-    advertiser_name: Optional[str] = Field(
+    advertiser_name: str | None = Field(
         default=None,
         description="Advertiser display name (e.g., 'Coca-Cola')",
     )
-    advertiser_industry: Optional[str] = Field(
+    advertiser_industry: str | None = Field(
         default=None,
         description="Advertiser industry vertical (e.g., 'CPG', 'Auto', 'Finance')",
     )
@@ -157,7 +156,7 @@ class BuyerContext(BaseModel):
         default=False,
         description="Whether the buyer has been authenticated with the seller",
     )
-    session_id: Optional[str] = Field(
+    session_id: str | None = Field(
         default=None,
         description="Session ID for maintaining state across requests",
     )
@@ -207,25 +206,25 @@ class DealRequest(BaseModel):
         default=DealType.PREFERRED_DEAL,
         description="Type of programmatic deal requested",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         ge=0,
         description="Requested impression volume (required for PG)",
     )
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Deal start date (YYYY-MM-DD)",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Deal end date (YYYY-MM-DD)",
     )
-    target_cpm: Optional[float] = Field(
+    target_cpm: float | None = Field(
         default=None,
         ge=0,
         description="Target CPM for negotiation (agency/advertiser tier only)",
     )
-    notes: Optional[str] = Field(
+    notes: str | None = Field(
         default=None,
         description="Additional notes or requirements for the deal",
     )
@@ -255,12 +254,12 @@ class DealResponse(BaseModel):
         ge=0,
         description="Final CPM price for the deal",
     )
-    original_price: Optional[float] = Field(
+    original_price: float | None = Field(
         default=None,
         ge=0,
         description="Original price before tier discount",
     )
-    discount_applied: Optional[float] = Field(
+    discount_applied: float | None = Field(
         default=None,
         ge=0,
         description="Discount percentage applied",
@@ -269,16 +268,16 @@ class DealResponse(BaseModel):
         ...,
         description="Access tier that determined pricing",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         ge=0,
         description="Guaranteed impressions (for PG deals)",
     )
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Deal start date",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Deal end date",
     )
@@ -286,7 +285,7 @@ class DealResponse(BaseModel):
         default_factory=dict,
         description="Platform-specific activation instructions",
     )
-    expires_at: Optional[str] = Field(
+    expires_at: str | None = Field(
         default=None,
         description="When this deal offer expires",
     )

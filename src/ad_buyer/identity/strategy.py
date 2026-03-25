@@ -15,7 +15,6 @@ Seller's tiered pricing:
 """
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -128,19 +127,13 @@ class IdentityStrategy:
         base_tier = self._tier_from_value(deal_context.deal_value_usd)
 
         # Apply relationship modifier
-        base_tier = self._apply_relationship_modifier(
-            base_tier, deal_context.seller_relationship
-        )
+        base_tier = self._apply_relationship_modifier(base_tier, deal_context.seller_relationship)
 
         # Apply campaign goal modifier
-        base_tier = self._apply_campaign_goal_modifier(
-            base_tier, deal_context.campaign_goal
-        )
+        base_tier = self._apply_campaign_goal_modifier(base_tier, deal_context.campaign_goal)
 
         # Apply deal type constraints
-        base_tier = self._apply_deal_type_constraint(
-            base_tier, deal_context.deal_type
-        )
+        base_tier = self._apply_deal_type_constraint(base_tier, deal_context.deal_type)
 
         return base_tier
 
@@ -241,17 +234,13 @@ class IdentityStrategy:
             return self._upgrade_tier(tier, 1)
         return tier
 
-    def _apply_campaign_goal_modifier(
-        self, tier: AccessTier, goal: CampaignGoal
-    ) -> AccessTier:
+    def _apply_campaign_goal_modifier(self, tier: AccessTier, goal: CampaignGoal) -> AccessTier:
         """Performance campaigns benefit from higher tiers."""
         if goal == CampaignGoal.PERFORMANCE:
             return self._upgrade_tier(tier, 1)
         return tier
 
-    def _apply_deal_type_constraint(
-        self, tier: AccessTier, deal_type: DealType
-    ) -> AccessTier:
+    def _apply_deal_type_constraint(self, tier: AccessTier, deal_type: DealType) -> AccessTier:
         """Apply deal-type-specific constraints.
 
         Private auctions with minimal signals should stay conservative.

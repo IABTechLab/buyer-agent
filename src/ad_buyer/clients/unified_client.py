@@ -3,9 +3,9 @@
 
 """Unified client for IAB agentic-direct server supporting both MCP and A2A protocols."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any
 
 from .a2a_client import A2AClient, A2AResponse
 from .mcp_client import IABMCPClient, MCPToolResult
@@ -89,7 +89,7 @@ class UnifiedClient:
         base_url: str,
         protocol: Protocol = Protocol.MCP,
         a2a_agent_type: str = "buyer",
-        buyer_identity: "Optional[BuyerIdentity]" = None,
+        buyer_identity: "BuyerIdentity | None" = None,
     ):
         """Initialize the unified client.
 
@@ -104,8 +104,8 @@ class UnifiedClient:
         self.a2a_agent_type = a2a_agent_type
         self.buyer_identity = buyer_identity
 
-        self._mcp_client: Optional[IABMCPClient] = None
-        self._a2a_client: Optional[A2AClient] = None
+        self._mcp_client: IABMCPClient | None = None
+        self._a2a_client: A2AClient | None = None
 
     async def connect(self, protocol: Protocol = None) -> None:
         """Connect to the server with specified protocol.
@@ -149,12 +149,12 @@ class UnifiedClient:
         await self.close()
 
     @property
-    def mcp(self) -> Optional[IABMCPClient]:
+    def mcp(self) -> IABMCPClient | None:
         """Get the MCP client (if connected)."""
         return self._mcp_client
 
     @property
-    def a2a(self) -> Optional[A2AClient]:
+    def a2a(self) -> A2AClient | None:
         """Get the A2A client (if connected)."""
         return self._a2a_client
 
@@ -615,7 +615,7 @@ class UnifiedClient:
         if self.buyer_identity:
             identity_seed = self.buyer_identity.agency_id or self.buyer_identity.seat_id or "public"
         seed = f"{product_id}-{identity_seed}-{timestamp}"
-        hash_suffix = hashlib.md5(seed.encode()).hexdigest()[:8].upper()
+        hash_suffix = hashlib.md5(seed.encode(), usedforsecurity=False).hexdigest()[:8].upper()
         deal_id = f"DEAL-{hash_suffix}"
 
         # Default flight dates

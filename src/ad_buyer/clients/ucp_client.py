@@ -9,8 +9,7 @@ following the IAB Tech Lab UCP specification.
 
 import logging
 import math
-from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -37,11 +36,11 @@ class UCPExchangeResult:
     def __init__(
         self,
         success: bool,
-        similarity_score: Optional[float] = None,
-        buyer_embedding: Optional[UCPEmbedding] = None,
-        seller_embedding: Optional[UCPEmbedding] = None,
+        similarity_score: float | None = None,
+        buyer_embedding: UCPEmbedding | None = None,
+        seller_embedding: UCPEmbedding | None = None,
         matched_capabilities: list[str] | None = None,
-        error: Optional[str] = None,
+        error: str | None = None,
     ):
         self.success = success
         self.similarity_score = similarity_score
@@ -63,7 +62,7 @@ class UCPClient:
 
     def __init__(
         self,
-        base_url: Optional[str] = None,
+        base_url: str | None = None,
         timeout: float = 30.0,
         default_dimension: int = 512,
     ):
@@ -77,7 +76,7 @@ class UCPClient:
         self._base_url = base_url
         self._timeout = timeout
         self._default_dimension = default_dimension
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the async HTTP client."""
@@ -123,15 +122,15 @@ class UCPClient:
         except httpx.HTTPStatusError as e:
             logger.error(f"UCP send failed: {e.response.status_code} - {e.response.text}")
             return {"error": str(e), "status_code": e.response.status_code}
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"UCP send error: {e}")
             return {"error": str(e)}
 
     async def receive_embedding(
         self,
         endpoint: str,
-        query_params: Optional[dict[str, Any]] = None,
-    ) -> Optional[UCPEmbedding]:
+        query_params: dict[str, Any] | None = None,
+    ) -> UCPEmbedding | None:
         """Receive an embedding from a seller's UCP endpoint.
 
         Args:
@@ -158,7 +157,7 @@ class UCPClient:
         except httpx.HTTPStatusError as e:
             logger.error(f"UCP receive failed: {e.response.status_code}")
             return None
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"UCP receive error: {e}")
             return None
 
@@ -185,12 +184,12 @@ class UCPClient:
             for cap_data in data.get("capabilities", []):
                 try:
                     capabilities.append(AudienceCapability.model_validate(cap_data))
-                except Exception as e:
+                except (ValueError, TypeError) as e:
                     logger.warning(f"Failed to parse capability: {e}")
 
             return capabilities
 
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"Capability discovery failed: {e}")
             return []
 
@@ -198,7 +197,7 @@ class UCPClient:
         self,
         emb1: UCPEmbedding,
         emb2: UCPEmbedding,
-        metric: Optional[SimilarityMetric] = None,
+        metric: SimilarityMetric | None = None,
     ) -> float:
         """Compute similarity between two embeddings.
 
@@ -211,9 +210,7 @@ class UCPClient:
             Similarity score (0-1 for cosine, unbounded for dot/L2)
         """
         if emb1.dimension != emb2.dimension:
-            logger.warning(
-                f"Dimension mismatch: {emb1.dimension} vs {emb2.dimension}"
-            )
+            logger.warning(f"Dimension mismatch: {emb1.dimension} vs {emb2.dimension}")
             return 0.0
 
         # Use recommended metric from model descriptor, or cosine as default
@@ -296,9 +293,7 @@ class UCPClient:
             # Compute similarity if we got seller's embedding
             similarity_score = None
             if seller_embedding:
-                similarity_score = self.compute_similarity(
-                    buyer_embedding, seller_embedding
-                )
+                similarity_score = self.compute_similarity(buyer_embedding, seller_embedding)
 
             return UCPExchangeResult(
                 success=True,
@@ -308,7 +303,7 @@ class UCPClient:
                 matched_capabilities=data.get("matched_capabilities", []),
             )
 
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"Embedding exchange failed: {e}")
             return UCPExchangeResult(
                 success=False,
@@ -320,7 +315,7 @@ class UCPClient:
         vector: list[float],
         embedding_type: EmbeddingType,
         signal_type: SignalType,
-        consent: Optional[UCPConsent] = None,
+        consent: UCPConsent | None = None,
         model_id: str = "ucp-embedding-v1",
         model_version: str = "1.0.0",
     ) -> UCPEmbedding:
@@ -368,7 +363,7 @@ class UCPClient:
     def create_query_embedding(
         self,
         audience_requirements: dict[str, Any],
-        consent: Optional[UCPConsent] = None,
+        consent: UCPConsent | None = None,
     ) -> UCPEmbedding:
         """Create a query embedding from audience requirements.
 
@@ -406,7 +401,6 @@ class UCPClient:
         This is a placeholder - in production, use a trained embedding model.
         """
         import hashlib
-        import struct
 
         # Create a deterministic seed from requirements
         req_str = str(sorted(requirements.items()))
@@ -415,6 +409,7 @@ class UCPClient:
         # Generate pseudo-random but deterministic vector using local instance
         # (avoids setting global random state, which is not thread-safe)
         import random
+
         rng = random.Random(seed)
 
         # Generate normalized vector
@@ -429,7 +424,7 @@ class UCPClient:
         self,
         audience_requirements: dict[str, Any],
         seller_endpoint: str,
-        consent: Optional[UCPConsent] = None,
+        consent: UCPConsent | None = None,
     ) -> AudienceValidationResult:
         """Validate audience requirements against seller capabilities.
 
@@ -442,14 +437,10 @@ class UCPClient:
             AudienceValidationResult with coverage and gaps
         """
         # Create query embedding
-        query_embedding = self.create_query_embedding(
-            audience_requirements, consent
-        )
+        query_embedding = self.create_query_embedding(audience_requirements, consent)
 
         # Exchange embeddings
-        exchange_result = await self.exchange_embeddings(
-            query_embedding, seller_endpoint
-        )
+        exchange_result = await self.exchange_embeddings(query_embedding, seller_endpoint)
 
         if not exchange_result.success:
             return AudienceValidationResult(

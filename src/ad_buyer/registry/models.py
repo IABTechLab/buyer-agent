@@ -11,7 +11,6 @@ Provides data models for:
 """
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -63,4 +62,4 @@ class AgentTrustInfo(BaseModel):
     agent_url: str
     is_registered: bool
     trust_level: TrustLevel = TrustLevel.UNKNOWN
-    registry_id: Optional[str] = None
+    registry_id: str | None = None

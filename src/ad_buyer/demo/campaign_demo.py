@@ -828,7 +828,7 @@ def _register_routes(
 
         try:
             campaign_id = pipeline.ingest_brief(data)
-        except Exception as exc:
+        except (ValueError, KeyError, TypeError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         campaign = campaign_store.get_campaign(campaign_id)
@@ -877,7 +877,7 @@ def _register_routes(
             plan = pipeline.plan_campaign(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         return jsonify({
@@ -901,7 +901,7 @@ def _register_routes(
             deals = pipeline.execute_booking(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         return jsonify({
@@ -926,7 +926,7 @@ def _register_routes(
             pipeline.finalize(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         return jsonify({
@@ -951,7 +951,7 @@ def _register_routes(
             snapshot = pipeline.activate_campaign(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         # Build response with pacing data
@@ -1006,7 +1006,7 @@ def _register_routes(
             campaign_store.pause_campaign(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         return jsonify({
@@ -1033,7 +1033,7 @@ def _register_routes(
             campaign_store.resume_campaign(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         return jsonify({
@@ -1060,7 +1060,7 @@ def _register_routes(
             campaign_store.complete_campaign(campaign_id)
         except KeyError as exc:
             return jsonify({"success": False, "error": str(exc)}), 404
-        except Exception as exc:
+        except (ValueError, TypeError, OSError) as exc:
             return jsonify({"success": False, "error": str(exc)}), 400
 
         return jsonify({
@@ -1087,7 +1087,7 @@ def _register_routes(
                 "creative_performance": report.creative_performance._to_dict(),
                 "deal_report": report.deal_report._to_dict(),
             })
-        except Exception as exc:
+        except (ValueError, TypeError, KeyError, OSError) as exc:
             logger.warning("Report generation failed: %s", exc)
             # Fall back to basic campaign data
             return jsonify({

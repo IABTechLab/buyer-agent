@@ -16,10 +16,10 @@ Covers:
 
 import json
 import sqlite3
-import uuid
 
 import pytest
 
+from ad_buyer.storage.campaign_store import CampaignStore
 from ad_buyer.storage.schema import (
     SCHEMA_VERSION,
     create_tables,
@@ -28,8 +28,6 @@ from ad_buyer.storage.schema import (
     migrate_v2_to_v4,
     set_schema_version,
 )
-from ad_buyer.storage.campaign_store import CampaignStore
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -75,17 +73,21 @@ def sample_campaign_data():
         "currency": "USD",
         "flight_start": "2026-04-01",
         "flight_end": "2026-05-26",
-        "channels": json.dumps([
-            {"channel": "CTV", "budget_pct": 60},
-            {"channel": "DISPLAY", "budget_pct": 30},
-            {"channel": "AUDIO", "budget_pct": 10},
-        ]),
+        "channels": json.dumps(
+            [
+                {"channel": "CTV", "budget_pct": 60},
+                {"channel": "DISPLAY", "budget_pct": 30},
+                {"channel": "AUDIO", "budget_pct": 10},
+            ]
+        ),
         "target_audience": json.dumps(["auto_intenders", "25-54"]),
         "target_geo": json.dumps(["US", "top_20_dmas"]),
-        "kpis": json.dumps([
-            {"metric": "CPCV", "target_value": 0.05},
-            {"metric": "CTR", "target_value": 0.8},
-        ]),
+        "kpis": json.dumps(
+            [
+                {"metric": "CPCV", "target_value": 0.05},
+                {"metric": "CTR", "target_value": 0.8},
+            ]
+        ),
     }
 
 
@@ -138,10 +140,22 @@ class TestSchemaMigrationV4:
         cursor = v4_conn.execute("PRAGMA table_info(campaigns)")
         cols = {row[1] for row in cursor.fetchall()}
         expected = {
-            "campaign_id", "advertiser_id", "campaign_name", "status",
-            "total_budget", "currency", "flight_start", "flight_end",
-            "channels", "target_audience", "target_geo", "kpis",
-            "brand_safety", "approval_config", "created_at", "updated_at",
+            "campaign_id",
+            "advertiser_id",
+            "campaign_name",
+            "status",
+            "total_budget",
+            "currency",
+            "flight_start",
+            "flight_end",
+            "channels",
+            "target_audience",
+            "target_geo",
+            "kpis",
+            "brand_safety",
+            "approval_config",
+            "created_at",
+            "updated_at",
         }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
 
@@ -150,10 +164,17 @@ class TestSchemaMigrationV4:
         cursor = v4_conn.execute("PRAGMA table_info(pacing_snapshots)")
         cols = {row[1] for row in cursor.fetchall()}
         expected = {
-            "snapshot_id", "campaign_id", "timestamp",
-            "total_budget", "total_spend", "pacing_pct",
-            "expected_spend", "deviation_pct",
-            "channel_snapshots", "deal_snapshots", "recommendations",
+            "snapshot_id",
+            "campaign_id",
+            "timestamp",
+            "total_budget",
+            "total_spend",
+            "pacing_pct",
+            "expected_spend",
+            "deviation_pct",
+            "channel_snapshots",
+            "deal_snapshots",
+            "recommendations",
             "created_at",
         }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
@@ -163,9 +184,15 @@ class TestSchemaMigrationV4:
         cursor = v4_conn.execute("PRAGMA table_info(creative_assets)")
         cols = {row[1] for row in cursor.fetchall()}
         expected = {
-            "asset_id", "campaign_id", "asset_name", "asset_type",
-            "format_spec", "source_url", "validation_status",
-            "validation_errors", "created_at",
+            "asset_id",
+            "campaign_id",
+            "asset_name",
+            "asset_type",
+            "format_spec",
+            "source_url",
+            "validation_status",
+            "validation_errors",
+            "created_at",
         }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
 
@@ -174,17 +201,21 @@ class TestSchemaMigrationV4:
         cursor = v4_conn.execute("PRAGMA table_info(ad_server_campaigns)")
         cols = {row[1] for row in cursor.fetchall()}
         expected = {
-            "binding_id", "campaign_id", "ad_server",
-            "external_campaign_id", "status", "creative_assignments",
-            "last_sync_at", "created_at",
+            "binding_id",
+            "campaign_id",
+            "ad_server",
+            "external_campaign_id",
+            "status",
+            "creative_assignments",
+            "last_sync_at",
+            "created_at",
         }
         assert expected.issubset(cols), f"Missing columns: {expected - cols}"
 
     def test_index_campaigns_status(self, v4_conn):
         """Index on campaigns(status) should exist."""
         cursor = v4_conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' "
-            "AND name='idx_campaigns_status'"
+            "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_campaigns_status'"
         )
         assert cursor.fetchone() is not None
 
@@ -400,7 +431,7 @@ class TestPacingSnapshotCRUD:
         for i in range(3):
             campaign_store.save_pacing_snapshot(
                 campaign_id=cid,
-                timestamp=f"2026-04-{10+i}T12:00:00Z",
+                timestamp=f"2026-04-{10 + i}T12:00:00Z",
                 total_budget=720000.0,
                 total_spend=120000.0 * (i + 1),
                 pacing_pct=95.0 + i,
@@ -450,10 +481,14 @@ class TestCreativeAssetCRUD:
             campaign_id=cid,
             asset_name="Rivian 30s CTV Spot",
             asset_type="video",
-            format_spec=json.dumps({
-                "width": 1920, "height": 1080,
-                "duration_sec": 30, "vast_version": "4.2",
-            }),
+            format_spec=json.dumps(
+                {
+                    "width": 1920,
+                    "height": 1080,
+                    "duration_sec": 30,
+                    "vast_version": "4.2",
+                }
+            ),
             source_url="https://cdn.example.com/rivian_30s.mp4",
         )
         assert isinstance(aid, str)
@@ -633,8 +668,15 @@ class TestEdgeCases:
     def test_campaign_all_statuses_valid(self, campaign_store, sample_campaign_data):
         """All defined campaign statuses should be saveable."""
         valid_statuses = [
-            "DRAFT", "PLANNING", "BOOKING", "READY", "ACTIVE",
-            "PAUSED", "PACING_HOLD", "COMPLETED", "CANCELED",
+            "DRAFT",
+            "PLANNING",
+            "BOOKING",
+            "READY",
+            "ACTIVE",
+            "PAUSED",
+            "PACING_HOLD",
+            "COMPLETED",
+            "CANCELED",
         ]
         for status in valid_statuses:
             sample_campaign_data["status"] = status

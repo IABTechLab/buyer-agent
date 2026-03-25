@@ -5,8 +5,12 @@
 
 from datetime import datetime
 
-import pytest
-
+from ad_buyer.models.flow_state import (
+    BookingState,
+    ChannelAllocation,
+    ExecutionStatus,
+    ProductRecommendation,
+)
 from ad_buyer.models.opendirect import (
     Account,
     AvailsRequest,
@@ -19,12 +23,6 @@ from ad_buyer.models.opendirect import (
     OrderStatus,
     Product,
     RateType,
-)
-from ad_buyer.models.flow_state import (
-    BookingState,
-    ChannelAllocation,
-    ExecutionStatus,
-    ProductRecommendation,
 )
 
 

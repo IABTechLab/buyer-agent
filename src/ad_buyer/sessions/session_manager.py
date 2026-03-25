@@ -9,8 +9,8 @@ Sessions follow a 7-day TTL and are automatically recreated on expiry.
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 
@@ -19,9 +19,7 @@ from .session_store import SessionRecord, SessionStore
 logger = logging.getLogger(__name__)
 
 # Default session store location
-DEFAULT_STORE_PATH = os.path.join(
-    os.path.expanduser("~"), ".ad_buyer", "sessions.json"
-)
+DEFAULT_STORE_PATH = os.path.join(os.path.expanduser("~"), ".ad_buyer", "sessions.json")
 
 # Default session TTL (7 days), used as fallback when seller doesn't specify
 SESSION_TTL_DAYS = 7
@@ -54,7 +52,7 @@ class SessionManager:
     async def create_session(
         self,
         seller_url: str,
-        buyer_identity: Optional[dict[str, Any]] = None,
+        buyer_identity: dict[str, Any] | None = None,
     ) -> str:
         """Create a new session with a seller.
 
@@ -87,12 +85,10 @@ class SessionManager:
 
         data = response.json()
         session_id = data["session_id"]
-        created_at = data.get(
-            "created_at", datetime.now(timezone.utc).isoformat()
-        )
+        created_at = data.get("created_at", datetime.now(UTC).isoformat())
         expires_at = data.get(
             "expires_at",
-            (datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS)).isoformat(),
+            (datetime.now(UTC) + timedelta(days=SESSION_TTL_DAYS)).isoformat(),
         )
 
         record = SessionRecord(
@@ -108,7 +104,7 @@ class SessionManager:
     async def get_or_create_session(
         self,
         seller_url: str,
-        buyer_identity: Optional[dict[str, Any]] = None,
+        buyer_identity: dict[str, Any] | None = None,
     ) -> str:
         """Get an existing active session or create a new one.
 
@@ -135,7 +131,7 @@ class SessionManager:
         seller_url: str,
         session_id: str,
         message: dict[str, Any],
-        buyer_identity: Optional[dict[str, Any]] = None,
+        buyer_identity: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Send a message on an existing session.
 
@@ -180,8 +176,7 @@ class SessionManager:
 
             if response.status_code not in (200, 201):
                 raise RuntimeError(
-                    f"Failed to send message on session {session_id}: "
-                    f"{response.status_code}"
+                    f"Failed to send message on session {session_id}: {response.status_code}"
                 )
 
         return response.json()
@@ -190,7 +185,7 @@ class SessionManager:
         self,
         client: httpx.AsyncClient,
         seller_url: str,
-        buyer_identity: Optional[dict[str, Any]] = None,
+        buyer_identity: dict[str, Any] | None = None,
     ) -> str:
         """Create a session using an existing httpx client instance.
 
@@ -217,18 +212,15 @@ class SessionManager:
 
         if response.status_code not in (200, 201):
             raise RuntimeError(
-                f"Failed to create session with {seller_url}: "
-                f"{response.status_code}"
+                f"Failed to create session with {seller_url}: {response.status_code}"
             )
 
         data = response.json()
         session_id = data["session_id"]
-        created_at = data.get(
-            "created_at", datetime.now(timezone.utc).isoformat()
-        )
+        created_at = data.get("created_at", datetime.now(UTC).isoformat())
         expires_at = data.get(
             "expires_at",
-            (datetime.now(timezone.utc) + timedelta(days=SESSION_TTL_DAYS)).isoformat(),
+            (datetime.now(UTC) + timedelta(days=SESSION_TTL_DAYS)).isoformat(),
         )
 
         record = SessionRecord(
@@ -260,7 +252,7 @@ class SessionManager:
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 await client.post(url)
-        except Exception:
+        except httpx.HTTPError:
             logger.warning(
                 "Failed to close session %s on %s (may already be expired)",
                 session_id,

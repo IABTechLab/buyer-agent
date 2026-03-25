@@ -17,9 +17,10 @@ Covers lines and branches NOT covered by the existing test_negotiation.py:
 - NegotiationOutcome enum completeness
 """
 
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.models import (
@@ -28,9 +29,8 @@ from ad_buyer.negotiation.models import (
     NegotiationRound,
     NegotiationSession,
 )
-from ad_buyer.negotiation.strategy import NegotiationContext, NegotiationStrategy
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-
+from ad_buyer.negotiation.strategy import NegotiationContext, NegotiationStrategy
 
 # =========================================================================
 # Helper: build mock httpx responses
@@ -93,12 +93,14 @@ class TestNegotiationClientAuth:
             target_cpm=20.0, max_cpm=30.0, concession_step=2.0, max_rounds=5
         )
 
-        resp = _make_mock_response({
-            "negotiation_id": "neg-auth",
-            "seller_price": 35.0,
-            "round_number": 1,
-            "action": "counter",
-        })
+        resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-auth",
+                "seller_price": 35.0,
+                "round_number": 1,
+                "action": "counter",
+            }
+        )
 
         patcher, mock_http = _patch_httpx(resp)
         with patcher:
@@ -132,12 +134,14 @@ class TestAutoNegotiateSellerAcceptsImmediately:
         )
 
         # Seller's response to first counter: immediately accepts
-        start_resp = _make_mock_response({
-            "negotiation_id": "neg-instant",
-            "seller_price": 20.0,
-            "round_number": 1,
-            "action": "accept",
-        })
+        start_resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-instant",
+                "seller_price": 20.0,
+                "round_number": 1,
+                "action": "accept",
+            }
+        )
 
         client = NegotiationClient()
         patcher, _ = _patch_httpx(start_resp)
@@ -170,26 +174,32 @@ class TestAutoNegotiateSellerAcceptsMidLoop:
         )
 
         # Round 1: buyer offers 20, seller counters at 40 (too high)
-        start_resp = _make_mock_response({
-            "negotiation_id": "neg-loop",
-            "seller_price": 40.0,
-            "round_number": 1,
-            "action": "counter",
-        })
+        start_resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-loop",
+                "seller_price": 40.0,
+                "round_number": 1,
+                "action": "counter",
+            }
+        )
 
         # Round 2: buyer offers 23 (20 + 3), seller counters at 35 (still moving)
-        counter_resp_1 = _make_mock_response({
-            "seller_price": 35.0,
-            "round_number": 2,
-            "action": "counter",
-        })
+        counter_resp_1 = _make_mock_response(
+            {
+                "seller_price": 35.0,
+                "round_number": 2,
+                "action": "counter",
+            }
+        )
 
         # Round 3: buyer offers 26 (23 + 3), seller accepts
-        counter_resp_2 = _make_mock_response({
-            "seller_price": 26.0,
-            "round_number": 3,
-            "action": "accept",
-        })
+        counter_resp_2 = _make_mock_response(
+            {
+                "seller_price": 26.0,
+                "round_number": 3,
+                "action": "accept",
+            }
+        )
 
         client = NegotiationClient()
         patcher, _ = _patch_httpx([start_resp, counter_resp_1, counter_resp_2])
@@ -222,26 +232,32 @@ class TestAutoNegotiateBuyerAcceptsMidLoop:
         )
 
         # Round 1: buyer offers 20, seller counters at 35 (above max_cpm=30)
-        start_resp = _make_mock_response({
-            "negotiation_id": "neg-buyeracc",
-            "seller_price": 35.0,
-            "round_number": 1,
-            "action": "counter",
-        })
+        start_resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-buyeracc",
+                "seller_price": 35.0,
+                "round_number": 1,
+                "action": "counter",
+            }
+        )
 
         # Round 2: buyer offers 22, seller drops to 29 (below max_cpm=30)
         # Strategy should_accept(29) returns True since 29 <= 30
-        counter_resp = _make_mock_response({
-            "seller_price": 29.0,
-            "round_number": 2,
-            "action": "counter",
-        })
+        counter_resp = _make_mock_response(
+            {
+                "seller_price": 29.0,
+                "round_number": 2,
+                "action": "counter",
+            }
+        )
 
         # Accept response
-        accept_resp = _make_mock_response({
-            "status": "accepted",
-            "deal_price": 29.0,
-        })
+        accept_resp = _make_mock_response(
+            {
+                "status": "accepted",
+                "deal_price": 29.0,
+            }
+        )
 
         client = NegotiationClient()
         patcher, _ = _patch_httpx([start_resp, counter_resp, accept_resp])
@@ -273,19 +289,23 @@ class TestAutoNegotiateSellerRejectsMidLoop:
         )
 
         # Round 1: seller counters at 35
-        start_resp = _make_mock_response({
-            "negotiation_id": "neg-reject",
-            "seller_price": 35.0,
-            "round_number": 1,
-            "action": "counter",
-        })
+        start_resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-reject",
+                "seller_price": 35.0,
+                "round_number": 1,
+                "action": "counter",
+            }
+        )
 
         # Round 2: seller rejects outright
-        counter_resp = _make_mock_response({
-            "seller_price": 35.0,
-            "round_number": 2,
-            "action": "reject",
-        })
+        counter_resp = _make_mock_response(
+            {
+                "seller_price": 35.0,
+                "round_number": 2,
+                "action": "reject",
+            }
+        )
 
         client = NegotiationClient()
         patcher, _ = _patch_httpx([start_resp, counter_resp])
@@ -519,12 +539,8 @@ class TestNegotiationModelsExtended:
     def test_negotiation_result_with_rounds_list(self):
         """NegotiationResult can store the full round history."""
         rounds = [
-            NegotiationRound(
-                round_number=1, buyer_price=20.0, seller_price=35.0, action="counter"
-            ),
-            NegotiationRound(
-                round_number=2, buyer_price=22.0, seller_price=30.0, action="accept"
-            ),
+            NegotiationRound(round_number=1, buyer_price=20.0, seller_price=35.0, action="counter"),
+            NegotiationRound(round_number=2, buyer_price=22.0, seller_price=30.0, action="accept"),
         ]
         result = NegotiationResult(
             proposal_id="prop-hist",
@@ -626,17 +642,21 @@ class TestCustomStrategies:
         strategy = AlwaysAcceptStrategy()
 
         # Seller responds with a counter
-        start_resp = _make_mock_response({
-            "negotiation_id": "neg-alwaysacc",
-            "seller_price": 50.0,
-            "round_number": 1,
-            "action": "counter",
-        })
+        start_resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-alwaysacc",
+                "seller_price": 50.0,
+                "round_number": 1,
+                "action": "counter",
+            }
+        )
 
-        accept_resp = _make_mock_response({
-            "status": "accepted",
-            "deal_price": 50.0,
-        })
+        accept_resp = _make_mock_response(
+            {
+                "status": "accepted",
+                "deal_price": 50.0,
+            }
+        )
 
         client = NegotiationClient()
         patcher, _ = _patch_httpx([start_resp, accept_resp])
@@ -656,12 +676,14 @@ class TestCustomStrategies:
         strategy = AlwaysWalkAwayStrategy()
 
         # Seller responds with a counter (price too high)
-        start_resp = _make_mock_response({
-            "negotiation_id": "neg-alwayswalk",
-            "seller_price": 50.0,
-            "round_number": 1,
-            "action": "counter",
-        })
+        start_resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-alwayswalk",
+                "seller_price": 50.0,
+                "round_number": 1,
+                "action": "counter",
+            }
+        )
 
         decline_resp = _make_mock_response({"status": "declined"})
 
@@ -698,11 +720,13 @@ class TestCounterOfferSessionState:
             our_last_offer=20.0,
         )
 
-        resp = _make_mock_response({
-            "seller_price": 33.0,
-            "round_number": 2,
-            "action": "counter",
-        })
+        resp = _make_mock_response(
+            {
+                "seller_price": 33.0,
+                "round_number": 2,
+                "action": "counter",
+            }
+        )
 
         patcher, _ = _patch_httpx(resp)
         with patcher:
@@ -757,13 +781,15 @@ class TestStartNegotiationRoundTracking:
             target_cpm=20.0, max_cpm=30.0, concession_step=2.0, max_rounds=5
         )
 
-        resp = _make_mock_response({
-            "negotiation_id": "neg-track",
-            "seller_price": 38.0,
-            "round_number": 1,
-            "action": "counter",
-            "rationale": "Starting at $38 CPM",
-        })
+        resp = _make_mock_response(
+            {
+                "negotiation_id": "neg-track",
+                "seller_price": 38.0,
+                "round_number": 1,
+                "action": "counter",
+                "rationale": "Starting at $38 CPM",
+            }
+        )
 
         patcher, _ = _patch_httpx(resp)
         with patcher:
@@ -791,9 +817,11 @@ class TestStartNegotiationRoundTracking:
         )
 
         # Minimal response (missing negotiation_id, seller_price, etc.)
-        resp = _make_mock_response({
-            "current_price": 35.0,
-        })
+        resp = _make_mock_response(
+            {
+                "current_price": 35.0,
+            }
+        )
 
         patcher, _ = _patch_httpx(resp)
         with patcher:

@@ -11,10 +11,9 @@ Covers edge cases, boundary conditions, and uncovered paths in:
 - ad_buyer.sessions (SessionRecord, SessionStore, SessionManager edge cases)
 """
 
-import base64
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -39,7 +38,6 @@ from ad_buyer.models.buyer_identity import (
 )
 from ad_buyer.sessions.session_manager import SessionManager
 from ad_buyer.sessions.session_store import SessionRecord, SessionStore
-
 
 # =============================================================================
 # BuyerIdentity model — additional edge cases
@@ -528,17 +526,13 @@ class TestEstimateSavingsEdgeCases:
     def test_savings_large_base_price(self):
         """Large base prices should compute correctly."""
         strategy = IdentityStrategy()
-        savings = strategy.estimate_savings(
-            1_000_000.0, AccessTier.PUBLIC, AccessTier.ADVERTISER
-        )
+        savings = strategy.estimate_savings(1_000_000.0, AccessTier.PUBLIC, AccessTier.ADVERTISER)
         assert savings == pytest.approx(150_000.0)
 
     def test_savings_very_small_base_price(self):
         """Very small base prices should still compute."""
         strategy = IdentityStrategy()
-        savings = strategy.estimate_savings(
-            0.01, AccessTier.PUBLIC, AccessTier.ADVERTISER
-        )
+        savings = strategy.estimate_savings(0.01, AccessTier.PUBLIC, AccessTier.ADVERTISER)
         assert savings == pytest.approx(0.0015)
 
 
@@ -623,9 +617,7 @@ class TestApiKeyStoreEdgeCases:
         """Corrupted base64 values should be handled gracefully."""
         store_path = tmp_path / "keys.json"
         # Write invalid base64 data
-        store_path.write_text(json.dumps({
-            "https://seller.example.com": "not-valid-base64!!!"
-        }))
+        store_path.write_text(json.dumps({"https://seller.example.com": "not-valid-base64!!!"}))
         store = ApiKeyStore(store_path=store_path)
         # Should start empty due to decode error
         assert store.list_sellers() == []
@@ -699,9 +691,7 @@ class TestAuthMiddlewareEdgeCases:
         store.add_key("https://seller.example.com", "key1")
         middleware = AuthMiddleware(key_store=store)
 
-        request = httpx.Request(
-            "GET", "https://seller.example.com/api/products?limit=10&offset=0"
-        )
+        request = httpx.Request("GET", "https://seller.example.com/api/products?limit=10&offset=0")
         modified = middleware.add_auth(request)
         assert modified.headers.get("X-Api-Key") == "key1"
 
@@ -825,26 +815,22 @@ class TestSessionRecordEdgeCases:
     def test_is_expired_with_timezone_naive_expires(self):
         """Session with timezone-naive expires_at should handle correctly."""
         # This covers line 39 in session_store.py
-        naive_future = (datetime.now(timezone.utc) + timedelta(days=1)).strftime(
-            "%Y-%m-%dT%H:%M:%S"
-        )
+        naive_future = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
         record = SessionRecord(
             session_id="s1",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             expires_at=naive_future,
         )
         assert record.is_expired() is False
 
     def test_is_expired_with_timezone_naive_past(self):
         """Expired session with timezone-naive expires_at should be detected."""
-        naive_past = (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
-            "%Y-%m-%dT%H:%M:%S"
-        )
+        naive_past = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
         record = SessionRecord(
             session_id="s1",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             expires_at=naive_past,
         )
         assert record.is_expired() is True
@@ -894,14 +880,17 @@ class TestSessionStoreEdgeCases:
         store_path = str(tmp_path / "sessions.json")
         with open(store_path, "w") as f:
             # Valid JSON but invalid session record structure (missing session_id)
-            json.dump({
-                "http://seller.example.com": {
-                    "seller_url": "http://seller.example.com",
-                    "created_at": "2026-01-01T00:00:00+00:00",
-                    "expires_at": "2026-01-08T00:00:00+00:00",
-                    # Missing "session_id" key
-                }
-            }, f)
+            json.dump(
+                {
+                    "http://seller.example.com": {
+                        "seller_url": "http://seller.example.com",
+                        "created_at": "2026-01-01T00:00:00+00:00",
+                        "expires_at": "2026-01-08T00:00:00+00:00",
+                        # Missing "session_id" key
+                    }
+                },
+                f,
+            )
         store = SessionStore(store_path)
         assert store.list_sessions() == {}
 
@@ -912,8 +901,8 @@ class TestSessionStoreEdgeCases:
         record = SessionRecord(
             session_id="s1",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store.save(record)
         assert os.path.exists(store_path)
@@ -926,16 +915,16 @@ class TestSessionStoreEdgeCases:
         old = SessionRecord(
             session_id="old",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store.save(old)
 
         new = SessionRecord(
             session_id="new",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store.save(new)
 
@@ -949,8 +938,8 @@ class TestSessionStoreEdgeCases:
         record = SessionRecord(
             session_id="active",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         store.save(record)
         assert store.cleanup_expired() == 0
@@ -963,8 +952,8 @@ class TestSessionStoreEdgeCases:
             record = SessionRecord(
                 session_id=f"expired-{i}",
                 seller_url=f"http://seller{i}.example.com",
-                created_at=(datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
-                expires_at=(datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+                created_at=(datetime.now(UTC) - timedelta(days=10)).isoformat(),
+                expires_at=(datetime.now(UTC) - timedelta(days=1)).isoformat(),
             )
             store.save(record)
         assert store.cleanup_expired() == 3
@@ -1000,8 +989,8 @@ class TestSessionManagerEdgeCases:
         record = SessionRecord(
             session_id="sess-stale",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -1013,8 +1002,8 @@ class TestSessionManagerEdgeCases:
         mock_create.status_code = 201
         mock_create.json.return_value = {
             "session_id": "sess-new",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         # Retry fails with 500
@@ -1026,9 +1015,7 @@ class TestSessionManagerEdgeCases:
             mock_client = AsyncMock()
             MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(
-                side_effect=[mock_404, mock_create, mock_retry_fail]
-            )
+            mock_client.post = AsyncMock(side_effect=[mock_404, mock_create, mock_retry_fail])
 
             with pytest.raises(RuntimeError, match="Failed to send message"):
                 await manager.send_message(
@@ -1063,8 +1050,8 @@ class TestSessionManagerEdgeCases:
         record = SessionRecord(
             session_id="sess-close",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -1089,8 +1076,8 @@ class TestSessionManagerEdgeCases:
         record = SessionRecord(
             session_id="sess-1",
             seller_url="http://seller.example.com",
-            created_at=datetime.now(timezone.utc).isoformat(),
-            expires_at=(datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
+            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
         )
         manager.store.save(record)
 
@@ -1118,8 +1105,8 @@ class TestSessionManagerEdgeCases:
         mock_response.status_code = 200
         mock_response.json.return_value = {
             "session_id": "sess-200",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
         with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:

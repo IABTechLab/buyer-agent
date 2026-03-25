@@ -4,17 +4,14 @@
 """Tests for DealJockey L2 agent creation."""
 
 import os
-import pytest
-from unittest.mock import MagicMock
 
 from crewai.tools import BaseTool
-from pydantic import Field
 
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
-from ad_buyer.agents.level2.deal_jockey_agent import create_deal_jockey_agent
 from ad_buyer.agents.level2 import create_deal_jockey_agent as imported_from_package
+from ad_buyer.agents.level2.deal_jockey_agent import create_deal_jockey_agent
 
 
 class _MockTool(BaseTool):
