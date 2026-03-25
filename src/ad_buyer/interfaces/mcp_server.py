@@ -779,6 +779,273 @@ async def compare_sellers(seller_urls: list[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Negotiation Tools (buyer-r0j)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def start_negotiation(
+    seller_url: str,
+    product_id: str,
+    product_name: str = "",
+    initial_price: float = 0.0,
+) -> str:
+    """Initiate a negotiation with a seller within the demo ecosystem.
+
+    Creates a deal in ``negotiating`` status and records the first
+    negotiation round with the buyer's initial price offer.
+
+    Note: This wraps the internal buyer-seller negotiation in the Agent
+    Range demo. Real SSP integrations use seller-initiated deal flows,
+    not buyer-initiated negotiation.
+
+    Args:
+        seller_url: Base URL of the seller agent.
+        product_id: The product/package to negotiate on.
+        product_name: Human-readable name for the product.
+        initial_price: The buyer's opening offer (CPM).
+
+    Returns a JSON object with:
+    - deal_id: the newly created deal identifier
+    - status: the deal status (negotiating)
+    - initial_price: the buyer's opening offer
+    - timestamp: when the negotiation was started
+    """
+    store = _get_deal_store()
+    try:
+        deal_id = store.save_deal(
+            seller_url=seller_url,
+            product_id=product_id,
+            product_name=product_name,
+            status="negotiating",
+            price=initial_price,
+        )
+
+        store.save_negotiation_round(
+            deal_id=deal_id,
+            proposal_id=f"prop-{deal_id[:8]}",
+            round_number=1,
+            buyer_price=initial_price,
+            seller_price=0.0,
+            action="counter",
+            rationale="Initial buyer offer",
+        )
+
+        result = {
+            "deal_id": deal_id,
+            "status": "negotiating",
+            "seller_url": seller_url,
+            "product_id": product_id,
+            "product_name": product_name,
+            "initial_price": initial_price,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def get_negotiation_status(deal_id: str) -> str:
+    """Check the status of a specific negotiation.
+
+    Returns the deal's current state and its full negotiation history
+    (all rounds of offers and counter-offers).
+
+    Args:
+        deal_id: The unique identifier of the deal/negotiation.
+
+    Returns a JSON object with:
+    - deal_id, status, product_name, seller_url, price
+    - rounds_count: number of negotiation rounds
+    - rounds: list of negotiation round details
+    - error: present only if the deal was not found
+    """
+    store = _get_deal_store()
+    try:
+        deal = store.get_deal(deal_id)
+        if deal is None:
+            return json.dumps(
+                {"error": f"Deal not found: {deal_id}"},
+                indent=2,
+            )
+
+        rounds = store.get_negotiation_history(deal_id)
+
+        round_summaries = []
+        for r in rounds:
+            round_summaries.append({
+                "round_number": r["round_number"],
+                "buyer_price": r["buyer_price"],
+                "seller_price": r["seller_price"],
+                "action": r["action"],
+                "rationale": r.get("rationale", ""),
+            })
+
+        result = {
+            "deal_id": deal_id,
+            "status": deal.get("status", "unknown"),
+            "product_id": deal.get("product_id", ""),
+            "product_name": deal.get("product_name", ""),
+            "seller_url": deal.get("seller_url", ""),
+            "price": deal.get("price"),
+            "rounds_count": len(round_summaries),
+            "rounds": round_summaries,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def list_active_negotiations() -> str:
+    """List all active/pending negotiations.
+
+    Returns deals that are currently in ``negotiating`` status,
+    along with the number of negotiation rounds for each.
+
+    Returns a JSON object with:
+    - total: number of active negotiations
+    - negotiations: list of negotiation summaries
+    """
+    store = _get_deal_store()
+    try:
+        deals = store.list_deals(status="negotiating")
+
+        negotiations = []
+        for d in deals:
+            deal_id = d["id"]
+            rounds = store.get_negotiation_history(deal_id)
+
+            negotiations.append({
+                "deal_id": deal_id,
+                "product_id": d.get("product_id", ""),
+                "product_name": d.get("product_name", ""),
+                "seller_url": d.get("seller_url", ""),
+                "price": d.get("price"),
+                "status": d.get("status", "negotiating"),
+                "rounds_count": len(rounds),
+                "created_at": d.get("created_at", ""),
+            })
+
+        result = {
+            "total": len(negotiations),
+            "negotiations": negotiations,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# Order Management Tools (buyer-r0j)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_orders(status: str | None = None) -> str:
+    """List all orders with optional status filter.
+
+    Args:
+        status: Optional status to filter by (e.g. pending, booked,
+            delivering, completed, cancelled). If omitted, returns
+            all orders.
+
+    Returns a JSON object with:
+    - total: number of orders matching the filter
+    - orders: list of order summary objects
+    """
+    store = _get_order_store()
+    try:
+        filters = None
+        if status is not None:
+            filters = {"status": status}
+        orders = store.list_orders(filters=filters)
+
+        result = {
+            "total": len(orders),
+            "orders": orders,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def get_order_status(order_id: str) -> str:
+    """Get detailed status of a specific order.
+
+    Args:
+        order_id: The unique identifier of the order.
+
+    Returns a JSON object with:
+    - order_id, status, deal_id, and all order metadata
+    - error: present only if the order was not found
+    """
+    store = _get_order_store()
+    try:
+        order = store.get_order(order_id)
+        if order is None:
+            return json.dumps(
+                {"error": f"Order not found: {order_id}"},
+                indent=2,
+            )
+
+        order["timestamp"] = datetime.now(timezone.utc).isoformat()
+        return json.dumps(order, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def transition_order(
+    order_id: str,
+    to_status: str,
+    reason: str = "",
+) -> str:
+    """Trigger an order state transition.
+
+    Updates the order's status (e.g., approve, reject, book, complete).
+    The previous status and transition reason are included in the response.
+
+    Args:
+        order_id: The unique identifier of the order.
+        to_status: The target status to transition to.
+        reason: Optional explanation for the transition.
+
+    Returns a JSON object with:
+    - order_id, previous_status, new_status, reason
+    - error: present only if the order was not found
+    """
+    store = _get_order_store()
+    try:
+        order = store.get_order(order_id)
+        if order is None:
+            return json.dumps(
+                {"error": f"Order not found: {order_id}"},
+                indent=2,
+            )
+
+        previous_status = order.get("status", "unknown")
+        order["status"] = to_status
+        store.set_order(order_id, order)
+
+        result = {
+            "order_id": order_id,
+            "previous_status": previous_status,
+            "new_status": to_status,
+            "reason": reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+# ---------------------------------------------------------------------------
 # Mounting
 # ---------------------------------------------------------------------------
 
