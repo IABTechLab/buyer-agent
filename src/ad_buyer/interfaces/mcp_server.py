@@ -10,6 +10,11 @@ Tool categories:
   - Foundation: get_setup_status, health_check, get_config
   - Campaign Management: list_campaigns, get_campaign_status,
     check_pacing, review_budgets (buyer-3w3)
+  - Seller Discovery: discover_sellers, get_seller_media_kit,
+    compare_sellers (buyer-nob)
+  - Negotiation: start_negotiation, get_negotiation_status,
+    list_active_negotiations (buyer-r0j)
+  - Orders: list_orders, get_order_status, transition_order (buyer-r0j)
 
 Mount into a FastAPI app:
     from ad_buyer.interfaces.mcp_server import mount_mcp
@@ -31,7 +36,12 @@ from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
 from ..config.settings import Settings
+from ..media_kit.client import MediaKitClient
+from ..media_kit.models import MediaKitError
+from ..registry.client import RegistryClient
 from ..storage.campaign_store import CampaignStore
+from ..storage.deal_store import DealStore
+from ..storage.order_store import OrderStore
 from ..storage.pacing_store import PacingStore
 
 logger = logging.getLogger(__name__)
@@ -111,6 +121,38 @@ def _set_deal_store(store: DealStore | None) -> None:
     """
     global _deal_store_override
     _deal_store_override = store
+
+
+def _get_registry_client() -> RegistryClient:
+    """Get a RegistryClient instance.
+
+    Uses the IAB server URL from settings as the registry URL.
+    Returns a new instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    return RegistryClient(registry_url=settings.iab_server_url)
+
+
+def _get_media_kit_client() -> MediaKitClient:
+    """Get a MediaKitClient instance.
+
+    Uses the API key from settings for authenticated access.
+    Returns a new instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    return MediaKitClient(api_key=settings.api_key)
+
+
+def _get_order_store() -> OrderStore:
+    """Get a connected OrderStore instance.
+
+    Uses the database URL from settings. Returns a new connected
+    instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    store = OrderStore(settings.database_url)
+    store.connect()
+    return store
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +573,209 @@ def review_budgets() -> str:
     finally:
         campaign_store.disconnect()
         pacing_store.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# Seller Discovery Tools (buyer-nob)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def discover_sellers(capability: str | None = None) -> str:
+    """Discover available seller agents from the IAB AAMP registry.
+
+    Queries the agent registry to find seller agents, optionally
+    filtering by capability name (e.g., "ctv", "display", "video").
+
+    Args:
+        capability: Optional capability name to filter sellers by.
+            If omitted, returns all sellers in the registry.
+
+    Returns a JSON object with:
+    - total: number of sellers found
+    - sellers: list of seller agent cards with id, name, url,
+      capabilities, trust_level, and protocols
+    """
+    registry = _get_registry_client()
+    try:
+        caps_filter = [capability] if capability else None
+        sellers = await registry.discover_sellers(
+            capabilities_filter=caps_filter,
+        )
+
+        seller_list = []
+        for seller in sellers:
+            seller_list.append({
+                "agent_id": seller.agent_id,
+                "name": seller.name,
+                "url": seller.url,
+                "capabilities": [
+                    {"name": c.name, "description": c.description, "tags": c.tags}
+                    for c in seller.capabilities
+                ],
+                "trust_level": seller.trust_level.value,
+                "protocols": seller.protocols,
+            })
+
+        result = {
+            "total": len(seller_list),
+            "sellers": seller_list,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        logger.warning("Failed to discover sellers: %s", exc)
+        result = {
+            "error": f"Failed to discover sellers: {exc}",
+            "total": 0,
+            "sellers": [],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def get_seller_media_kit(seller_url: str) -> str:
+    """Fetch a specific seller's media kit with inventory and pricing.
+
+    Retrieves the media kit from a seller agent, showing available
+    packages, ad formats, pricing ranges, and capabilities.
+
+    Args:
+        seller_url: The base URL of the seller agent
+            (e.g., "http://localhost:8001").
+
+    Returns a JSON object with:
+    - seller_name: the seller's display name
+    - seller_url: the seller's base URL
+    - total_packages: number of available packages
+    - packages: list of package summaries with pricing and format info
+    """
+    client = _get_media_kit_client()
+    try:
+        kit = await client.get_media_kit(seller_url)
+
+        packages = []
+        for pkg in kit.all_packages:
+            packages.append({
+                "package_id": pkg.package_id,
+                "name": pkg.name,
+                "description": pkg.description,
+                "ad_formats": pkg.ad_formats,
+                "device_types": pkg.device_types,
+                "price_range": pkg.price_range,
+                "rate_type": pkg.rate_type,
+                "is_featured": pkg.is_featured,
+                "geo_targets": pkg.geo_targets,
+                "tags": pkg.tags,
+            })
+
+        result = {
+            "seller_name": kit.seller_name,
+            "seller_url": kit.seller_url,
+            "total_packages": kit.total_packages,
+            "packages": packages,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    except MediaKitError as exc:
+        logger.warning("Failed to fetch media kit from %s: %s", seller_url, exc)
+        result = {
+            "error": f"Failed to fetch media kit: {exc}",
+            "seller_url": seller_url,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        logger.warning(
+            "Unexpected error fetching media kit from %s: %s", seller_url, exc,
+        )
+        result = {
+            "error": f"Unexpected error: {exc}",
+            "seller_url": seller_url,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def compare_sellers(seller_urls: list[str]) -> str:
+    """Compare pricing and capabilities across multiple sellers.
+
+    Fetches media kits from each seller and produces a side-by-side
+    comparison of their inventory, pricing, and supported ad formats.
+
+    Args:
+        seller_urls: List of seller agent base URLs to compare.
+
+    Returns a JSON object with:
+    - sellers_compared: number of sellers in the comparison
+    - sellers: per-seller summary (name, packages, ad formats, pricing)
+    - summary: aggregate stats (total packages, all ad formats seen)
+    """
+    client = _get_media_kit_client()
+
+    sellers_data: list[dict[str, Any]] = []
+    total_packages = 0
+    all_ad_formats: set[str] = set()
+
+    for url in seller_urls:
+        try:
+            kit = await client.get_media_kit(url)
+
+            # Collect ad formats across all packages
+            seller_formats: set[str] = set()
+            packages = []
+            for pkg in kit.all_packages:
+                seller_formats.update(pkg.ad_formats)
+                packages.append({
+                    "package_id": pkg.package_id,
+                    "name": pkg.name,
+                    "price_range": pkg.price_range,
+                    "ad_formats": pkg.ad_formats,
+                    "rate_type": pkg.rate_type,
+                })
+
+            all_ad_formats.update(seller_formats)
+            total_packages += len(packages)
+
+            sellers_data.append({
+                "seller_url": url,
+                "seller_name": kit.seller_name,
+                "total_packages": len(packages),
+                "ad_formats": sorted(seller_formats),
+                "packages": packages,
+            })
+
+        except (MediaKitError, Exception) as exc:
+            logger.warning("Failed to fetch media kit from %s: %s", url, exc)
+            sellers_data.append({
+                "seller_url": url,
+                "error": f"Failed to fetch media kit: {exc}",
+                "total_packages": 0,
+                "ad_formats": [],
+                "packages": [],
+            })
+
+    result = {
+        "sellers_compared": len(seller_urls),
+        "sellers": sellers_data,
+        "summary": {
+            "total_packages_across_sellers": total_packages,
+            "all_ad_formats": sorted(all_ad_formats),
+            "sellers_reachable": sum(
+                1 for s in sellers_data if "error" not in s
+            ),
+            "sellers_unreachable": sum(
+                1 for s in sellers_data if "error" in s
+            ),
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
 
 
 # ---------------------------------------------------------------------------
