@@ -14,6 +14,11 @@ Tool categories:
     check_pacing, review_budgets (buyer-3w3)
   - Deal Library: list_deals, search_deals, inspect_deal,
     import_deals_csv, create_deal_manual, get_portfolio_summary (buyer-4ds)
+  - Seller Discovery: discover_sellers, get_seller_media_kit,
+    compare_sellers (buyer-nob)
+  - Negotiation: start_negotiation, get_negotiation_status,
+    list_active_negotiations (buyer-r0j)
+  - Orders: list_orders, get_order_status, transition_order (buyer-r0j)
 
 Mount into a FastAPI app:
     from ad_buyer.interfaces.mcp_server import mount_mcp
@@ -37,9 +42,13 @@ from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
 from ..config.settings import Settings
+from ..media_kit.client import MediaKitClient
+from ..media_kit.models import MediaKitError
+from ..registry.client import RegistryClient
 from ..services.setup_wizard import SetupWizard
 from ..storage.campaign_store import CampaignStore
 from ..storage.deal_store import DealStore
+from ..storage.order_store import OrderStore
 from ..storage.pacing_store import PacingStore
 from ..tools.deal_import import (
     ImportResult as CsvImportResult,
@@ -128,6 +137,38 @@ def _set_deal_store(store: DealStore | None) -> None:
     """
     global _deal_store_override
     _deal_store_override = store
+
+
+def _get_registry_client() -> RegistryClient:
+    """Get a RegistryClient instance.
+
+    Uses the IAB server URL from settings as the registry URL.
+    Returns a new instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    return RegistryClient(registry_url=settings.iab_server_url)
+
+
+def _get_media_kit_client() -> MediaKitClient:
+    """Get a MediaKitClient instance.
+
+    Uses the API key from settings for authenticated access.
+    Returns a new instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    return MediaKitClient(api_key=settings.api_key)
+
+
+def _get_order_store() -> OrderStore:
+    """Get a connected OrderStore instance.
+
+    Uses the database URL from settings. Returns a new connected
+    instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    store = OrderStore(settings.database_url)
+    store.connect()
+    return store
 
 
 # ---------------------------------------------------------------------------
@@ -840,6 +881,329 @@ def search_deals(query: str) -> str:
             store.disconnect()
 
 
+# ---------------------------------------------------------------------------
+# Seller Discovery Tools (buyer-nob)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def discover_sellers(capability: str | None = None) -> str:
+    """Discover available seller agents from the IAB AAMP registry.
+
+    Queries the agent registry to find seller agents, optionally
+    filtering by capability name (e.g., "ctv", "display", "video").
+
+    Args:
+        capability: Optional capability name to filter sellers by.
+            If omitted, returns all sellers in the registry.
+
+    Returns a JSON object with:
+    - total: number of sellers found
+    - sellers: list of seller agent cards with id, name, url,
+      capabilities, trust_level, and protocols
+    """
+    registry = _get_registry_client()
+    try:
+        caps_filter = [capability] if capability else None
+        sellers = await registry.discover_sellers(
+            capabilities_filter=caps_filter,
+        )
+
+        seller_list = []
+        for seller in sellers:
+            seller_list.append({
+                "agent_id": seller.agent_id,
+                "name": seller.name,
+                "url": seller.url,
+                "capabilities": [
+                    {"name": c.name, "description": c.description, "tags": c.tags}
+                    for c in seller.capabilities
+                ],
+                "trust_level": seller.trust_level.value,
+                "protocols": seller.protocols,
+            })
+
+        result = {
+            "total": len(seller_list),
+            "sellers": seller_list,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        logger.warning("Failed to discover sellers: %s", exc)
+        result = {
+            "error": f"Failed to discover sellers: {exc}",
+            "total": 0,
+            "sellers": [],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def get_seller_media_kit(seller_url: str) -> str:
+    """Fetch a specific seller's media kit with inventory and pricing.
+
+    Retrieves the media kit from a seller agent, showing available
+    packages, ad formats, pricing ranges, and capabilities.
+
+    Args:
+        seller_url: The base URL of the seller agent
+            (e.g., "http://localhost:8001").
+
+    Returns a JSON object with:
+    - seller_name: the seller's display name
+    - seller_url: the seller's base URL
+    - total_packages: number of available packages
+    - packages: list of package summaries with pricing and format info
+    """
+    client = _get_media_kit_client()
+    try:
+        kit = await client.get_media_kit(seller_url)
+
+        packages = []
+        for pkg in kit.all_packages:
+            packages.append({
+                "package_id": pkg.package_id,
+                "name": pkg.name,
+                "description": pkg.description,
+                "ad_formats": pkg.ad_formats,
+                "device_types": pkg.device_types,
+                "price_range": pkg.price_range,
+                "rate_type": pkg.rate_type,
+                "is_featured": pkg.is_featured,
+                "geo_targets": pkg.geo_targets,
+                "tags": pkg.tags,
+            })
+
+        result = {
+            "seller_name": kit.seller_name,
+            "seller_url": kit.seller_url,
+            "total_packages": kit.total_packages,
+            "packages": packages,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    except MediaKitError as exc:
+        logger.warning("Failed to fetch media kit from %s: %s", seller_url, exc)
+        result = {
+            "error": f"Failed to fetch media kit: {exc}",
+            "seller_url": seller_url,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    except Exception as exc:
+        logger.warning(
+            "Unexpected error fetching media kit from %s: %s", seller_url, exc,
+        )
+        result = {
+            "error": f"Unexpected error: {exc}",
+            "seller_url": seller_url,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+async def compare_sellers(seller_urls: list[str]) -> str:
+    """Compare pricing and capabilities across multiple sellers.
+
+    Fetches media kits from each seller and produces a side-by-side
+    comparison of their inventory, pricing, and supported ad formats.
+
+    Args:
+        seller_urls: List of seller agent base URLs to compare.
+
+    Returns a JSON object with:
+    - sellers_compared: number of sellers in the comparison
+    - sellers: per-seller summary (name, packages, ad formats, pricing)
+    - summary: aggregate stats (total packages, all ad formats seen)
+    """
+    client = _get_media_kit_client()
+
+    sellers_data: list[dict[str, Any]] = []
+    total_packages = 0
+    all_ad_formats: set[str] = set()
+
+    for url in seller_urls:
+        try:
+            kit = await client.get_media_kit(url)
+
+            # Collect ad formats across all packages
+            seller_formats: set[str] = set()
+            packages = []
+            for pkg in kit.all_packages:
+                seller_formats.update(pkg.ad_formats)
+                packages.append({
+                    "package_id": pkg.package_id,
+                    "name": pkg.name,
+                    "price_range": pkg.price_range,
+                    "ad_formats": pkg.ad_formats,
+                    "rate_type": pkg.rate_type,
+                })
+
+            all_ad_formats.update(seller_formats)
+            total_packages += len(packages)
+
+            sellers_data.append({
+                "seller_url": url,
+                "seller_name": kit.seller_name,
+                "total_packages": len(packages),
+                "ad_formats": sorted(seller_formats),
+                "packages": packages,
+            })
+
+        except (MediaKitError, Exception) as exc:
+            logger.warning("Failed to fetch media kit from %s: %s", url, exc)
+            sellers_data.append({
+                "seller_url": url,
+                "error": f"Failed to fetch media kit: {exc}",
+                "total_packages": 0,
+                "ad_formats": [],
+                "packages": [],
+            })
+
+    result = {
+        "sellers_compared": len(seller_urls),
+        "sellers": sellers_data,
+        "summary": {
+            "total_packages_across_sellers": total_packages,
+            "all_ad_formats": sorted(all_ad_formats),
+            "sellers_reachable": sum(
+                1 for s in sellers_data if "error" not in s
+            ),
+            "sellers_unreachable": sum(
+                1 for s in sellers_data if "error" in s
+            ),
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Negotiation Tools (buyer-r0j)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def start_negotiation(
+    seller_url: str,
+    product_id: str,
+    product_name: str = "",
+    initial_price: float = 0.0,
+) -> str:
+    """Initiate a negotiation with a seller within the demo ecosystem.
+
+    Creates a deal in ``negotiating`` status and records the first
+    negotiation round with the buyer's initial price offer.
+
+    Note: This wraps the internal buyer-seller negotiation in the Agent
+    Range demo. Real SSP integrations use seller-initiated deal flows,
+    not buyer-initiated negotiation.
+
+    Args:
+        seller_url: Base URL of the seller agent.
+        product_id: The product/package to negotiate on.
+        product_name: Human-readable name for the product.
+        initial_price: The buyer's opening offer (CPM).
+
+    Returns a JSON object with:
+    - deal_id: the newly created deal identifier
+    - status: the deal status (negotiating)
+    - initial_price: the buyer's opening offer
+    - timestamp: when the negotiation was started
+    """
+    store = _get_deal_store()
+    try:
+        deal_id = store.save_deal(
+            seller_url=seller_url,
+            product_id=product_id,
+            product_name=product_name,
+            status="negotiating",
+            price=initial_price,
+        )
+
+        store.save_negotiation_round(
+            deal_id=deal_id,
+            proposal_id=f"prop-{deal_id[:8]}",
+            round_number=1,
+            buyer_price=initial_price,
+            seller_price=0.0,
+            action="counter",
+            rationale="Initial buyer offer",
+        )
+
+        result = {
+            "deal_id": deal_id,
+            "status": "negotiating",
+            "seller_url": seller_url,
+            "product_id": product_id,
+            "product_name": product_name,
+            "initial_price": initial_price,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def get_negotiation_status(deal_id: str) -> str:
+    """Check the status of a specific negotiation.
+
+    Returns the deal's current state and its full negotiation history
+    (all rounds of offers and counter-offers).
+
+    Args:
+        deal_id: The unique identifier of the deal/negotiation.
+
+    Returns a JSON object with:
+    - deal_id, status, product_name, seller_url, price
+    - rounds_count: number of negotiation rounds
+    - rounds: list of negotiation round details
+    - error: present only if the deal was not found
+    """
+    store = _get_deal_store()
+    try:
+        deal = store.get_deal(deal_id)
+        if deal is None:
+            return json.dumps(
+                {"error": f"Deal not found: {deal_id}"},
+                indent=2,
+            )
+
+        rounds = store.get_negotiation_history(deal_id)
+
+        round_summaries = []
+        for r in rounds:
+            round_summaries.append({
+                "round_number": r["round_number"],
+                "buyer_price": r["buyer_price"],
+                "seller_price": r["seller_price"],
+                "action": r["action"],
+                "rationale": r.get("rationale", ""),
+            })
+
+        result = {
+            "deal_id": deal_id,
+            "status": deal.get("status", "unknown"),
+            "product_id": deal.get("product_id", ""),
+            "product_name": deal.get("product_name", ""),
+            "seller_url": deal.get("seller_url", ""),
+            "price": deal.get("price"),
+            "rounds_count": len(round_summaries),
+            "rounds": round_summaries,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
 @mcp.tool()
 def inspect_deal(deal_id: str) -> str:
     """Get detailed information on a specific deal.
@@ -1320,6 +1684,153 @@ def get_portfolio_summary(
     finally:
         if _deal_store_override is None:
             store.disconnect()
+
+
+@mcp.tool()
+def list_active_negotiations() -> str:
+    """List all active/pending negotiations.
+
+    Returns deals that are currently in ``negotiating`` status,
+    along with the number of negotiation rounds for each.
+
+    Returns a JSON object with:
+    - total: number of active negotiations
+    - negotiations: list of negotiation summaries
+    """
+    store = _get_deal_store()
+    try:
+        deals = store.list_deals(status="negotiating")
+
+        negotiations = []
+        for d in deals:
+            deal_id = d["id"]
+            rounds = store.get_negotiation_history(deal_id)
+
+            negotiations.append({
+                "deal_id": deal_id,
+                "product_id": d.get("product_id", ""),
+                "product_name": d.get("product_name", ""),
+                "seller_url": d.get("seller_url", ""),
+                "price": d.get("price"),
+                "status": d.get("status", "negotiating"),
+                "rounds_count": len(rounds),
+                "created_at": d.get("created_at", ""),
+            })
+
+        result = {
+            "total": len(negotiations),
+            "negotiations": negotiations,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# Order Management Tools (buyer-r0j)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_orders(status: str | None = None) -> str:
+    """List all orders with optional status filter.
+
+    Args:
+        status: Optional status to filter by (e.g. pending, booked,
+            delivering, completed, cancelled). If omitted, returns
+            all orders.
+
+    Returns a JSON object with:
+    - total: number of orders matching the filter
+    - orders: list of order summary objects
+    """
+    store = _get_order_store()
+    try:
+        filters = None
+        if status is not None:
+            filters = {"status": status}
+        orders = store.list_orders(filters=filters)
+
+        result = {
+            "total": len(orders),
+            "orders": orders,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def get_order_status(order_id: str) -> str:
+    """Get detailed status of a specific order.
+
+    Args:
+        order_id: The unique identifier of the order.
+
+    Returns a JSON object with:
+    - order_id, status, deal_id, and all order metadata
+    - error: present only if the order was not found
+    """
+    store = _get_order_store()
+    try:
+        order = store.get_order(order_id)
+        if order is None:
+            return json.dumps(
+                {"error": f"Order not found: {order_id}"},
+                indent=2,
+            )
+
+        order["timestamp"] = datetime.now(timezone.utc).isoformat()
+        return json.dumps(order, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def transition_order(
+    order_id: str,
+    to_status: str,
+    reason: str = "",
+) -> str:
+    """Trigger an order state transition.
+
+    Updates the order's status (e.g., approve, reject, book, complete).
+    The previous status and transition reason are included in the response.
+
+    Args:
+        order_id: The unique identifier of the order.
+        to_status: The target status to transition to.
+        reason: Optional explanation for the transition.
+
+    Returns a JSON object with:
+    - order_id, previous_status, new_status, reason
+    - error: present only if the order was not found
+    """
+    store = _get_order_store()
+    try:
+        order = store.get_order(order_id)
+        if order is None:
+            return json.dumps(
+                {"error": f"Order not found: {order_id}"},
+                indent=2,
+            )
+
+        previous_status = order.get("status", "unknown")
+        order["status"] = to_status
+        store.set_order(order_id, order)
+
+        result = {
+            "order_id": order_id,
+            "previous_status": previous_status,
+            "new_status": to_status,
+            "reason": reason,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
 
 
 # ---------------------------------------------------------------------------

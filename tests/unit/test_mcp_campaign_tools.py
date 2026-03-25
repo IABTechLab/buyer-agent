@@ -134,10 +134,10 @@ class TestCampaignToolRegistration:
 
     @pytest.mark.asyncio
     async def test_total_tool_count(self):
-        """Should have 3 foundation + 4 campaign + 6 deal library = 13 tools."""
+        """Should have 3+4+4+6+3+3+3 = 26 tools (all categories merged)."""
         tools = await mcp.list_tools()
         names = sorted(t.name for t in tools)
-        assert len(names) == 13, f"Expected 13 tools, got {len(names)}: {names}"
+        assert len(names) == 26, f"Expected 26 tools, got {len(names)}: {names}"
 
 
 # ---------------------------------------------------------------------------
