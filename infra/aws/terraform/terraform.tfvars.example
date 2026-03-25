@@ -1,9 +1,18 @@
+# =============================================================================
+# Ad Buyer System - Terraform Variables Example
 # Copy this file to terraform.tfvars and fill in the values.
+# =============================================================================
 
+# General
 environment         = "dev"
 region              = "us-east-1"
 vpc_cidr            = "10.0.0.0/16"
+
+# ECS / Fargate
 container_image_tag = "latest"
+
+# ElastiCache Redis
+redis_node_type = "cache.t3.micro"
 
 # ACM certificate ARN for HTTPS. Leave empty to use HTTP-only listener.
 certificate_arn = ""

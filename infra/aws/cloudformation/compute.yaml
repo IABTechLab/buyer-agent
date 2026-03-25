@@ -49,6 +49,15 @@ Parameters:
     Default: /ad-buyer-system/anthropic-api-key
     Description: SSM SecureString parameter name for the Anthropic API key.
 
+  RedisEndpoint:
+    Type: String
+    Description: Redis primary endpoint address.
+
+  RedisPort:
+    Type: String
+    Default: "6379"
+    Description: Redis port.
+
   ContainerPort:
     Type: Number
     Default: 8001
@@ -244,8 +253,12 @@ Resources:
               ContainerPath: /app/data
               ReadOnly: false
           Environment:
+            - Name: STORAGE_TYPE
+              Value: redis
             - Name: DATABASE_URL
               Value: "sqlite:///./data/ad_buyer.db"
+            - Name: REDIS_URL
+              Value: !Sub "redis://${RedisEndpoint}:${RedisPort}/0"
             - Name: ENVIRONMENT
               Value: !Ref Environment
           Secrets:

@@ -245,8 +245,16 @@ resource "aws_ecs_task_definition" "this" {
 
       environment = [
         {
+          name  = "STORAGE_TYPE"
+          value = "redis"
+        },
+        {
           name  = "DATABASE_URL"
           value = "sqlite:///./data/ad_buyer.db"
+        },
+        {
+          name  = "REDIS_URL"
+          value = "redis://${var.redis_endpoint}:${var.redis_port}/0"
         },
         {
           name  = "ENVIRONMENT"

@@ -10,6 +10,22 @@
 
 services:
   # ---------------------------------------------------------------------------
+  # Redis — production-equivalent key-value store
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Application
   # ---------------------------------------------------------------------------
   app:
@@ -21,9 +37,14 @@ services:
     env_file:
       - ../../.env
     environment:
+      STORAGE_TYPE: redis
       DATABASE_URL: sqlite:///./data/ad_buyer.db
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - buyerdata:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   # ---------------------------------------------------------------------------
@@ -40,4 +61,5 @@ services:
   #     STORAGE_TYPE: sqlite
 
 volumes:
+  redisdata:
   buyerdata:

@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  Ad Buyer System — Root stack orchestrating network and compute resources
-  for a FastAPI application with SQLite persistence on EFS.
+  Ad Buyer System — Root stack orchestrating network, storage, and compute
+  resources for a FastAPI application with Redis-backed storage and EFS
+  persistence for SQLite fallback.
 
 Parameters:
   Environment:
@@ -35,6 +36,16 @@ Parameters:
     Default: /ad-buyer-system/anthropic-api-key
     Description: SSM SecureString parameter name holding the Anthropic API key.
 
+  RedisNodeType:
+    Type: String
+    Default: cache.t3.micro
+    Description: ElastiCache Redis node type.
+    AllowedValues:
+      - cache.t3.micro
+      - cache.t3.small
+      - cache.t3.medium
+      - cache.r6g.large
+
 Resources:
   NetworkStack:
     Type: AWS::CloudFormation::Stack
@@ -48,9 +59,27 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  ComputeStack:
+  StorageStack:
     Type: AWS::CloudFormation::Stack
     DependsOn: NetworkStack
+    Properties:
+      TemplateURL: !Sub "https://${TemplatesBucketName}.s3.amazonaws.com/${TemplatesPrefix}/storage.yaml"
+      Parameters:
+        Environment: !Ref Environment
+        VpcId: !GetAtt NetworkStack.Outputs.VpcId
+        PrivateSubnet1Id: !GetAtt NetworkStack.Outputs.PrivateSubnet1Id
+        PrivateSubnet2Id: !GetAtt NetworkStack.Outputs.PrivateSubnet2Id
+        RedisSecurityGroupId: !GetAtt NetworkStack.Outputs.RedisSecurityGroupId
+        RedisNodeType: !Ref RedisNodeType
+      Tags:
+        - Key: Project
+          Value: ad-buyer-system
+        - Key: Environment
+          Value: !Ref Environment
+
+  ComputeStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: StorageStack
     Properties:
       TemplateURL: !Sub "https://${TemplatesBucketName}.s3.amazonaws.com/${TemplatesPrefix}/compute.yaml"
       Parameters:
@@ -63,6 +92,8 @@ Resources:
         AlbSecurityGroupId: !GetAtt NetworkStack.Outputs.AlbSecurityGroupId
         EcsSecurityGroupId: !GetAtt NetworkStack.Outputs.EcsSecurityGroupId
         EfsSecurityGroupId: !GetAtt NetworkStack.Outputs.EfsSecurityGroupId
+        RedisEndpoint: !GetAtt StorageStack.Outputs.RedisEndpoint
+        RedisPort: !GetAtt StorageStack.Outputs.RedisPort
         ContainerImage: !Ref ContainerImage
         CertificateArn: !Ref CertificateArn
         AnthropicApiKeyParameter: !Ref AnthropicApiKeyParameter
@@ -92,3 +123,11 @@ Outputs:
   EfsFileSystemId:
     Description: ID of the EFS filesystem used for SQLite persistence.
     Value: !GetAtt ComputeStack.Outputs.EfsFileSystemId
+
+  RedisEndpoint:
+    Description: Redis primary endpoint address.
+    Value: !GetAtt StorageStack.Outputs.RedisEndpoint
+
+  RedisPort:
+    Description: Redis primary endpoint port.
+    Value: !GetAtt StorageStack.Outputs.RedisPort
