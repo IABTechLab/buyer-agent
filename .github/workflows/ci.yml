@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run ruff check
+        run: ruff check src/ tests/
+
+      - name: Run ruff format check
+        run: ruff format --check src/ tests/
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest tests/ -v --tb=short --cov=src/ad_buyer --cov-report=term-missing
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f infra/docker/Dockerfile -t ad-buyer-system:test .
+
+      - name: Verify health check endpoint exists
+        run: |
+          docker run -d --name buyer-test -p 8001:8001 ad-buyer-system:test
+          sleep 5
+          docker logs buyer-test
+          docker stop buyer-test
+          docker rm buyer-test

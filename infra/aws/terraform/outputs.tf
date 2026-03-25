@@ -32,3 +32,13 @@ output "cloudwatch_log_group" {
   description = "CloudWatch log group for the ECS tasks"
   value       = module.compute.cloudwatch_log_group
 }
+
+output "redis_endpoint" {
+  description = "ElastiCache Redis primary endpoint"
+  value       = module.storage.redis_endpoint
+}
+
+output "redis_port" {
+  description = "ElastiCache Redis port"
+  value       = module.storage.redis_port
+}
