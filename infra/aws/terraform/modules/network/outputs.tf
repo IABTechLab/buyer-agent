@@ -27,3 +27,8 @@ output "efs_security_group_id" {
   description = "Security group ID for EFS mount targets"
   value       = aws_security_group.efs.id
 }
+
+output "redis_security_group_id" {
+  description = "Security group ID for Redis"
+  value       = aws_security_group.redis.id
+}

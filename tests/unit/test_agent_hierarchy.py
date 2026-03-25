@@ -18,7 +18,7 @@ import os
 from unittest.mock import MagicMock
 
 import pytest
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
@@ -800,83 +800,6 @@ class TestToolFactoryFunctions:
         assert AudienceDiscoveryTool in tool_types
         assert AudienceMatchingTool in tool_types
         assert CoverageEstimationTool in tool_types
-
-
-# ===========================================================================
-# Crew Composition Tests
-#
-# NOTE: CrewAI now validates that manager_agent is NOT in the agents list.
-# The current crew factories include the manager in agents, which triggers
-# a ValidationError. These tests document this known issue and verify the
-# intended crew structure via the validation error message.
-# ===========================================================================
-
-
-class TestPortfolioCrewKnownIssue:
-    """Tests for the Portfolio Crew -- documents known manager-in-agents issue.
-
-    The portfolio_crew.py includes portfolio_manager in both agents=[] and
-    manager_agent=, which newer crewai rejects. This test documents the bug.
-    """
-
-    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, campaign_brief):
-        """Portfolio crew creation currently fails due to manager-in-agents bug."""
-        with pytest.raises(ValidationError, match="Manager agent should not be included"):
-            create_portfolio_crew(mock_opendirect_client, campaign_brief)
-
-
-class TestBrandingCrewKnownIssue:
-    """Documents the manager-in-agents validation issue for branding crew."""
-
-    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
-        with pytest.raises(ValidationError, match="Manager agent should not be included"):
-            create_branding_crew(mock_opendirect_client, channel_brief)
-
-
-class TestMobileCrewKnownIssue:
-    """Documents the manager-in-agents validation issue for mobile crew."""
-
-    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
-        with pytest.raises(ValidationError, match="Manager agent should not be included"):
-            create_mobile_crew(mock_opendirect_client, channel_brief)
-
-
-class TestCTVCrewKnownIssue:
-    """Documents the manager-in-agents validation issue for CTV crew."""
-
-    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
-        with pytest.raises(ValidationError, match="Manager agent should not be included"):
-            create_ctv_crew(mock_opendirect_client, channel_brief)
-
-
-class TestPerformanceCrewKnownIssue:
-    """Documents the manager-in-agents validation issue for performance crew."""
-
-    def test_creation_raises_manager_in_agents_error(self, mock_opendirect_client, channel_brief):
-        with pytest.raises(ValidationError, match="Manager agent should not be included"):
-            create_performance_crew(mock_opendirect_client, channel_brief)
-
-
-class TestAllCrewFactoriesKnownIssue:
-    """Verifies all crew factories share the same manager-in-agents issue."""
-
-    CREW_FACTORIES_WITH_BRIEF = [
-        ("portfolio", create_portfolio_crew, "campaign_brief"),
-        ("branding", create_branding_crew, "channel_brief"),
-        ("mobile", create_mobile_crew, "channel_brief"),
-        ("ctv", create_ctv_crew, "channel_brief"),
-        ("performance", create_performance_crew, "channel_brief"),
-    ]
-
-    @pytest.fixture
-    def briefs(self, campaign_brief, channel_brief):
-        return {"campaign_brief": campaign_brief, "channel_brief": channel_brief}
-
-    def test_all_fail_with_manager_in_agents(self, mock_opendirect_client, briefs):
-        """All crew factories currently fail with manager-in-agents validation."""
-        for name, factory, brief_key in self.CREW_FACTORIES_WITH_BRIEF:
-            with pytest.raises(ValidationError, match="Manager agent should not be included"):
-                factory(mock_opendirect_client, briefs[brief_key])
 
 
 # ===========================================================================

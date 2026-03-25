@@ -175,34 +175,10 @@ def _register_routes(app: Flask, store: DealStore) -> None:
             return jsonify({"success": False, "errors": result.errors}), 400
 
         # Persist via DealStore.
-        # create_manual_deal packs v2 fields into the metadata JSON, but
-        # save_deal accepts them as direct kwargs too, so we pass them
-        # explicitly for proper column storage.
+        # _build_deal_data() includes v2 fields as top-level keys,
+        # so deal_data can be passed directly to save_deal().
         deal_data = result.deal_data
-        v2_extras: dict[str, Any] = {}
-        if entry.media_type is not None:
-            v2_extras["media_type"] = entry.media_type
-        if entry.display_name:
-            v2_extras["display_name"] = entry.display_name
-        if entry.seller_org is not None:
-            v2_extras["seller_org"] = entry.seller_org
-        if entry.seller_domain is not None:
-            v2_extras["seller_domain"] = entry.seller_domain
-        if entry.seller_type is not None:
-            v2_extras["seller_type"] = entry.seller_type
-        if entry.buyer_org is not None:
-            v2_extras["buyer_org"] = entry.buyer_org
-        if entry.description is not None:
-            v2_extras["description"] = entry.description
-        if entry.price_model is not None:
-            v2_extras["price_model"] = entry.price_model
-        if entry.fixed_price_cpm is not None:
-            v2_extras["fixed_price_cpm"] = entry.fixed_price_cpm
-        if entry.bid_floor_cpm is not None:
-            v2_extras["bid_floor_cpm"] = entry.bid_floor_cpm
-        v2_extras["currency"] = entry.currency
-
-        deal_id = store.save_deal(**deal_data, **v2_extras)
+        deal_id = store.save_deal(**deal_data)
 
         # Save portfolio metadata
         if result.metadata:

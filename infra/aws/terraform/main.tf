@@ -29,6 +29,13 @@ provider "aws" {
   }
 }
 
+locals {
+  name_prefix = "ad-buyer-${var.environment}"
+}
+
+# -----------------------------------------------------------------------------
+# Network module: VPC, subnets, NAT, security groups
+# -----------------------------------------------------------------------------
 module "network" {
   source = "./modules/network"
 
@@ -37,6 +44,22 @@ module "network" {
   project     = "ad-buyer-system"
 }
 
+# -----------------------------------------------------------------------------
+# Storage module: ElastiCache Redis
+# -----------------------------------------------------------------------------
+module "storage" {
+  source = "./modules/storage"
+
+  name_prefix         = local.name_prefix
+  environment         = var.environment
+  private_subnet_ids  = module.network.private_subnet_ids
+  redis_security_group_id = module.network.redis_security_group_id
+  redis_node_type     = var.redis_node_type
+}
+
+# -----------------------------------------------------------------------------
+# Compute module: ECS Fargate, ALB, EFS, IAM, CloudWatch
+# -----------------------------------------------------------------------------
 module "compute" {
   source = "./modules/compute"
 
@@ -52,4 +75,6 @@ module "compute" {
   alb_security_group_id = module.network.alb_security_group_id
   ecs_security_group_id = module.network.ecs_security_group_id
   efs_security_group_id = module.network.efs_security_group_id
+  redis_endpoint      = module.storage.redis_endpoint
+  redis_port          = module.storage.redis_port
 }

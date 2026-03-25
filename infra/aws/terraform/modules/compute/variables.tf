@@ -53,3 +53,14 @@ variable "efs_security_group_id" {
   description = "Security group ID for EFS mount targets"
   type        = string
 }
+
+variable "redis_endpoint" {
+  description = "ElastiCache Redis primary endpoint address"
+  type        = string
+}
+
+variable "redis_port" {
+  description = "ElastiCache Redis port"
+  type        = number
+  default     = 6379
+}

@@ -291,6 +291,29 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Redis from ECS tasks
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref EcsSecurityGroup
+          Description: Redis from ECS tasks
+      SecurityGroupEgress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound
+      Tags:
+        - Key: Name
+          Value: !Sub "${Environment}-ad-buyer-redis-sg"
+        - Key: Project
+          Value: ad-buyer-system
+        - Key: Environment
+          Value: !Ref Environment
+
 Outputs:
   VpcId:
     Description: VPC ID
@@ -339,3 +362,9 @@ Outputs:
     Value: !Ref EfsSecurityGroup
     Export:
       Name: !Sub "${Environment}-ad-buyer-EfsSecurityGroupId"
+
+  RedisSecurityGroupId:
+    Description: Redis security group ID
+    Value: !Ref RedisSecurityGroup
+    Export:
+      Name: !Sub "${Environment}-ad-buyer-RedisSecurityGroupId"

@@ -228,3 +228,30 @@ resource "aws_vpc_security_group_egress_rule" "efs_all" {
   ip_protocol       = "-1"
   cidr_ipv4         = "0.0.0.0/0"
 }
+
+# Redis Security Group — allows inbound from ECS on Redis port
+resource "aws_security_group" "redis" {
+  name        = "${var.project}-${var.environment}-redis-sg"
+  description = "Allow Redis inbound from ECS tasks"
+  vpc_id      = aws_vpc.this.id
+
+  tags = merge(local.tags, {
+    Name = "${var.project}-${var.environment}-redis-sg"
+  })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "redis_from_ecs" {
+  security_group_id            = aws_security_group.redis.id
+  description                  = "Redis from ECS tasks"
+  from_port                    = 6379
+  to_port                      = 6379
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.ecs.id
+}
+
+resource "aws_vpc_security_group_egress_rule" "redis_all" {
+  security_group_id = aws_security_group.redis.id
+  description       = "Allow all outbound"
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
+}

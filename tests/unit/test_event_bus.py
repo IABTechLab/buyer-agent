@@ -9,6 +9,8 @@ from unittest.mock import patch
 
 import pytest
 
+from ad_buyer.events.bus import EventBus
+
 # ---------------------------------------------------------------------------
 # EventType enum tests
 # ---------------------------------------------------------------------------

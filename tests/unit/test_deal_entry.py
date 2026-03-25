@@ -435,8 +435,10 @@ class TestDealDataStructure:
         assert data["flight_start"] == "2026-04-01"
         assert data["flight_end"] == "2026-06-30"
 
-    def test_deal_data_includes_v2_fields_in_metadata(self):
-        """V2 deal library fields should be included in deal_data metadata JSON."""
+    def test_deal_data_includes_v2_fields_as_top_level_keys(self):
+        """V2 deal library fields should be top-level keys in deal_data,
+        not buried in a metadata JSON blob, so they survive the
+        save_deal/get_deal roundtrip."""
         from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
@@ -460,20 +462,88 @@ class TestDealDataStructure:
         result = create_manual_deal(entry)
 
         data = result.deal_data
-        # V2 fields should be present as top-level metadata JSON keys
-        metadata = json.loads(data["metadata"])
-        assert metadata["display_name"] == "V2 Deal"
-        assert metadata["seller_org"] == "NBCUniversal"
-        assert metadata["seller_domain"] == "nbcuniversal.com"
-        assert metadata["seller_type"] == "PUBLISHER"
-        assert metadata["buyer_org"] == "MediaCo"
-        assert metadata["buyer_id"] == "buyer-001"
-        assert metadata["price_model"] == "CPM"
-        assert metadata["fixed_price_cpm"] == 15.50
-        assert metadata["bid_floor_cpm"] == 12.00
-        assert metadata["currency"] == "EUR"
-        assert metadata["media_type"] == "CTV"
-        assert metadata["description"] == "Premium CTV"
+        # V2 fields must be top-level keys (not inside metadata JSON)
+        assert data["display_name"] == "V2 Deal"
+        assert data["seller_org"] == "NBCUniversal"
+        assert data["seller_domain"] == "nbcuniversal.com"
+        assert data["seller_type"] == "PUBLISHER"
+        assert data["buyer_org"] == "MediaCo"
+        assert data["buyer_id"] == "buyer-001"
+        assert data["price_model"] == "CPM"
+        assert data["fixed_price_cpm"] == 15.50
+        assert data["bid_floor_cpm"] == 12.00
+        assert data["currency"] == "EUR"
+        assert data["media_type"] == "CTV"
+        assert data["description"] == "Premium CTV"
+        # metadata key should no longer be present
+        assert "metadata" not in data
+
+    def test_deal_data_includes_v2_fields_as_top_level_keys(self):
+        """V2 fields must also appear as top-level deal_data keys for save_deal()."""
+        from ad_buyer.tools.deal_library.deal_entry import (
+            ManualDealEntry,
+            create_manual_deal,
+        )
+
+        entry = ManualDealEntry(
+            display_name="V2 Top-Level Deal",
+            seller_url="https://seller.example.com",
+            seller_org="NBCUniversal",
+            seller_domain="nbcuniversal.com",
+            seller_type="PUBLISHER",
+            buyer_org="MediaCo",
+            buyer_id="buyer-001",
+            price_model="CPM",
+            fixed_price_cpm=15.50,
+            bid_floor_cpm=12.00,
+            currency="EUR",
+            media_type="CTV",
+            description="Premium CTV inventory",
+        )
+        result = create_manual_deal(entry)
+
+        data = result.deal_data
+        # These must be top-level keys so save_deal() writes to v2 columns
+        assert data["display_name"] == "V2 Top-Level Deal"
+        assert data["seller_org"] == "NBCUniversal"
+        assert data["seller_domain"] == "nbcuniversal.com"
+        assert data["seller_type"] == "PUBLISHER"
+        assert data["buyer_org"] == "MediaCo"
+        assert data["buyer_id"] == "buyer-001"
+        assert data["price_model"] == "CPM"
+        assert data["fixed_price_cpm"] == 15.50
+        assert data["bid_floor_cpm"] == 12.00
+        assert data["currency"] == "EUR"
+        assert data["media_type"] == "CTV"
+        assert data["description"] == "Premium CTV inventory"
+
+    def test_deal_data_v2_fields_absent_when_not_provided(self):
+        """Optional v2 fields should be absent from deal_data when not provided."""
+        from ad_buyer.tools.deal_library.deal_entry import (
+            ManualDealEntry,
+            create_manual_deal,
+        )
+
+        entry = ManualDealEntry(
+            display_name="Minimal Deal",
+            seller_url="https://seller.example.com",
+        )
+        result = create_manual_deal(entry)
+
+        data = result.deal_data
+        assert "seller_org" not in data
+        assert "seller_domain" not in data
+        assert "seller_type" not in data
+        assert "buyer_org" not in data
+        assert "buyer_id" not in data
+        assert "price_model" not in data
+        assert "fixed_price_cpm" not in data
+        assert "bid_floor_cpm" not in data
+        assert "media_type" not in data
+        assert "description" not in data
+        # display_name and currency always have values
+        assert data["display_name"] == "Minimal Deal"
+        assert data["currency"] == "USD"
 
 
 # ---------------------------------------------------------------------------
@@ -696,3 +766,99 @@ class TestDealEntryResult:
         assert result.deal_data is None
         assert result.metadata is None
         assert len(result.errors) > 0
+
+
+# ---------------------------------------------------------------------------
+# Roundtrip test: create_manual_deal -> DealStore.save_deal -> get_deal
+# ---------------------------------------------------------------------------
+
+
+class TestManualDealRoundtrip:
+    """Verify v2 fields survive the create_manual_deal -> save_deal -> get_deal roundtrip."""
+
+    def test_v2_fields_roundtrip(self):
+        """Fields passed to create_manual_deal must be readable via get_deal."""
+        from ad_buyer.storage import DealStore
+        from ad_buyer.tools.deal_library.deal_entry import (
+            ManualDealEntry,
+            create_manual_deal,
+        )
+
+        # -- arrange: in-memory store --
+        store = DealStore("sqlite:///:memory:")
+        store.connect()
+
+        try:
+            entry = ManualDealEntry(
+                display_name="ESPN Sports PMP",
+                seller_url="https://espn.seller.example.com",
+                deal_type="PD",
+                seller_org="ESPN",
+                seller_domain="espn.com",
+                seller_type="PUBLISHER",
+                buyer_org="MediaCo Agency",
+                buyer_id="buyer-mediaco-001",
+                price_model="CPM",
+                fixed_price_cpm=18.75,
+                bid_floor_cpm=14.00,
+                currency="EUR",
+                media_type="CTV",
+                description="Q2 CTV sports inventory",
+            )
+            result = create_manual_deal(entry)
+            assert result.success is True
+
+            # -- act: persist via save_deal with the returned deal_data --
+            deal_id = store.save_deal(**result.deal_data)
+
+            # -- assert: read back and verify every v2 field --
+            deal = store.get_deal(deal_id)
+            assert deal is not None
+
+            assert deal["display_name"] == "ESPN Sports PMP"
+            assert deal["seller_org"] == "ESPN"
+            assert deal["seller_domain"] == "espn.com"
+            assert deal["seller_type"] == "PUBLISHER"
+            assert deal["buyer_org"] == "MediaCo Agency"
+            assert deal["buyer_id"] == "buyer-mediaco-001"
+            assert deal["price_model"] == "CPM"
+            assert deal["fixed_price_cpm"] == 18.75
+            assert deal["bid_floor_cpm"] == 14.00
+            assert deal["currency"] == "EUR"
+            assert deal["media_type"] == "CTV"
+            assert deal["description"] == "Q2 CTV sports inventory"
+        finally:
+            store.disconnect()
+
+    def test_list_deals_media_type_filter_after_manual_create(self):
+        """list_deals(media_type='CTV') should find manually-created CTV deals."""
+        from ad_buyer.storage import DealStore
+        from ad_buyer.tools.deal_library.deal_entry import (
+            ManualDealEntry,
+            create_manual_deal,
+        )
+
+        store = DealStore("sqlite:///:memory:")
+        store.connect()
+
+        try:
+            entry = ManualDealEntry(
+                display_name="CTV Deal",
+                seller_url="https://seller.example.com",
+                media_type="CTV",
+            )
+            result = create_manual_deal(entry)
+            assert result.success is True
+            store.save_deal(**result.deal_data)
+
+            # Filter by media_type should find the deal
+            ctv_deals = store.list_deals(media_type="CTV")
+            assert len(ctv_deals) == 1
+            assert ctv_deals[0]["display_name"] == "CTV Deal"
+            assert ctv_deals[0]["media_type"] == "CTV"
+
+            # Filtering by a different media_type should not find it
+            audio_deals = store.list_deals(media_type="AUDIO")
+            assert len(audio_deals) == 0
+        finally:
+            store.disconnect()
