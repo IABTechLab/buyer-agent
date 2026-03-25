@@ -1,0 +1,93 @@
+{
+  "status": "ok",
+  "data": {
+    "deals": [
+      {
+        "id": "MAG-CTV-001",
+        "name": "Roku Premium CTV - Q2 2026",
+        "dealType": "PG",
+        "status": "active",
+        "currency": "USD",
+        "price": {
+          "cpm": 35.00,
+          "type": "fixed"
+        },
+        "floor": 28.00,
+        "impressions": 5000000,
+        "startDate": "2026-04-01",
+        "endDate": "2026-06-30",
+        "mediaType": "CTV",
+        "seatId": "seat-12345",
+        "publisherId": "pub-roku-001",
+        "publisherName": "Roku Channel",
+        "publisherDomain": "roku.com",
+        "description": "Premium Roku CTV inventory, primetime slots",
+        "targeting": {
+          "geo": ["US"],
+          "contentCategories": ["IAB1", "IAB2"],
+          "audiences": ["18-49", "HHI 75k+"]
+        },
+        "formats": ["video_30sec", "video_15sec"],
+        "buyerSeatId": "buyer-seat-abc"
+      },
+      {
+        "id": "MAG-CTV-002",
+        "name": "Fire TV Sports Package",
+        "dealType": "PD",
+        "status": "active",
+        "currency": "USD",
+        "price": {
+          "cpm": 22.50,
+          "type": "fixed"
+        },
+        "floor": 18.00,
+        "impressions": 2000000,
+        "startDate": "2026-05-01",
+        "endDate": "2026-07-31",
+        "mediaType": "CTV",
+        "seatId": "seat-12345",
+        "publisherId": "pub-amazon-001",
+        "publisherName": "Amazon Fire TV",
+        "publisherDomain": "amazon.com",
+        "description": "Fire TV sports content package",
+        "targeting": {
+          "geo": ["US", "CA"],
+          "contentCategories": ["IAB17"],
+          "audiences": ["sports-fans"]
+        },
+        "formats": ["video_30sec"],
+        "buyerSeatId": "buyer-seat-abc"
+      },
+      {
+        "id": "MAG-CTV-003",
+        "name": "Samsung TV Plus Open Auction",
+        "dealType": "OPEN_AUCTION",
+        "status": "active",
+        "currency": "USD",
+        "price": {
+          "type": "floor"
+        },
+        "floor": 8.00,
+        "impressions": null,
+        "startDate": null,
+        "endDate": null,
+        "mediaType": "CTV",
+        "seatId": "seat-12345",
+        "publisherId": "pub-samsung-001",
+        "publisherName": "Samsung TV Plus",
+        "publisherDomain": "samsung.com",
+        "description": null,
+        "targeting": {
+          "geo": ["US"],
+          "contentCategories": [],
+          "audiences": []
+        },
+        "formats": ["video_30sec", "video_15sec", "display_banner"],
+        "buyerSeatId": "buyer-seat-abc"
+      }
+    ],
+    "totalCount": 3,
+    "page": 1,
+    "pageSize": 100
+  }
+}
