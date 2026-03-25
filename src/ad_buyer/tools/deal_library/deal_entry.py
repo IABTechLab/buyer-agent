@@ -278,7 +278,10 @@ def _build_deal_data(entry: ManualDealEntry) -> dict[str, Any]:
     if entry.description is not None:
         v2_metadata["description"] = entry.description
 
-    # Build the deal dict matching DealStore.save_deal() parameters
+    # Build the deal dict matching DealStore.save_deal() parameters.
+    # V2 fields must appear as top-level keys so save_deal() writes them
+    # to their dedicated columns; they're ALSO kept in the metadata JSON
+    # for backward compatibility with older readers.
     deal_data: dict[str, Any] = {
         "seller_url": entry.seller_url,
         "product_id": entry.product_id,
@@ -291,6 +294,21 @@ def _build_deal_data(entry: ManualDealEntry) -> dict[str, Any]:
         "flight_start": entry.flight_start,
         "flight_end": entry.flight_end,
         "metadata": json.dumps(v2_metadata),
+        # v2 counterparty fields (top-level for save_deal())
+        "display_name": entry.display_name,
+        "seller_org": entry.seller_org,
+        "seller_domain": entry.seller_domain,
+        "seller_type": entry.seller_type,
+        "buyer_org": entry.buyer_org,
+        "buyer_id": entry.buyer_id,
+        # v2 pricing detail fields
+        "price_model": entry.price_model,
+        "fixed_price_cpm": entry.fixed_price_cpm,
+        "bid_floor_cpm": entry.bid_floor_cpm,
+        "currency": entry.currency,
+        # v2 inventory / descriptive fields
+        "media_type": entry.media_type,
+        "description": entry.description,
     }
 
     return deal_data
