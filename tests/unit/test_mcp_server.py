@@ -112,14 +112,16 @@ class TestMCPTools:
         )
 
     @pytest.mark.asyncio
-    async def test_exactly_three_foundation_tools(self):
-        """Only the three foundation tools should be registered."""
+    async def test_foundation_tools_are_present(self):
+        """The three foundation tools should be among the registered tools."""
         from ad_buyer.interfaces.mcp_server import mcp
 
         tools_result = await mcp.list_tools()
         tool_names = sorted(t.name for t in tools_result)
 
-        assert tool_names == ["get_config", "get_setup_status", "health_check"]
+        # Foundation tools must always be present (other modules add more)
+        for name in ["get_config", "get_setup_status", "health_check"]:
+            assert name in tool_names, f"{name} not in {tool_names}"
 
     @pytest.mark.asyncio
     async def test_get_setup_status_tool(self):

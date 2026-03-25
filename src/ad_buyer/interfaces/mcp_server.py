@@ -6,6 +6,11 @@
 Exposes buyer operations as MCP tools via FastMCP SSE transport.
 This is the foundation server that all other MCP tool modules build upon.
 
+Tool categories:
+  - Foundation: get_setup_status, health_check, get_config
+  - Campaign Management: list_campaigns, get_campaign_status,
+    check_pacing, review_budgets (buyer-3w3)
+
 Mount into a FastAPI app:
     from ad_buyer.interfaces.mcp_server import mount_mcp
     mount_mcp(app)
@@ -14,15 +19,20 @@ This creates an SSE endpoint at /mcp/sse for MCP client connections
 (Claude Desktop, ChatGPT, Cursor, Windsurf, etc.).
 """
 
+from __future__ import annotations
+
 import json
 import logging
 import sqlite3
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
 from ..config.settings import Settings
+from ..storage.campaign_store import CampaignStore
+from ..storage.pacing_store import PacingStore
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +59,58 @@ def _get_settings() -> Settings:
     (and test patches) are reflected.
     """
     return Settings()
+
+
+def _get_campaign_store() -> CampaignStore:
+    """Get a connected CampaignStore instance.
+
+    Uses the database URL from settings. Returns a new connected
+    instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    store = CampaignStore(settings.database_url)
+    store.connect()
+    return store
+
+
+def _get_pacing_store() -> PacingStore:
+    """Get a connected PacingStore instance.
+
+    Uses the database URL from settings. Returns a new connected
+    instance each time so that test patches are reflected.
+    """
+    settings = _get_settings()
+    store = PacingStore(settings.database_url)
+    store.connect()
+    return store
+
+
+# Deal store with test-injection support
+_deal_store_override: DealStore | None = None
+
+
+def _get_deal_store() -> DealStore:
+    """Get a connected DealStore instance.
+
+    If a test override has been set via ``_set_deal_store()``, returns
+    that instance.  Otherwise creates a new one from settings.
+    """
+    if _deal_store_override is not None:
+        return _deal_store_override
+    settings = _get_settings()
+    store = DealStore(settings.database_url)
+    store.connect()
+    return store
+
+
+def _set_deal_store(store: DealStore | None) -> None:
+    """Set (or clear) a DealStore override for testing.
+
+    Pass a connected in-memory DealStore to inject test data.
+    Pass None to revert to the default settings-based store.
+    """
+    global _deal_store_override
+    _deal_store_override = store
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +269,268 @@ def get_config() -> str:
         "crew_max_iterations": settings.crew_max_iterations,
     }
     return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Campaign Management Tools (buyer-3w3)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_campaigns(status: str | None = None) -> str:
+    """List all campaigns with optional status filter.
+
+    Args:
+        status: Optional campaign status to filter by
+            (e.g. DRAFT, PLANNING, BOOKING, READY, ACTIVE, PAUSED,
+            COMPLETED, CANCELED). If omitted, returns all campaigns.
+
+    Returns a JSON object with:
+    - total: number of campaigns matching the filter
+    - campaigns: list of campaign summary objects
+    """
+    store = _get_campaign_store()
+    try:
+        kwargs: dict[str, Any] = {}
+        if status is not None:
+            kwargs["status"] = status
+        campaigns = store.list_campaigns(**kwargs)
+
+        campaign_summaries = []
+        for c in campaigns:
+            campaign_summaries.append({
+                "campaign_id": c["campaign_id"],
+                "campaign_name": c["campaign_name"],
+                "advertiser_id": c["advertiser_id"],
+                "status": c["status"],
+                "total_budget": c["total_budget"],
+                "currency": c.get("currency", "USD"),
+                "flight_start": c["flight_start"],
+                "flight_end": c["flight_end"],
+            })
+
+        result = {
+            "total": len(campaign_summaries),
+            "campaigns": campaign_summaries,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def get_campaign_status(campaign_id: str) -> str:
+    """Get detailed status of a specific campaign.
+
+    Args:
+        campaign_id: The unique identifier of the campaign.
+
+    Returns a JSON object with:
+    - campaign_id, campaign_name, status, budget, flight dates
+    - pacing: latest pacing snapshot data (or null if no data)
+    - error: present only if the campaign was not found
+    """
+    campaign_store = _get_campaign_store()
+    pacing_store = _get_pacing_store()
+    try:
+        campaign = campaign_store.get_campaign(campaign_id)
+        if campaign is None:
+            return json.dumps(
+                {"error": f"Campaign not found: {campaign_id}"},
+                indent=2,
+            )
+
+        # Get latest pacing snapshot
+        latest = pacing_store.get_latest_pacing_snapshot(campaign_id)
+
+        pacing_data = None
+        if latest is not None:
+            pacing_data = {
+                "total_spend": latest.total_spend,
+                "expected_spend": latest.expected_spend,
+                "pacing_pct": latest.pacing_pct,
+                "deviation_pct": latest.deviation_pct,
+                "snapshot_timestamp": latest.timestamp.isoformat(),
+            }
+
+        # Parse channels JSON if present
+        channels_raw = campaign.get("channels")
+        channels: list[dict[str, Any]] = []
+        if channels_raw:
+            try:
+                channels = json.loads(channels_raw)
+            except (json.JSONDecodeError, TypeError):
+                channels = []
+
+        result = {
+            "campaign_id": campaign["campaign_id"],
+            "campaign_name": campaign["campaign_name"],
+            "advertiser_id": campaign["advertiser_id"],
+            "status": campaign["status"],
+            "total_budget": campaign["total_budget"],
+            "currency": campaign.get("currency", "USD"),
+            "flight_start": campaign["flight_start"],
+            "flight_end": campaign["flight_end"],
+            "channels": channels,
+            "pacing": pacing_data,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        campaign_store.disconnect()
+        pacing_store.disconnect()
+
+
+@mcp.tool()
+def check_pacing(campaign_id: str) -> str:
+    """Check budget pacing for a campaign.
+
+    Determines whether the campaign is on track, behind, or ahead
+    of its expected spend based on the latest pacing snapshot.
+
+    Pacing thresholds:
+    - on_track: deviation within +/- 10%
+    - behind: deviation below -10%
+    - ahead: deviation above +10%
+    - no_data: no pacing snapshots available
+
+    Args:
+        campaign_id: The unique identifier of the campaign.
+
+    Returns a JSON object with:
+    - pacing_status: on_track, behind, ahead, or no_data
+    - pacing_pct: current pacing percentage
+    - deviation_pct: deviation from expected pacing
+    - total_budget, total_spend, expected_spend
+    - channel_pacing: per-channel pacing breakdown (if available)
+    - error: present only if the campaign was not found
+    """
+    campaign_store = _get_campaign_store()
+    pacing_store = _get_pacing_store()
+    try:
+        campaign = campaign_store.get_campaign(campaign_id)
+        if campaign is None:
+            return json.dumps(
+                {"error": f"Campaign not found: {campaign_id}"},
+                indent=2,
+            )
+
+        latest = pacing_store.get_latest_pacing_snapshot(campaign_id)
+
+        if latest is None:
+            result = {
+                "campaign_id": campaign_id,
+                "campaign_name": campaign["campaign_name"],
+                "pacing_status": "no_data",
+                "total_budget": campaign["total_budget"],
+                "total_spend": 0.0,
+                "expected_spend": 0.0,
+                "pacing_pct": 0.0,
+                "deviation_pct": 0.0,
+                "channel_pacing": [],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            return json.dumps(result, indent=2)
+
+        # Determine pacing status from deviation
+        deviation = latest.deviation_pct
+        if deviation < -10.0:
+            pacing_status = "behind"
+        elif deviation > 10.0:
+            pacing_status = "ahead"
+        else:
+            pacing_status = "on_track"
+
+        # Build channel pacing breakdown
+        channel_pacing = []
+        for ch in latest.channel_snapshots:
+            channel_pacing.append({
+                "channel": ch.channel,
+                "allocated_budget": ch.allocated_budget,
+                "spend": ch.spend,
+                "pacing_pct": ch.pacing_pct,
+                "impressions": ch.impressions,
+            })
+
+        result = {
+            "campaign_id": campaign_id,
+            "campaign_name": campaign["campaign_name"],
+            "pacing_status": pacing_status,
+            "total_budget": latest.total_budget,
+            "total_spend": latest.total_spend,
+            "expected_spend": latest.expected_spend,
+            "pacing_pct": latest.pacing_pct,
+            "deviation_pct": latest.deviation_pct,
+            "channel_pacing": channel_pacing,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        campaign_store.disconnect()
+        pacing_store.disconnect()
+
+
+@mcp.tool()
+def review_budgets() -> str:
+    """Review budget allocation and spend across all campaigns.
+
+    Provides an aggregate view of total budget and spend across all
+    campaigns, plus per-campaign budget breakdowns with delivery
+    percentages.
+
+    Returns a JSON object with:
+    - total_budget: sum of all campaign budgets
+    - total_spend: sum of all campaign spend (from latest pacing)
+    - campaigns: per-campaign budget and spend details
+    - timestamp: when this review was generated
+    """
+    campaign_store = _get_campaign_store()
+    pacing_store = _get_pacing_store()
+    try:
+        campaigns = campaign_store.list_campaigns()
+
+        total_budget = 0.0
+        total_spend = 0.0
+        campaign_budgets = []
+
+        for c in campaigns:
+            budget = c["total_budget"]
+            total_budget += budget
+
+            # Get latest pacing for spend data
+            latest = pacing_store.get_latest_pacing_snapshot(c["campaign_id"])
+            spend = latest.total_spend if latest else 0.0
+            total_spend += spend
+
+            # Calculate delivery percentage
+            delivery_pct = (spend / budget * 100.0) if budget > 0 else 0.0
+
+            campaign_budgets.append({
+                "campaign_id": c["campaign_id"],
+                "campaign_name": c["campaign_name"],
+                "status": c["status"],
+                "total_budget": budget,
+                "total_spend": spend,
+                "delivery_pct": round(delivery_pct, 1),
+                "currency": c.get("currency", "USD"),
+            })
+
+        result = {
+            "total_budget": total_budget,
+            "total_spend": total_spend,
+            "overall_delivery_pct": (
+                round(total_spend / total_budget * 100.0, 1)
+                if total_budget > 0 else 0.0
+            ),
+            "campaign_count": len(campaign_budgets),
+            "campaigns": campaign_budgets,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        campaign_store.disconnect()
+        pacing_store.disconnect()
 
 
 # ---------------------------------------------------------------------------
