@@ -34,6 +34,7 @@ import csv
 import io
 import json
 import logging
+import os
 import sqlite3
 from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
@@ -59,6 +60,11 @@ from ..tools.deal_import import (
 from ..tools.deal_library.deal_entry import (
     ManualDealEntry,
     create_manual_deal,
+)
+from ..tools.deal_library.connectors import (
+    IndexExchangeConnector,
+    MagniteConnector,
+    PubMaticConnector,
 )
 
 logger = logging.getLogger(__name__)
@@ -2508,6 +2514,225 @@ def get_pacing_report(campaign_id: str) -> str:
     finally:
         campaign_store.disconnect()
         pacing_store.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# SSP Connector Tools (buyer-sozw)
+# ---------------------------------------------------------------------------
+
+# Registry mapping normalised ssp_name → connector class attribute name.
+# The class is looked up from the module namespace at call time so that
+# tests can patch the class via its module-level name (e.g.
+# "ad_buyer.interfaces.mcp_server.PubMaticConnector") and have the patch
+# take effect without the registry caching the original class.
+_SSP_CLASS_NAMES: dict[str, str] = {
+    "pubmatic": "PubMaticConnector",
+    "magnite": "MagniteConnector",
+    "index_exchange": "IndexExchangeConnector",
+}
+
+
+def _get_ssp_connector_class(name: str) -> type | None:
+    """Look up an SSP connector class by normalised name.
+
+    Returns the class from the current module namespace so that test
+    patches are respected.  Returns None if the name is unknown.
+    """
+    class_name = _SSP_CLASS_NAMES.get(name)
+    if class_name is None:
+        return None
+    import sys
+    module = sys.modules[__name__]
+    return getattr(module, class_name, None)
+
+
+@mcp.tool()
+def list_ssp_connectors() -> str:
+    """List available SSP connectors and their configuration status.
+
+    Returns each supported SSP connector with:
+    - name: normalised SSP identifier (use as ssp_name in other tools)
+    - display_name: human-readable SSP name
+    - configured: whether required environment variables are set
+    - required_env_vars: list of env var names needed for this connector
+
+    Returns a JSON object with:
+    - total: number of available connectors (always 3)
+    - connectors: list of connector status objects
+    - timestamp: when this list was generated
+    """
+    connectors = []
+    for name in _SSP_CLASS_NAMES:
+        cls = _get_ssp_connector_class(name)
+        if cls is None:
+            continue
+        instance = cls()
+        required = instance.get_required_config()
+        connectors.append({
+            "name": name,
+            "display_name": instance.ssp_name,
+            "configured": instance.is_configured(),
+            "required_env_vars": required,
+        })
+
+    result = {
+        "total": len(connectors),
+        "connectors": connectors,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def import_deals_ssp(ssp_name: str) -> str:
+    """Import deals from a specified SSP connector into the deal portfolio.
+
+    Instantiates the named SSP connector, calls its API to fetch deals,
+    normalises them, and saves each deal to the deal store.  Returns the
+    same result structure as ``import_deals_csv``.
+
+    Args:
+        ssp_name: Which SSP to import from.  One of:
+            ``"pubmatic"``, ``"magnite"``, ``"index_exchange"``.
+            Case-insensitive.
+
+    Returns a JSON object with:
+    - total_rows: total deals fetched from the SSP
+    - successful: number of deals saved to the deal store
+    - failed: number of deals that failed normalisation
+    - skipped: number of duplicate deals skipped
+    - errors: list of per-deal error messages
+    - deal_ids: list of saved deal IDs
+    - ssp_name: normalised name of the connector used
+    - timestamp: when this import was performed
+    """
+    key = ssp_name.strip().lower()
+    cls = _get_ssp_connector_class(key)
+    if cls is None:
+        known = ", ".join(sorted(_SSP_CLASS_NAMES.keys()))
+        return json.dumps(
+            {
+                "error": (
+                    f"Unknown SSP connector: '{ssp_name}'. "
+                    f"Known connectors: {known}"
+                ),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            indent=2,
+        )
+
+    connector = cls()
+    if not connector.is_configured():
+        missing = [v for v in connector.get_required_config() if not os.environ.get(v)]
+        return json.dumps(
+            {
+                "error": (
+                    f"{connector.ssp_name} connector is not configured. "
+                    f"Set these environment variables: {', '.join(missing)}"
+                ),
+                "ssp_name": key,
+                "required_env_vars": connector.get_required_config(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            indent=2,
+        )
+
+    # Fetch deals from the SSP
+    fetch_result = connector.fetch_deals()
+
+    # Persist normalised deals to the deal store
+    store = _get_deal_store()
+    try:
+        deal_ids: list[str] = []
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        for deal_data in fetch_result.deals:
+            saved_id = store.save_deal(**deal_data)
+            deal_ids.append(saved_id)
+            store.save_portfolio_metadata(
+                deal_id=saved_id,
+                import_source=connector.import_source,
+                import_date=today,
+            )
+
+        result = {
+            "total_rows": fetch_result.total_fetched,
+            "successful": fetch_result.successful,
+            "failed": fetch_result.failed,
+            "skipped": fetch_result.skipped,
+            "errors": fetch_result.errors,
+            "deal_ids": deal_ids,
+            "ssp_name": key,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        if _deal_store_override is None:
+            store.disconnect()
+
+
+@mcp.tool()
+def test_ssp_connection(ssp_name: str) -> str:
+    """Test connectivity to a specific SSP connector.
+
+    Checks whether credentials are configured and, if so, attempts a
+    lightweight API call to verify the credentials are valid.
+
+    Args:
+        ssp_name: Which SSP to test.  One of:
+            ``"pubmatic"``, ``"magnite"``, ``"index_exchange"``.
+            Case-insensitive.
+
+    Returns a JSON object with:
+    - ssp_name: normalised name of the connector tested
+    - connected: true if the connection succeeded, false otherwise
+    - configured: whether required environment variables are set
+    - message: human-readable status or error message
+    - timestamp: when this test was performed
+    """
+    key = ssp_name.strip().lower()
+    cls = _get_ssp_connector_class(key)
+    if cls is None:
+        known = ", ".join(sorted(_SSP_CLASS_NAMES.keys()))
+        return json.dumps(
+            {
+                "error": (
+                    f"Unknown SSP connector: '{ssp_name}'. "
+                    f"Known connectors: {known}"
+                ),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            indent=2,
+        )
+
+    connector = cls()
+    configured = connector.is_configured()
+    if not configured:
+        missing = [v for v in connector.get_required_config() if not os.environ.get(v)]
+        result = {
+            "ssp_name": key,
+            "connected": False,
+            "configured": False,
+            "message": (
+                f"{connector.ssp_name} connector is not configured. "
+                f"Missing env vars: {', '.join(missing)}"
+            ),
+            "required_env_vars": connector.get_required_config(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+
+    # Connector is configured — attempt connection test
+    connected = connector.test_connection()
+    result = {
+        "ssp_name": key,
+        "connected": connected,
+        "configured": True,
+        "message": (
+            f"{connector.ssp_name} connection test {'succeeded' if connected else 'failed'}."
+        ),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
 
 
 # ---------------------------------------------------------------------------

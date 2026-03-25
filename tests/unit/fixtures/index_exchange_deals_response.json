@@ -1,0 +1,92 @@
+{
+  "status": "success",
+  "total": 4,
+  "page": 1,
+  "pageSize": 100,
+  "deals": [
+    {
+      "dealId": "IX-PG-2026-001",
+      "name": "Premium News PG Package",
+      "status": "active",
+      "dealType": "PG",
+      "floorPrice": null,
+      "price": 52.00,
+      "currency": "USD",
+      "publisherDomain": "news.example.com",
+      "adType": "display",
+      "startDate": "2026-04-01",
+      "endDate": "2026-06-30",
+      "impressions": 3000000,
+      "description": "Guaranteed news homepage display inventory",
+      "targeting": {
+        "geo": ["US", "CA"],
+        "contentCategories": ["IAB12", "IAB12-1"],
+        "audiences": []
+      },
+      "formats": ["display_banner", "display_interstitial"]
+    },
+    {
+      "dealId": "IX-PD-2026-042",
+      "name": "Tech Content Preferred Deal",
+      "status": "active",
+      "dealType": "PD",
+      "floorPrice": 14.00,
+      "price": 18.50,
+      "currency": "USD",
+      "publisherDomain": "tech.example.com",
+      "adType": "display",
+      "startDate": "2026-04-01",
+      "endDate": "2026-09-30",
+      "impressions": null,
+      "description": "Preferred deal for tech content pages",
+      "targeting": {
+        "geo": ["US"],
+        "contentCategories": ["IAB19"],
+        "audiences": ["tech-enthusiasts"]
+      },
+      "formats": ["display_banner"]
+    },
+    {
+      "dealId": "IX-PMP-2026-777",
+      "name": "In-Market Auto Private Auction",
+      "status": "active",
+      "dealType": "PMP",
+      "floorPrice": 9.50,
+      "price": null,
+      "currency": "USD",
+      "publisherDomain": null,
+      "adType": "video",
+      "startDate": "2026-03-15",
+      "endDate": "2026-12-31",
+      "impressions": null,
+      "description": null,
+      "targeting": {
+        "geo": ["US"],
+        "contentCategories": ["IAB2"],
+        "audiences": ["in-market-auto", "new-car-buyers-2026"]
+      },
+      "formats": ["video_preroll", "video_midroll"]
+    },
+    {
+      "dealId": "IX-PG-2026-099",
+      "name": "Paused Entertainment PG",
+      "status": "inactive",
+      "dealType": "PG",
+      "floorPrice": null,
+      "price": 30.00,
+      "currency": "USD",
+      "publisherDomain": "entertainment.example.com",
+      "adType": "display",
+      "startDate": "2026-01-01",
+      "endDate": "2026-03-31",
+      "impressions": 1000000,
+      "description": null,
+      "targeting": {
+        "geo": ["US", "UK", "AU"],
+        "contentCategories": ["IAB1"],
+        "audiences": []
+      },
+      "formats": ["display_banner", "display_native"]
+    }
+  ]
+}
