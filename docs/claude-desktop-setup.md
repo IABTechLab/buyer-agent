@@ -1,381 +1,156 @@
-# Claude Desktop Setup Guide
+# Claude Setup Guide (Desktop & Web)
 
-Connect Claude Desktop to the IAB Tech Lab Ad Buyer Agent via the Model Context
-Protocol (MCP). Once connected, you can manage campaigns, review deals, check
-pacing, and interact with seller systems using natural language directly inside
-Claude Desktop.
-
----
+Connect your buyer agent to Claude Desktop or Claude on the web for conversational management of campaigns, deals, pacing, seller relationships, and approvals.
 
 ## Prerequisites
 
-- **Claude Desktop** installed (macOS or Windows). Download from
-  [claude.ai/download](https://claude.ai/download).
-- **Ad Buyer System running** locally. See the
-  [Quickstart](getting-started/quickstart.md) if you have not done this yet.
-  The server must be reachable at `http://localhost:8001` before Claude Desktop
-  can connect to it.
-- **Python 3.11+** with the buyer agent installed (`pip install -e .`).
+Your developer should have already:
+- Deployed the buyer agent server
+- Connected your seller agents (configured `SELLER_ENDPOINTS`)
+- Configured SSP connectors if needed (PubMatic, Magnite, Index Exchange)
+- Generated an operator API key for you
 
----
+If not, see the [Developer Setup Guide](ai-assistant/developer-setup.md) first.
 
-## How the MCP Connection Works
+## Step 1: Add the Buyer Agent to Claude Desktop
 
-The buyer agent exposes an MCP server over
-[Server-Sent Events (SSE)](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events).
-When Claude Desktop starts it reads `claude_desktop_config.json`, connects to
-the SSE endpoint, and makes all registered tools available in the Claude chat
-interface.
+There are two ways to connect, depending on whether the buyer agent is running locally or on a remote server.
 
-```
-Claude Desktop  --SSE-->  http://localhost:8001/mcp/sse  -->  Buyer Agent
-```
+### Option A: Remote Server (Recommended for Production)
 
-The SSE endpoint is mounted automatically when the buyer server starts — no
-extra configuration on the server side is needed.
+Works on both **Claude Desktop** and **Claude on the web** (claude.ai):
 
----
+1. Open Claude Desktop or go to [claude.ai](https://claude.ai)
+2. Go to **Settings > Integrations**
+3. Click **"+ Add Custom Integration"**
+4. Enter your buyer agent's MCP URL: `https://your-buyer.example.com/mcp/sse`
+5. If prompted for authentication, enter your operator API key
+6. Click **Save**
 
-## Step 1: Start the Buyer Agent Server
+> Available on Pro, Max, Team, and Enterprise plans. Free users get one custom integration. This is the same setup for both Claude Desktop and Claude web — the integration syncs across both.
 
-Open a terminal and start the server:
+### Option B: Local Development Server
 
-```bash
-cd /path/to/ad_buyer_system
-source venv/bin/activate        # or: .venv/bin/activate
-uvicorn ad_buyer.interfaces.api.main:app --reload --port 8001
-```
+For buyer agents running on `localhost`:
 
-Verify it is running:
-
-```bash
-curl http://localhost:8001/health
-# {"status": "healthy", "version": "..."}
-```
-
-Leave this terminal open. Claude Desktop needs the server running at all times.
-
----
-
-## Step 2: Configure Claude Desktop
-
-Claude Desktop is configured via a JSON file. Open it in a text editor:
-
-| Platform | Path |
-|----------|------|
-| macOS    | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-| Windows  | `%APPDATA%\Claude\claude_desktop_config.json` |
-
-If the file does not exist, create it. Add the `mcpServers` block below. If the
-file already has other MCP servers, add `ad-buyer-agent` alongside them.
+1. Open Claude Desktop
+2. Go to **Settings > Developer > Edit Config**
+3. This opens `claude_desktop_config.json`. Add:
 
 ```json
 {
   "mcpServers": {
-    "ad-buyer-agent": {
+    "buyer-agent": {
       "url": "http://localhost:8001/mcp/sse"
     }
   }
 }
 ```
 
-### What each field means
+4. Save and restart Claude Desktop
 
-| Field | Value | Description |
-|-------|-------|-------------|
-| `mcpServers` | object | Top-level registry of MCP servers for Claude Desktop |
-| `ad-buyer-agent` | key | Display name shown in Claude Desktop's tool panel |
-| `url` | `http://localhost:8001/mcp/sse` | SSE endpoint of the running buyer agent |
+> **Note**: The JSON config method is for **local servers only**. Remote servers must use the Settings > Integrations UI.
 
-### Using a non-default port
+## Step 2: First-Run Setup Wizard
 
-If you started the server on a different port, update the URL accordingly:
+When you first connect, the buyer agent detects that configuration is incomplete and offers to walk you through it:
 
-```json
-{
-  "mcpServers": {
-    "ad-buyer-agent": {
-      "url": "http://localhost:9000/mcp/sse"
-    }
-  }
-}
-```
+> **Claude**: "Welcome! Your buyer agent is deployed and connected. Let's finish the business setup. I'll walk you through the key steps — you can skip any step to accept defaults."
 
----
+### Step 1: Buyer Identity
 
-## Step 3: Restart Claude Desktop
+> **You**: "We're Havas Media Group"
+>
+> **Claude**: "Got it. I've set your buyer name to 'Havas Media Group'. What's your seat ID for deal negotiations?"
+>
+> **You**: "havas-na-001"
 
-After saving `claude_desktop_config.json`, **fully quit and relaunch** Claude
-Desktop. It reads the config only on startup.
+### Step 2: Seller Connections
 
-- macOS: `Cmd+Q` then reopen from Applications
-- Windows: Right-click the system tray icon and choose Quit, then reopen
+> **Claude**: "I see seller endpoints are configured. Let me verify connectivity."
+>
+> **Claude**: "Connected to 2 seller agents: ESPN Digital (espn.example.com) and Condé Nast (conde.example.com). Both are healthy."
 
-When Claude Desktop reconnects, look for a hammer icon or "Tools" panel
-indicating that MCP tools are available.
+### Step 3: Deal Templates
 
----
+> **Claude**: "Want to set up deal templates for common buy types? I can pre-configure CTV, Video, and Display templates."
+>
+> **You**: "Yes — CTV at $28 max CPM and Video at $18 max CPM to start"
 
-## Step 4: Verify the Connection
+### Step 4: Approval Gates
 
-In a new Claude conversation, type:
+> **Claude**: "Should deals require approval before they go live? What's your threshold?"
+>
+> **You**: "Auto-approve deals under $10,000 total value. Require approval for larger deals."
 
-```
-Check the health of the buyer agent.
-```
+### Step 5: SSP Connectors
 
-Claude will call `health_check` and return something like:
+> **Claude**: "I see PubMatic credentials are configured. Want me to run an initial deal import?"
+>
+> **You**: "Yes, pull in all active deals"
 
-```
-The buyer agent is healthy (version 1.0.0). All services are running:
-database: healthy, seller_connections: configured (1 endpoint), event_bus: healthy.
-```
+### Step 6: Review & Launch
 
-If Claude says it cannot find any tools, see the [Troubleshooting](#troubleshooting)
-section below.
+> **Claude**: "Here's your setup summary: [summary]. Your buyer agent is ready. Try 'List active campaigns' or 'Show me available inventory from ESPN' to get started."
 
----
+## Day-to-Day Operations
 
-## Available Tools
+After setup, use Claude Desktop to manage your buyer agent:
 
-The buyer agent exposes tools across six categories. All tools are available
-immediately once Claude Desktop connects — no additional setup is required.
+### Campaigns
+- "List all active campaigns"
+- "What's the pacing on campaign camp-abc123?"
+- "Review budgets across all campaigns — which ones are underspending?"
+- "Give me a full report on camp-abc123"
 
-### Foundation
-
-These tools let you inspect system state and configuration.
-
-| Tool | Description |
-|------|-------------|
-| `get_setup_status` | Check whether all required configuration is in place (seller endpoints, database, API keys, LLM key) |
-| `health_check` | Check service health: database, seller connections, event bus |
-| `get_config` | View non-sensitive configuration (environment, models, seller URLs, log level) |
-
-### Campaign Management
-
-View and monitor advertising campaigns and their delivery status.
-
-| Tool | Description |
-|------|-------------|
-| `list_campaigns` | List all campaigns, optionally filtered by status (DRAFT, ACTIVE, PAUSED, etc.) |
-| `get_campaign_status` | Get full details for a specific campaign, including the latest pacing snapshot |
-| `check_pacing` | Check whether a campaign is on-track, behind, or ahead of expected spend |
-| `review_budgets` | Aggregate budget and spend across all campaigns |
-
-### Approval Management
-
-Review and decide on pending approval requests for deals and campaigns.
-
-| Tool | Description |
-|------|-------------|
-| `list_pending_approvals` | List approval requests awaiting a decision, optionally filtered by campaign |
-| `approve_or_reject` | Approve or reject a specific approval request with an optional reason |
-
-### API Key Management
-
-Store and manage API keys used to authenticate with seller agents.
-
-| Tool | Description |
-|------|-------------|
-| `list_api_keys` | List configured seller API keys (key values are always masked) |
-| `create_api_key` | Store or replace an API key for a seller URL |
-| `revoke_api_key` | Permanently remove a stored API key |
-
-### Templates
-
-Create reusable deal and supply-path templates to speed up booking.
-
-| Tool | Description |
-|------|-------------|
-| `list_templates` | List deal templates and supply path templates (filterable by type) |
-| `create_template` | Create a new deal or supply path template |
-| `instantiate_from_template` | Instantiate a deal from a template with optional field overrides |
-
-### Reporting
-
-Generate performance and pacing reports for campaigns and deals.
-
-| Tool | Description |
-|------|-------------|
-| `get_deal_performance` | Get price, status, and negotiation history for a specific deal |
-| `get_campaign_report` | Full campaign report: status, pacing, creative validation, deal metrics |
-| `get_pacing_report` | Detailed pacing report with per-channel breakdown and deviation alerts |
-
----
-
-## First-Use Walkthrough
-
-This walkthrough uses the MCP tools to verify your installation and explore the
-system for the first time. Run each step in a new Claude Desktop conversation.
-
-### Step 1 — Confirm setup status
-
-```
-Check the buyer agent setup status and tell me what's configured.
-```
-
-Claude calls `get_setup_status`. A fresh installation will show
-`seller_endpoints_configured: false` until you add a seller URL. That is
-expected at this point.
-
-### Step 2 — View the current configuration
-
-```
-Show me the buyer agent configuration.
-```
-
-Claude calls `get_config` and lists the active environment, model names,
-seller endpoints, and database path. This is a safe read-only call — no
-secrets are exposed.
-
-### Step 3 — Add a seller endpoint
-
-If you have a seller agent running (default port 3000), add its API key:
-
-```
-Store an API key for the seller agent at http://localhost:3000. Use the key "demo-key-001".
-```
-
-Claude calls `create_api_key`. It confirms the key was stored and shows the
-masked value. The buyer will use this key for authenticated calls to that seller.
-
-### Step 4 — Check for campaigns
-
-```
-List all campaigns. If there are none, that's fine — just tell me the count.
-```
-
-Claude calls `list_campaigns` and reports the total. On a fresh database this
-returns zero campaigns.
-
-### Step 5 — Review pending approvals
-
-```
-Are there any pending approval requests?
-```
-
-Claude calls `list_pending_approvals`. On a fresh system this is empty. Once
-the booking workflow creates deals that require approval, they will appear here.
-
----
-
-## Example Conversations
-
-The examples below show natural-language prompts you can use for each tool
-category. Copy and paste them into Claude Desktop after connecting.
-
-### System health and configuration
-
-```
-Is the buyer agent healthy right now?
-```
-
-```
-What sellers are configured and are they all reachable?
-```
-
-```
-Show me the full configuration — environment, models, and endpoints.
-```
-
-### Campaign status and pacing
-
-```
-List all my active campaigns.
-```
-
-```
-What is the pacing status for campaign camp-abc123?
-```
-
-```
-Give me a full report on campaign camp-abc123 including pacing and deal metrics.
-```
-
-```
-Review budgets across all campaigns and tell me which ones are underspending.
-```
-
-```
-Which campaigns are behind on pacing by more than 15%?
-```
+### Deals
+- "Find available CTV inventory from ESPN"
+- "Create a PMP deal with ESPN for $28 CPM on their sports package"
+- "How is deal deal-xyz456 performing?"
+- "Import available deals from PubMatic"
+- "Show me my deal library"
 
 ### Approvals
-
-```
-Are there any deals or campaigns waiting for my approval?
-```
-
-```
-Show me all pending approvals for campaign camp-abc123.
-```
-
-```
-Approve approval request appr-001 on behalf of "jane.smith" with the reason "reviewed and looks good".
-```
-
-```
-Reject approval request appr-002. Reason: CPM is too high, needs renegotiation.
-```
-
-### API key management
-
-```
-What seller API keys do I have configured?
-```
-
-```
-Add an API key for http://seller.example.com:3000 with value "sk-seller-xyz".
-```
-
-```
-Remove the API key for http://old-seller.example.com.
-```
+- "Are there any deals waiting for my approval?"
+- "Approve approval request appr-001 — reviewed and looks good"
+- "Reject appr-002 — CPM is too high, needs renegotiation"
 
 ### Templates
-
-```
-List all my deal templates.
-```
-
-```
-Show me the supply path templates I have set up.
-```
-
-```
-Create a new PMP deal template called "Q3 CTV Standard" with a max CPM of $25.
-```
-
-```
-Instantiate deal template tmpl-001 for product "premium-ctv" at a price of $22.50.
-```
+- "List my deal templates"
+- "Create a new Q3 CTV template at $25 max CPM"
+- "Instantiate template tmpl-001 for the ESPN sports package"
 
 ### Reporting
+- "Generate a pacing report for camp-abc123 with alerts"
+- "Show deal performance for deal-xyz456"
 
-```
-How is deal deal-abc456 performing?
-```
+### Seller Management
+- "What sellers are configured and are they all reachable?"
+- "Add an API key for the new seller at https://publisher.example.com"
+- "Show me ESPN's media kit"
 
-```
-Give me a pacing report for campaign camp-abc123 including any alerts.
-```
+### Troubleshooting
+- "Check the buyer agent health"
+- "Show me the buyer setup status"
+- "What sellers do I have configured?"
 
-```
-Generate a full campaign report for camp-abc123.
-```
+## Also Works With
 
----
+The same MCP endpoint works with other AI platforms:
+
+- **[ChatGPT](multi-client-setup.md)** — via Developer Mode Apps & Connectors
+- **[OpenAI Codex](multi-client-setup.md#openai-codex)** — via `config.toml`
+- **[Cursor](multi-client-setup.md#cursor)** — via `.cursor/mcp.json`
+- **[Windsurf](multi-client-setup.md#windsurf)** — via MCP config file
 
 ## Troubleshooting
 
 ### Claude says "no tools available" or does not recognize buyer agent tools
 
 1. Confirm the buyer server is running: `curl http://localhost:8001/health`
-2. Check that `claude_desktop_config.json` uses the correct port (8001 by
-   default, or whatever you passed to `--port`).
-3. Fully quit and relaunch Claude Desktop — it only reads the config at startup.
-4. Check the Claude Desktop logs for connection errors (macOS:
-   `~/Library/Logs/Claude/`).
+2. Check that `claude_desktop_config.json` has the correct URL (default port is 8001)
+3. Fully quit and relaunch Claude Desktop — it only reads the config at startup
+4. Check Claude Desktop logs for connection errors (macOS: `~/Library/Logs/Claude/`)
 
 ### Connection refused on `http://localhost:8001/mcp/sse`
 
@@ -385,45 +160,14 @@ The buyer server is not running or crashed. Start it with:
 uvicorn ad_buyer.interfaces.api.main:app --reload --port 8001
 ```
 
-If it fails to start, check that your `.env` file has a valid
-`ANTHROPIC_API_KEY` and that all dependencies are installed
-(`pip install -e .`).
+If it fails to start, check that your `.env` has a valid `ANTHROPIC_API_KEY` and that all dependencies are installed (`pip install -e .`).
 
 ### Tools appear but calls return errors
 
-**`database_accessible: false`** — The SQLite database file cannot be created
-or opened. Check that the process has write permission in the project directory.
-By default the database is `./ad_buyer.db` relative to where you launched the
-server.
+**`seller_endpoints_configured: false`** — No sellers are configured. Set `SELLER_ENDPOINTS=http://localhost:3000` in your `.env` and restart the server.
 
-**`seller_endpoints_configured: false`** — No sellers are configured. Set
-`SELLER_ENDPOINTS=http://localhost:3000` in your `.env` and restart the server.
+**`database_accessible: false`** — The SQLite database file cannot be created or opened. Check that the process has write permission in the project directory.
 
-**Campaign not found** — The campaign ID you provided does not exist in the
-database. Use `list_campaigns` first to see valid IDs.
+**Campaign not found** — Use `list_campaigns` first to see valid IDs.
 
-**Approval request not found** — Use `list_pending_approvals` to confirm the
-request ID before calling `approve_or_reject`.
-
-### API key was stored but seller calls still fail
-
-Check whether the seller requires the key in a specific header. The buyer sends
-stored keys as `X-Api-Key` on outbound requests. Confirm this matches the
-seller's expected authentication scheme.
-
-### Claude Desktop shows the tool panel but tools disappear after a few minutes
-
-The SSE connection between Claude Desktop and the server may have timed out.
-Restart the buyer server and use the `/reload` button in Claude Desktop's tool
-panel if available, or restart Claude Desktop.
-
----
-
-## Related
-
-- [Quickstart](getting-started/quickstart.md) — Install and run the buyer agent
-- [Configuration](guides/configuration.md) — Full environment variable reference
-- [MCP Client (Seller Communication)](api/mcp-client.md) — How the buyer calls seller MCP tools
-- [Campaign Automation Guide](guides/campaign-pipeline.md) — Full campaign lifecycle
-- [Budget Pacing](guides/budget-pacing.md) — Understanding pacing thresholds and alerts
-- [API Overview](api/overview.md) — REST API reference
+**Approval request not found** — Use `list_pending_approvals` to confirm the request ID before calling `approve_or_reject`.

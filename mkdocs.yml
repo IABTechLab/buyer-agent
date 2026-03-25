@@ -76,8 +76,12 @@ nav:
       - Deal Store: architecture/deal-store.md
       - Models: architecture/models.md
       - Tools Reference: architecture/tools.md
+      - MCP Server: architecture/mcp-server.md
+      - Deal Library: architecture/deal-library.md
+      - SSP Connectors: architecture/ssp-connectors.md
   - State Machines:
       - Order Lifecycle: state-machines/order-lifecycle.md
+      - Change Request Flow: state-machines/change-request-flow.md
   - Event Bus:
       - Overview: event-bus/overview.md
   - Buyer Guide:
@@ -90,12 +94,21 @@ nav:
       - Multi-Seller Discovery: guides/multi-seller.md
       - Linear TV Buying: guides/linear-tv.md
       - Configuration: guides/configuration.md
-      - Deployment: guides/deployment.md
+      - Deployment & Operations: guides/deployment-ops-guide.md
       - Multi-Seller Orchestration: guides/multi-seller-orchestration.md
       - Campaign Pipeline: guides/campaign-pipeline.md
       - Budget Pacing: guides/budget-pacing.md
       - Creative Management: guides/creative-management.md
+      - Deal Library: guides/deal-library.md
+      - SSP Connector Setup: guides/ssp-connectors.md
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
+  - AI Assistant Setup:
+      - Claude (Desktop & Web): claude-desktop-setup.md
+      - ChatGPT, Codex & AI IDEs: multi-client-setup.md
+      - Developer Setup: ai-assistant/developer-setup.md
+  - MCP Reference:
+      - Tools Reference: ai-assistant/mcp-tools.md
+      - Setup Wizard: ai-assistant/setup-wizard.md
   - "Seller Agent Docs →": https://iabtechlab.github.io/seller-agent/
