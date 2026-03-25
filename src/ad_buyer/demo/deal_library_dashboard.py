@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""DealJockey Phase 1 demo dashboard.
+"""DealLibrary Phase 1 demo dashboard.
 
 Standalone Flask app that exercises all Phase 1 capabilities:
   - Schema status inspection
@@ -13,7 +13,7 @@ Standalone Flask app that exercises all Phase 1 capabilities:
 
 Run with:
     cd ad_buyer_system && source venv/bin/activate
-    python -m ad_buyer.demo.dealjockey_dashboard
+    python -m ad_buyer.demo.deal_library_dashboard
     # Opens on http://localhost:5050
 """
 
@@ -30,7 +30,7 @@ from flask import Flask, jsonify, render_template, request
 from ..storage.deal_store import DealStore
 from ..storage.schema import SCHEMA_VERSION
 from ..tools.deal_import import parse_csv_deals
-from ..tools.deal_jockey.deal_entry import (
+from ..tools.deal_library.deal_entry import (
     VALID_DEAL_TYPES,
     VALID_MEDIA_TYPES,
     VALID_PRICE_MODELS,
@@ -447,13 +447,13 @@ def _register_routes(app: Flask, store: DealStore) -> None:
 
     @app.route("/api/agent-info")
     def api_agent_info():
-        """Return DealJockey agent configuration (static, no instantiation)."""
-        # Read from the module docstring and create_deal_jockey_agent
+        """Return DealLibrary agent configuration (static, no instantiation)."""
+        # Read from the module docstring and create_deal_library_agent
 
         # Extract the Agent kwargs without actually creating the agent
         # (which would require LLM config). Instead, read the source.
         info = {
-            "role": "Deal Jockey - Portfolio Manager",
+            "role": "Deal Library - Portfolio Manager",
             "goal": (
                 "Manage deal portfolios -- import, catalog, inspect, organize, "
                 "migrate, and optimize deals across publishers, SSPs, and DSPs. "
@@ -469,7 +469,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
                 "comparison, and gap analysis."
             ),
             "l1_routing": {
-                "deal_jockey_keywords": [
+                "deal_library_keywords": [
                     "portfolio",
                     "existing deals",
                     "my deals",
@@ -538,11 +538,11 @@ def main() -> None:
     """Run the dashboard development server."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    db_path = os.environ.get("DASHBOARD_DB", "sqlite:///dealjockey_demo.db")
+    db_path = os.environ.get("DASHBOARD_DB", "sqlite:///deal_library_demo.db")
     app = create_app(database_url=db_path)
 
     port = int(os.environ.get("DASHBOARD_PORT", "5050"))
-    print(f"\n  DealJockey Dashboard running at http://localhost:{port}\n")
+    print(f"\n  Deal Library Dashboard running at http://localhost:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=True)
 
 

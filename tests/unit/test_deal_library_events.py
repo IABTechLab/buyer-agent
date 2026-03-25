@@ -1,9 +1,9 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for DealJockey Phase 1 event types.
+"""Tests for DealLibrary Phase 1 event types.
 
-Verifies that the four Phase 1 DealJockey event types are properly
+Verifies that the four Phase 1 DealLibrary event types are properly
 defined, can be used to create Event instances, can be emitted on
 the event bus, and can be persisted via DealStore.save_event().
 """
@@ -14,12 +14,12 @@ import json
 import pytest
 
 # ---------------------------------------------------------------------------
-# EventType enum tests - Phase 1 DealJockey events
+# EventType enum tests - Phase 1 DealLibrary events
 # ---------------------------------------------------------------------------
 
 
-class TestDealJockeyEventTypes:
-    """Tests for DealJockey Phase 1 EventType enum values."""
+class TestDealLibraryEventTypes:
+    """Tests for DealLibrary Phase 1 EventType enum values."""
 
     def test_deal_imported_exists(self):
         """DEAL_IMPORTED event type must exist with correct value."""
@@ -54,7 +54,7 @@ class TestDealJockeyEventTypes:
         assert EventType.DEAL_MANUAL_ACTION_REQUIRED.value == "deal.manual_action_required"
 
     def test_all_phase1_types_in_enum(self):
-        """All four Phase 1 DealJockey event types must be in EventType."""
+        """All four Phase 1 DealLibrary event types must be in EventType."""
         from ad_buyer.events.models import EventType
 
         expected_phase1 = [
@@ -68,7 +68,7 @@ class TestDealJockeyEventTypes:
             assert val in actual_values, f"Missing Phase 1 event type: {val}"
 
     def test_phase1_types_are_string_enum(self):
-        """Phase 1 DealJockey types should be str Enum for JSON serialization."""
+        """Phase 1 DealLibrary types should be str Enum for JSON serialization."""
         from ad_buyer.events.models import EventType
 
         assert isinstance(EventType.DEAL_IMPORTED, str)
@@ -82,8 +82,8 @@ class TestDealJockeyEventTypes:
 # ---------------------------------------------------------------------------
 
 
-class TestDealJockeyEventModel:
-    """Tests for creating Event instances with DealJockey Phase 1 types."""
+class TestDealLibraryEventModel:
+    """Tests for creating Event instances with DealLibrary Phase 1 types."""
 
     def test_event_with_deal_imported(self):
         """Event should be creatable with DEAL_IMPORTED type."""
@@ -155,8 +155,8 @@ class TestDealJockeyEventModel:
 # ---------------------------------------------------------------------------
 
 
-class TestDealJockeyEventBus:
-    """Tests for emitting DealJockey Phase 1 events on the bus."""
+class TestDealLibraryEventBus:
+    """Tests for emitting DealLibrary Phase 1 events on the bus."""
 
     @pytest.fixture
     def bus(self):
@@ -287,8 +287,8 @@ class TestDealJockeyEventBus:
 # ---------------------------------------------------------------------------
 
 
-class TestDealJockeyEventPersistence:
-    """Tests for persisting Phase 1 DealJockey events via DealStore."""
+class TestDealLibraryEventPersistence:
+    """Tests for persisting Phase 1 DealLibrary events via DealStore."""
 
     @pytest.fixture
     def store(self):
@@ -374,7 +374,7 @@ class TestDealJockeyEventPersistence:
 # ---------------------------------------------------------------------------
 
 
-class TestDealJockeyEmitEvent:
+class TestDealLibraryEmitEvent:
     """Tests for emitting Phase 1 events via the emit_event helper."""
 
     def test_emit_deal_imported(self):

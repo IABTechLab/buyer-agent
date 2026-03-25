@@ -1,11 +1,11 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""CSV deal import parser for DealJockey.
+"""CSV deal import parser for DealLibrary.
 
 Reads CSV files containing deal data and maps them to the v2 deal library
 schema.  This is a pure function -- it does NOT call DealStore.save_deal()
-or emit events.  The caller (DealJockey agent or a higher-level import
+or emit events.  The caller (DealLibrary agent or a higher-level import
 tool) is responsible for:
 
 1. Calling ``parse_csv_deals()`` to get parsed deal dicts.

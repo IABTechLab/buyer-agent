@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Template management tools for DealJockey.
+"""Template management tools for DealLibrary.
 
 CrewAI tools for CRUD operations on deal templates and supply path
 optimization templates.  Deal templates encode an agency's preferred

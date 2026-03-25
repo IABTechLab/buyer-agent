@@ -3,6 +3,6 @@
 
 """Allow running the demo dashboard via ``python -m ad_buyer.demo``."""
 
-from .dealjockey_dashboard import main
+from .deal_library_dashboard import main
 
 main()

@@ -4,7 +4,7 @@
 """Unit tests for portfolio inspection tools.
 
 Tests ListPortfolioTool, SearchPortfolioTool, PortfolioSummaryTool,
-and InspectDealTool -- the CrewAI tools DealJockey uses to view,
+and InspectDealTool -- the CrewAI tools DealLibrary uses to view,
 filter, search, and aggregate portfolio views.
 """
 
@@ -196,7 +196,7 @@ class TestListPortfolioTool:
 
     def test_list_all_deals_no_filters(self, populated_store):
         """List all deals without any filters."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -212,7 +212,7 @@ class TestListPortfolioTool:
 
     def test_filter_by_status(self, populated_store):
         """Filter deals by status."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -227,7 +227,7 @@ class TestListPortfolioTool:
 
     def test_filter_by_media_type(self, populated_store):
         """Filter deals by media type."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -242,7 +242,7 @@ class TestListPortfolioTool:
 
     def test_filter_by_seller_domain(self, populated_store):
         """Filter deals by seller domain."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -254,7 +254,7 @@ class TestListPortfolioTool:
 
     def test_filter_by_deal_type(self, populated_store):
         """Filter deals by deal type."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -266,7 +266,7 @@ class TestListPortfolioTool:
 
     def test_filter_by_advertiser_id(self, populated_store):
         """Filter deals by advertiser ID from portfolio metadata."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -279,7 +279,7 @@ class TestListPortfolioTool:
 
     def test_filter_by_seller_type(self, populated_store):
         """Filter deals by seller type."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -291,7 +291,7 @@ class TestListPortfolioTool:
 
     def test_combined_filters(self, populated_store):
         """Apply multiple filters at once."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -304,7 +304,7 @@ class TestListPortfolioTool:
 
     def test_pagination_limit(self, populated_store):
         """Limit the number of results."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -318,7 +318,7 @@ class TestListPortfolioTool:
 
     def test_pagination_offset(self, populated_store):
         """Skip results with offset."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -333,7 +333,7 @@ class TestListPortfolioTool:
 
     def test_sort_by_price_asc(self, populated_store):
         """Sort deals by price ascending."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -348,7 +348,7 @@ class TestListPortfolioTool:
 
     def test_sort_by_price_desc(self, populated_store):
         """Sort deals by price descending."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -363,7 +363,7 @@ class TestListPortfolioTool:
 
     def test_sort_by_display_name(self, populated_store):
         """Sort deals by display name."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -378,7 +378,7 @@ class TestListPortfolioTool:
 
     def test_empty_database(self, deal_store):
         """Handle an empty database gracefully."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -391,7 +391,7 @@ class TestListPortfolioTool:
 
     def test_invalid_json_input(self, deal_store):
         """Handle invalid JSON gracefully."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -402,7 +402,7 @@ class TestListPortfolioTool:
 
     def test_returns_human_readable_output(self, populated_store):
         """Output should be human-readable, not raw dicts."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             ListPortfolioTool,
         )
 
@@ -425,7 +425,7 @@ class TestSearchPortfolioTool:
 
     def test_search_by_display_name(self, populated_store):
         """Search should find deals by display name."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -437,7 +437,7 @@ class TestSearchPortfolioTool:
 
     def test_search_by_seller_org(self, populated_store):
         """Search should find deals by seller organization."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -449,7 +449,7 @@ class TestSearchPortfolioTool:
 
     def test_search_by_seller_domain(self, populated_store):
         """Search should find deals by seller domain."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -460,7 +460,7 @@ class TestSearchPortfolioTool:
 
     def test_search_by_description(self, populated_store):
         """Search should find deals by description text."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -471,7 +471,7 @@ class TestSearchPortfolioTool:
 
     def test_search_case_insensitive(self, populated_store):
         """Search should be case-insensitive."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -482,7 +482,7 @@ class TestSearchPortfolioTool:
 
     def test_search_no_results(self, populated_store):
         """Search with no matches should report cleanly."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -493,7 +493,7 @@ class TestSearchPortfolioTool:
 
     def test_search_empty_database(self, deal_store):
         """Search on empty database should handle gracefully."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -504,7 +504,7 @@ class TestSearchPortfolioTool:
 
     def test_search_shows_match_context(self, populated_store):
         """Search results should indicate which field matched."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -516,7 +516,7 @@ class TestSearchPortfolioTool:
 
     def test_search_empty_query(self, populated_store):
         """Empty search query should return an error or all deals."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             SearchPortfolioTool,
         )
 
@@ -537,7 +537,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_empty_portfolio(self, deal_store):
         """Summary on empty portfolio should report zeros gracefully."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -548,7 +548,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_total_deal_count(self, populated_store):
         """Summary should report total number of deals."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -559,7 +559,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_by_status(self, populated_store):
         """Summary should break down deals by status."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -574,7 +574,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_by_media_type(self, populated_store):
         """Summary should break down deals by media type."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -588,7 +588,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_by_deal_type(self, populated_store):
         """Summary should break down deals by deal type."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -602,7 +602,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_top_sellers(self, populated_store):
         """Summary should list top sellers by deal count."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -614,7 +614,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_portfolio_value(self, populated_store):
         """Summary should calculate total portfolio value."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -632,7 +632,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_expiring_deals(self, populated_store):
         """Summary should report deals expiring within N days if requested."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -644,7 +644,7 @@ class TestPortfolioSummaryTool:
 
     def test_summary_invalid_json(self, deal_store):
         """Handle invalid JSON input gracefully."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             PortfolioSummaryTool,
         )
 
@@ -664,7 +664,7 @@ class TestInspectDealTool:
 
     def test_inspect_existing_deal(self, populated_store):
         """Inspect an existing deal by ID."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -680,7 +680,7 @@ class TestInspectDealTool:
 
     def test_inspect_deal_shows_metadata(self, populated_store):
         """Inspect should show portfolio metadata."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -692,7 +692,7 @@ class TestInspectDealTool:
 
     def test_inspect_deal_shows_activations(self, store_with_related_data):
         """Inspect should show deal activations."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -705,7 +705,7 @@ class TestInspectDealTool:
 
     def test_inspect_deal_shows_performance(self, store_with_related_data):
         """Inspect should show performance cache data."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -717,7 +717,7 @@ class TestInspectDealTool:
 
     def test_inspect_nonexistent_deal(self, deal_store):
         """Inspect a non-existent deal should return a clear message."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -728,7 +728,7 @@ class TestInspectDealTool:
 
     def test_inspect_deal_without_metadata(self, deal_store):
         """Inspect a deal that has no portfolio_metadata or activations."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -748,7 +748,7 @@ class TestInspectDealTool:
 
     def test_inspect_human_readable_format(self, populated_store):
         """Output should be formatted for agent readability, not raw dicts."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
         )
 
@@ -769,7 +769,7 @@ class TestToolExports:
 
     def test_import_all_tools(self):
         """All four tools should be importable from the module."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
             ListPortfolioTool,
             PortfolioSummaryTool,
@@ -781,9 +781,9 @@ class TestToolExports:
         assert PortfolioSummaryTool is not None
         assert InspectDealTool is not None
 
-    def test_tools_exported_from_deal_jockey_init(self):
-        """Tools should be re-exported from deal_jockey.__init__."""
-        from ad_buyer.tools.deal_jockey import (
+    def test_tools_exported_from_deal_library_init(self):
+        """Tools should be re-exported from deal_library.__init__."""
+        from ad_buyer.tools.deal_library import (
             InspectDealTool,
             ListPortfolioTool,
             PortfolioSummaryTool,
@@ -799,7 +799,7 @@ class TestToolExports:
         """Each tool should be a CrewAI BaseTool subclass."""
         from crewai.tools import BaseTool
 
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
             ListPortfolioTool,
             PortfolioSummaryTool,
@@ -813,7 +813,7 @@ class TestToolExports:
 
     def test_tools_have_name_and_description(self, deal_store):
         """Each tool should have a name and description."""
-        from ad_buyer.tools.deal_jockey.portfolio_inspection import (
+        from ad_buyer.tools.deal_library.portfolio_inspection import (
             InspectDealTool,
             ListPortfolioTool,
             PortfolioSummaryTool,

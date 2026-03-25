@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for the DealJockey demo dashboard.
+"""Tests for the DealLibrary demo dashboard.
 
 Covers:
   - Seed data populates the expected number of deals
@@ -18,7 +18,7 @@ import json
 
 import pytest
 
-from ad_buyer.demo.dealjockey_dashboard import create_app
+from ad_buyer.demo.deal_library_dashboard import create_app
 from ad_buyer.demo.seed_data import seed_demo_data
 from ad_buyer.storage.deal_store import DealStore
 
@@ -137,7 +137,7 @@ class TestAPIRoutes:
         """GET / should return the dashboard HTML page."""
         resp = client.get("/")
         assert resp.status_code == 200
-        assert b"DealJockey" in resp.data
+        assert b"Deal Library" in resp.data
 
     def test_api_schema(self, client):
         """GET /api/schema should return version and table info."""
@@ -243,7 +243,7 @@ class TestAPIRoutes:
         resp = client.get("/api/agent-info")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["role"] == "Deal Jockey - Portfolio Manager"
+        assert data["role"] == "Deal Library - Portfolio Manager"
         assert "l1_routing" in data
         assert "phase1_tools" in data
         assert "phase1_event_types" in data

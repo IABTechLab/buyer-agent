@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Seed data for the DealJockey demo dashboard.
+"""Seed data for the DealLibrary demo dashboard.
 
 Populates the DealStore with 14 realistic sample deals spanning
 multiple media types, statuses, deal types, sellers, and price ranges.

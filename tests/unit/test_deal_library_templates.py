@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for DealJockey template CRUD tools.
+"""Tests for DealLibrary template CRUD tools.
 
 Tests cover:
 - ManageDealTemplateTool: create, read, list, update, delete deal templates
@@ -15,7 +15,7 @@ import json
 import pytest
 
 from ad_buyer.storage import DealStore
-from ad_buyer.tools.deal_jockey.templates import (
+from ad_buyer.tools.deal_library.templates import (
     ManageDealTemplateTool,
     ManageSupplyPathTemplateTool,
 )

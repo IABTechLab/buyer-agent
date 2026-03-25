@@ -1,14 +1,14 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""CrewAI tools for OpenDirect operations and DealJockey portfolio management."""
+"""CrewAI tools for OpenDirect operations and DealLibrary portfolio management."""
 
 from .audience import (
     AudienceDiscoveryTool,
     AudienceMatchingTool,
     CoverageEstimationTool,
 )
-from .deal_jockey import (
+from .deal_library import (
     InspectDealTool,
     ListPortfolioTool,
     ManualDealEntryTool,
@@ -21,7 +21,7 @@ __all__ = [
     "AudienceDiscoveryTool",
     "AudienceMatchingTool",
     "CoverageEstimationTool",
-    # DealJockey tools
+    # DealLibrary tools
     "ManualDealEntryTool",
     "ListPortfolioTool",
     "SearchPortfolioTool",

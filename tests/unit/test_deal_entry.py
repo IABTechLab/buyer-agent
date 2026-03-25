@@ -19,7 +19,7 @@ class TestManualDealEntryModel:
 
     def test_minimal_required_fields(self):
         """Model should accept only the two required fields."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntry
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntry
 
         entry = ManualDealEntry(
             display_name="ESPN Sports PMP",
@@ -30,7 +30,7 @@ class TestManualDealEntryModel:
 
     def test_default_values(self):
         """Default values should be applied when not provided."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntry
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntry
 
         entry = ManualDealEntry(
             display_name="Test Deal",
@@ -43,7 +43,7 @@ class TestManualDealEntryModel:
 
     def test_all_fields_populated(self):
         """Model should accept all fields when fully populated."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntry
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntry
 
         entry = ManualDealEntry(
             display_name="Premium Video PG",
@@ -81,7 +81,7 @@ class TestManualDealEntryModel:
 
     def test_optional_fields_default_none(self):
         """Optional fields should default to None."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntry
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntry
 
         entry = ManualDealEntry(
             display_name="Test",
@@ -116,7 +116,7 @@ class TestCreateManualDeal:
 
     def test_valid_minimal_deal(self):
         """Valid deal with minimal fields should succeed."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -134,7 +134,7 @@ class TestCreateManualDeal:
 
     def test_valid_full_deal(self):
         """Valid deal with all fields should succeed."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -172,7 +172,7 @@ class TestCreateManualDeal:
 
     def test_invalid_deal_type(self):
         """Invalid deal_type should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -190,7 +190,7 @@ class TestCreateManualDeal:
 
     def test_invalid_media_type(self):
         """Invalid media_type should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -208,7 +208,7 @@ class TestCreateManualDeal:
 
     def test_invalid_seller_type(self):
         """Invalid seller_type should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -226,7 +226,7 @@ class TestCreateManualDeal:
 
     def test_invalid_price_model(self):
         """Invalid price_model should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -244,7 +244,7 @@ class TestCreateManualDeal:
 
     def test_invalid_status(self):
         """Invalid status should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -262,7 +262,7 @@ class TestCreateManualDeal:
 
     def test_empty_display_name(self):
         """Empty display_name should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -279,7 +279,7 @@ class TestCreateManualDeal:
 
     def test_whitespace_only_display_name(self):
         """Whitespace-only display_name should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -296,7 +296,7 @@ class TestCreateManualDeal:
 
     def test_flight_end_before_start(self):
         """flight_end before flight_start should produce validation error."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -315,7 +315,7 @@ class TestCreateManualDeal:
 
     def test_flight_start_only_is_valid(self):
         """Providing only flight_start (no flight_end) should be valid."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -331,7 +331,7 @@ class TestCreateManualDeal:
 
     def test_flight_end_only_is_valid(self):
         """Providing only flight_end (no flight_start) should be valid."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -347,7 +347,7 @@ class TestCreateManualDeal:
 
     def test_multiple_validation_errors(self):
         """Multiple invalid fields should produce multiple errors."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -374,7 +374,7 @@ class TestDealDataStructure:
 
     def test_deal_data_has_required_save_deal_fields(self):
         """deal_data must contain all fields needed by DealStore.save_deal()."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -397,7 +397,7 @@ class TestDealDataStructure:
 
     def test_deal_data_maps_display_name_to_product_name(self):
         """display_name should map to product_name for save_deal()."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -412,7 +412,7 @@ class TestDealDataStructure:
 
     def test_deal_data_includes_optional_fields_when_provided(self):
         """Optional fields should be included in deal_data when provided."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -437,7 +437,7 @@ class TestDealDataStructure:
 
     def test_deal_data_includes_v2_fields_in_metadata(self):
         """V2 deal library fields should be included in deal_data metadata JSON."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -486,7 +486,7 @@ class TestMetadataExtraction:
 
     def test_metadata_import_source_is_manual(self):
         """metadata.import_source should always be 'MANUAL'."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -501,7 +501,7 @@ class TestMetadataExtraction:
 
     def test_metadata_includes_tags(self):
         """metadata should include tags when provided."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -517,7 +517,7 @@ class TestMetadataExtraction:
 
     def test_metadata_includes_advertiser_id(self):
         """metadata should include advertiser_id when provided."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -533,7 +533,7 @@ class TestMetadataExtraction:
 
     def test_metadata_tags_none_when_not_provided(self):
         """metadata.tags should be None when not provided."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -548,7 +548,7 @@ class TestMetadataExtraction:
 
     def test_metadata_advertiser_id_none_when_not_provided(self):
         """metadata.advertiser_id should be None when not provided."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -572,21 +572,21 @@ class TestManualDealEntryTool:
 
     def test_tool_has_correct_name(self):
         """Tool should have the expected name."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         assert tool.name == "manual_deal_entry"
 
     def test_tool_has_description(self):
         """Tool should have a non-empty description."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         assert len(tool.description) > 0
 
     def test_tool_accepts_json_string(self):
         """Tool should accept a JSON string of deal parameters."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         result = tool._run(
@@ -604,7 +604,7 @@ class TestManualDealEntryTool:
 
     def test_tool_returns_errors_for_invalid_input(self):
         """Tool should return validation errors for invalid input."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         result = tool._run(
@@ -621,7 +621,7 @@ class TestManualDealEntryTool:
 
     def test_tool_returns_errors_for_malformed_json(self):
         """Tool should handle malformed JSON gracefully."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         result = tool._run(deal_params="not valid json {{{")
@@ -630,7 +630,7 @@ class TestManualDealEntryTool:
 
     def test_tool_returns_errors_for_missing_required_fields(self):
         """Tool should return errors when required fields are missing."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         result = tool._run(
@@ -645,7 +645,7 @@ class TestManualDealEntryTool:
 
     def test_tool_has_args_schema(self):
         """Tool should have a Pydantic args_schema for CrewAI."""
-        from ad_buyer.tools.deal_jockey.deal_entry import ManualDealEntryTool
+        from ad_buyer.tools.deal_library.deal_entry import ManualDealEntryTool
 
         tool = ManualDealEntryTool()
         assert hasattr(tool, "args_schema")
@@ -662,7 +662,7 @@ class TestDealEntryResult:
 
     def test_success_result_structure(self):
         """Successful result should have all expected fields populated."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )
@@ -681,7 +681,7 @@ class TestDealEntryResult:
 
     def test_failure_result_structure(self):
         """Failed result should have None for data fields and populated errors."""
-        from ad_buyer.tools.deal_jockey.deal_entry import (
+        from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,
             create_manual_deal,
         )

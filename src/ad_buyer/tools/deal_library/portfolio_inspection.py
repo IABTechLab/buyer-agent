@@ -1,9 +1,9 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Portfolio inspection tools for DealJockey.
+"""Portfolio inspection tools for DealLibrary.
 
-CrewAI tools that let DealJockey list, filter, search, and aggregate
+CrewAI tools that let DealLibrary list, filter, search, and aggregate
 deal portfolio views.  Unlike the CSV parser and manual-entry tools
 (which are pure functions), these tools interact directly with
 DealStore to query live portfolio data.

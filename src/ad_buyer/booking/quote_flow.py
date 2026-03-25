@@ -8,7 +8,7 @@ Encapsulates the quote-then-book workflow:
 2. Calculate tiered pricing
 3. Build deal data with Deal ID and activation instructions
 
-This module is used by both DealJockey and the campaign
+This module is used by both DealLibrary and the campaign
 channel specialists for creating deals.
 """
 

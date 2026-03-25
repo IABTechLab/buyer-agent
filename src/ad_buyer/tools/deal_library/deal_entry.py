@@ -1,11 +1,11 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Manual deal entry tool for DealJockey.
+"""Manual deal entry tool for DealLibrary.
 
 Validates and prepares structured deal input for saving to the deal library.
 This is a pure validation/preparation tool -- it does NOT interact with
-DealStore directly. The caller (DealJockey agent or a higher-level flow)
+DealStore directly. The caller (DealLibrary agent or a higher-level flow)
 handles persistence and event emission.
 
 Usage:

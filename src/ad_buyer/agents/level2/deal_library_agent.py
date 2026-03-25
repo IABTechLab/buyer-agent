@@ -1,18 +1,18 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""DealJockey agent - deal portfolio management specialist.
+"""DealLibrary agent - deal portfolio management specialist.
 
-DealJockey is an L2 agent in the buyer hierarchy that manages deal portfolios:
+DealLibrary is an L2 agent in the buyer hierarchy that manages deal portfolios:
 importing, cataloging, inspecting, organizing, migrating, and optimizing deals
 across publishers, SSPs, and DSPs.
 
 L1 Routing Heuristics
 ---------------------
-The L1 Portfolio Manager routes requests to DealJockey vs. Campaign flow using
-these heuristics (from DEAL_JOCKEY_STRATEGIC_PLAN.md Section 5.4):
+The L1 Portfolio Manager routes requests to DealLibrary vs. Campaign flow using
+these heuristics (from the strategic plan, Section 5.4):
 
-  -> DealJockey:
+  -> DealLibrary:
      "portfolio", "existing deals", "my deals", "migrate", "clone",
      "deprecate", "compare prices", "import", "catalog", "gap analysis",
      "sunset"
@@ -26,7 +26,7 @@ these heuristics (from DEAL_JOCKEY_STRATEGIC_PLAN.md Section 5.4):
      deal portfolio, or book deals for a specific campaign?"
 
   -> Specific deal ID referenced:
-     Status check / inspection -> DealJockey
+     Status check / inspection -> DealLibrary
      Activate for campaign -> Campaign flow
 """
 
@@ -37,13 +37,13 @@ from crewai import LLM, Agent
 from ...config.settings import settings
 
 
-def create_deal_jockey_agent(
+def create_deal_library_agent(
     tools: list[Any] | None = None,
     verbose: bool = True,
 ) -> Agent:
-    """Create the DealJockey agent.
+    """Create the DealLibrary agent.
 
-    The DealJockey agent focuses on deal portfolio management:
+    The DealLibrary agent focuses on deal portfolio management:
     - Deal portfolio organization and cataloging
     - CSV and bulk deal import/normalization
     - Deal template creation and management
@@ -58,10 +58,10 @@ def create_deal_jockey_agent(
         verbose: Whether to enable verbose logging
 
     Returns:
-        Configured DealJockey Agent
+        Configured DealLibrary Agent
     """
     return Agent(
-        role="Deal Jockey - Portfolio Manager",
+        role="Deal Library - Portfolio Manager",
         goal="""Manage deal portfolios — import, catalog, inspect, organize,
 migrate, and optimize deals across publishers, SSPs, and DSPs. Treat deals
 as a managed asset class, ensuring the agency's deal inventory is current,

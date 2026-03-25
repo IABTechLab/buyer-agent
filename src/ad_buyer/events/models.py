@@ -56,7 +56,7 @@ class EventType(str, Enum):
     SESSION_CREATED = "session.created"
     SESSION_CLOSED = "session.closed"
 
-    # DealJockey - Phase 1
+    # DealLibrary - Phase 1
     DEAL_IMPORTED = "deal.imported"
     DEAL_TEMPLATE_CREATED = "deal.template_created"
     PORTFOLIO_INSPECTED = "portfolio.inspected"

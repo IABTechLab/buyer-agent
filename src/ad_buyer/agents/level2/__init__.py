@@ -5,7 +5,7 @@
 
 from .branding_agent import create_branding_agent
 from .ctv_agent import create_ctv_agent
-from .deal_jockey_agent import create_deal_jockey_agent
+from .deal_library_agent import create_deal_library_agent
 from .dsp_agent import create_dsp_agent
 from .linear_tv_agent import create_linear_tv_agent
 from .mobile_app_agent import create_mobile_app_agent
@@ -18,5 +18,5 @@ __all__ = [
     "create_linear_tv_agent",
     "create_performance_agent",
     "create_dsp_agent",
-    "create_deal_jockey_agent",
+    "create_deal_library_agent",
 ]

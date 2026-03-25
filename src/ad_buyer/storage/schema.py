@@ -404,7 +404,7 @@ APPROVAL_REQUESTS_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_approval_requests_stage ON approval_requests(stage);",
 ]
 
-# -- v5: Template tables (DealJockey Section 6.3, 6.4) ---------------------
+# -- v5: Template tables (DealLibrary Section 6.3, 6.4) ---------------------
 
 DEAL_TEMPLATE_TABLE = """
 CREATE TABLE IF NOT EXISTS deal_templates (
@@ -696,7 +696,7 @@ def migrate_v4_to_v5(conn: sqlite3.Connection) -> None:
     """Migrate schema from v4 to v5 (deal and supply path templates).
 
     Creates ``deal_templates`` and ``supply_path_templates`` tables for
-    DealJockey template CRUD (Strategic Plan Sections 6.3 and 6.4).
+    DealLibrary template CRUD (Strategic Plan Sections 6.3 and 6.4).
 
     This migration is idempotent: CREATE TABLE IF NOT EXISTS is a no-op
     for existing tables.
