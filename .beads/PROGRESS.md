@@ -1,8 +1,8 @@
 # Buyer Agent v2 — Progress
 
-**15 open** | **0 in progress** | **44 closed** | **9 blocked** | 59 total
+**2 open** | **0 in progress** | **54 closed** | **0 blocked** | 56 total
 
-`[██████████████░░░░░░] 75% (44/59)`
+`[████████████████████] 96% (54/56)`
 
 ## Phase 1 — Seller Interoperability
 
@@ -42,24 +42,24 @@
 | \[x] | buyer-lna | Pacing snapshot storage | P1 | — | 2026-03-19 |
 | \[x] | buyer-lae | Quote normalization logic | P1 | — | 2026-03-19 |
 
-## Phase 3 — Platform & Infrastructure
+## Phase 3 — Buyer Agent AI Assistant (MCP Platform)
 
 | | ID | Task | Priority | Blockers | Done |
 |---|---|---|---|---|---|
-| \[!] | buyer-1o3 | Deployment & Operations Guide | P3 | buyer-j95 | |
-| \[ ] | buyer-j95 | Infrastructure-as-Code Deployment | P3 | — | |
-| \[ ] | buyer-nz9 | Order Status & Audit API Integration | P2 | — | |
-| \[ ] | buyer-mw9 | Buyer Agent AI Assistant (epic) | P1 | — | |
-| \[ ] | buyer-fvd | MCP Server Foundation | P1 | — | |
-| \[!] | buyer-byk | Setup Wizard Service | P1 | buyer-fvd | |
-| \[!] | buyer-4ds | Deal Library MCP Tools | P1 | buyer-fvd | |
-| \[!] | buyer-3w3 | Campaign Management MCP Tools | P1 | buyer-fvd | |
-| \[!] | buyer-nob | Seller Discovery MCP Tools | P2 | buyer-fvd | |
-| \[!] | buyer-r0j | Negotiation & Orders MCP Tools | P2 | buyer-fvd | |
-| \[!] | buyer-5x7 | Template & Reporting MCP Tools | P2 | buyer-fvd | |
-| \[!] | buyer-j7f | Approval & API Key MCP Tools | P2 | buyer-fvd | |
-| \[!] | buyer-q6t | Claude Desktop Setup Guide | P2 | buyer-fvd | |
-| \[!] | buyer-02h | ChatGPT & Multi-Client Setup Guide | P3 | buyer-fvd | |
+| \[ ] | buyer-mw9 | EPIC: Buyer Agent AI Assistant | P1 | — | (open — children done) |
+| \[x] | buyer-fvd | MCP Server Foundation | P1 | — | 2026-03-25 |
+| \[x] | buyer-j95 | Infrastructure-as-Code Deployment | P3 | — | 2026-03-25 |
+| \[x] | buyer-nz9 | Order Status & Audit API Integration | P2 | — | 2026-03-25 |
+| \[x] | buyer-3w3 | Campaign Management MCP Tools | P1 | — | 2026-03-25 |
+| \[x] | buyer-4ds | Deal Library MCP Tools | P1 | — | 2026-03-25 |
+| \[x] | buyer-byk | Setup Wizard Service | P1 | — | 2026-03-25 |
+| \[x] | buyer-nob | Seller Discovery MCP Tools | P2 | — | 2026-03-25 |
+| \[x] | buyer-r0j | Negotiation & Orders MCP Tools | P2 | — | 2026-03-25 |
+| \[x] | buyer-5x7 | Template & Reporting MCP Tools | P2 | — | 2026-03-25 |
+| \[x] | buyer-j7f | Approval & API Key MCP Tools | P2 | — | 2026-03-25 |
+| \[x] | buyer-q6t | Claude Desktop Setup Guide | P2 | — | 2026-03-25 |
+| \[x] | buyer-1o3 | Deployment & Operations Guide | P3 | — | 2026-03-25 |
+| \[x] | buyer-02h | ChatGPT & Multi-Client Setup Guide | P3 | — | 2026-03-25 |
 
 ## Phase 4 — Deal Library & External Hooks
 
@@ -81,4 +81,4 @@
 | \[ ] | buyer-xa5 | SSP Integration (Magnite, Index Exchange, PubMatic, FreeWheel) | P2 | — | |
 
 ---
-*Last updated: 2026-03-25 — v2 replan applied*
+*Last updated: 2026-03-25 — Phase 3 Buyer Agent AI Assistant complete (13/13 beads)*
