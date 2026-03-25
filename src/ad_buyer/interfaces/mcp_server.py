@@ -10,6 +10,10 @@ Tool categories:
   - Foundation: get_setup_status, health_check, get_config
   - Campaign Management: list_campaigns, get_campaign_status,
     check_pacing, review_budgets (buyer-3w3)
+  - Templates: list_templates, create_template,
+    instantiate_from_template (buyer-5x7)
+  - Reporting: get_deal_performance, get_campaign_report,
+    get_pacing_report (buyer-5x7)
 
 Mount into a FastAPI app:
     from ad_buyer.interfaces.mcp_server import mount_mcp
@@ -30,8 +34,10 @@ from typing import Any
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 
+from ..auth.key_store import ApiKeyStore
 from ..config.settings import Settings
 from ..storage.campaign_store import CampaignStore
+from ..storage.deal_store import DealStore
 from ..storage.pacing_store import PacingStore
 
 logger = logging.getLogger(__name__)
@@ -111,6 +117,22 @@ def _set_deal_store(store: DealStore | None) -> None:
     """
     global _deal_store_override
     _deal_store_override = store
+
+
+def _get_api_key_store() -> ApiKeyStore:
+    """Get an ApiKeyStore instance.
+
+    Uses the default store path (~/.ad_buyer/seller_keys.json).
+    Returns a new instance each time so that test patches are reflected.
+    """
+    return ApiKeyStore()
+
+
+def _mask_key(key: str) -> str:
+    """Mask an API key for display, showing only last 4 characters."""
+    if len(key) <= 4:
+        return "****"
+    return "*" * (len(key) - 4) + key[-4:]
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +553,227 @@ def review_budgets() -> str:
     finally:
         campaign_store.disconnect()
         pacing_store.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# Approval Tools (buyer-j7f)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_pending_approvals(campaign_id: str | None = None) -> str:
+    """List approval requests that are awaiting a decision.
+
+    Returns pending approval requests for deals, campaigns, and budget
+    changes. Wraps the existing approval gate system.
+
+    Args:
+        campaign_id: Optional campaign ID to filter by. If omitted,
+            returns all pending approvals.
+
+    Returns a JSON object with:
+    - total: number of pending approval requests
+    - pending: list of pending approval request objects
+    - timestamp: when this list was generated
+    """
+    store = _get_campaign_store()
+    try:
+        store.create_approval_requests_table()
+        kwargs: dict[str, Any] = {"status": "pending"}
+        if campaign_id is not None:
+            kwargs["campaign_id"] = campaign_id
+
+        rows = store.list_approval_requests(**kwargs)
+
+        pending = []
+        for row in rows:
+            pending.append({
+                "approval_request_id": row["approval_request_id"],
+                "campaign_id": row["campaign_id"],
+                "stage": row["stage"],
+                "status": row["status"],
+                "requested_at": row["requested_at"],
+                "context": json.loads(row.get("context") or "{}"),
+            })
+
+        result = {
+            "total": len(pending),
+            "pending": pending,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+@mcp.tool()
+def approve_or_reject(
+    approval_request_id: str,
+    decision: str,
+    reviewer: str,
+    reason: str = "",
+) -> str:
+    """Approve or reject a pending approval request.
+
+    Updates the approval request status and records the reviewer's
+    decision. The decision must be either "approved" or "rejected".
+
+    Args:
+        approval_request_id: The unique ID of the approval request.
+        decision: Either "approved" or "rejected".
+        reviewer: Identifier of the person or system making the decision.
+        reason: Optional explanation for the decision.
+
+    Returns a JSON object with:
+    - approval_request_id, previous_status, new_status, reviewer, reason
+    - error: present only if the request was not found or already decided
+    """
+    store = _get_campaign_store()
+    try:
+        store.create_approval_requests_table()
+
+        # Look up the existing request
+        request = store.get_approval_request(approval_request_id)
+        if request is None:
+            return json.dumps(
+                {"error": f"Approval request not found: {approval_request_id}"},
+                indent=2,
+            )
+
+        # Check if already decided
+        if request["status"] != "pending":
+            return json.dumps(
+                {
+                    "error": (
+                        f"Approval request {approval_request_id} already decided "
+                        f"(status={request['status']})"
+                    )
+                },
+                indent=2,
+            )
+
+        # Normalize decision
+        new_status = decision.lower()
+        if new_status not in ("approved", "rejected"):
+            return json.dumps(
+                {"error": f"Invalid decision: {decision}. Must be 'approved' or 'rejected'."},
+                indent=2,
+            )
+
+        # Update the request
+        now = datetime.now(timezone.utc)
+        store.update_approval_request(
+            approval_request_id,
+            status=new_status,
+            decided_at=now.isoformat(),
+            reviewer=reviewer,
+            notes=reason if reason else None,
+        )
+
+        result = {
+            "approval_request_id": approval_request_id,
+            "previous_status": "pending",
+            "new_status": new_status,
+            "reviewer": reviewer,
+            "reason": reason,
+            "timestamp": now.isoformat(),
+        }
+        return json.dumps(result, indent=2)
+    finally:
+        store.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# API Key Management Tools (buyer-j7f)
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+def list_api_keys() -> str:
+    """List configured API keys for seller integrations.
+
+    Returns seller URLs and masked key values. Full key values are
+    never exposed through this tool for security.
+
+    Returns a JSON object with:
+    - total: number of configured API keys
+    - keys: list of objects with seller_url and masked_key
+    - timestamp: when this list was generated
+    """
+    key_store = _get_api_key_store()
+
+    sellers = key_store.list_sellers()
+    keys = []
+    for seller_url in sellers:
+        raw_key = key_store.get_key(seller_url)
+        keys.append({
+            "seller_url": seller_url,
+            "masked_key": _mask_key(raw_key) if raw_key else "****",
+        })
+
+    result = {
+        "total": len(keys),
+        "keys": keys,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def create_api_key(seller_url: str, api_key: str) -> str:
+    """Store or replace an API key for a seller integration.
+
+    If a key already exists for the seller URL, it is replaced.
+    The response confirms creation but does not expose the full key.
+
+    Args:
+        seller_url: Base URL of the seller agent.
+        api_key: The API key value to store.
+
+    Returns a JSON object with:
+    - seller_url: the seller URL the key was stored for
+    - created: true if the key was stored successfully
+    - masked_key: masked version of the stored key
+    - timestamp: when the key was created/updated
+    """
+    key_store = _get_api_key_store()
+
+    key_store.add_key(seller_url, api_key)
+
+    result = {
+        "seller_url": seller_url,
+        "created": True,
+        "masked_key": _mask_key(api_key),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
+
+
+@mcp.tool()
+def revoke_api_key(seller_url: str) -> str:
+    """Revoke (remove) an API key for a seller integration.
+
+    Permanently removes the stored API key for the given seller URL.
+    If no key exists for the URL, returns revoked=false.
+
+    Args:
+        seller_url: Base URL of the seller agent whose key to revoke.
+
+    Returns a JSON object with:
+    - seller_url: the seller URL
+    - revoked: true if a key was found and removed, false otherwise
+    - timestamp: when the revocation was processed
+    """
+    key_store = _get_api_key_store()
+
+    removed = key_store.remove_key(seller_url)
+
+    result = {
+        "seller_url": seller_url,
+        "revoked": removed,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    return json.dumps(result, indent=2)
 
 
 # ---------------------------------------------------------------------------
