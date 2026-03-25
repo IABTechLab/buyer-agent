@@ -122,7 +122,7 @@ class UCPClient:
         except httpx.HTTPStatusError as e:
             logger.error(f"UCP send failed: {e.response.status_code} - {e.response.text}")
             return {"error": str(e), "status_code": e.response.status_code}
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"UCP send error: {e}")
             return {"error": str(e)}
 
@@ -157,7 +157,7 @@ class UCPClient:
         except httpx.HTTPStatusError as e:
             logger.error(f"UCP receive failed: {e.response.status_code}")
             return None
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"UCP receive error: {e}")
             return None
 
@@ -184,12 +184,12 @@ class UCPClient:
             for cap_data in data.get("capabilities", []):
                 try:
                     capabilities.append(AudienceCapability.model_validate(cap_data))
-                except Exception as e:
+                except (ValueError, TypeError) as e:
                     logger.warning(f"Failed to parse capability: {e}")
 
             return capabilities
 
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"Capability discovery failed: {e}")
             return []
 
@@ -303,7 +303,7 @@ class UCPClient:
                 matched_capabilities=data.get("matched_capabilities", []),
             )
 
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             logger.error(f"Embedding exchange failed: {e}")
             return UCPExchangeResult(
                 success=False,

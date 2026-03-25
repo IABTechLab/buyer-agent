@@ -171,7 +171,7 @@ Returns:
 
             return self._format_deal_response(deal_response)
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error requesting deal: {e}"
 
     def _create_deal_response(

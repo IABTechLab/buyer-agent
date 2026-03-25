@@ -5,6 +5,7 @@
 
 from typing import Any
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -112,5 +113,5 @@ Analysis:
   {"Budget pacing is on track." if abs(stats.delivery_rate - stats.budget_utilization) < 10 else "Consider adjusting pacing."}
 """
 
-        except Exception as e:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             return f"Error retrieving stats: {e}"

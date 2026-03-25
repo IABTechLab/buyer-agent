@@ -113,7 +113,7 @@ def book(
         try:
             result = flow.kickoff()
             progress.update(task, description="Workflow complete")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI top-level handler; must show any error to user
             console.print(f"[red]Error running workflow:[/red] {e}")
             raise typer.Exit(1)
 
@@ -297,7 +297,7 @@ def status(
         try:
             order = asyncio.run(client.get_order(account_id, order_id))
             lines = asyncio.run(client.list_lines(account_id, order_id))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI top-level handler; must show any error to user
             console.print(f"[red]Error fetching order:[/red] {e}")
             raise typer.Exit(1)
 

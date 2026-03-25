@@ -912,7 +912,7 @@ class TestDealStoreIntegration:
     async def test_store_error_does_not_fail_request(self):
         """If DealStore raises, the API result is still returned."""
         mock_store = MagicMock()
-        mock_store.save_deal.side_effect = Exception("DB connection lost")
+        mock_store.save_deal.side_effect = OSError("DB connection lost")
 
         def handler(request):
             return _json_response(200, _quote_response_json())

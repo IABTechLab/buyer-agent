@@ -488,5 +488,5 @@ class ApprovalGate:
 
         try:
             return ApprovalConfig(**data)
-        except Exception:
+        except (TypeError, ValueError):
             return ApprovalConfig()

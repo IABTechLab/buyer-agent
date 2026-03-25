@@ -188,7 +188,7 @@ class BudgetPacingEngine:
                 for cb in bus._subscribers.get(event.event_type.value, []):
                     try:
                         cb(event)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - subscriber isolation
                         logger.error(
                             "Subscriber error for %s: %s",
                             event.event_type,
@@ -197,7 +197,7 @@ class BudgetPacingEngine:
                 for cb in bus._subscribers.get("*", []):
                     try:
                         cb(event)
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - subscriber isolation
                         logger.error("Subscriber error (wildcard): %s", e)
                 return
 
@@ -210,7 +210,7 @@ class BudgetPacingEngine:
                     loop.run_until_complete(self.event_bus.publish(event))
             except RuntimeError:
                 asyncio.run(self.event_bus.publish(event))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
             logger.warning("Failed to emit event %s: %s", event_type, exc)
 
     # ------------------------------------------------------------------

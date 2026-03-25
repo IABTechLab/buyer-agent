@@ -167,7 +167,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
         # Build ManualDealEntry from posted data
         try:
             entry = ManualDealEntry(**data)
-        except Exception as exc:
+        except (ValueError, TypeError) as exc:
             return jsonify({"success": False, "errors": [str(exc)]}), 400
 
         result = create_manual_deal(entry)
@@ -335,7 +335,7 @@ def _register_routes(app: Flask, store: DealStore) -> None:
                 )
 
                 saved_ids.append(deal_id)
-            except Exception as exc:
+            except (OSError, ValueError, TypeError) as exc:
                 save_errors.append({"index": i, "error": str(exc)})
 
         return jsonify(

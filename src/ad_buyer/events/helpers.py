@@ -48,7 +48,7 @@ async def emit_event(
         )
         await bus.publish(event)
         return event
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - event emission is fail-open by design
         logger.warning("Failed to emit event %s: %s", event_type, e)
         return None
 
@@ -105,6 +105,6 @@ def emit_event_sync(
             asyncio.run(bus.publish(event))
 
         return event
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - event emission is fail-open by design
         logger.warning("Failed to emit event (sync) %s: %s", event_type, e)
         return None

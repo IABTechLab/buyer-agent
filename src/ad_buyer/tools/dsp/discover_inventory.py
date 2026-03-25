@@ -155,7 +155,7 @@ Returns:
 
             return self._format_results(result.data, identity_context)
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error discovering inventory: {e}"
 
     def _format_results(

@@ -6,6 +6,7 @@
 from datetime import datetime
 from typing import Any
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -114,7 +115,7 @@ Returns:
 
         except ValueError as e:
             return f"Error parsing dates: {e}. Please use YYYY-MM-DD format."
-        except Exception as e:
+        except (httpx.HTTPError, OSError) as e:
             return f"Error checking availability: {e}"
 
     def _format_results(

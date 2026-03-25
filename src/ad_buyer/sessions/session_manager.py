@@ -252,7 +252,7 @@ class SessionManager:
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 await client.post(url)
-        except Exception:
+        except httpx.HTTPError:
             logger.warning(
                 "Failed to close session %s on %s (may already be expired)",
                 session_id,

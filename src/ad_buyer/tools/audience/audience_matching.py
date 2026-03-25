@@ -3,8 +3,9 @@
 
 """Audience Matching Tool - Match campaign audiences to inventory via UCP."""
 
-from typing import Any
+from typing import Any, Optional, Type
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -16,24 +17,26 @@ from ...models.ucp import UCPConsent
 class AudienceMatchingInput(BaseModel):
     """Input schema for audience matching tool."""
 
-    seller_endpoint: str = Field(description="Seller's UCP exchange endpoint URL")
-    demographics: dict[str, Any] | None = Field(
+    seller_endpoint: str = Field(
+        description="Seller's UCP exchange endpoint URL"
+    )
+    demographics: Optional[dict[str, Any]] = Field(
         default=None,
         description="Demographic targeting (age, gender, income, etc.)",
     )
-    interests: list[str] | None = Field(
+    interests: Optional[list[str]] = Field(
         default=None,
         description="Interest-based targeting categories",
     )
-    behaviors: list[str] | None = Field(
+    behaviors: Optional[list[str]] = Field(
         default=None,
         description="Behavioral targeting segments",
     )
-    geography: str | None = Field(
+    geography: Optional[str] = Field(
         default=None,
         description="Geographic targeting (country code)",
     )
-    exclusions: list[str] | None = Field(
+    exclusions: Optional[list[str]] = Field(
         default=None,
         description="Audience segments to exclude",
     )
@@ -52,16 +55,16 @@ class AudienceMatchingTool(BaseTool):
     using UCP embedding exchange. Returns a similarity score (0-1) indicating
     how well the seller's inventory matches the target audience, along with
     matched capabilities and any gaps identified."""
-    args_schema: type[BaseModel] = AudienceMatchingInput
+    args_schema: Type[BaseModel] = AudienceMatchingInput
 
     def _run(
         self,
         seller_endpoint: str,
-        demographics: dict[str, Any] | None = None,
-        interests: list[str] | None = None,
-        behaviors: list[str] | None = None,
-        geography: str | None = None,
-        exclusions: list[str] | None = None,
+        demographics: Optional[dict[str, Any]] = None,
+        interests: Optional[list[str]] = None,
+        behaviors: Optional[list[str]] = None,
+        geography: Optional[str] = None,
+        exclusions: Optional[list[str]] = None,
     ) -> str:
         """Execute the audience matching."""
         return run_async(
@@ -78,11 +81,11 @@ class AudienceMatchingTool(BaseTool):
     async def _arun(
         self,
         seller_endpoint: str,
-        demographics: dict[str, Any] | None = None,
-        interests: list[str] | None = None,
-        behaviors: list[str] | None = None,
-        geography: str | None = None,
-        exclusions: list[str] | None = None,
+        demographics: Optional[dict[str, Any]] = None,
+        interests: Optional[list[str]] = None,
+        behaviors: Optional[list[str]] = None,
+        geography: Optional[str] = None,
+        exclusions: Optional[list[str]] = None,
     ) -> str:
         """Async implementation of audience matching."""
         # Build audience requirements
@@ -116,7 +119,7 @@ class AudienceMatchingTool(BaseTool):
                 seller_endpoint=seller_endpoint,
                 consent=consent,
             )
-        except Exception:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             # Return mock result for demonstration
             validation = self._get_mock_validation(requirements)
         finally:
@@ -163,12 +166,10 @@ class AudienceMatchingTool(BaseTool):
         alternatives = []
         if has_behaviors:
             gaps.append("behavioral_targeting")
-            alternatives.append(
-                {
-                    "gap": "behavioral_targeting",
-                    "suggestion": "Use contextual signals with frequency capping as proxy",
-                }
-            )
+            alternatives.append({
+                "gap": "behavioral_targeting",
+                "suggestion": "Use contextual signals with frequency capping as proxy",
+            })
 
         return AudienceValidationResult(
             validation_status=status,
@@ -176,8 +177,7 @@ class AudienceMatchingTool(BaseTool):
             matched_capabilities=[
                 "cap_ctx_categories",
                 "cap_ctx_keywords",
-            ]
-            + (["cap_demo_age", "cap_demo_gender"] if has_demographics else []),
+            ] + (["cap_demo_age", "cap_demo_gender"] if has_demographics else []),
             gaps=gaps,
             alternatives=alternatives,
             ucp_similarity_score=score,

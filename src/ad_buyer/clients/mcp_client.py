@@ -55,7 +55,7 @@ class SimpleMCPClient:
             response = await self._client.get(f"{self.base_url}/")
             if response.status_code == 200:
                 self._server_info = response.json()
-        except Exception:
+        except (httpx.HTTPError, ValueError):
             pass
 
         # Try /mcp/tools endpoint first (standard for ad seller agents)
@@ -69,7 +69,7 @@ class SimpleMCPClient:
                         name = tool.get("name", "")
                         if name:
                             self._tools[name] = tool
-        except Exception:
+        except (httpx.HTTPError, ValueError):
             pass
 
         # If no tools found, try calling list_tools
@@ -81,7 +81,7 @@ class SimpleMCPClient:
                         name = tool.get("name", "")
                         if name:
                             self._tools[name] = tool
-            except Exception:
+            except (httpx.HTTPError, ValueError):
                 pass
 
         # Final fallback: assume standard OpenDirect tools
@@ -148,7 +148,7 @@ class SimpleMCPClient:
             )
         except httpx.HTTPStatusError as e:
             return MCPToolResult(success=False, error=f"HTTP {e.response.status_code}")
-        except Exception as e:
+        except (httpx.HTTPError, ValueError) as e:
             return MCPToolResult(success=False, error=str(e))
 
     # Convenience methods matching IABMCPClient interface
@@ -281,7 +281,7 @@ class IABMCPClient:
                 raw=result,
             )
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return MCPToolResult(
                 success=False,
                 error=str(e),

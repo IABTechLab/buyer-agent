@@ -401,7 +401,7 @@ class ManualDealEntryTool(BaseTool):
         # Build ManualDealEntry from parsed params
         try:
             entry = ManualDealEntry(**params)
-        except Exception as exc:
+        except (ValueError, TypeError) as exc:
             return f"Error: Invalid deal parameters -- {exc}"
 
         # Validate and prepare

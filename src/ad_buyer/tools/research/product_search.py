@@ -5,6 +5,7 @@
 
 from typing import Any
 
+import httpx
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
@@ -136,7 +137,7 @@ Returns:
                 products = await self._client.search_products(filters)
             else:
                 products = await self._client.list_products(top=limit)
-        except Exception as e:
+        except (httpx.HTTPError, OSError, ValueError) as e:
             return f"Error searching products: {e}"
 
         # Filter by price client-side if needed

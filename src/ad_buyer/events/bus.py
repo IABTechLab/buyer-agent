@@ -66,12 +66,12 @@ class InMemoryEventBus(EventBus):
         for cb in self._subscribers.get(event.event_type.value, []):
             try:
                 cb(event)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - subscriber isolation: one failure must not block others
                 logger.error("Subscriber error for %s: %s", event.event_type, e)
         for cb in self._subscribers.get("*", []):
             try:
                 cb(event)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - subscriber isolation: one failure must not block others
                 logger.error("Subscriber error (wildcard): %s", e)
 
     async def subscribe(self, event_type: str, callback: Subscriber) -> None:

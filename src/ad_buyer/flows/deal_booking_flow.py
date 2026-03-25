@@ -5,6 +5,7 @@
 
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -89,7 +90,7 @@ class DealBookingFlow(Flow[BookingState]):
                 cost=getattr(booked_line, "cost", 0.0),
                 booking_status=getattr(booked_line, "booking_status", "pending"),
             )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist booking for deal %s", deal_id)
 
     def _persist_deal_status(self, deal_id: str, new_status: str) -> None:
@@ -112,7 +113,7 @@ class DealBookingFlow(Flow[BookingState]):
                     new_status,
                     deal_id,
                 )
-        except Exception:
+        except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception(
                 "Failed to persist status change to %s for deal %s",
                 new_status,
@@ -198,7 +199,7 @@ class DealBookingFlow(Flow[BookingState]):
                 "gaps": gaps,
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - audience planning is optional; must not fail the flow
             # Don't fail the flow - audience planning is optional
             self.state.errors.append(f"Audience planning warning: {e}")
             return {"status": "success", "audience_plan": None, "error": str(e)}
@@ -337,7 +338,7 @@ class DealBookingFlow(Flow[BookingState]):
                 },
             }
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Budget allocation failed: {e}")
             self.state.execution_status = ExecutionStatus.FAILED
             return {"status": "failed", "error": str(e)}
@@ -403,7 +404,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             return {"channel": "branding", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Branding research failed: {e}")
             return {"channel": "branding", "status": "failed", "error": str(e)}
 
@@ -432,7 +433,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             return {"channel": "ctv", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"CTV research failed: {e}")
             return {"channel": "ctv", "status": "failed", "error": str(e)}
 
@@ -461,7 +462,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             return {"channel": "mobile_app", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Mobile research failed: {e}")
             return {"channel": "mobile_app", "status": "failed", "error": str(e)}
 
@@ -490,7 +491,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             return {"channel": "performance", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Performance research failed: {e}")
             return {"channel": "performance", "status": "failed", "error": str(e)}
 
@@ -576,7 +577,7 @@ class DealBookingFlow(Flow[BookingState]):
                     # Stash the store deal_id on the recommendation for
                     # later use when booking
                     rec._store_deal_id = deal_id  # type: ignore[attr-defined]
-                except Exception:
+                except (sqlite3.Error, OSError, ValueError, AttributeError):
                     logger.exception(
                         "Failed to persist deal for recommendation %s",
                         rec.product_id,

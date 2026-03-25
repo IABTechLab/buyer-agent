@@ -128,7 +128,7 @@ Returns:
 
             return self._format_pricing(product, volume, deal_type, flight_start, flight_end)
 
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError) as e:
             return f"Error getting pricing: {e}"
 
     def _format_pricing(
