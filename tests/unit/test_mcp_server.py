@@ -10,7 +10,6 @@ foundation tools: get_setup_status, health_check, get_config.
 import json
 
 import pytest
-
 from mcp.server.fastmcp import FastMCP
 
 
@@ -60,6 +59,7 @@ class TestSSEMounting:
     def test_mount_mcp_adds_route(self):
         """mount_mcp should add the /mcp/sse route to the FastAPI app."""
         from fastapi import FastAPI
+
         from ad_buyer.interfaces.mcp_server import mount_mcp
 
         test_app = FastAPI()

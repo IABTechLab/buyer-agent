@@ -36,7 +36,7 @@ import json
 import logging
 import os
 import sqlite3
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import FastAPI
@@ -55,17 +55,19 @@ from ..storage.order_store import OrderStore
 from ..storage.pacing_store import PacingStore
 from ..tools.deal_import import (
     ImportResult as CsvImportResult,
+)
+from ..tools.deal_import import (
     _parse_row,
     _resolve_columns,
+)
+from ..tools.deal_library.connectors import (
+    IndexExchangeConnector,  # noqa: F401 - looked up dynamically via _get_ssp_connector_class
+    MagniteConnector,  # noqa: F401
+    PubMaticConnector,  # noqa: F401
 )
 from ..tools.deal_library.deal_entry import (
     ManualDealEntry,
     create_manual_deal,
-)
-from ..tools.deal_library.connectors import (
-    IndexExchangeConnector,
-    MagniteConnector,
-    PubMaticConnector,
 )
 
 logger = logging.getLogger(__name__)
@@ -250,7 +252,7 @@ def get_setup_status() -> str:
     result = {
         "setup_complete": setup_complete,
         "checks": checks,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -315,7 +317,7 @@ def health_check() -> str:
         "status": overall_status,
         "version": __version__,
         "services": services,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -392,7 +394,7 @@ def run_setup_wizard() -> str:
     """
     wizard = _get_wizard()
     result = wizard.run_wizard()
-    result["timestamp"] = datetime.now(timezone.utc).isoformat()
+    result["timestamp"] = datetime.now(UTC).isoformat()
     return json.dumps(result, indent=2)
 
 
@@ -415,13 +417,13 @@ def get_wizard_step(step_number: int) -> str:
     try:
         step = wizard.get_step(step_number)
         result = step.to_dict()
-        result["timestamp"] = datetime.now(timezone.utc).isoformat()
+        result["timestamp"] = datetime.now(UTC).isoformat()
         return json.dumps(result, indent=2)
     except ValueError as exc:
         return json.dumps(
             {
                 "error": str(exc),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -451,7 +453,7 @@ def complete_wizard_step(step_number: int, config: str = "{}") -> str:
                 "success": True,
                 "step_number": step.step_number,
                 "status": step.status.value,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -460,7 +462,7 @@ def complete_wizard_step(step_number: int, config: str = "{}") -> str:
             {
                 "success": False,
                 "error": str(exc),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -490,7 +492,7 @@ def skip_wizard_step(step_number: int) -> str:
                 "step_number": step.step_number,
                 "status": step.status.value,
                 "defaults_applied": step.defaults,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -498,7 +500,7 @@ def skip_wizard_step(step_number: int) -> str:
         return json.dumps(
             {
                 "error": str(exc),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -545,7 +547,7 @@ def list_campaigns(status: str | None = None) -> str:
         result = {
             "total": len(campaign_summaries),
             "campaigns": campaign_summaries,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -607,7 +609,7 @@ def get_campaign_status(campaign_id: str) -> str:
             "flight_end": campaign["flight_end"],
             "channels": channels,
             "pacing": pacing_data,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -662,7 +664,7 @@ def check_pacing(campaign_id: str) -> str:
                 "pacing_pct": 0.0,
                 "deviation_pct": 0.0,
                 "channel_pacing": [],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             return json.dumps(result, indent=2)
 
@@ -696,7 +698,7 @@ def check_pacing(campaign_id: str) -> str:
             "pacing_pct": latest.pacing_pct,
             "deviation_pct": latest.deviation_pct,
             "channel_pacing": channel_pacing,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -758,7 +760,7 @@ def review_budgets() -> str:
             ),
             "campaign_count": len(campaign_budgets),
             "campaigns": campaign_budgets,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -827,7 +829,7 @@ def list_deals(
         result = {
             "total": len(deal_summaries),
             "deals": deal_summaries,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -883,7 +885,11 @@ def search_deals(query: str) -> str:
             if matched_fields:
                 matches.append({
                     "deal_id": deal["id"],
-                    "display_name": deal.get("display_name") or deal.get("product_name") or "(unnamed)",
+                    "display_name": (
+                        deal.get("display_name")
+                        or deal.get("product_name")
+                        or "(unnamed)"
+                    ),
                     "status": deal.get("status", "unknown"),
                     "deal_type": deal.get("deal_type", "unknown"),
                     "media_type": deal.get("media_type"),
@@ -897,7 +903,7 @@ def search_deals(query: str) -> str:
             "total": len(matches),
             "query": query,
             "deals": matches,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -950,7 +956,7 @@ async def discover_sellers(capability: str | None = None) -> str:
         result = {
             "total": len(seller_list),
             "sellers": seller_list,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
 
@@ -960,7 +966,7 @@ async def discover_sellers(capability: str | None = None) -> str:
             "error": f"Failed to discover sellers: {exc}",
             "total": 0,
             "sellers": [],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
 
@@ -1006,7 +1012,7 @@ async def get_seller_media_kit(seller_url: str) -> str:
             "seller_url": kit.seller_url,
             "total_packages": kit.total_packages,
             "packages": packages,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
 
@@ -1015,7 +1021,7 @@ async def get_seller_media_kit(seller_url: str) -> str:
         result = {
             "error": f"Failed to fetch media kit: {exc}",
             "seller_url": seller_url,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
 
@@ -1026,7 +1032,7 @@ async def get_seller_media_kit(seller_url: str) -> str:
         result = {
             "error": f"Unexpected error: {exc}",
             "seller_url": seller_url,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
 
@@ -1103,7 +1109,7 @@ async def compare_sellers(seller_urls: list[str]) -> str:
                 1 for s in sellers_data if "error" in s
             ),
         },
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -1168,7 +1174,7 @@ def start_negotiation(
             "product_id": product_id,
             "product_name": product_name,
             "initial_price": initial_price,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1221,7 +1227,7 @@ def get_negotiation_status(deal_id: str) -> str:
             "price": deal.get("price"),
             "rounds_count": len(round_summaries),
             "rounds": round_summaries,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1321,7 +1327,7 @@ def inspect_deal(deal_id: str) -> str:
         else:
             result["performance"] = None
 
-        result["timestamp"] = datetime.now(timezone.utc).isoformat()
+        result["timestamp"] = datetime.now(UTC).isoformat()
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
@@ -1371,7 +1377,7 @@ def import_deals_csv(
                 "skipped": 0,
                 "errors": [],
                 "deal_ids": [],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             return json.dumps(result, indent=2)
 
@@ -1389,7 +1395,7 @@ def import_deals_csv(
                 "skipped": 0,
                 "errors": [{"message": "No columns could be mapped to schema fields."}],
                 "deal_ids": [],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             return json.dumps(result, indent=2)
 
@@ -1438,7 +1444,7 @@ def import_deals_csv(
             store.save_portfolio_metadata(
                 deal_id=saved_id,
                 import_source="CSV",
-                import_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                import_date=datetime.now(UTC).strftime("%Y-%m-%d"),
             )
 
         # Build error dicts
@@ -1459,7 +1465,7 @@ def import_deals_csv(
             "skipped": import_result.skipped,
             "errors": error_dicts,
             "deal_ids": deal_ids,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1557,7 +1563,7 @@ def create_deal_manual(
         return json.dumps({
             "success": False,
             "errors": [str(exc)],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }, indent=2)
 
     # Validate and prepare
@@ -1567,7 +1573,7 @@ def create_deal_manual(
         return json.dumps({
             "success": False,
             "errors": entry_result.errors,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }, indent=2)
 
     # Save the deal
@@ -1576,11 +1582,15 @@ def create_deal_manual(
         deal_id = store.save_deal(**entry_result.deal_data)
 
         # Save portfolio metadata
-        tags_json = json.dumps(entry_result.metadata["tags"]) if entry_result.metadata.get("tags") else None
+        tags_json = (
+            json.dumps(entry_result.metadata["tags"])
+            if entry_result.metadata.get("tags")
+            else None
+        )
         store.save_portfolio_metadata(
             deal_id=deal_id,
             import_source=entry_result.metadata["import_source"],
-            import_date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            import_date=datetime.now(UTC).strftime("%Y-%m-%d"),
             advertiser_id=entry_result.metadata.get("advertiser_id"),
             tags=tags_json,
         )
@@ -1589,7 +1599,7 @@ def create_deal_manual(
             "success": True,
             "deal_id": deal_id,
             "display_name": display_name,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }, indent=2)
     finally:
         if _deal_store_override is None:
@@ -1635,7 +1645,7 @@ def get_portfolio_summary(
                 "by_media_type": {},
                 "top_sellers": [],
                 "expiring_deals": [],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }, indent=2)
 
         # Count by status
@@ -1687,7 +1697,11 @@ def get_portfolio_summary(
             if flight_end and now_str <= flight_end <= cutoff_str:
                 expiring_deals.append({
                     "deal_id": deal["id"],
-                    "display_name": deal.get("display_name") or deal.get("product_name") or "(unnamed)",
+                    "display_name": (
+                        deal.get("display_name")
+                        or deal.get("product_name")
+                        or "(unnamed)"
+                    ),
                     "flight_end": flight_end,
                 })
 
@@ -1702,7 +1716,7 @@ def get_portfolio_summary(
                 for name, count in top_sellers
             ],
             "expiring_deals": expiring_deals,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1744,7 +1758,7 @@ def list_active_negotiations() -> str:
         result = {
             "total": len(negotiations),
             "negotiations": negotiations,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1779,7 +1793,7 @@ def list_orders(status: str | None = None) -> str:
         result = {
             "total": len(orders),
             "orders": orders,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1806,7 +1820,7 @@ def get_order_status(order_id: str) -> str:
                 indent=2,
             )
 
-        order["timestamp"] = datetime.now(timezone.utc).isoformat()
+        order["timestamp"] = datetime.now(UTC).isoformat()
         return json.dumps(order, indent=2)
     finally:
         store.disconnect()
@@ -1850,7 +1864,7 @@ def transition_order(
             "previous_status": previous_status,
             "new_status": to_status,
             "reason": reason,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1901,7 +1915,7 @@ def list_pending_approvals(campaign_id: str | None = None) -> str:
         result = {
             "total": len(pending),
             "pending": pending,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -1963,7 +1977,7 @@ def approve_or_reject(
             )
 
         # Update the request
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         store.update_approval_request(
             approval_request_id,
             status=new_status,
@@ -2016,7 +2030,7 @@ def list_api_keys() -> str:
     result = {
         "total": len(keys),
         "keys": keys,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -2046,7 +2060,7 @@ def create_api_key(seller_url: str, api_key: str) -> str:
         "seller_url": seller_url,
         "created": True,
         "masked_key": _mask_key(api_key),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -2073,7 +2087,7 @@ def revoke_api_key(seller_url: str) -> str:
     result = {
         "seller_url": seller_url,
         "revoked": removed,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -2133,7 +2147,7 @@ def list_templates(template_type: str | None = None) -> str:
             "supply_path_templates": spo_templates,
             "total_deal_templates": len(deal_templates),
             "total_supply_path_templates": len(spo_templates),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -2214,7 +2228,7 @@ def create_template(
             "template_id": template_id,
             "template_type": template_type,
             "name": name,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     except Exception as exc:
@@ -2301,7 +2315,7 @@ def instantiate_from_template(
             "template_name": tmpl["name"],
             "product_name": product_name,
             "price": price,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     except Exception as exc:
@@ -2355,7 +2369,7 @@ def get_deal_performance(deal_id: str) -> str:
             "price": deal.get("price"),
             "negotiation_rounds": len(rounds),
             "created_at": deal.get("created_at", ""),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -2419,7 +2433,7 @@ def get_campaign_report(campaign_id: str) -> str:
                 "avg_fill_rate": deals.avg_fill_rate,
                 "avg_win_rate": deals.avg_win_rate,
             },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -2510,7 +2524,7 @@ def get_pacing_report(campaign_id: str) -> str:
             "channel_pacing": channel_pacing,
             "alerts": alerts,
             "snapshot_timestamp": dashboard.snapshot_timestamp,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -2580,7 +2594,7 @@ def list_ssp_connectors() -> str:
     result = {
         "total": len(connectors),
         "connectors": connectors,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
@@ -2618,7 +2632,7 @@ def import_deals_ssp(ssp_name: str) -> str:
                     f"Unknown SSP connector: '{ssp_name}'. "
                     f"Known connectors: {known}"
                 ),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -2634,7 +2648,7 @@ def import_deals_ssp(ssp_name: str) -> str:
                 ),
                 "ssp_name": key,
                 "required_env_vars": connector.get_required_config(),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -2646,7 +2660,7 @@ def import_deals_ssp(ssp_name: str) -> str:
     store = _get_deal_store()
     try:
         deal_ids: list[str] = []
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         for deal_data in fetch_result.deals:
             saved_id = store.save_deal(**deal_data)
             deal_ids.append(saved_id)
@@ -2664,7 +2678,7 @@ def import_deals_ssp(ssp_name: str) -> str:
             "errors": fetch_result.errors,
             "deal_ids": deal_ids,
             "ssp_name": key,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
     finally:
@@ -2701,7 +2715,7 @@ def test_ssp_connection(ssp_name: str) -> str:
                     f"Unknown SSP connector: '{ssp_name}'. "
                     f"Known connectors: {known}"
                 ),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
         )
@@ -2719,7 +2733,7 @@ def test_ssp_connection(ssp_name: str) -> str:
                 f"Missing env vars: {', '.join(missing)}"
             ),
             "required_env_vars": connector.get_required_config(),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         return json.dumps(result, indent=2)
 
@@ -2732,7 +2746,7 @@ def test_ssp_connection(ssp_name: str) -> str:
         "message": (
             f"{connector.ssp_name} connection test {'succeeded' if connected else 'failed'}."
         ),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     return json.dumps(result, indent=2)
 
