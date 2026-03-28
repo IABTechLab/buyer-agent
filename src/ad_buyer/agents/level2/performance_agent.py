@@ -65,5 +65,5 @@ strategies.""",
         tools=tools or [],
         allow_delegation=True,
         verbose=verbose,
-        memory=True,
+        memory=False,
     )

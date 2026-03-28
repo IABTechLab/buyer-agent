@@ -53,6 +53,7 @@ class DealBookingFlow(Flow[BookingState]):
         self,
         client: OpenDirectClient,
         store: Optional[DealStore] = None,
+        **kwargs,
     ):
         """Initialize the flow with OpenDirect client and optional persistence.
 
@@ -60,8 +61,11 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
+            **kwargs: Initial state field values passed through to Flow.__init__
+                (e.g. campaign_brief=...). Flow.state has no setter so initial
+                state must be provided this way rather than assigned after init.
         """
-        super().__init__()
+        super().__init__(**kwargs)
         self._client = client
         self._store = store
 

@@ -65,5 +65,5 @@ When searching for inventory, always consider:
         tools=tools or [],
         allow_delegation=False,
         verbose=verbose,
-        memory=True,
+        memory=False,
     )

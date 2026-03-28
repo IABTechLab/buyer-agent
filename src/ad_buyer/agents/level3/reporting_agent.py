@@ -71,5 +71,5 @@ insights that inform optimization decisions.""",
         tools=tools or [],
         allow_delegation=False,
         verbose=verbose,
-        memory=True,
+        memory=False,
     )

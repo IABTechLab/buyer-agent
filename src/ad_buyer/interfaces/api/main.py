@@ -6,6 +6,7 @@
 import json
 import logging
 import uuid
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any, Optional
 
@@ -18,6 +19,8 @@ import sys
 
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
+from ...media_kit.client import MediaKitClient
+from ...media_kit.models import MediaKitError
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
 from ...storage import DealStore
@@ -47,6 +50,7 @@ app = FastAPI(
         {"name": "Health", "description": "Service health and readiness"},
         {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
         {"name": "Products", "description": "Seller inventory product search"},
+        {"name": "Media Kit", "description": "Seller media kit package search"},
         {"name": "Events", "description": "Event bus query endpoints"},
     ],
 )
@@ -205,6 +209,12 @@ class ProductSearchRequest(BaseModel):
     min_price: Optional[float] = None
     max_price: Optional[float] = None
     limit: int = Field(default=10, ge=1, le=50)
+
+
+class MediaKitSearchRequest(BaseModel):
+    """Request to search seller media kit packages by keyword (e.g. sports, video)."""
+
+    query: str = Field(..., min_length=1, max_length=200)
 
 
 def _create_client() -> OpenDirectClient:
@@ -410,6 +420,43 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
     return {"results": result}
 
 
+@app.post("/media-kit/search", tags=["Media Kit"])
+async def search_media_kit_packages(request: MediaKitSearchRequest) -> dict[str, Any]:
+    """Search seller media kit for packages matching a keyword (e.g. sports, video).
+
+    Queries all configured seller endpoints and returns matching packages
+    (names, descriptions, tags, content categories). Use this to discover
+    inventory before booking.
+    """
+    seller_urls = _current_settings().get_media_kit_seller_urls()
+    if not seller_urls:
+        raise HTTPException(
+            status_code=503,
+            detail="No seller endpoints configured. Set OPENDIRECT_BASE_URL or SELLER_ENDPOINTS.",
+        )
+
+    current = _current_settings()
+    client = MediaKitClient(api_key=current.opendirect_api_key or None)
+    all_packages: list[dict[str, Any]] = []
+
+    try:
+        for seller_url in seller_urls:
+            try:
+                packages = await client.search_packages(seller_url, query=request.query)
+                for pkg in packages:
+                    d = asdict(pkg)
+                    # Ensure seller_url is included (may be in dataclass)
+                    d["seller_url"] = getattr(pkg, "seller_url", None) or seller_url
+                    all_packages.append(d)
+            except MediaKitError as e:
+                logger.warning("Media kit search failed for %s: %s", seller_url, e)
+                continue
+    finally:
+        await client.close()
+
+    return {"query": request.query, "packages": all_packages, "total": len(all_packages)}
+
+
 # ---------------------------------------------------------------------------
 # Event endpoints
 # ---------------------------------------------------------------------------
@@ -465,8 +512,11 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         _persist_job(job_id, job)
 
         client = _create_client()
-        flow = DealBookingFlow(client, store=_get_store())
-        flow.state = BookingState(campaign_brief=request.brief.model_dump())
+        flow = DealBookingFlow(
+            client,
+            store=_get_store(),
+            campaign_brief=request.brief.model_dump(),
+        )
 
         # Store flow reference for approval
         job["_flow"] = flow

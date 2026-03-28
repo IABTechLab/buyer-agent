@@ -71,5 +71,5 @@ executing any booking action.""",
         tools=tools or [],
         allow_delegation=False,
         verbose=verbose,
-        memory=True,
+        memory=False,
     )

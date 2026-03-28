@@ -90,7 +90,7 @@ def create_audience_planner_agent(
         - Sellers' Audience Validator agents via UCP exchange""",
         verbose=verbose,
         allow_delegation=False,  # Makes final audience decisions
-        memory=True,
+        memory=False,
         llm=llm,
         tools=tools or [],
     )

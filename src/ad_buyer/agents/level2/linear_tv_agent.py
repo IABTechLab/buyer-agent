@@ -78,5 +78,5 @@ video campaigns across linear and streaming.""",
         tools=tools or [],
         allow_delegation=True,
         verbose=verbose,
-        memory=True,
+        memory=False,
     )

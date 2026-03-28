@@ -58,5 +58,5 @@ and coordinate with other channel specialists for cohesive campaigns.""",
         tools=tools or [],
         allow_delegation=True,
         verbose=verbose,
-        memory=True,
+        memory=False,
     )

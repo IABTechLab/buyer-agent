@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 
 from ...clients.mcp_client import SimpleMCPClient
 from ...config.settings import settings
+from ...media_kit.client import MediaKitClient
+from ...media_kit.models import MediaKitError
 
 
 class ConversationMessage:
@@ -180,6 +182,57 @@ class MultiSellerSearchTool(BaseTool):
                     output.append(f"  {products}")
 
         return "\n".join(output)
+
+
+class MediaKitSearchInput(BaseModel):
+    """Input for searching media kit packages by keyword."""
+
+    query: str = Field(
+        ...,
+        description="Search query for packages (e.g. 'sports', 'video', 'premium display')",
+    )
+
+
+class MediaKitSearchTool(BaseTool):
+    """Tool to search seller media kits by keyword (e.g. sports, video)."""
+
+    name: str = "search_media_kit_packages"
+    description: str = """Search for advertising packages across connected sellers by keyword.
+    Use this when the user wants to find products or packages by topic (e.g. sports, news, video, premium).
+    Returns package names, descriptions, price ranges, and tags from sellers' media kits."""
+    args_schema: type[BaseModel] = MediaKitSearchInput
+
+    def _run(self, query: str) -> str:
+        """Synchronous wrapper."""
+        return asyncio.get_event_loop().run_until_complete(self._arun(query))
+
+    async def _arun(self, query: str) -> str:
+        """Search all configured sellers' media kits for packages matching the query."""
+        seller_urls = settings.get_media_kit_seller_urls()
+        if not seller_urls:
+            return "No seller endpoints configured. Set OPENDIRECT_BASE_URL or SELLER_ENDPOINTS in .env."
+
+        client = MediaKitClient(api_key=settings.opendirect_api_key or None)
+        lines = [f"Media kit search for '{query}':"]
+        try:
+            for seller_url in seller_urls:
+                try:
+                    packages = await client.search_packages(seller_url, query=query)
+                    lines.append(f"\n=== {seller_url} ({len(packages)} package(s)) ===")
+                    for pkg in packages[:10]:
+                        name = getattr(pkg, "name", "Unknown")
+                        price = getattr(pkg, "price_range", "") or "—"
+                        desc = (getattr(pkg, "description", "") or "")[:80]
+                        pkg_id = getattr(pkg, "package_id", "")
+                        lines.append(f"  • {name} (id: {pkg_id}) — {price}")
+                        if desc:
+                            lines.append(f"    {desc}...")
+                except MediaKitError as e:
+                    lines.append(f"\n=== {seller_url} ===")
+                    lines.append(f"  Error: {e}")
+            return "\n".join(lines)
+        finally:
+            await client.close()
 
 
 class CallSellerToolInput(BaseModel):
@@ -443,13 +496,18 @@ You are connected to the following seller agents:
 {seller_info}
 
 You have tools to:
-1. **search_all_sellers** - Search inventory across ALL connected sellers
-2. **book_pg_deal** - Book Programmatic Guaranteed deals directly with sellers
-3. **create_pmp_deal** - Create Private Marketplace deals and get Deal IDs
-4. **call_seller_tool** - Call any tool on any seller (for advanced operations)
+1. **search_media_kit_packages** - Search for packages by keyword (e.g. sports, video, premium) across sellers' media kits
+2. **search_all_sellers** - Search inventory across ALL connected sellers
+3. **book_pg_deal** - Book Programmatic Guaranteed deals directly with sellers
+4. **create_pmp_deal** - Create Private Marketplace deals and get Deal IDs
+5. **call_seller_tool** - Call any tool on any seller (for advanced operations)
+
+WORKFLOW FOR DISCOVERY:
+- When the user asks for packages by topic (e.g. sports, video, premium), use search_media_kit_packages with that keyword.
+- For general product listing use search_all_sellers.
 
 WORKFLOW FOR BOOKING:
-1. Use search_all_sellers to find products and get their product_id
+1. Use search_media_kit_packages or search_all_sellers to find products and get their product_id
 2. Calculate impressions from budget: impressions = (budget / cpm) * 1000
 3. Use book_pg_deal or create_pmp_deal to execute the booking
 4. Return the confirmation to the user
@@ -465,7 +523,7 @@ Provide specific, actionable recommendations based on user requirements.""",
             ),
             tools=self._tools,
             verbose=False,
-            memory=True,
+            memory=False,
         )
 
     def _initialize_sellers(self) -> None:
@@ -485,6 +543,7 @@ Provide specific, actionable recommendations based on user requirements.""",
 
         # Create tools for connected sellers
         self._tools = [
+            MediaKitSearchTool(),
             MultiSellerSearchTool(sellers=self._sellers),
             CallSellerToolTool(sellers=self._sellers),
             BookPGDealTool(sellers=self._sellers),

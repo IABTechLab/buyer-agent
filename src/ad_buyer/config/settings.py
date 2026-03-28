@@ -46,6 +46,22 @@ class Settings(BaseSettings):
             return []
         return [url.strip() for url in self.seller_endpoints.split(",") if url.strip()]
 
+    def get_media_kit_seller_urls(self) -> list[str]:
+        """Return seller base URLs for media kit (host root, e.g. http://localhost:3000).
+
+        Uses SELLER_ENDPOINTS if set; otherwise derives from OPENDIRECT_BASE_URL
+        by stripping /api/v2.1 or similar path so media-kit requests hit the seller root.
+        """
+        urls = list(self.get_seller_endpoints())
+        if not urls and self.opendirect_base_url:
+            base = self.opendirect_base_url.rstrip("/")
+            for suffix in ("/api/v2.1", "/api/v2", "/api"):
+                if base.endswith(suffix):
+                    base = base[: -len(suffix)]
+                    break
+            urls = [base]
+        return urls
+
     # LLM Settings
     default_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
     manager_llm_model: str = "anthropic/claude-opus-4-20250514"
