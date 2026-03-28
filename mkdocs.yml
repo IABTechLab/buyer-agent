@@ -110,5 +110,6 @@ nav:
       - Developer Setup: ai-assistant/developer-setup.md
   - MCP Reference:
       - Tools Reference: ai-assistant/mcp-tools.md
+      - Slash Commands: ai-assistant/slash-commands.md
       - Setup Wizard: ai-assistant/setup-wizard.md
   - "Seller Agent Docs →": https://iabtechlab.github.io/seller-agent/

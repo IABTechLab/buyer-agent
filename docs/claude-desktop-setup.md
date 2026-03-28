@@ -93,6 +93,27 @@ When you first connect, the buyer agent detects that configuration is incomplete
 
 > **Claude**: "Here's your setup summary: [summary]. Your buyer agent is ready. Try 'List active campaigns' or 'Show me available inventory from ESPN' to get started."
 
+## Available Slash Commands
+
+Once the buyer agent is connected, Claude Desktop recognizes the following slash commands:
+
+| Command | What it does |
+|---------|-------------|
+| `/setup` | Run the guided setup wizard (first-time or reconfigure) |
+| `/status` | Check configuration and system health |
+| `/campaigns` | Campaign portfolio overview with budget pacing |
+| `/deals` | Full dashboard of your deal portfolio |
+| `/discover` | Find and compare seller agents in the IAB registry |
+| `/negotiate` | View active negotiations and start new ones |
+| `/orders` | Active orders and execution status |
+| `/approvals` | Pending items waiting for your decision |
+| `/configure` | Manage templates, SSP connectors, and settings |
+| `/help` | List all available capabilities |
+
+See the [Slash Commands Reference](ai-assistant/slash-commands.md) for detailed descriptions and the tools each command uses.
+
+---
+
 ## Day-to-Day Operations
 
 After setup, use Claude Desktop to manage your buyer agent:
