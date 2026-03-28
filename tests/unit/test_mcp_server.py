@@ -393,3 +393,84 @@ class TestErrorHandling:
         assert result is not None
         data = json.loads(_extract_text(result))
         assert "checks" in data
+
+
+class TestPromptRegistration:
+    """Test that all 10 MCP prompts (slash commands) are registered."""
+
+    EXPECTED_PROMPTS = [
+        "setup",
+        "status",
+        "campaigns",
+        "deals",
+        "discover",
+        "negotiate",
+        "orders",
+        "approvals",
+        "configure",
+        "help",
+    ]
+
+    @pytest.mark.asyncio
+    async def test_all_prompts_registered(self):
+        """All 10 buyer prompts should be registered on the MCP server."""
+        from ad_buyer.interfaces.mcp_server import mcp
+
+        prompts_result = await mcp.list_prompts()
+        prompt_names = [p.name for p in prompts_result]
+
+        for name in self.EXPECTED_PROMPTS:
+            assert name in prompt_names, (
+                f"Prompt '{name}' not registered. Found: {prompt_names}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_prompt_count(self):
+        """There should be exactly 10 prompts registered."""
+        from ad_buyer.interfaces.mcp_server import mcp
+
+        prompts_result = await mcp.list_prompts()
+        assert len(prompts_result) == 10, (
+            f"Expected 10 prompts, got {len(prompts_result)}: "
+            f"{[p.name for p in prompts_result]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_each_prompt_has_description(self):
+        """Every registered prompt should have a non-empty description."""
+        from ad_buyer.interfaces.mcp_server import mcp
+
+        prompts_result = await mcp.list_prompts()
+        for prompt in prompts_result:
+            assert prompt.description, (
+                f"Prompt '{prompt.name}' has no description"
+            )
+
+    @pytest.mark.asyncio
+    async def test_each_prompt_returns_messages(self):
+        """Every registered prompt should return a list of Messages."""
+        from ad_buyer.interfaces.mcp_server import mcp
+
+        prompts_result = await mcp.list_prompts()
+        for prompt in prompts_result:
+            result = await mcp.get_prompt(prompt.name)
+            assert result is not None, (
+                f"Prompt '{prompt.name}' returned None"
+            )
+            assert len(result.messages) > 0, (
+                f"Prompt '{prompt.name}' returned no messages"
+            )
+
+    @pytest.mark.asyncio
+    async def test_each_prompt_has_user_role(self):
+        """Every prompt message should have role='user'."""
+        from ad_buyer.interfaces.mcp_server import mcp
+
+        prompts_result = await mcp.list_prompts()
+        for prompt in prompts_result:
+            result = await mcp.get_prompt(prompt.name)
+            for msg in result.messages:
+                assert msg.role == "user", (
+                    f"Prompt '{prompt.name}' has role '{msg.role}', "
+                    f"expected 'user'"
+                )

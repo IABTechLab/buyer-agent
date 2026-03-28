@@ -41,6 +41,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.prompts.base import Message
 
 from ..auth.key_store import ApiKeyStore
 from ..config.settings import Settings
@@ -2734,6 +2735,124 @@ def test_ssp_connection(ssp_name: str) -> str:
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     return json.dumps(result, indent=2)
+
+
+# ---------------------------------------------------------------------------
+# Prompts (Slash Commands)
+# ---------------------------------------------------------------------------
+# These surface as /commands in Claude Desktop and Claude Web.
+# Each prompt injects a user message that guides Claude to use the
+# appropriate tools for that workflow.
+
+
+@mcp.prompt(name="setup", description="First-time guided setup wizard")
+async def setup_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Check my setup status and walk me through configuring everything "
+                "that's incomplete. Go step by step through all 8 wizard steps: "
+                "deployment, seller connections, credentials, buyer identity, deal "
+                "preferences, campaign defaults, approval gates, and review. "
+                "Ask me one question at a time.",
+    )]
+
+
+@mcp.prompt(name="status", description="Configuration and health overview")
+async def status_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Show me a complete status overview: setup state, system health, "
+                "seller connections, database status, and any issues that need "
+                "attention.",
+    )]
+
+
+@mcp.prompt(name="campaigns", description="Campaign portfolio with budget pacing")
+async def campaigns_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Show me all my campaigns with their current status and budget "
+                "pacing. Highlight any campaigns that are behind or ahead on "
+                "pacing, and flag anything that needs attention. Include a budget "
+                "summary across all campaigns.",
+    )]
+
+
+@mcp.prompt(name="deals", description="Deal portfolio dashboard")
+async def deals_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Give me a full dashboard of my deal portfolio: total deals, "
+                "breakdown by status and deal type, top sellers, portfolio value, "
+                "and any deals expiring in the next 30 days. Include recent "
+                "activity.",
+    )]
+
+
+@mcp.prompt(name="discover", description="Find and compare seller agents")
+async def discover_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Search the IAB registry for available seller agents. Show me "
+                "who's out there, what they offer, and their capabilities. If I'm "
+                "interested in specific sellers, help me compare their media kits "
+                "and pricing side by side.",
+    )]
+
+
+@mcp.prompt(name="negotiate", description="Negotiation status and actions")
+async def negotiate_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Show me all active negotiations: where each one stands, how many "
+                "rounds we've been through, the current price positions, and what "
+                "action is needed next. If there are no active negotiations, help "
+                "me start one by discovering sellers and their inventory.",
+    )]
+
+
+@mcp.prompt(name="orders", description="Active orders and execution status")
+async def orders_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Show me all my orders: their current status, any pending "
+                "transitions, and orders that need my action. Group them by "
+                "status and highlight anything stuck or overdue.",
+    )]
+
+
+@mcp.prompt(name="approvals", description="Pending approvals queue")
+async def approvals_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Show me everything waiting for my approval: pending deal "
+                "approvals, campaign approvals, and any budget or order changes "
+                "that need my decision. Most urgent first. For each item, show "
+                "me the context I need to decide.",
+    )]
+
+
+@mcp.prompt(name="configure", description="Settings, templates, and SSP connectors")
+async def configure_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="Show me my current configuration: deal and supply path templates, "
+                "SSP connector status, API keys (masked), and campaign defaults. "
+                "Help me create new templates, configure SSP connectors, or update "
+                "settings.",
+    )]
+
+
+@mcp.prompt(name="help", description="What can this agent do?")
+async def help_prompt() -> list[Message]:
+    return [Message(
+        role="user",
+        content="List everything I can do with this buyer agent, organized by "
+                "category. Include all slash commands with descriptions, and "
+                "summarize the tool categories: campaigns, deals, seller discovery, "
+                "negotiation, orders, approvals, templates, reporting, SSP "
+                "connectors, and API keys.",
+    )]
 
 
 # ---------------------------------------------------------------------------
