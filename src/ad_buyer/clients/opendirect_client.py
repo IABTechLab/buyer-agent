@@ -12,10 +12,12 @@ from ..models.opendirect import (
     AvailsRequest,
     AvailsResponse,
     Creative,
+    DeliveryType,
     Line,
     LineStats,
     Order,
     Product,
+    RateType,
 )
 
 
@@ -38,9 +40,11 @@ class OpenDirectClient:
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")
+        self._timeout = timeout
+        self._headers = self._build_headers(api_key, oauth_token)
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
-            headers=self._build_headers(api_key, oauth_token),
+            headers=self._headers,
             timeout=timeout,
         )
 
@@ -59,6 +63,42 @@ class OpenDirectClient:
     # Products
     # -------------------------------------------------------------------------
 
+    def _normalize_product(self, data: dict[str, Any]) -> Product:
+        """Normalize a product dict from either OpenDirect or seller-native format.
+
+        Seller-agents (e.g. Paramount) return a custom discovery format that
+        omits required OpenDirect fields (publisherId, basePrice, rateType).
+        This method maps those seller fields to a valid Product object so the
+        rest of the buyer pipeline can work without knowing which format was used.
+        """
+        # Already in OpenDirect format — has at least one canonical field
+        if "publisherId" in data or "basePrice" in data or "rateType" in data:
+            return Product.model_validate(data)
+
+        # Seller-native (Paramount-style) discovery format
+        return Product(
+            id=data.get("product_id") or data.get("id"),
+            publisher_id=data.get("publisher_id", "seller"),
+            name=data.get("name", "Unknown Product")[:38],
+            description=data.get("description"),
+            base_price=float(data.get("base_price", data.get("basePrice", 0.0))),
+            rate_type=RateType.CPM,
+            delivery_type=DeliveryType.GUARANTEED,
+            available_impressions=data.get("available_impressions"),
+            targeting={
+                "capabilities": data.get("tags", []),
+                "device_types": data.get("device_types", []),
+            },
+            ext={
+                "primary_channel": data.get("primary_channel", ""),
+                "tier": data.get("tier", ""),
+                "reach": data.get("reach", ""),
+                "buying_methods": data.get("buying_methods", []),
+                "ad_formats": data.get("ad_formats", []),
+                "is_featured": data.get("is_featured", False),
+            },
+        )
+
     async def list_products(
         self, skip: int = 0, top: int = 50, **filters: Any
     ) -> list[Product]:
@@ -76,8 +116,8 @@ class OpenDirectClient:
         response = await self._client.get("/products", params=params)
         response.raise_for_status()
         data = response.json()
-        products = data.get("products", data) if isinstance(data, dict) else data
-        return [Product.model_validate(p) for p in products]
+        raw = data.get("products", data) if isinstance(data, dict) else data
+        return [self._normalize_product(p) for p in raw]
 
     async def get_product(self, product_id: str) -> Product:
         """Get a single product by ID.
@@ -95,17 +135,99 @@ class OpenDirectClient:
     async def search_products(self, filters: dict[str, Any]) -> list[Product]:
         """Search products with filters.
 
+        Uses GET /products with client-side filtering because POST /products/search
+        is not universally implemented by all seller-agents.  The full catalog is
+        fetched once and then narrowed in-process by channel, format, and tags.
+
         Args:
             filters: Search filter parameters (channel, format, pricing, etc.)
 
         Returns:
             List of matching Product objects
         """
-        response = await self._client.post("/products/search", json=filters)
+        response = await self._client.get("/products")
         response.raise_for_status()
         data = response.json()
-        products = data.get("products", data) if isinstance(data, dict) else data
-        return [Product.model_validate(p) for p in products]
+        raw = data.get("products", data) if isinstance(data, dict) else data
+        products = [self._normalize_product(p) for p in raw]
+
+        # Client-side filtering on the fields the tool passes in
+        channel = (filters.get("channel") or "").lower()
+        fmt = (filters.get("adFormat") or "").lower()
+        delivery = (filters.get("deliveryType") or "").lower()
+
+        def _matches(p: Product) -> bool:
+            ext = p.ext or {}
+            if channel:
+                primary = ext.get("primary_channel", "").lower()
+                tags = [t.lower() for t in (p.targeting or {}).get("capabilities", [])]
+                ad_formats = [f.lower() for f in ext.get("ad_formats", [])]
+                if channel not in primary and channel not in tags and channel not in ad_formats:
+                    return False
+            if fmt:
+                ad_formats = [f.lower() for f in ext.get("ad_formats", [])]
+                if fmt not in ad_formats:
+                    return False
+            if delivery:
+                if p.delivery_type.value.lower() != delivery:
+                    return False
+            return True
+
+        return [p for p in products if _matches(p)]
+
+    def search_products_sync(self, filters: dict[str, Any]) -> list[Product]:
+        """Synchronous version of search_products for use in CrewAI tool _run() methods.
+
+        Uses httpx.Client (blocking) so it works correctly from synchronous code
+        called inside a running event loop (e.g. CrewAI agent tool execution),
+        avoiding the nest_asyncio / uvloop incompatibility entirely.
+        """
+        with httpx.Client(
+            base_url=self.base_url,
+            headers=self._headers,
+            timeout=self._timeout,
+        ) as client:
+            response = client.get("/products")
+            response.raise_for_status()
+            data = response.json()
+            raw = data.get("products", data) if isinstance(data, dict) else data
+            products = [self._normalize_product(p) for p in raw]
+
+        channel = (filters.get("channel") or "").lower()
+        fmt = (filters.get("adFormat") or "").lower()
+        delivery = (filters.get("deliveryType") or "").lower()
+
+        def _matches(p: Product) -> bool:
+            ext = p.ext or {}
+            if channel:
+                primary = ext.get("primary_channel", "").lower()
+                tags = [t.lower() for t in (p.targeting or {}).get("capabilities", [])]
+                ad_formats = [f.lower() for f in ext.get("ad_formats", [])]
+                if channel not in primary and channel not in tags and channel not in ad_formats:
+                    return False
+            if fmt:
+                ad_formats = [f.lower() for f in ext.get("ad_formats", [])]
+                if fmt not in ad_formats:
+                    return False
+            if delivery:
+                if p.delivery_type.value.lower() != delivery:
+                    return False
+            return True
+
+        return [p for p in products if _matches(p)]
+
+    def list_products_sync(self, top: int = 50) -> list[Product]:
+        """Synchronous version of list_products for CrewAI tool _run() methods."""
+        with httpx.Client(
+            base_url=self.base_url,
+            headers=self._headers,
+            timeout=self._timeout,
+        ) as client:
+            response = client.get("/products", params={"$top": top})
+            response.raise_for_status()
+            data = response.json()
+            raw = data.get("products", data) if isinstance(data, dict) else data
+            return [self._normalize_product(p) for p in raw]
 
     async def check_avails(self, request: AvailsRequest) -> AvailsResponse:
         """Check availability and pricing for a product.

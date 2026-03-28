@@ -35,7 +35,15 @@ def run_async(coro: Coroutine[Any, Any, T]) -> T:
         # No running loop -- safe to use asyncio.run()
         return asyncio.run(coro)
     else:
-        # Already inside a running loop -- patch it with nest_asyncio
-        # so we can call run_until_complete without RuntimeError.
-        nest_asyncio.apply(loop)
-        return loop.run_until_complete(coro)
+        # Already inside a running loop -- attempt to patch it with nest_asyncio.
+        # This fails for uvloop (used by uvicorn); in that case fall back to
+        # running in a fresh thread with its own event loop so we don't block.
+        try:
+            nest_asyncio.apply(loop)
+            return loop.run_until_complete(coro)
+        except ValueError:
+            # uvloop (or other non-patchable loop) -- run in a new thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                future = ex.submit(asyncio.run, coro)
+                return future.result()

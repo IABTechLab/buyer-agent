@@ -59,7 +59,7 @@ Performance Agent for retargeting strategies.""",
             temperature=0.5,
         ),
         tools=tools or [],
-        allow_delegation=True,
+        allow_delegation=False,
         verbose=verbose,
         memory=False,
     )

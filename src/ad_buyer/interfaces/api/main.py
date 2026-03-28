@@ -3,6 +3,11 @@
 
 """FastAPI server for the Ad Buyer System."""
 
+# Load .env into os.environ FIRST — litellm and CrewAI read from os.environ
+# directly, not from pydantic settings objects.
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
 import json
 import logging
 import uuid
@@ -61,6 +66,51 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def _reload_jobs_from_db() -> None:
+    """Reload persisted jobs from SQLite into the in-memory jobs dict on startup.
+
+    This means a server restart no longer causes 404s for jobs the UI is still
+    polling.  Running jobs that were in-flight when the server died are marked
+    'failed' so the UI can surface a clear error instead of hanging forever.
+    """
+    store = _get_store()
+    if store is None:
+        logger.warning("DealStore unavailable — starting with empty in-memory job cache")
+        return
+
+    try:
+        rows = store.list_jobs(limit=200)
+        loaded = 0
+        for row in rows:
+            job_id = row.get("id") or row.get("job_id")
+            if not job_id or job_id in jobs:
+                continue
+            # Map DB column names → in-memory dict keys
+            job: dict[str, Any] = {
+                "status":             row.get("status", "unknown"),
+                "progress":           float(row.get("progress", 0.0)),
+                "brief":              row.get("brief") or {},
+                "auto_approve":       bool(row.get("auto_approve", False)),
+                "budget_allocations": row.get("budget_allocs") or {},
+                "recommendations":    row.get("recommendations") or [],
+                "booked_lines":       row.get("booked_lines") or [],
+                "errors":             row.get("errors") or [],
+                "created_at":         row.get("created_at", ""),
+                "updated_at":         row.get("updated_at", ""),
+            }
+            # Jobs that were still 'running' when the server died can never
+            # complete — mark them failed so the UI stops polling.
+            if job["status"] == "running":
+                job["status"] = "failed"
+                job["errors"].append("Server restarted while job was running")
+            jobs[job_id] = job
+            loaded += 1
+        logger.info("Reloaded %d job(s) from DealStore on startup", loaded)
+    except Exception:
+        logger.exception("Failed to reload jobs from DealStore on startup")
 
 # Paths that never require authentication
 _PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
@@ -280,7 +330,25 @@ async def create_booking(
 async def get_booking_status(job_id: str) -> BookingStatus:
     """Get status of a booking workflow."""
     if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
+        # Try the persistent store (handles restarts where memory was wiped)
+        store = _get_store()
+        if store is not None:
+            row = store.get_job(job_id)
+            if row is not None:
+                jobs[job_id] = {
+                    "status":             row.get("status", "unknown"),
+                    "progress":           float(row.get("progress", 0.0)),
+                    "brief":              row.get("brief") or {},
+                    "auto_approve":       bool(row.get("auto_approve", False)),
+                    "budget_allocations": row.get("budget_allocs") or {},
+                    "recommendations":    row.get("recommendations") or [],
+                    "booked_lines":       row.get("booked_lines") or [],
+                    "errors":             row.get("errors") or [],
+                    "created_at":         row.get("created_at", ""),
+                    "updated_at":         row.get("updated_at", ""),
+                }
+        if job_id not in jobs:
+            raise HTTPException(status_code=404, detail="Job not found")
 
     job = jobs[job_id]
     return BookingStatus(
@@ -409,7 +477,7 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
     client = _create_client()
     tool = ProductSearchTool(client)
 
-    result = tool._run(
+    result = await tool._arun(
         channel=request.channel,
         format=request.format,
         min_price=request.min_price,
@@ -522,7 +590,28 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        result = flow.kickoff()
+        _persist_job(job_id, job)
+
+        logger.info("[%s] ⏱  kickoff_async START  %s", job_id[:8], datetime.utcnow().isoformat())
+        # Use kickoff_async so that all parallel research branches are fully
+        # awaited before we read flow.state. The synchronous kickoff() returns
+        # before internal threads complete, causing partial state reads.
+        result = await flow.kickoff_async()
+        logger.info("[%s] ⏱  kickoff_async END    %s", job_id[:8], datetime.utcnow().isoformat())
+
+        n_allocs = len(flow.state.budget_allocations)
+        n_recs   = len(flow.state.pending_approvals)
+        n_errs   = len(flow.state.errors)
+        logger.info(
+            "[%s] ⏱  state snapshot — allocations=%d  recommendations=%d  flow_errors=%d",
+            job_id[:8], n_allocs, n_recs, n_errs,
+        )
+        if flow.state.errors:
+            for err in flow.state.errors:
+                logger.error("[%s] ❌ flow error: %s", job_id[:8], err)
+
+        # Propagate flow-level errors into the job so callers can see them
+        job["errors"].extend(flow.state.errors)
 
         job["progress"] = 0.8
         job["budget_allocations"] = {
@@ -541,6 +630,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
 
         job["progress"] = 1.0 if job["status"] == "completed" else 0.9
         job["updated_at"] = datetime.utcnow().isoformat()
+        logger.info("[%s] ⏱  job status → %s  %s", job_id[:8], job["status"], job["updated_at"])
         _persist_job(job_id, job)
 
     except Exception as e:

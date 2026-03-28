@@ -53,7 +53,7 @@ Your key responsibilities:
             temperature=0.3,
         ),
         tools=tools or [],
-        allow_delegation=True,
+        allow_delegation=False,
         verbose=verbose,
         memory=False,
     )

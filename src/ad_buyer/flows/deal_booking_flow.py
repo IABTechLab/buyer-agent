@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from crewai.flow.flow import Flow, listen, or_, start
+from crewai.flow.flow import Flow, and_, listen, or_, start
 
 from ..clients.opendirect_client import OpenDirectClient
 from ..clients.ucp_client import UCPClient
@@ -288,7 +288,7 @@ class DealBookingFlow(Flow[BookingState]):
         return gaps
 
     @listen(plan_audience)
-    def allocate_budget(self, audience_result: dict[str, Any]) -> dict[str, Any]:
+    async def allocate_budget(self, audience_result: dict[str, Any]) -> dict[str, Any]:
         """Portfolio manager determines channel budget allocation."""
         if audience_result.get("status") != "success":
             return audience_result
@@ -300,7 +300,7 @@ class DealBookingFlow(Flow[BookingState]):
                 campaign_brief=self.state.campaign_brief,
             )
 
-            result = portfolio_crew.kickoff()
+            result = await portfolio_crew.kickoff_async()
 
             # Parse allocation result
             # The result should be a JSON string with allocations
@@ -365,13 +365,16 @@ class DealBookingFlow(Flow[BookingState]):
         }
 
     @listen(allocate_budget)
-    def research_branding(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+    async def research_branding(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
         """Branding specialist researches display/video inventory."""
+        logger.info("⏩ research_branding START %s", datetime.utcnow().isoformat())
         if allocation_result.get("status") != "success":
+            logger.info("⏹ research_branding SKIP (no success)")
             return {"channel": "branding", "status": "skipped"}
 
         branding_alloc = self.state.budget_allocations.get("branding")
         if not branding_alloc or branding_alloc.budget <= 0:
+            logger.info("⏹ research_branding SKIP (no budget)")
             return {"channel": "branding", "status": "no_budget"}
 
         try:
@@ -383,26 +386,31 @@ class DealBookingFlow(Flow[BookingState]):
                 channel_brief,
                 audience_plan=self.state.audience_plan,
             )
-            result = crew.kickoff()
+            result = await crew.kickoff_async()
 
             recommendations = self._parse_recommendations(str(result), "branding")
             self.state.channel_recommendations["branding"] = recommendations
             self.state.updated_at = datetime.utcnow()
 
+            logger.info("⏹ research_branding END   %s  recs=%d", datetime.utcnow().isoformat(), len(recommendations))
             return {"channel": "branding", "status": "success", "count": len(recommendations)}
 
         except Exception as e:
+            logger.error("⏹ research_branding FAILED: %s", e)
             self.state.errors.append(f"Branding research failed: {e}")
             return {"channel": "branding", "status": "failed", "error": str(e)}
 
     @listen(allocate_budget)
-    def research_ctv(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+    async def research_ctv(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
         """CTV specialist researches streaming inventory."""
+        logger.info("⏩ research_ctv START %s", datetime.utcnow().isoformat())
         if allocation_result.get("status") != "success":
+            logger.info("⏹ research_ctv SKIP (no success)")
             return {"channel": "ctv", "status": "skipped"}
 
         ctv_alloc = self.state.budget_allocations.get("ctv")
         if not ctv_alloc or ctv_alloc.budget <= 0:
+            logger.info("⏹ research_ctv SKIP (no budget)")
             return {"channel": "ctv", "status": "no_budget"}
 
         try:
@@ -412,26 +420,31 @@ class DealBookingFlow(Flow[BookingState]):
                 channel_brief,
                 audience_plan=self.state.audience_plan,
             )
-            result = crew.kickoff()
+            result = await crew.kickoff_async()
 
             recommendations = self._parse_recommendations(str(result), "ctv")
             self.state.channel_recommendations["ctv"] = recommendations
             self.state.updated_at = datetime.utcnow()
 
+            logger.info("⏹ research_ctv END   %s  recs=%d", datetime.utcnow().isoformat(), len(recommendations))
             return {"channel": "ctv", "status": "success", "count": len(recommendations)}
 
         except Exception as e:
+            logger.error("⏹ research_ctv FAILED: %s", e)
             self.state.errors.append(f"CTV research failed: {e}")
             return {"channel": "ctv", "status": "failed", "error": str(e)}
 
     @listen(allocate_budget)
-    def research_mobile(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+    async def research_mobile(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
         """Mobile specialist researches app install inventory."""
+        logger.info("⏩ research_mobile START %s", datetime.utcnow().isoformat())
         if allocation_result.get("status") != "success":
+            logger.info("⏹ research_mobile SKIP (no success)")
             return {"channel": "mobile_app", "status": "skipped"}
 
         mobile_alloc = self.state.budget_allocations.get("mobile_app")
         if not mobile_alloc or mobile_alloc.budget <= 0:
+            logger.info("⏹ research_mobile SKIP (no budget)")
             return {"channel": "mobile_app", "status": "no_budget"}
 
         try:
@@ -441,26 +454,31 @@ class DealBookingFlow(Flow[BookingState]):
                 channel_brief,
                 audience_plan=self.state.audience_plan,
             )
-            result = crew.kickoff()
+            result = await crew.kickoff_async()
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
             self.state.channel_recommendations["mobile_app"] = recommendations
             self.state.updated_at = datetime.utcnow()
 
+            logger.info("⏹ research_mobile END   %s  recs=%d", datetime.utcnow().isoformat(), len(recommendations))
             return {"channel": "mobile_app", "status": "success", "count": len(recommendations)}
 
         except Exception as e:
+            logger.error("⏹ research_mobile FAILED: %s", e)
             self.state.errors.append(f"Mobile research failed: {e}")
             return {"channel": "mobile_app", "status": "failed", "error": str(e)}
 
     @listen(allocate_budget)
-    def research_performance(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+    async def research_performance(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
         """Performance specialist researches remarketing inventory."""
+        logger.info("⏩ research_performance START %s", datetime.utcnow().isoformat())
         if allocation_result.get("status") != "success":
+            logger.info("⏹ research_performance SKIP (no success)")
             return {"channel": "performance", "status": "skipped"}
 
         perf_alloc = self.state.budget_allocations.get("performance")
         if not perf_alloc or perf_alloc.budget <= 0:
+            logger.info("⏹ research_performance SKIP (no budget)")
             return {"channel": "performance", "status": "no_budget"}
 
         try:
@@ -470,11 +488,12 @@ class DealBookingFlow(Flow[BookingState]):
                 channel_brief,
                 audience_plan=self.state.audience_plan,
             )
-            result = crew.kickoff()
+            result = await crew.kickoff_async()
 
             recommendations = self._parse_recommendations(str(result), "performance")
             self.state.channel_recommendations["performance"] = recommendations
             self.state.updated_at = datetime.utcnow()
+            logger.info("⏹ research_performance END   %s  recs=%d", datetime.utcnow().isoformat(), len(recommendations))
 
             return {"channel": "performance", "status": "success", "count": len(recommendations)}
 
@@ -494,7 +513,7 @@ class DealBookingFlow(Flow[BookingState]):
             target_audience=self.state.campaign_brief.get("target_audience", {}),
             objectives=self.state.campaign_brief.get("objectives", []),
             kpis=self.state.campaign_brief.get("kpis", {}),
-        ).model_dump(by_alias=True)
+        ).model_dump()
 
     def _parse_recommendations(
         self, result_str: str, channel: str
@@ -529,20 +548,23 @@ class DealBookingFlow(Flow[BookingState]):
 
         return recommendations
 
-    @listen(or_(research_branding, research_ctv, research_mobile, research_performance))
+    @listen(and_(research_branding, research_ctv, research_mobile, research_performance))
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
         """Consolidate all channel recommendations for approval."""
-        # Check if all active channels have reported
+        from datetime import datetime as _dt
+        logger.info("━━━ consolidate_recommendations ENTERED %s ━━━", _dt.utcnow().isoformat())
+
         active_channels = [
             ch for ch, alloc in self.state.budget_allocations.items()
             if alloc.budget > 0
         ]
         completed_channels = list(self.state.channel_recommendations.keys())
+        logger.info("  active_channels=%s", active_channels)
+        logger.info("  completed_channels=%s", completed_channels)
 
-        # Check if we're still waiting for channels
         pending = set(active_channels) - set(completed_channels)
         if pending:
-            return {"status": "waiting", "pending": list(pending)}
+            logger.warning("  ⚠ unexpected pending channels: %s", pending)
 
         # All channels complete - consolidate
         self.state.pending_approvals = []

@@ -1,17 +1,13 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Portfolio Crew - top-level hierarchical crew."""
+"""Portfolio Crew - budget allocation crew (sequential)."""
 
 from typing import Any
 
 from crewai import Crew, Process, Task
 
 from ..agents.level1.portfolio_manager import create_portfolio_manager
-from ..agents.level2.branding_agent import create_branding_agent
-from ..agents.level2.ctv_agent import create_ctv_agent
-from ..agents.level2.mobile_app_agent import create_mobile_app_agent
-from ..agents.level2.performance_agent import create_performance_agent
 from ..clients.opendirect_client import OpenDirectClient
 from ..config.settings import settings
 
@@ -20,10 +16,11 @@ def create_portfolio_crew(
     client: OpenDirectClient,
     campaign_brief: dict[str, Any],
 ) -> Crew:
-    """Create the top-level portfolio management crew.
+    """Create the portfolio management crew.
 
-    This crew coordinates budget allocation and channel specialist
-    delegation for a campaign.
+    Runs sequentially so the Portfolio Manager completes budget allocation
+    and channel guidance without delegating via tool calls (which caused
+    malformed message history under the hierarchical process).
 
     Args:
         client: OpenDirect API client
@@ -32,12 +29,7 @@ def create_portfolio_crew(
     Returns:
         Configured Portfolio Crew
     """
-    # Create agents (tools will be added by channel crews)
     portfolio_manager = create_portfolio_manager()
-    branding_agent = create_branding_agent()
-    mobile_app_agent = create_mobile_app_agent()
-    ctv_agent = create_ctv_agent()
-    performance_agent = create_performance_agent()
 
     # Define budget allocation task
     budget_allocation_task = Task(
@@ -70,44 +62,10 @@ Not all channels may be needed - allocate $0 to channels that don't fit the obje
         agent=portfolio_manager,
     )
 
-    # Define channel coordination task
-    channel_coordination_task = Task(
-        description="""
-Based on the budget allocation, provide high-level guidance for each
-active channel specialist:
-
-For each channel with budget > $0:
-1. Key objectives for that channel
-2. Targeting priorities
-3. Quality requirements (viewability, brand safety, etc.)
-4. Any specific constraints or preferences
-
-This guidance will be used by channel specialists to research and
-recommend specific inventory.
-""",
-        expected_output="""Channel guidance for each active channel:
-{
-    "channel_name": {
-        "objectives": ["..."],
-        "targeting_priorities": ["..."],
-        "quality_requirements": {...},
-        "constraints": ["..."]
-    }
-}""",
-        agent=portfolio_manager,
-        context=[budget_allocation_task],
-    )
-
     return Crew(
-        agents=[
-            branding_agent,
-            mobile_app_agent,
-            ctv_agent,
-            performance_agent,
-        ],
-        tasks=[budget_allocation_task, channel_coordination_task],
-        process=Process.hierarchical,
-        manager_agent=portfolio_manager,
+        agents=[portfolio_manager],
+        tasks=[budget_allocation_task],
+        process=Process.sequential,
         memory=settings.crew_memory_enabled,
         verbose=settings.crew_verbose,
     )

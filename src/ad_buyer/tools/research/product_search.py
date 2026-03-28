@@ -8,7 +8,6 @@ from typing import Any, Optional
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 
 
@@ -91,19 +90,31 @@ Returns:
         delivery_type: Optional[str] = None,
         limit: int = 10,
     ) -> str:
-        """Synchronous wrapper for async search."""
-        return run_async(
-            self._arun(
-                channel=channel,
-                format=format,
-                min_price=min_price,
-                max_price=max_price,
-                publisher_ids=publisher_ids,
-                targeting_capabilities=targeting_capabilities,
-                delivery_type=delivery_type,
-                limit=limit,
-            )
-        )
+        """Synchronous search using httpx.Client — safe to call from inside a running event loop."""
+        filters: dict[str, Any] = {}
+        if channel:
+            filters["channel"] = channel
+        if format:
+            filters["adFormat"] = format
+        if delivery_type:
+            filters["deliveryType"] = delivery_type
+
+        try:
+            if filters:
+                products = self._client.search_products_sync(filters)
+            else:
+                products = self._client.list_products_sync(top=limit)
+        except Exception as e:
+            return f"Error searching products: {e}"
+
+        # Filter by price; treat base_price=0 as unknown/hidden (pass through)
+        if min_price is not None:
+            products = [p for p in products if p.base_price == 0 or p.base_price >= min_price]
+        if max_price is not None:
+            products = [p for p in products if p.base_price == 0 or p.base_price <= max_price]
+
+        products = products[:limit]
+        return self._format_results(products)
 
     async def _arun(
         self,
@@ -139,11 +150,13 @@ Returns:
         except Exception as e:
             return f"Error searching products: {e}"
 
-        # Filter by price client-side if needed
+        # Filter by price client-side if needed.
+        # Products with base_price=0 have hidden/negotiated pricing — treat as
+        # matching any price range rather than excluding them.
         if min_price is not None:
-            products = [p for p in products if p.base_price >= min_price]
+            products = [p for p in products if p.base_price == 0 or p.base_price >= min_price]
         if max_price is not None:
-            products = [p for p in products if p.base_price <= max_price]
+            products = [p for p in products if p.base_price == 0 or p.base_price <= max_price]
 
         # Limit results
         products = products[:limit]
