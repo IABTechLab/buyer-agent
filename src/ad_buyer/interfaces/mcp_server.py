@@ -2885,3 +2885,7 @@ def mount_mcp(app: FastAPI) -> None:
     sse_app = mcp.sse_app()
     app.mount("/mcp/sse", sse_app)
     logger.info("MCP SSE server mounted at /mcp/sse")
+
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")

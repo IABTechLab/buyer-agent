@@ -41,24 +41,20 @@ For buyer agents running on `localhost`:
 {
   "mcpServers": {
     "buyer-agent": {
-      "command": "uvicorn",
-      "args": ["ad_buyer.interfaces.api.main:app", "--port", "8001"],
-      "env": {
-        "ANTHROPIC_API_KEY": "your-key"
-      }
+      "command": "/path/to/ad_buyer_system/venv/bin/python",
+      "args": ["-m", "ad_buyer.interfaces.mcp_server"],
+      "cwd": "/path/to/ad_buyer_system/src"
     }
   }
 }
 ```
 
-> **Tip**: If `uvicorn` is installed in a virtualenv rather than globally, use the full path to the venv binary:
-> ```json
-> "command": "/path/to/ad_buyer_system/venv/bin/uvicorn"
-> ```
+Replace `/path/to/ad_buyer_system` with the actual path to your buyer agent installation (e.g., `/Users/yourname/dev/agent_range/ad_buyer_system`).
 
 4. Save and restart Claude Desktop
+5. Click the **+** button in the chat input — you should see **buyer-agent** listed
 
-> **Note**: The JSON config method is for **local stdio servers only**. Remote servers must use the Settings > Integrations UI.
+> **Note**: The JSON config launches the MCP server in stdio mode (stdin/stdout). This is different from the SSE endpoint used by remote servers. Remote servers must use the Settings > Integrations UI.
 
 ## Step 2: First-Run Setup Wizard
 
@@ -177,11 +173,11 @@ The same MCP endpoint works with other AI platforms:
 
 ### Claude says "no tools available" or does not recognize buyer agent tools
 
-1. Confirm the buyer server is running: `curl http://localhost:8001/health`
-2. Check that `claude_desktop_config.json` uses the `command`/`args` format (not `url` — Claude Desktop does not support the `url` config key for local servers)
-3. Verify the `command` path points to a valid `uvicorn` binary (use `which uvicorn` or the full venv path)
-4. Fully quit and relaunch Claude Desktop — it only reads the config at startup
-5. Check Claude Desktop logs for connection errors (macOS: `~/Library/Logs/Claude/`)
+1. Check that `claude_desktop_config.json` uses the `command`/`args` format with `python -m ad_buyer.interfaces.mcp_server` (not `url` or `uvicorn` — Claude Desktop requires stdio transport)
+2. Verify the `command` path points to a valid Python binary in your venv (e.g., `/path/to/venv/bin/python`)
+3. Verify `cwd` points to the `src/` directory inside your buyer agent installation
+4. Fully quit (Cmd+Q) and relaunch Claude Desktop — it only reads the config at startup
+5. Check Claude Desktop logs for connection errors (macOS: `~/Library/Logs/Claude/mcp.log`)
 
 ### Connection refused on `http://localhost:8001/mcp/sse`
 
