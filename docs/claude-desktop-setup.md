@@ -41,15 +41,24 @@ For buyer agents running on `localhost`:
 {
   "mcpServers": {
     "buyer-agent": {
-      "url": "http://localhost:8001/mcp/sse"
+      "command": "uvicorn",
+      "args": ["ad_buyer.interfaces.api.main:app", "--port", "8001"],
+      "env": {
+        "ANTHROPIC_API_KEY": "your-key"
+      }
     }
   }
 }
 ```
 
+> **Tip**: If `uvicorn` is installed in a virtualenv rather than globally, use the full path to the venv binary:
+> ```json
+> "command": "/path/to/ad_buyer_system/venv/bin/uvicorn"
+> ```
+
 4. Save and restart Claude Desktop
 
-> **Note**: The JSON config method is for **local servers only**. Remote servers must use the Settings > Integrations UI.
+> **Note**: The JSON config method is for **local stdio servers only**. Remote servers must use the Settings > Integrations UI.
 
 ## Step 2: First-Run Setup Wizard
 
@@ -169,9 +178,10 @@ The same MCP endpoint works with other AI platforms:
 ### Claude says "no tools available" or does not recognize buyer agent tools
 
 1. Confirm the buyer server is running: `curl http://localhost:8001/health`
-2. Check that `claude_desktop_config.json` has the correct URL (default port is 8001)
-3. Fully quit and relaunch Claude Desktop — it only reads the config at startup
-4. Check Claude Desktop logs for connection errors (macOS: `~/Library/Logs/Claude/`)
+2. Check that `claude_desktop_config.json` uses the `command`/`args` format (not `url` — Claude Desktop does not support the `url` config key for local servers)
+3. Verify the `command` path points to a valid `uvicorn` binary (use `which uvicorn` or the full venv path)
+4. Fully quit and relaunch Claude Desktop — it only reads the config at startup
+5. Check Claude Desktop logs for connection errors (macOS: `~/Library/Logs/Claude/`)
 
 ### Connection refused on `http://localhost:8001/mcp/sse`
 
