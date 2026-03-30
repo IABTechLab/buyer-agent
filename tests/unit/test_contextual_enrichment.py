@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from ad_buyer.tools.research.contextual_enrichment import (
+    BrandSafetyTool,
     ClassifyContentTool,
     ContextualSearchTool,
 )
@@ -19,6 +20,11 @@ from ad_buyer.tools.research.contextual_enrichment import (
 @pytest.fixture
 def classify_tool():
     return ClassifyContentTool()
+
+
+@pytest.fixture
+def brand_safety_tool():
+    return BrandSafetyTool()
 
 
 @pytest.fixture
@@ -37,10 +43,17 @@ class TestClassifyContentTool:
         assert "error" in data
 
     @pytest.mark.asyncio
-    async def test_classify_with_taxonomy_id(self, classify_tool):
+    async def test_classify_with_retriever_id(self, classify_tool):
         mock_client = AsyncMock()
         mock_client.classify_content.return_value = {
-            "results": [{"label": "Sports", "score": 0.9}]
+            "documents": [
+                {
+                    "iab_category_name": "Sports",
+                    "iab_path": ["Sports"],
+                    "iab_tier": 1,
+                    "score": 0.9,
+                }
+            ]
         }
         mock_client.close = AsyncMock()
 
@@ -49,20 +62,21 @@ class TestClassifyContentTool:
             return_value=mock_client,
         ):
             result = await classify_tool._arun(
-                text="NFL scores", taxonomy_id="tax-123"
+                text="NFL scores", retriever_id="ret-123"
             )
 
         data = json.loads(result)
-        assert data["results"][0]["label"] == "Sports"
+        assert data["categories"][0]["category"] == "Sports"
+        assert data["categories"][0]["score"] == 0.9
         mock_client.close.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_classify_auto_discovers_taxonomy(self, classify_tool):
+    async def test_classify_auto_discovers_retriever(self, classify_tool):
         mock_client = AsyncMock()
-        mock_client.list_taxonomies.return_value = [
-            {"taxonomy_id": "t1", "taxonomy_name": "IAB Content Taxonomy v3.0"}
+        mock_client.list_retrievers.return_value = [
+            {"retriever_id": "ret-1", "retriever_name": "iab_text_search"}
         ]
-        mock_client.classify_content.return_value = {"results": []}
+        mock_client.classify_content.return_value = {"documents": []}
         mock_client.close = AsyncMock()
 
         with patch(
@@ -71,15 +85,14 @@ class TestClassifyContentTool:
         ):
             result = await classify_tool._arun(text="test content")
 
-        data = json.loads(result)
         mock_client.classify_content.assert_called_once_with(
-            taxonomy_id="t1", text="test content", url=None,
+            retriever_id="ret-1", text="test content", limit=10,
         )
 
     @pytest.mark.asyncio
-    async def test_classify_no_taxonomies(self, classify_tool):
+    async def test_classify_no_retriever(self, classify_tool):
         mock_client = AsyncMock()
-        mock_client.list_taxonomies.return_value = []
+        mock_client.list_retrievers.return_value = []
         mock_client.close = AsyncMock()
 
         with patch(
@@ -89,7 +102,61 @@ class TestClassifyContentTool:
             result = await classify_tool._arun(text="test")
 
         data = json.loads(result)
-        assert "No taxonomies found" in data["error"]
+        assert "No IAB retriever found" in data["error"]
+
+
+class TestBrandSafetyTool:
+    def test_tool_name(self, brand_safety_tool):
+        assert brand_safety_tool.name == "check_brand_safety"
+
+    @pytest.mark.asyncio
+    async def test_safe_content(self, brand_safety_tool):
+        mock_client = AsyncMock()
+        mock_client.list_retrievers.return_value = [
+            {"retriever_id": "ret-1", "retriever_name": "iab_text_search"}
+        ]
+        mock_client.check_brand_safety.return_value = {
+            "safe": True,
+            "risk_level": "low",
+            "flagged_categories": [],
+            "categories": [{"category": "Sports", "score": 0.9}],
+        }
+        mock_client.close = AsyncMock()
+
+        with patch(
+            "ad_buyer.tools.research.contextual_enrichment._get_mixpeek_client",
+            return_value=mock_client,
+        ):
+            result = await brand_safety_tool._arun(text="basketball game")
+
+        data = json.loads(result)
+        assert data["safe"] is True
+
+    @pytest.mark.asyncio
+    async def test_unsafe_content(self, brand_safety_tool):
+        mock_client = AsyncMock()
+        mock_client.list_retrievers.return_value = [
+            {"retriever_id": "ret-1", "retriever_name": "iab_text_search"}
+        ]
+        mock_client.check_brand_safety.return_value = {
+            "safe": False,
+            "risk_level": "high",
+            "flagged_categories": [
+                {"category": "Casinos & Gambling", "score": 0.88}
+            ],
+            "categories": [],
+        }
+        mock_client.close = AsyncMock()
+
+        with patch(
+            "ad_buyer.tools.research.contextual_enrichment._get_mixpeek_client",
+            return_value=mock_client,
+        ):
+            result = await brand_safety_tool._arun(text="casino gambling")
+
+        data = json.loads(result)
+        assert data["safe"] is False
+        assert data["risk_level"] == "high"
 
 
 class TestContextualSearchTool:
@@ -100,7 +167,7 @@ class TestContextualSearchTool:
     async def test_search(self, search_tool):
         mock_client = AsyncMock()
         mock_client.search_content.return_value = {
-            "results": [{"doc_id": "d1", "score": 0.85}]
+            "documents": [{"document_id": "d1", "score": 0.85}]
         }
         mock_client.close = AsyncMock()
 
@@ -113,7 +180,7 @@ class TestContextualSearchTool:
             )
 
         data = json.loads(result)
-        assert data["results"][0]["score"] == 0.85
+        assert data["documents"][0]["score"] == 0.85
         mock_client.search_content.assert_called_once_with(
             retriever_id="ret-1", query="sports news", limit=5,
         )

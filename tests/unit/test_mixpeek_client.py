@@ -11,7 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from ad_buyer.clients.mixpeek_client import MixpeekClient, MixpeekError
+from ad_buyer.clients.mixpeek_client import (
+    BRAND_UNSAFE_CATEGORIES,
+    MixpeekClient,
+    MixpeekError,
+)
 
 
 @pytest.fixture
@@ -51,20 +55,22 @@ class TestClassifyContent:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "results": [{"label": "Sports", "score": 0.95}]
+            "documents": [
+                {
+                    "iab_category_name": "American Football",
+                    "iab_path": ["Sports", "American Football"],
+                    "iab_tier": 2,
+                    "score": 0.87,
+                }
+            ]
         }
 
         with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
             result = await client.classify_content(
-                taxonomy_id="tax-123", text="NFL football scores"
+                retriever_id="ret-123", text="NFL football scores"
             )
 
-        assert result["results"][0]["label"] == "Sports"
-
-    @pytest.mark.asyncio
-    async def test_classify_requires_text_or_url(self, client):
-        with pytest.raises(ValueError, match="Either text or url"):
-            await client.classify_content(taxonomy_id="tax-123")
+        assert result["documents"][0]["iab_category_name"] == "American Football"
 
     @pytest.mark.asyncio
     async def test_classify_api_error_raises(self, client):
@@ -75,8 +81,93 @@ class TestClassifyContent:
         with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
             with pytest.raises(MixpeekError, match="401"):
                 await client.classify_content(
-                    taxonomy_id="tax-123", text="test"
+                    retriever_id="ret-123", text="test"
                 )
+
+
+class TestBrandSafety:
+    @pytest.mark.asyncio
+    async def test_safe_content(self, client):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "documents": [
+                {
+                    "iab_category_name": "Sports",
+                    "iab_path": ["Sports"],
+                    "iab_tier": 1,
+                    "score": 0.90,
+                }
+            ]
+        }
+
+        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+            result = await client.check_brand_safety(
+                retriever_id="ret-123", text="local basketball game"
+            )
+
+        assert result["safe"] is True
+        assert result["risk_level"] == "low"
+        assert len(result["flagged_categories"]) == 0
+
+    @pytest.mark.asyncio
+    async def test_unsafe_gambling_content(self, client):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "documents": [
+                {
+                    "iab_category_name": "Poker and Professional Gambling",
+                    "iab_path": ["Sports", "Poker and Professional Gambling"],
+                    "iab_tier": 2,
+                    "score": 0.88,
+                },
+                {
+                    "iab_category_name": "Casinos & Gambling",
+                    "iab_path": ["Attractions", "Casinos & Gambling"],
+                    "iab_tier": 2,
+                    "score": 0.85,
+                },
+            ]
+        }
+
+        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+            result = await client.check_brand_safety(
+                retriever_id="ret-123", text="poker casino betting"
+            )
+
+        assert result["safe"] is False
+        assert result["risk_level"] == "high"
+        assert len(result["flagged_categories"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_threshold_filters_low_scores(self, client):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "documents": [
+                {
+                    "iab_category_name": "Casinos & Gambling",
+                    "iab_path": ["Attractions", "Casinos & Gambling"],
+                    "iab_tier": 2,
+                    "score": 0.75,  # Below threshold
+                },
+            ]
+        }
+
+        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+            result = await client.check_brand_safety(
+                retriever_id="ret-123",
+                text="card games",
+                threshold=0.80,
+            )
+
+        assert result["safe"] is True
+        assert len(result["categories"]) == 0  # Filtered out
+
+    def test_brand_unsafe_categories_is_frozenset(self):
+        assert isinstance(BRAND_UNSAFE_CATEGORIES, frozenset)
+        assert "Casinos & Gambling" in BRAND_UNSAFE_CATEGORIES
 
 
 class TestSearchContent:
@@ -84,7 +175,7 @@ class TestSearchContent:
     async def test_search_builds_correct_body(self, client):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"results": []}
+        mock_resp.json.return_value = {"documents": []}
 
         with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp) as mock_req:
             await client.search_content(
@@ -95,6 +186,24 @@ class TestSearchContent:
         body = call_args.kwargs.get("json") or call_args[1].get("json")
         assert body["inputs"]["query"] == "sports news"
         assert body["page_size"] == 5
+
+
+class TestListRetrievers:
+    @pytest.mark.asyncio
+    async def test_list_returns_results(self, client):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "results": [
+                {"retriever_id": "r1", "retriever_name": "iab_text_search"}
+            ]
+        }
+
+        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+            result = await client.list_retrievers()
+
+        assert len(result) == 1
+        assert result[0]["retriever_name"] == "iab_text_search"
 
 
 class TestListTaxonomies:

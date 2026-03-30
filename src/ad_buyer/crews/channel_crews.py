@@ -19,15 +19,30 @@ from ..tools.audience import AudienceDiscoveryTool, AudienceMatchingTool, Covera
 from ..tools.execution.line_management import BookLineTool, CreateLineTool, ReserveLineTool
 from ..tools.execution.order_management import CreateOrderTool
 from ..tools.research.avails_check import AvailsCheckTool
+from ..tools.research.contextual_enrichment import (
+    BrandSafetyTool,
+    ClassifyContentTool,
+    ContextualSearchTool,
+)
 from ..tools.research.product_search import ProductSearchTool
 
 
 def _create_research_tools(client: OpenDirectClient) -> list[Any]:
     """Create research tools with the OpenDirect client."""
-    return [
+    tools: list[Any] = [
         ProductSearchTool(client),
         AvailsCheckTool(client),
     ]
+
+    # Add Mixpeek contextual enrichment tools when configured
+    if settings.mixpeek_api_key:
+        tools.extend([
+            ClassifyContentTool(),
+            BrandSafetyTool(),
+            ContextualSearchTool(),
+        ])
+
+    return tools
 
 
 def _create_execution_tools(client: OpenDirectClient) -> list[Any]:

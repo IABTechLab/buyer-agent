@@ -4,7 +4,7 @@
 """Research tools for inventory discovery."""
 
 from .avails_check import AvailsCheckTool
-from .contextual_enrichment import ClassifyContentTool, ContextualSearchTool
+from .contextual_enrichment import BrandSafetyTool, ClassifyContentTool, ContextualSearchTool
 from .product_search import ProductSearchTool
 
 __all__ = [
@@ -12,4 +12,5 @@ __all__ = [
     "AvailsCheckTool",
     "ClassifyContentTool",
     "ContextualSearchTool",
+    "BrandSafetyTool",
 ]

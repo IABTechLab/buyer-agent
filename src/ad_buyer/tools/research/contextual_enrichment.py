@@ -1,8 +1,8 @@
 # Contextual enrichment tools powered by Mixpeek.
 #
-# Provides IAB taxonomy classification and brand-safety scoring
-# that buyer agents can use during inventory research and deal
-# evaluation.
+# Provides IAB taxonomy classification, brand-safety scoring,
+# and contextual inventory search that buyer agents can use during
+# inventory research and deal evaluation.
 
 from __future__ import annotations
 
@@ -28,31 +28,38 @@ def _get_mixpeek_client() -> MixpeekClient:
 
 
 # -----------------------------------------------------------------------
-# 1. Content Classification
+# 1. Content Classification (IAB Taxonomy)
 # -----------------------------------------------------------------------
 
 class ClassifyContentInput(BaseModel):
     """Input for contextual content classification."""
 
-    text: str | None = Field(
-        default=None,
-        description="Raw page/creative text to classify",
+    text: str = Field(
+        description="Page or ad-creative text to classify into IAB categories",
     )
-    url: str | None = Field(
+    retriever_id: str | None = Field(
         default=None,
-        description="Page URL — Mixpeek will scrape and classify it",
+        description=(
+            "Mixpeek retriever pipeline ID for IAB classification. "
+            "If omitted, auto-discovers an IAB retriever in the namespace."
+        ),
     )
-    taxonomy_id: str | None = Field(
-        default=None,
-        description="Mixpeek taxonomy ID. Uses default IAB taxonomy if omitted.",
+    limit: int = Field(
+        default=10,
+        description="Max IAB category matches to return",
+        ge=1,
+        le=50,
     )
 
 
 class ClassifyContentTool(BaseTool):
     """Classify page or creative content into IAB v3.0 categories.
 
-    Uses Mixpeek's taxonomy engine to map text or a URL to
-    standardised IAB content categories with confidence scores.
+    Uses a Mixpeek retriever pipeline to perform semantic search
+    against an IAB category reference corpus.  Returns ranked
+    category matches with hierarchical paths (e.g.
+    Sports > American Football) and confidence scores.
+
     Buyer agents use these categories for contextual targeting
     decisions and brand-safety evaluation.
     """
@@ -60,53 +67,138 @@ class ClassifyContentTool(BaseTool):
     name: str = "classify_content"
     description: str = (
         "Classify page or ad-creative content into IAB v3.0 taxonomy "
-        "categories using Mixpeek. Supply either raw text or a URL. "
-        "Returns category codes with confidence scores for contextual "
-        "targeting and brand-safety evaluation."
+        "categories using Mixpeek. Supply text content to classify. "
+        "Returns ranked IAB category matches with hierarchical paths "
+        "(e.g. Sports > American Football) and confidence scores for "
+        "contextual targeting and brand-safety evaluation."
     )
     args_schema: type[BaseModel] = ClassifyContentInput
 
     def _run(
         self,
-        text: str | None = None,
-        url: str | None = None,
-        taxonomy_id: str | None = None,
+        text: str = "",
+        retriever_id: str | None = None,
+        limit: int = 10,
     ) -> str:
-        return run_async(self._arun(text=text, url=url, taxonomy_id=taxonomy_id))
+        return run_async(self._arun(text=text, retriever_id=retriever_id, limit=limit))
 
     async def _arun(
         self,
-        text: str | None = None,
-        url: str | None = None,
-        taxonomy_id: str | None = None,
+        text: str = "",
+        retriever_id: str | None = None,
+        limit: int = 10,
     ) -> str:
-        if not text and not url:
-            return json.dumps({"error": "Either text or url must be provided"})
+        if not text:
+            return json.dumps({"error": "text must be provided"})
 
         client = _get_mixpeek_client()
         try:
-            # If no taxonomy_id supplied, try to find an IAB taxonomy
-            tid = taxonomy_id
-            if not tid:
-                taxonomies = await client.list_taxonomies()
-                iab = [
-                    t for t in taxonomies
-                    if "iab" in t.get("taxonomy_name", "").lower()
-                ]
-                if iab:
-                    tid = iab[0]["taxonomy_id"]
-                elif taxonomies:
-                    tid = taxonomies[0]["taxonomy_id"]
-                else:
+            rid = retriever_id
+            if not rid:
+                rid = await _discover_iab_retriever(client)
+                if not rid:
                     return json.dumps({
-                        "error": "No taxonomies found in this namespace. "
-                        "Create one first via the Mixpeek dashboard."
+                        "error": "No IAB retriever found in this namespace. "
+                        "Set MIXPEEK_NAMESPACE to a namespace with IAB data, "
+                        "or pass retriever_id explicitly."
                     })
 
             result = await client.classify_content(
-                taxonomy_id=tid,
-                text=text,
-                url=url,
+                retriever_id=rid, text=text, limit=limit,
+            )
+
+            # Simplify output for the agent
+            docs = result.get("documents", [])
+            categories = [
+                {
+                    "category": d.get("iab_category_name"),
+                    "path": d.get("iab_path", []),
+                    "tier": d.get("iab_tier"),
+                    "score": round(d.get("score", 0), 4),
+                }
+                for d in docs
+            ]
+            return json.dumps({"categories": categories}, indent=2)
+
+        except MixpeekError as exc:
+            return json.dumps({"error": str(exc)})
+        finally:
+            await client.close()
+
+
+# -----------------------------------------------------------------------
+# 2. Brand Safety Check
+# -----------------------------------------------------------------------
+
+class BrandSafetyInput(BaseModel):
+    """Input for brand-safety evaluation."""
+
+    text: str = Field(
+        description="Page or ad-creative text to evaluate for brand safety",
+    )
+    retriever_id: str | None = Field(
+        default=None,
+        description=(
+            "Mixpeek retriever pipeline ID for IAB classification. "
+            "If omitted, auto-discovers an IAB retriever in the namespace."
+        ),
+    )
+    threshold: float = Field(
+        default=0.80,
+        description="Minimum confidence score to consider a category match",
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class BrandSafetyTool(BaseTool):
+    """Evaluate content for brand-safety risk.
+
+    Classifies content via IAB taxonomy and flags matches against
+    known sensitive categories (gambling, adult content, etc.).
+    Returns a safety verdict with risk level and flagged categories.
+    """
+
+    name: str = "check_brand_safety"
+    description: str = (
+        "Evaluate page or ad-creative content for brand-safety risk. "
+        "Classifies content into IAB categories and flags sensitive "
+        "categories (gambling, adult, etc.). Returns safe/unsafe verdict, "
+        "risk level (low/medium/high), and flagged categories."
+    )
+    args_schema: type[BaseModel] = BrandSafetyInput
+
+    def _run(
+        self,
+        text: str = "",
+        retriever_id: str | None = None,
+        threshold: float = 0.80,
+    ) -> str:
+        return run_async(
+            self._arun(text=text, retriever_id=retriever_id, threshold=threshold)
+        )
+
+    async def _arun(
+        self,
+        text: str = "",
+        retriever_id: str | None = None,
+        threshold: float = 0.80,
+    ) -> str:
+        if not text:
+            return json.dumps({"error": "text must be provided"})
+
+        client = _get_mixpeek_client()
+        try:
+            rid = retriever_id
+            if not rid:
+                rid = await _discover_iab_retriever(client)
+                if not rid:
+                    return json.dumps({
+                        "error": "No IAB retriever found in this namespace."
+                    })
+
+            result = await client.check_brand_safety(
+                retriever_id=rid, text=text, threshold=threshold,
             )
             return json.dumps(result, indent=2)
 
@@ -117,7 +209,7 @@ class ClassifyContentTool(BaseTool):
 
 
 # -----------------------------------------------------------------------
-# 2. Contextual Search (inventory enrichment)
+# 3. Contextual Search (inventory enrichment)
 # -----------------------------------------------------------------------
 
 class ContextualSearchInput(BaseModel):
@@ -183,3 +275,22 @@ class ContextualSearchTool(BaseTool):
             return json.dumps({"error": str(exc)})
         finally:
             await client.close()
+
+
+# -----------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------
+
+async def _discover_iab_retriever(client: MixpeekClient) -> str | None:
+    """Find an IAB text search retriever in the current namespace."""
+    retrievers = await client.list_retrievers()
+    # Prefer a retriever with "iab" and "text" in the name
+    for r in retrievers:
+        name = r.get("retriever_name", "").lower()
+        if "iab" in name and "text" in name:
+            return r["retriever_id"]
+    # Fall back to any retriever with "iab" in the name
+    for r in retrievers:
+        if "iab" in r.get("retriever_name", "").lower():
+            return r["retriever_id"]
+    return None
