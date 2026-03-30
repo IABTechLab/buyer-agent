@@ -69,6 +69,7 @@ from ..tools.deal_library.deal_entry import (
     ManualDealEntry,
     create_manual_deal,
 )
+from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 
 logger = logging.getLogger(__name__)
 
@@ -2867,6 +2868,97 @@ async def help_prompt() -> list[Message]:
                 "negotiation, orders, approvals, templates, reporting, SSP "
                 "connectors, and API keys.",
     )]
+
+
+# ---------------------------------------------------------------------------
+# Contextual Enrichment (Mixpeek)
+# ---------------------------------------------------------------------------
+
+
+def _get_mixpeek_client() -> MixpeekClient:
+    """Create a MixpeekClient from current settings."""
+    s = Settings()
+    return MixpeekClient(
+        api_key=s.mixpeek_api_key,
+        base_url=s.mixpeek_base_url,
+        namespace=s.mixpeek_namespace,
+    )
+
+
+@mcp.tool(
+    name="classify_content",
+    description=(
+        "Classify page or ad-creative content into IAB v3.0 taxonomy "
+        "categories using Mixpeek. Supply either raw text or a URL. "
+        "Returns category codes with confidence scores for contextual "
+        "targeting and brand-safety evaluation."
+    ),
+)
+async def classify_content(
+    text: str | None = None,
+    url: str | None = None,
+    taxonomy_id: str | None = None,
+) -> str:
+    """Classify content into IAB taxonomy categories via Mixpeek."""
+    if not text and not url:
+        return json.dumps({"error": "Either text or url must be provided"})
+
+    client = _get_mixpeek_client()
+    try:
+        tid = taxonomy_id
+        if not tid:
+            taxonomies = await client.list_taxonomies()
+            iab = [
+                t for t in taxonomies
+                if "iab" in t.get("taxonomy_name", "").lower()
+            ]
+            if iab:
+                tid = iab[0]["taxonomy_id"]
+            elif taxonomies:
+                tid = taxonomies[0]["taxonomy_id"]
+            else:
+                return json.dumps({
+                    "error": "No taxonomies found in this namespace. "
+                    "Create one first via the Mixpeek dashboard."
+                })
+
+        result = await client.classify_content(
+            taxonomy_id=tid, text=text, url=url,
+        )
+        return json.dumps(result, indent=2)
+    except MixpeekError as exc:
+        return json.dumps({"error": str(exc)})
+    finally:
+        await client.close()
+
+
+@mcp.tool(
+    name="contextual_search",
+    description=(
+        "Search indexed ad inventory using a Mixpeek retriever pipeline. "
+        "Pipelines can combine multimodal search, brand-safety filtering, "
+        "IAB taxonomy enrichment, and reranking. Returns matching inventory "
+        "with relevance scores and enriched metadata."
+    ),
+)
+async def contextual_search(
+    query: str,
+    retriever_id: str,
+    limit: int = 10,
+) -> str:
+    """Search inventory via a Mixpeek retriever pipeline."""
+    client = _get_mixpeek_client()
+    try:
+        result = await client.search_content(
+            retriever_id=retriever_id,
+            query=query,
+            limit=limit,
+        )
+        return json.dumps(result, indent=2)
+    except MixpeekError as exc:
+        return json.dumps({"error": str(exc)})
+    finally:
+        await client.close()
 
 
 # ---------------------------------------------------------------------------
