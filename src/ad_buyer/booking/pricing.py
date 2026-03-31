@@ -20,8 +20,27 @@ Volume discounts (agency/advertiser only):
 """
 
 from dataclasses import dataclass
+from enum import Enum
 
 from ..models.buyer_identity import AccessTier
+
+
+class PricingSource(Enum):
+    """Provenance of a pricing value.
+
+    Every PricingResult carries a pricing_source indicating where the
+    price came from.  This prevents the system from silently using
+    fabricated CPMs.
+
+    Values:
+        SELLER_QUOTED: Price was provided by the seller (base price exists).
+        NEGOTIATED: Price was agreed via negotiation (target_cpm accepted).
+        UNAVAILABLE: No pricing is available (seller has not provided a price).
+    """
+
+    SELLER_QUOTED = "seller_quoted"
+    NEGOTIATED = "negotiated"
+    UNAVAILABLE = "unavailable"
 
 
 @dataclass
@@ -30,23 +49,28 @@ class PricingResult:
 
     Attributes:
         base_price: Original base price before any discounts.
+            None when pricing_source is UNAVAILABLE.
         tier: The buyer's access tier.
         tier_discount: Tier-based discount percentage applied.
         volume_discount: Volume-based discount percentage applied.
         tiered_price: Price after tier discount (before volume discount).
+            None when pricing_source is UNAVAILABLE.
         final_price: Price after all discounts (tier + volume + negotiation).
+            None when pricing_source is UNAVAILABLE.
         requested_volume: Impression volume used for volume discount calculation.
         deal_type: Deal type requested (if any).
+        pricing_source: Provenance of the pricing value.
     """
 
-    base_price: float
+    base_price: float | None
     tier: AccessTier
     tier_discount: float
     volume_discount: float
-    tiered_price: float
-    final_price: float
+    tiered_price: float | None
+    final_price: float | None
     requested_volume: int | None = None
     deal_type: str | None = None
+    pricing_source: PricingSource = PricingSource.SELLER_QUOTED
 
 
 class PricingCalculator:
@@ -81,7 +105,7 @@ class PricingCalculator:
 
     def calculate(
         self,
-        base_price: float,
+        base_price: float | None,
         tier: AccessTier,
         tier_discount: float,
         volume: int | None = None,
@@ -93,7 +117,9 @@ class PricingCalculator:
         """Calculate the final price after tier and volume discounts.
 
         Args:
-            base_price: Base CPM price from the product.
+            base_price: Base CPM price from the product.  When None,
+                the calculator refuses to compute and returns a result
+                with pricing_source=UNAVAILABLE.
             tier: Buyer's access tier (public/seat/agency/advertiser).
             tier_discount: Discount percentage for the tier (0-15).
             volume: Requested impression volume (may unlock volume discounts).
@@ -103,8 +129,24 @@ class PricingCalculator:
             deal_type: Deal type requested (for informational purposes).
 
         Returns:
-            PricingResult with all pricing details.
+            PricingResult with all pricing details.  When base_price is
+            None, all price fields are None and pricing_source is
+            UNAVAILABLE.
         """
+        # Guard: refuse to compute when base_price is None
+        if base_price is None:
+            return PricingResult(
+                base_price=None,
+                tier=tier,
+                tier_discount=tier_discount,
+                volume_discount=0.0,
+                tiered_price=None,
+                final_price=None,
+                requested_volume=volume,
+                deal_type=deal_type,
+                pricing_source=PricingSource.UNAVAILABLE,
+            )
+
         # Step 1: Apply tier discount
         tiered_price = base_price * (1 - tier_discount / 100)
 
@@ -118,6 +160,7 @@ class PricingCalculator:
             final_price = tiered_price
 
         # Step 4: Handle negotiation
+        pricing_source = PricingSource.SELLER_QUOTED
         if target_cpm is not None and can_negotiate and negotiation_enabled:
             floor_price = tiered_price * 0.90
             if target_cpm >= floor_price:
@@ -125,6 +168,7 @@ class PricingCalculator:
             else:
                 # Counter at floor
                 final_price = floor_price
+            pricing_source = PricingSource.NEGOTIATED
 
         return PricingResult(
             base_price=base_price,
@@ -135,6 +179,7 @@ class PricingCalculator:
             final_price=final_price,
             requested_volume=volume,
             deal_type=deal_type,
+            pricing_source=pricing_source,
         )
 
     def _get_volume_discount(

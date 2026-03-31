@@ -791,14 +791,15 @@ class TestRequestDealOutput:
 
     @pytest.mark.asyncio
     async def test_deal_handles_non_numeric_baseprice(self, mock_client, agency_context):
-        """Product with non-numeric basePrice should use default of $20."""
+        """Product with non-numeric basePrice should return a pricing error."""
         mock_client.get_product.return_value = MagicMock(
             success=True, data={"id": "bad", "name": "Bad Price", "basePrice": "TBD"}
         )
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="bad")
-        # Should not crash, should use $20 default
-        assert "DEAL-" in result
+        # Should not crash; should return error instead of fabricating $20 CPM
+        assert "Error" in result or "pricing" in result.lower()
+        assert "DEAL CREATED" not in result
 
     @pytest.mark.asyncio
     async def test_deal_exception_handling(self, mock_client, agency_context):
