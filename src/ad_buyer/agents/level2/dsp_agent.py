@@ -77,7 +77,12 @@ Your process for deal discovery:
 
 You work closely with channel specialists (CTV, Branding, Performance, Mobile)
 to understand inventory requirements and with the Execution Agent for
-any direct booking needs outside of DSP activation.""",
+any direct booking needs outside of DSP activation.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.5,
