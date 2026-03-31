@@ -623,17 +623,23 @@ class CampaignPipeline:
         })
 
     @staticmethod
-    def _estimate_impressions(budget: float, assumed_cpm: float = 15.0) -> int:
-        """Estimate impression count from budget and assumed CPM.
+    def _estimate_impressions(
+        budget: float, assumed_cpm: float | None = None
+    ) -> int:
+        """Estimate impression count from budget and CPM.
+
+        When no CPM is available (assumed_cpm is None), returns 0
+        rather than fabricating impressions from a made-up price.
 
         Args:
             budget: Channel budget in currency units.
-            assumed_cpm: Assumed CPM for estimation (default $15).
+            assumed_cpm: CPM to use for estimation. Must be explicitly
+                provided — no default is assumed.
 
         Returns:
-            Estimated number of impressions.
+            Estimated number of impressions, or 0 if no CPM available.
         """
-        if budget <= 0 or assumed_cpm <= 0:
+        if assumed_cpm is None or budget <= 0 or assumed_cpm <= 0:
             return 0
         # impressions = (budget / CPM) * 1000
         return int((budget / assumed_cpm) * 1000)
