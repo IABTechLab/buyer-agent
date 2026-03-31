@@ -211,8 +211,8 @@ class TestPricingCalculatorNegotiation:
 class TestPricingCalculatorEdgeCases:
     """Test edge cases and data integrity."""
 
-    def test_non_numeric_base_price_defaults_to_fallback(self):
-        """Non-numeric base price falls back to 0."""
+    def test_zero_base_price_produces_zero_output(self):
+        """Zero base price correctly produces zero pricing output."""
         calc = PricingCalculator()
         result = calc.calculate(
             base_price=0,
