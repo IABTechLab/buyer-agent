@@ -49,12 +49,16 @@ class PricingInfo(BaseModel):
     """Pricing breakdown returned by the seller.
 
     Extended with CPP fields for linear TV (pricing_model "cpp" or "hybrid").
+
+    base_cpm and final_cpm are Optional to support ``pricing_type=on_request``
+    (Layer 2b — pricing provenance tracking, bead ar-r76d).  When the seller
+    has not provided pricing, these fields are None.
     """
 
-    base_cpm: float
+    base_cpm: float | None = None
     tier_discount_pct: float = 0.0
     volume_discount_pct: float = 0.0
-    final_cpm: float
+    final_cpm: float | None = None
     currency: str = "USD"
     pricing_model: str = "cpm"  # "cpm", "cpp", "unit_rate", "hybrid"
     rationale: str = ""
