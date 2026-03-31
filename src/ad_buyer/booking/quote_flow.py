@@ -56,7 +56,7 @@ class QuoteFlowClient:
         volume: int | None = None,
         target_cpm: float | None = None,
         deal_type: str | None = None,
-    ) -> PricingResult:
+    ) -> PricingResult | None:
         """Calculate pricing for a product based on buyer context.
 
         Args:
@@ -66,11 +66,12 @@ class QuoteFlowClient:
             deal_type: Deal type requested.
 
         Returns:
-            PricingResult with all pricing details.
+            PricingResult with all pricing details, or None if no
+            valid pricing is available from the seller.
         """
-        base_price = product.get("basePrice", product.get("price", 0))
+        base_price = product.get("basePrice", product.get("price"))
         if not isinstance(base_price, (int, float)):
-            base_price = 0
+            return None
 
         tier = self._buyer_context.identity.get_access_tier()
         tier_discount = self._buyer_context.identity.get_discount_percentage()
@@ -96,7 +97,7 @@ class QuoteFlowClient:
         flight_start: str | None = None,
         flight_end: str | None = None,
         target_cpm: float | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         """Build deal data dict for deal creation.
 
         Calculates pricing and generates a Deal ID, returning
@@ -113,7 +114,8 @@ class QuoteFlowClient:
 
         Returns:
             Dict with deal details including deal_id, pricing,
-            and activation instructions.
+            and activation instructions. Returns None if the
+            product has no valid pricing available.
         """
         # Calculate pricing
         pricing = self.get_pricing(
@@ -122,6 +124,9 @@ class QuoteFlowClient:
             target_cpm=target_cpm,
             deal_type=deal_type,
         )
+
+        if pricing is None:
+            return None
 
         # Generate deal ID
         identity = self._buyer_context.identity

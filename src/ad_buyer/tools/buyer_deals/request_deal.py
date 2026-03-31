@@ -238,6 +238,14 @@ Returns:
                 audience_plan=audience_plan,
             )
 
+            if deal_response is None:
+                product_name = product.get("name", product_id)
+                return (
+                    f"Error: No pricing available for product '{product_name}' "
+                    f"(ID: {product_id}). Seller has not provided a CPM. "
+                    "Negotiation required before deal creation."
+                )
+
             formatted = self._format_deal_response(deal_response, audience_plan)
             if approval_banner:
                 formatted = f"{approval_banner}\n{formatted}"
@@ -334,18 +342,20 @@ Returns:
         flight_end: str | None,
         target_cpm: float | None,
         audience_plan: AudiencePlan | None = None,
-    ) -> DealResponse:
+    ) -> DealResponse | None:
         """Create a deal response with calculated pricing.
 
         Uses the centralized PricingCalculator and deal ID generator
         from ad_buyer.booking to avoid duplicated logic.
+
+        Returns None when the product has no valid pricing available.
         """
         tier = self._buyer_context.identity.get_access_tier()
         discount = self._buyer_context.identity.get_discount_percentage()
-        base_price = product.get("basePrice", product.get("price", 20.0))
+        base_price = product.get("basePrice", product.get("price"))
 
         if not isinstance(base_price, (int, float)):
-            base_price = 20.0
+            return None
 
         calculator = PricingCalculator()
         pricing = calculator.calculate(
