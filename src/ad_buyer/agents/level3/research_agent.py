@@ -57,7 +57,12 @@ When searching for inventory, always consider:
 - Targeting requirements
 - Flight dates
 - Quality metrics
-- Publisher reputation""",
+- Publisher reputation
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.2,
