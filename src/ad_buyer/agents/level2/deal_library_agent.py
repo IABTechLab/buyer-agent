@@ -86,7 +86,12 @@ management, not campaign execution.
 
 When a deal needs to be booked for a campaign, you hand off to the appropriate
 campaign flow. When you detect underperforming deals or better supply paths, you
-propose changes that the campaign flow can execute.""",
+propose changes that the campaign flow can execute.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.3,

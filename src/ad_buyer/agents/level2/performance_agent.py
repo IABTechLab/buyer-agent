@@ -57,7 +57,12 @@ You work with the Research Agent to find conversion-optimized inventory
 and the Execution Agent to book campaigns. You collaborate with the
 Reporting Agent to analyze performance and identify optimization
 opportunities. You coordinate with other specialists for full-funnel
-strategies.""",
+strategies.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.5,
