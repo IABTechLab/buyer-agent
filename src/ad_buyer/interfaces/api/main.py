@@ -50,6 +50,7 @@ app = FastAPI(
         {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
         {"name": "Products", "description": "Seller inventory product search"},
         {"name": "Events", "description": "Event bus query endpoints"},
+        {"name": "Webhooks", "description": "Webhook receiver endpoints for seller notifications"},
     ],
 )
 
@@ -100,8 +101,23 @@ def _mount_order_router() -> None:
 
 _mount_order_router()
 
+# Mount webhook receiver router
+from ...webhooks import webhook_router
+app.include_router(webhook_router)
+
 # Paths that never require authentication
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+_PUBLIC_PATHS = {
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/webhooks/deal-updates",
+    "/webhooks/inventory",
+    "/webhooks/negotiation",
+    "/webhooks/proposals",
+    "/webhooks/registry-updates",
+    "/webhooks/events",
+}
 
 
 @app.middleware("http")
