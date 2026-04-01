@@ -545,13 +545,12 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
 
         client = _create_client()
         flow = DealBookingFlow(client, store=_get_store())
-        flow.state = BookingState(campaign_brief=request.brief.model_dump())
 
         # Store flow reference for approval
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        result = flow.kickoff()
+        result = flow.kickoff(inputs={"campaign_brief": request.brief.model_dump()})
 
         job["progress"] = 0.8
         job["budget_allocations"] = {
