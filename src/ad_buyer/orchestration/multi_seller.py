@@ -353,11 +353,12 @@ class MultiSellerOrchestrator:
                     timeout=self._quote_timeout,
                 )
 
+                cpm_display = f"{quote.pricing.final_cpm:.2f}" if quote.pricing.final_cpm is not None else "unavailable"
                 logger.info(
-                    "Received quote %s from seller %s (CPM: %.2f)",
+                    "Received quote %s from seller %s (CPM: %s)",
                     quote.quote_id,
                     seller.agent_id,
-                    quote.pricing.final_cpm,
+                    cpm_display,
                 )
 
                 return SellerQuoteResult(
@@ -460,11 +461,11 @@ class MultiSellerOrchestrator:
         # Normalize and rank
         ranked = self._normalizer.compare_quotes(quote_tuples)
 
-        # Apply max CPM filter
+        # Apply max CPM filter (skip unpriced quotes — they have effective_cpm=None)
         if max_cpm is not None:
             ranked = [
                 nq for nq in ranked
-                if nq.effective_cpm <= max_cpm
+                if nq.effective_cpm is not None and nq.effective_cpm <= max_cpm
             ]
 
         logger.info(
@@ -557,11 +558,12 @@ class MultiSellerOrchestrator:
                     },
                 )
 
+                deal_cpm_display = f"{deal.pricing.final_cpm:.2f}" if deal.pricing.final_cpm is not None else "unavailable"
                 logger.info(
-                    "Booked deal %s from seller %s (CPM: %.2f)",
+                    "Booked deal %s from seller %s (CPM: %s)",
                     deal.deal_id,
                     nq.seller_id,
-                    deal.pricing.final_cpm,
+                    deal_cpm_display,
                 )
 
             except Exception as exc:  # noqa: BLE001 - per-deal isolation; continue booking remaining deals

@@ -63,7 +63,12 @@ Booking workflow states:
 
 You work for the channel specialists and execute bookings only after
 receiving approved recommendations. Always verify parameters before
-executing any booking action.""",
+executing any booking action.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.1,

@@ -135,11 +135,12 @@ Provide ranked recommendations with rationale.
         "publisher": "...",
         "format": "...",
         "impressions": X,
-        "cpm": Y,
-        "cost": Z,
+        "cpm": Y or null,
+        "cost": Z or null,
         "rationale": "..."
     }
-]""",
+]
+Note: cpm must be null if no seller pricing was provided. NEVER estimate CPM.""",
         agent=research_agent,
     )
 

@@ -508,7 +508,7 @@ class UnifiedClient:
 
         # Enhance result with tiered pricing calculation
         if result.data and isinstance(result.data, dict):
-            base_price = result.data.get("basePrice", result.data.get("price", 0))
+            base_price = result.data.get("basePrice", result.data.get("price"))
             if isinstance(base_price, (int, float)) and self.buyer_identity:
                 from ..models.buyer_identity import AccessTier
 
@@ -526,12 +526,25 @@ class UnifiedClient:
 
                 result.data["pricing"] = {
                     "base_price": pricing.base_price,
-                    "tiered_price": round(pricing.final_price, 2),
+                    "tiered_price": round(pricing.final_price, 2) if pricing.final_price is not None else None,
                     "tier": tier_obj.value if self.buyer_identity else "public",
                     "tier_discount": discount if self.buyer_identity else 0,
                     "volume_discount": pricing.volume_discount,
                     "requested_volume": volume,
                     "deal_type": deal_type,
+                    "pricing_source": pricing.pricing_source.value,
+                }
+            elif not isinstance(base_price, (int, float)):
+                # No valid pricing available — mark as unavailable
+                result.data["pricing"] = {
+                    "base_price": None,
+                    "tiered_price": None,
+                    "tier": self.buyer_identity.get_access_tier().value if self.buyer_identity else "public",
+                    "tier_discount": self.buyer_identity.get_discount_percentage() if self.buyer_identity else 0,
+                    "volume_discount": 0.0,
+                    "requested_volume": volume,
+                    "deal_type": deal_type,
+                    "pricing_source": "unavailable",
                 }
 
         return result

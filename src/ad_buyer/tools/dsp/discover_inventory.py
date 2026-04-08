@@ -186,7 +186,7 @@ Returns:
                 product_id = product.get("id", "Unknown")
                 name = product.get("name", "Unknown Product")
                 publisher = product.get("publisherId", product.get("publisher", "Unknown"))
-                base_price = product.get("basePrice", product.get("price", 0))
+                base_price = product.get("basePrice", product.get("price"))
                 channel = product.get("channel", product.get("deliveryType", "N/A"))
                 impressions = product.get(
                     "availableImpressions", product.get("available_impressions", "N/A")
@@ -194,7 +194,8 @@ Returns:
                 targeting = product.get("targeting", product.get("availableTargeting", []))
 
                 # Calculate tiered price using centralized PricingCalculator
-                if isinstance(base_price, (int, float)) and discount > 0:
+                # When no pricing is available, show as unavailable
+                if isinstance(base_price, (int, float)) and base_price > 0 and discount > 0:
                     tier_obj = self._buyer_context.identity.get_access_tier()
                     calculator = PricingCalculator()
                     pricing_result = calculator.calculate(
@@ -203,12 +204,11 @@ Returns:
                         tier_discount=discount,
                     )
                     price_display = f"${pricing_result.tiered_price:.2f} (was ${base_price:.2f})"
+                elif isinstance(base_price, (int, float)) and base_price > 0:
+                    price_display = f"${base_price:.2f}"
                 else:
-                    price_display = (
-                        f"${base_price:.2f}"
-                        if isinstance(base_price, (int, float))
-                        else str(base_price)
-                    )
+                    # No valid pricing from seller — do not fabricate
+                    price_display = "Pricing unavailable (rate on request)"
 
                 output_lines.extend(
                     [
