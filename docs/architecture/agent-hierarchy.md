@@ -17,7 +17,7 @@ graph TB
         CTV["CTV Specialist<br/>(streaming)"]
         MOB["Mobile App Specialist<br/>(app install)"]
         PERF["Performance Specialist<br/>(remarketing)"]
-        DSP["DSP Specialist<br/>(deal discovery)"]
+        DSP["Buyer Deal Specialist<br/>(deal discovery)"]
     end
 
     subgraph Level3["Level 3 — Functional Agents"]
@@ -158,9 +158,9 @@ Maximizes conversions and ROAS through lower-funnel tactics.
 | Creative | Dynamic creative optimization, A/B testing |
 | Tracking | Pixel implementation, cross-device attribution |
 
-### DSP Deal Discovery Specialist
+### Buyer Deal Discovery Specialist
 
-**File:** `src/ad_buyer/agents/level2/dsp_agent.py`
+**File:** `src/ad_buyer/agents/level2/buyer_deal_specialist_agent.py`
 
 Discovers inventory and obtains Deal IDs for activation in traditional DSP platforms.
 
@@ -171,8 +171,8 @@ Discovers inventory and obtains Deal IDs for activation in traditional DSP platf
 | Pricing | Identity-based tiered pricing, volume discounts |
 | Negotiation | Price negotiation for agency/advertiser tiers |
 
-!!! tip "DSP vs. other specialists"
-    The DSP Specialist works alongside the channel specialists, not in place of them. Channel specialists decide *what* inventory to buy; the DSP Specialist handles the mechanics of obtaining Deal IDs for programmatic activation. See [DSP Deal Flow](dsp-deal-flow.md) for the full workflow.
+!!! tip "Buyer Deal Specialist vs. other specialists"
+    The Buyer Deal Specialist works alongside the channel specialists, not in place of them. Channel specialists decide *what* inventory to buy; the Buyer Deal Specialist handles the mechanics of obtaining Deal IDs for programmatic activation. See [Buyer Deal Flow](buyer-deal-flow.md) for the full workflow.
 
 ---
 
@@ -379,6 +379,6 @@ sequenceDiagram
 
 - [Architecture Overview](overview.md) --- Full system architecture
 - [Tools Reference](tools.md) --- All CrewAI tools available to agents
-- [DSP Deal Flow](dsp-deal-flow.md) --- DSP-specific deal discovery workflow
+- [Buyer Deal Flow](buyer-deal-flow.md) --- Buyer deal discovery workflow
 - [Booking Flow](booking-flow.md) --- Detailed booking sequence
 - [Configuration](../guides/configuration.md) --- LLM and agent settings
