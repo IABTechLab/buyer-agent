@@ -1,0 +1,2114 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="API &amp; Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent" name="description"/>
+<link href="https://iabtechlab.github.io/buyer-agent/guides/campaign-pipeline/" rel="canonical"/>
+<link href="../multi-seller-orchestration/" rel="prev"/>
+<link href="../budget-pacing/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Campaign Pipeline - IAB Tech Lab — Buyer Agent</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="indigo" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#campaign-brief-to-deal-pipeline">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+<aside class="md-banner">
+<div class="md-banner__inner md-grid md-typeset">
+<a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here →
+  </a>
+</div>
+</aside>
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Campaign Pipeline
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting-started/quickstart/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/overview/">
+          
+  
+  
+  API Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../architecture/overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../state-machines/order-lifecycle/">
+          
+  
+  
+  State Machines
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../event-bus/overview/">
+          
+  
+  
+  Event Bus
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../overview/">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../integration/seller-agent/">
+          
+  
+  
+  Integration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../claude-desktop-setup/">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../ai-assistant/mcp-tools/">
+          
+  
+  
+  MCP Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="https://iabtechlab.github.io/seller-agent/">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/quickstart/">
+<span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/protocols/">
+<span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/mcp-client/">
+<span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/a2a-client/">
+<span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/authentication/">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/change-requests/">
+<span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/deals/">
+<span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/bookings/">
+<span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/seller-discovery/">
+<span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/products/">
+<span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/agent-hierarchy/">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/booking-flow/">
+<span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/buyer-deal-flow/">
+<span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/deal-store/">
+<span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/models/">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/mcp-server/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/order-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/change-request-flow/">
+<span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../event-bus/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-booking/">
+<span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../negotiation/">
+<span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../identity/">
+<span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../multi-seller/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../linear-tv/">
+<span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../configuration/">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deployment-ops-guide/">
+<span class="md-ellipsis">
+    
+  
+    Deployment &amp; Operations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../multi-seller-orchestration/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pipeline-stages">
+<span class="md-ellipsis">
+      
+        Pipeline Stages
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-campaign-brief">
+<span class="md-ellipsis">
+      
+        The Campaign Brief
+      
+    </span>
+</a>
+<nav aria-label="The Campaign Brief" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#required-fields">
+<span class="md-ellipsis">
+      
+        Required Fields
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#optional-fields">
+<span class="md-ellipsis">
+      
+        Optional Fields
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channel-allocations">
+<span class="md-ellipsis">
+      
+        Channel Allocations
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#example-brief">
+<span class="md-ellipsis">
+      
+        Example Brief
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#quick-example">
+<span class="md-ellipsis">
+      
+        Quick Example
+      
+    </span>
+</a>
+<nav aria-label="Quick Example" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#end-to-end-all-stages">
+<span class="md-ellipsis">
+      
+        End-to-End (All Stages)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-by-stage">
+<span class="md-ellipsis">
+      
+        Stage-by-Stage
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-details">
+<span class="md-ellipsis">
+      
+        Stage Details
+      
+    </span>
+</a>
+<nav aria-label="Stage Details" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-1-ingest-brief">
+<span class="md-ellipsis">
+      
+        Stage 1: Ingest Brief
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-2-plan-campaign">
+<span class="md-ellipsis">
+      
+        Stage 2: Plan Campaign
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-3-execute-booking">
+<span class="md-ellipsis">
+      
+        Stage 3: Execute Booking
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-4-finalize">
+<span class="md-ellipsis">
+      
+        Stage 4: Finalize
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#campaign-state-machine">
+<span class="md-ellipsis">
+      
+        Campaign State Machine
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#human-approval-gates">
+<span class="md-ellipsis">
+      
+        Human Approval Gates
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#events-emitted">
+<span class="md-ellipsis">
+      
+        Events Emitted
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#persistence">
+<span class="md-ellipsis">
+      
+        Persistence
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tips">
+<span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../budget-pacing/">
+<span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../creative-management/">
+<span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/opendirect/">
+<span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../claude-desktop-setup/">
+<span class="md-ellipsis">
+    
+  
+    Claude (Desktop &amp; Web)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../multi-client-setup/">
+<span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex &amp; AI IDEs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/developer-setup/">
+<span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/mcp-tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/slash-commands/">
+<span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/setup-wizard/">
+<span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="https://iabtechlab.github.io/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#pipeline-stages">
+<span class="md-ellipsis">
+      
+        Pipeline Stages
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-campaign-brief">
+<span class="md-ellipsis">
+      
+        The Campaign Brief
+      
+    </span>
+</a>
+<nav aria-label="The Campaign Brief" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#required-fields">
+<span class="md-ellipsis">
+      
+        Required Fields
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#optional-fields">
+<span class="md-ellipsis">
+      
+        Optional Fields
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channel-allocations">
+<span class="md-ellipsis">
+      
+        Channel Allocations
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#example-brief">
+<span class="md-ellipsis">
+      
+        Example Brief
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#quick-example">
+<span class="md-ellipsis">
+      
+        Quick Example
+      
+    </span>
+</a>
+<nav aria-label="Quick Example" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#end-to-end-all-stages">
+<span class="md-ellipsis">
+      
+        End-to-End (All Stages)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-by-stage">
+<span class="md-ellipsis">
+      
+        Stage-by-Stage
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-details">
+<span class="md-ellipsis">
+      
+        Stage Details
+      
+    </span>
+</a>
+<nav aria-label="Stage Details" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-1-ingest-brief">
+<span class="md-ellipsis">
+      
+        Stage 1: Ingest Brief
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-2-plan-campaign">
+<span class="md-ellipsis">
+      
+        Stage 2: Plan Campaign
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-3-execute-booking">
+<span class="md-ellipsis">
+      
+        Stage 3: Execute Booking
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#stage-4-finalize">
+<span class="md-ellipsis">
+      
+        Stage 4: Finalize
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#campaign-state-machine">
+<span class="md-ellipsis">
+      
+        Campaign State Machine
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#human-approval-gates">
+<span class="md-ellipsis">
+      
+        Human Approval Gates
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#events-emitted">
+<span class="md-ellipsis">
+      
+        Events Emitted
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#persistence">
+<span class="md-ellipsis">
+      
+        Persistence
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tips">
+<span class="md-ellipsis">
+      
+        Tips
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="campaign-brief-to-deal-pipeline">Campaign Brief to Deal Pipeline<a class="headerlink" href="#campaign-brief-to-deal-pipeline" title="Permanent link">¶</a></h1>
+<p>The campaign pipeline transforms a structured <strong>campaign brief</strong> into <strong>booked deals</strong> --- automating the entire workflow from brief ingestion through channel planning, multi-seller deal orchestration, and campaign finalization. Hand the buyer agent a brief describing what you want to achieve, and it returns a portfolio of booked deals that satisfy the brief's objectives.</p>
+<p>The pipeline is implemented by <code>CampaignPipeline</code> in <code>ad_buyer.pipelines.campaign_pipeline</code>. It coordinates the campaign brief parser, campaign store (state persistence), multi-seller orchestrator (deal booking), and event bus (lifecycle events) across four stages.</p>
+<hr/>
+<h2 id="pipeline-stages">Pipeline Stages<a class="headerlink" href="#pipeline-stages" title="Permanent link">¶</a></h2>
+<pre class="mermaid"><code>flowchart LR
+    Ingest["1. Ingest Brief\n(DRAFT)"]
+    Plan["2. Plan Campaign\n(PLANNING)"]
+    Book["3. Execute Booking\n(BOOKING)"]
+    Ready["4. Finalize\n(READY)"]
+
+    Ingest --&gt; Plan --&gt; Book --&gt; Ready
+</code></pre>
+<p>Each stage transitions the campaign through the <a href="../../state-machines/order-lifecycle/">campaign automation state machine</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Method</th>
+<th>Status Transition</th>
+<th>What Happens</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ingest</strong></td>
+<td><code>ingest_brief()</code></td>
+<td>→ DRAFT</td>
+<td>Parse and validate the brief, create campaign record</td>
+</tr>
+<tr>
+<td><strong>Plan</strong></td>
+<td><code>plan_campaign()</code></td>
+<td>DRAFT → PLANNING</td>
+<td>Compute per-channel budget allocations and deal types</td>
+</tr>
+<tr>
+<td><strong>Book</strong></td>
+<td><code>execute_booking()</code></td>
+<td>PLANNING → BOOKING</td>
+<td>Run multi-seller orchestration for each channel</td>
+</tr>
+<tr>
+<td><strong>Finalize</strong></td>
+<td><code>finalize()</code></td>
+<td>BOOKING → READY</td>
+<td>Mark campaign ready for activation</td>
+</tr>
+</tbody>
+</table>
+<p>You can call each stage independently or use <code>pipeline.run(brief)</code> to execute all four in sequence.</p>
+<hr/>
+<h2 id="the-campaign-brief">The Campaign Brief<a class="headerlink" href="#the-campaign-brief" title="Permanent link">¶</a></h2>
+<p>The campaign brief is a structured JSON document that describes what an advertiser wants to achieve. It is validated against a Pydantic schema (<code>CampaignBrief</code>) before the pipeline accepts it.</p>
+<h3 id="required-fields">Required Fields<a class="headerlink" href="#required-fields" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>advertiser_id</code></td>
+<td><code>str</code></td>
+<td>Advertiser identifier</td>
+</tr>
+<tr>
+<td><code>campaign_name</code></td>
+<td><code>str</code></td>
+<td>Human-readable campaign name</td>
+</tr>
+<tr>
+<td><code>objective</code></td>
+<td><code>str</code></td>
+<td><code>AWARENESS</code>, <code>CONSIDERATION</code>, <code>CONVERSION</code>, or <code>REACH</code></td>
+</tr>
+<tr>
+<td><code>total_budget</code></td>
+<td><code>float</code></td>
+<td>Total campaign budget (must be &gt; 0)</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td><code>str</code></td>
+<td>ISO 4217 currency code (e.g. <code>USD</code>)</td>
+</tr>
+<tr>
+<td><code>flight_start</code></td>
+<td><code>date</code></td>
+<td>Campaign start date (<code>YYYY-MM-DD</code>)</td>
+</tr>
+<tr>
+<td><code>flight_end</code></td>
+<td><code>date</code></td>
+<td>Campaign end date (must be after start)</td>
+</tr>
+<tr>
+<td><code>channels</code></td>
+<td><code>list</code></td>
+<td>Channel allocations (at least one; budget percentages must sum to 100)</td>
+</tr>
+<tr>
+<td><code>target_audience</code></td>
+<td><code>list[str]</code></td>
+<td>IAB Audience Taxonomy segment IDs</td>
+</tr>
+</tbody>
+</table>
+<h3 id="optional-fields">Optional Fields<a class="headerlink" href="#optional-fields" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>agency_id</code></td>
+<td><code>str</code></td>
+<td>Agency identifier</td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td><code>str</code></td>
+<td>Campaign objective/notes</td>
+</tr>
+<tr>
+<td><code>target_geo</code></td>
+<td><code>list</code></td>
+<td>Geographic targeting (country, state, DMA, metro, zip)</td>
+</tr>
+<tr>
+<td><code>kpis</code></td>
+<td><code>list</code></td>
+<td>Performance targets (CPM, CPC, CPCV, CTR, VCR, ROAS, GRP)</td>
+</tr>
+<tr>
+<td><code>brand_safety</code></td>
+<td><code>object</code></td>
+<td>Content exclusions (categories, keywords)</td>
+</tr>
+<tr>
+<td><code>frequency_cap</code></td>
+<td><code>object</code></td>
+<td>Cross-channel frequency cap (max impressions per period)</td>
+</tr>
+<tr>
+<td><code>pacing_model</code></td>
+<td><code>str</code></td>
+<td><code>EVEN</code> (default), <code>FRONT_LOADED</code>, <code>BACK_LOADED</code>, or <code>CUSTOM</code></td>
+</tr>
+<tr>
+<td><code>preferred_sellers</code></td>
+<td><code>list[str]</code></td>
+<td>Seller IDs to prioritize</td>
+</tr>
+<tr>
+<td><code>excluded_sellers</code></td>
+<td><code>list[str]</code></td>
+<td>Seller IDs to avoid</td>
+</tr>
+<tr>
+<td><code>creative_ids</code></td>
+<td><code>list[str]</code></td>
+<td>Pre-uploaded creative asset IDs</td>
+</tr>
+<tr>
+<td><code>approval_config</code></td>
+<td><code>object</code></td>
+<td>Human approval gates per stage</td>
+</tr>
+<tr>
+<td><code>deal_preferences</code></td>
+<td><code>object</code></td>
+<td>Preferred deal types and max CPM</td>
+</tr>
+<tr>
+<td><code>exclusion_list</code></td>
+<td><code>list[str]</code></td>
+<td>Domains/brands to exclude</td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td><code>str</code></td>
+<td>Free-text notes</td>
+</tr>
+</tbody>
+</table>
+<h3 id="channel-allocations">Channel Allocations<a class="headerlink" href="#channel-allocations" title="Permanent link">¶</a></h3>
+<p>Each entry in the <code>channels</code> array specifies a channel and its share of the total budget:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="p">{</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="w">  </span><span class="nt">"channels"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="w">    </span><span class="p">{</span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CTV"</span><span class="p">,</span><span class="w"> </span><span class="nt">"budget_pct"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">"format_prefs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"pre-roll"</span><span class="p">,</span><span class="w"> </span><span class="s2">"mid-roll"</span><span class="p">]},</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="w">    </span><span class="p">{</span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"DISPLAY"</span><span class="p">,</span><span class="w"> </span><span class="nt">"budget_pct"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span><span class="w"> </span><span class="nt">"format_prefs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"300x250"</span><span class="p">,</span><span class="w"> </span><span class="s2">"728x90"</span><span class="p">]},</span>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="w">    </span><span class="p">{</span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"AUDIO"</span><span class="p">,</span><span class="w"> </span><span class="nt">"budget_pct"</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span><span class="w"> </span><span class="nt">"format_prefs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"30s"</span><span class="p">]}</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="w">  </span><span class="p">]</span>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="p">}</span>
+</code></pre></div>
+<p>Supported channel types: <code>CTV</code>, <code>DISPLAY</code>, <code>AUDIO</code>, <code>NATIVE</code>, <code>DOOH</code>, <code>LINEAR_TV</code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Budget percentages must sum to 100</p>
+<p>The brief validator rejects briefs where channel <code>budget_pct</code> values do not sum to exactly 100. Duplicate channel types are also rejected.</p>
+</div>
+<h3 id="example-brief">Example Brief<a class="headerlink" href="#example-brief" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="p">{</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="w">  </span><span class="nt">"advertiser_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"acme-corp"</span><span class="p">,</span>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="w">  </span><span class="nt">"campaign_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Q3 Brand Awareness"</span><span class="p">,</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="w">  </span><span class="nt">"objective"</span><span class="p">:</span><span class="w"> </span><span class="s2">"AWARENESS"</span><span class="p">,</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="w">  </span><span class="nt">"total_budget"</span><span class="p">:</span><span class="w"> </span><span class="mi">150000</span><span class="p">,</span>
+<a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="w">  </span><span class="nt">"currency"</span><span class="p">:</span><span class="w"> </span><span class="s2">"USD"</span><span class="p">,</span>
+<a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="w">  </span><span class="nt">"flight_start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-07-01"</span><span class="p">,</span>
+<a href="#__codelineno-1-8" id="__codelineno-1-8" name="__codelineno-1-8"></a><span class="w">  </span><span class="nt">"flight_end"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-09-30"</span><span class="p">,</span>
+<a href="#__codelineno-1-9" id="__codelineno-1-9" name="__codelineno-1-9"></a><span class="w">  </span><span class="nt">"channels"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a href="#__codelineno-1-10" id="__codelineno-1-10" name="__codelineno-1-10"></a><span class="w">    </span><span class="p">{</span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CTV"</span><span class="p">,</span><span class="w"> </span><span class="nt">"budget_pct"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="nt">"format_prefs"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"pre-roll"</span><span class="p">]},</span>
+<a href="#__codelineno-1-11" id="__codelineno-1-11" name="__codelineno-1-11"></a><span class="w">    </span><span class="p">{</span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"DISPLAY"</span><span class="p">,</span><span class="w"> </span><span class="nt">"budget_pct"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">},</span>
+<a href="#__codelineno-1-12" id="__codelineno-1-12" name="__codelineno-1-12"></a><span class="w">    </span><span class="p">{</span><span class="nt">"channel"</span><span class="p">:</span><span class="w"> </span><span class="s2">"AUDIO"</span><span class="p">,</span><span class="w"> </span><span class="nt">"budget_pct"</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">}</span>
+<a href="#__codelineno-1-13" id="__codelineno-1-13" name="__codelineno-1-13"></a><span class="w">  </span><span class="p">],</span>
+<a href="#__codelineno-1-14" id="__codelineno-1-14" name="__codelineno-1-14"></a><span class="w">  </span><span class="nt">"target_audience"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"IAB-AUD-1234"</span><span class="p">,</span><span class="w"> </span><span class="s2">"IAB-AUD-5678"</span><span class="p">],</span>
+<a href="#__codelineno-1-15" id="__codelineno-1-15" name="__codelineno-1-15"></a><span class="w">  </span><span class="nt">"target_geo"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a href="#__codelineno-1-16" id="__codelineno-1-16" name="__codelineno-1-16"></a><span class="w">    </span><span class="p">{</span><span class="nt">"geo_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"COUNTRY"</span><span class="p">,</span><span class="w"> </span><span class="nt">"geo_value"</span><span class="p">:</span><span class="w"> </span><span class="s2">"US"</span><span class="p">}</span>
+<a href="#__codelineno-1-17" id="__codelineno-1-17" name="__codelineno-1-17"></a><span class="w">  </span><span class="p">],</span>
+<a href="#__codelineno-1-18" id="__codelineno-1-18" name="__codelineno-1-18"></a><span class="w">  </span><span class="nt">"kpis"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a href="#__codelineno-1-19" id="__codelineno-1-19" name="__codelineno-1-19"></a><span class="w">    </span><span class="p">{</span><span class="nt">"metric"</span><span class="p">:</span><span class="w"> </span><span class="s2">"CPM"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target_value"</span><span class="p">:</span><span class="w"> </span><span class="mf">15.0</span><span class="p">},</span>
+<a href="#__codelineno-1-20" id="__codelineno-1-20" name="__codelineno-1-20"></a><span class="w">    </span><span class="p">{</span><span class="nt">"metric"</span><span class="p">:</span><span class="w"> </span><span class="s2">"VCR"</span><span class="p">,</span><span class="w"> </span><span class="nt">"target_value"</span><span class="p">:</span><span class="w"> </span><span class="mf">75.0</span><span class="p">}</span>
+<a href="#__codelineno-1-21" id="__codelineno-1-21" name="__codelineno-1-21"></a><span class="w">  </span><span class="p">],</span>
+<a href="#__codelineno-1-22" id="__codelineno-1-22" name="__codelineno-1-22"></a><span class="w">  </span><span class="nt">"brand_safety"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a href="#__codelineno-1-23" id="__codelineno-1-23" name="__codelineno-1-23"></a><span class="w">    </span><span class="nt">"excluded_categories"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"IAB25"</span><span class="p">,</span><span class="w"> </span><span class="s2">"IAB26"</span><span class="p">],</span>
+<a href="#__codelineno-1-24" id="__codelineno-1-24" name="__codelineno-1-24"></a><span class="w">    </span><span class="nt">"excluded_keywords"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"gambling"</span><span class="p">,</span><span class="w"> </span><span class="s2">"tobacco"</span><span class="p">]</span>
+<a href="#__codelineno-1-25" id="__codelineno-1-25" name="__codelineno-1-25"></a><span class="w">  </span><span class="p">},</span>
+<a href="#__codelineno-1-26" id="__codelineno-1-26" name="__codelineno-1-26"></a><span class="w">  </span><span class="nt">"pacing_model"</span><span class="p">:</span><span class="w"> </span><span class="s2">"EVEN"</span><span class="p">,</span>
+<a href="#__codelineno-1-27" id="__codelineno-1-27" name="__codelineno-1-27"></a><span class="w">  </span><span class="nt">"excluded_sellers"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"seller-block-123"</span><span class="p">],</span>
+<a href="#__codelineno-1-28" id="__codelineno-1-28" name="__codelineno-1-28"></a><span class="w">  </span><span class="nt">"deal_preferences"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a href="#__codelineno-1-29" id="__codelineno-1-29" name="__codelineno-1-29"></a><span class="w">    </span><span class="nt">"preferred_deal_types"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"PG"</span><span class="p">,</span><span class="w"> </span><span class="s2">"PD"</span><span class="p">],</span>
+<a href="#__codelineno-1-30" id="__codelineno-1-30" name="__codelineno-1-30"></a><span class="w">    </span><span class="nt">"max_cpm"</span><span class="p">:</span><span class="w"> </span><span class="mf">35.0</span>
+<a href="#__codelineno-1-31" id="__codelineno-1-31" name="__codelineno-1-31"></a><span class="w">  </span><span class="p">},</span>
+<a href="#__codelineno-1-32" id="__codelineno-1-32" name="__codelineno-1-32"></a><span class="w">  </span><span class="nt">"approval_config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a href="#__codelineno-1-33" id="__codelineno-1-33" name="__codelineno-1-33"></a><span class="w">    </span><span class="nt">"plan_review"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a href="#__codelineno-1-34" id="__codelineno-1-34" name="__codelineno-1-34"></a><span class="w">    </span><span class="nt">"booking"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a href="#__codelineno-1-35" id="__codelineno-1-35" name="__codelineno-1-35"></a><span class="w">    </span><span class="nt">"creative"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a href="#__codelineno-1-36" id="__codelineno-1-36" name="__codelineno-1-36"></a><span class="w">    </span><span class="nt">"pacing_adjustment"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<a href="#__codelineno-1-37" id="__codelineno-1-37" name="__codelineno-1-37"></a><span class="w">  </span><span class="p">}</span>
+<a href="#__codelineno-1-38" id="__codelineno-1-38" name="__codelineno-1-38"></a><span class="p">}</span>
+</code></pre></div>
+<hr/>
+<h2 id="quick-example">Quick Example<a class="headerlink" href="#quick-example" title="Permanent link">¶</a></h2>
+<h3 id="end-to-end-all-stages">End-to-End (All Stages)<a class="headerlink" href="#end-to-end-all-stages" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.pipelines.campaign_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">CampaignPipeline</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.orchestration.multi_seller</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiSellerOrchestrator</span>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.storage.campaign_store</span><span class="w"> </span><span class="kn">import</span> <span class="n">CampaignStore</span>
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.bus</span><span class="w"> </span><span class="kn">import</span> <span class="n">InMemoryEventBus</span>
+<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a>
+<a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a><span class="c1"># Setup</span>
+<a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a><span class="n">store</span> <span class="o">=</span> <span class="n">CampaignStore</span><span class="p">(</span><span class="s2">"sqlite:///./ad_buyer.db"</span><span class="p">)</span>
+<a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a><span class="n">store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+<a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a><span class="n">bus</span> <span class="o">=</span> <span class="n">InMemoryEventBus</span><span class="p">()</span>
+<a href="#__codelineno-2-10" id="__codelineno-2-10" name="__codelineno-2-10"></a>
+<a href="#__codelineno-2-11" id="__codelineno-2-11" name="__codelineno-2-11"></a><span class="n">orchestrator</span> <span class="o">=</span> <span class="n">MultiSellerOrchestrator</span><span class="p">(</span>
+<a href="#__codelineno-2-12" id="__codelineno-2-12" name="__codelineno-2-12"></a>    <span class="n">registry_client</span><span class="o">=</span><span class="n">registry</span><span class="p">,</span>
+<a href="#__codelineno-2-13" id="__codelineno-2-13" name="__codelineno-2-13"></a>    <span class="n">deals_client_factory</span><span class="o">=</span><span class="n">deals_factory</span><span class="p">,</span>
+<a href="#__codelineno-2-14" id="__codelineno-2-14" name="__codelineno-2-14"></a>    <span class="n">event_bus</span><span class="o">=</span><span class="n">bus</span><span class="p">,</span>
+<a href="#__codelineno-2-15" id="__codelineno-2-15" name="__codelineno-2-15"></a><span class="p">)</span>
+<a href="#__codelineno-2-16" id="__codelineno-2-16" name="__codelineno-2-16"></a>
+<a href="#__codelineno-2-17" id="__codelineno-2-17" name="__codelineno-2-17"></a><span class="n">pipeline</span> <span class="o">=</span> <span class="n">CampaignPipeline</span><span class="p">(</span>
+<a href="#__codelineno-2-18" id="__codelineno-2-18" name="__codelineno-2-18"></a>    <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
+<a href="#__codelineno-2-19" id="__codelineno-2-19" name="__codelineno-2-19"></a>    <span class="n">orchestrator</span><span class="o">=</span><span class="n">orchestrator</span><span class="p">,</span>
+<a href="#__codelineno-2-20" id="__codelineno-2-20" name="__codelineno-2-20"></a>    <span class="n">event_bus</span><span class="o">=</span><span class="n">bus</span><span class="p">,</span>
+<a href="#__codelineno-2-21" id="__codelineno-2-21" name="__codelineno-2-21"></a><span class="p">)</span>
+<a href="#__codelineno-2-22" id="__codelineno-2-22" name="__codelineno-2-22"></a>
+<a href="#__codelineno-2-23" id="__codelineno-2-23" name="__codelineno-2-23"></a><span class="c1"># Run the full pipeline</span>
+<a href="#__codelineno-2-24" id="__codelineno-2-24" name="__codelineno-2-24"></a><span class="n">summary</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">run</span><span class="p">({</span>
+<a href="#__codelineno-2-25" id="__codelineno-2-25" name="__codelineno-2-25"></a>    <span class="s2">"advertiser_id"</span><span class="p">:</span> <span class="s2">"acme-corp"</span><span class="p">,</span>
+<a href="#__codelineno-2-26" id="__codelineno-2-26" name="__codelineno-2-26"></a>    <span class="s2">"campaign_name"</span><span class="p">:</span> <span class="s2">"Q3 Brand Awareness"</span><span class="p">,</span>
+<a href="#__codelineno-2-27" id="__codelineno-2-27" name="__codelineno-2-27"></a>    <span class="s2">"objective"</span><span class="p">:</span> <span class="s2">"AWARENESS"</span><span class="p">,</span>
+<a href="#__codelineno-2-28" id="__codelineno-2-28" name="__codelineno-2-28"></a>    <span class="s2">"total_budget"</span><span class="p">:</span> <span class="mi">150000</span><span class="p">,</span>
+<a href="#__codelineno-2-29" id="__codelineno-2-29" name="__codelineno-2-29"></a>    <span class="s2">"currency"</span><span class="p">:</span> <span class="s2">"USD"</span><span class="p">,</span>
+<a href="#__codelineno-2-30" id="__codelineno-2-30" name="__codelineno-2-30"></a>    <span class="s2">"flight_start"</span><span class="p">:</span> <span class="s2">"2026-07-01"</span><span class="p">,</span>
+<a href="#__codelineno-2-31" id="__codelineno-2-31" name="__codelineno-2-31"></a>    <span class="s2">"flight_end"</span><span class="p">:</span> <span class="s2">"2026-09-30"</span><span class="p">,</span>
+<a href="#__codelineno-2-32" id="__codelineno-2-32" name="__codelineno-2-32"></a>    <span class="s2">"channels"</span><span class="p">:</span> <span class="p">[</span>
+<a href="#__codelineno-2-33" id="__codelineno-2-33" name="__codelineno-2-33"></a>        <span class="p">{</span><span class="s2">"channel"</span><span class="p">:</span> <span class="s2">"CTV"</span><span class="p">,</span> <span class="s2">"budget_pct"</span><span class="p">:</span> <span class="mi">50</span><span class="p">},</span>
+<a href="#__codelineno-2-34" id="__codelineno-2-34" name="__codelineno-2-34"></a>        <span class="p">{</span><span class="s2">"channel"</span><span class="p">:</span> <span class="s2">"DISPLAY"</span><span class="p">,</span> <span class="s2">"budget_pct"</span><span class="p">:</span> <span class="mi">30</span><span class="p">},</span>
+<a href="#__codelineno-2-35" id="__codelineno-2-35" name="__codelineno-2-35"></a>        <span class="p">{</span><span class="s2">"channel"</span><span class="p">:</span> <span class="s2">"AUDIO"</span><span class="p">,</span> <span class="s2">"budget_pct"</span><span class="p">:</span> <span class="mi">20</span><span class="p">},</span>
+<a href="#__codelineno-2-36" id="__codelineno-2-36" name="__codelineno-2-36"></a>    <span class="p">],</span>
+<a href="#__codelineno-2-37" id="__codelineno-2-37" name="__codelineno-2-37"></a>    <span class="s2">"target_audience"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"IAB-AUD-1234"</span><span class="p">],</span>
+<a href="#__codelineno-2-38" id="__codelineno-2-38" name="__codelineno-2-38"></a><span class="p">})</span>
+<a href="#__codelineno-2-39" id="__codelineno-2-39" name="__codelineno-2-39"></a>
+<a href="#__codelineno-2-40" id="__codelineno-2-40" name="__codelineno-2-40"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Campaign: </span><span class="si">{</span><span class="n">summary</span><span class="p">[</span><span class="s1">'campaign_id'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a href="#__codelineno-2-41" id="__codelineno-2-41" name="__codelineno-2-41"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Status: </span><span class="si">{</span><span class="n">summary</span><span class="p">[</span><span class="s1">'status'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># "ready"</span>
+<a href="#__codelineno-2-42" id="__codelineno-2-42" name="__codelineno-2-42"></a><span class="k">for</span> <span class="n">ch</span><span class="p">,</span> <span class="n">info</span> <span class="ow">in</span> <span class="n">summary</span><span class="p">[</span><span class="s2">"channels"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a href="#__codelineno-2-43" id="__codelineno-2-43" name="__codelineno-2-43"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">ch</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'deals_booked'</span><span class="p">]</span><span class="si">}</span><span class="s2"> deals, $</span><span class="si">{</span><span class="n">info</span><span class="p">[</span><span class="s1">'total_spend'</span><span class="p">]</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span><span class="s2"> spend"</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="stage-by-stage">Stage-by-Stage<a class="headerlink" href="#stage-by-stage" title="Permanent link">¶</a></h3>
+<p>For more control, call each stage independently:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="c1"># Stage 1: Ingest brief</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="n">campaign_id</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">ingest_brief</span><span class="p">(</span><span class="n">brief_json</span><span class="p">)</span>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="c1"># Stage 2: Plan (creates per-channel allocations)</span>
+<a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a><span class="n">plan</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">plan_campaign</span><span class="p">(</span><span class="n">campaign_id</span><span class="p">)</span>
+<a href="#__codelineno-3-6" id="__codelineno-3-6" name="__codelineno-3-6"></a><span class="k">for</span> <span class="n">cp</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">channel_plans</span><span class="p">:</span>
+<a href="#__codelineno-3-7" id="__codelineno-3-7" name="__codelineno-3-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">cp</span><span class="o">.</span><span class="n">channel</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">: $</span><span class="si">{</span><span class="n">cp</span><span class="o">.</span><span class="n">budget</span><span class="si">:</span><span class="s2">,.2f</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">cp</span><span class="o">.</span><span class="n">budget_pct</span><span class="si">}</span><span class="s2">%)"</span><span class="p">)</span>
+<a href="#__codelineno-3-8" id="__codelineno-3-8" name="__codelineno-3-8"></a>
+<a href="#__codelineno-3-9" id="__codelineno-3-9" name="__codelineno-3-9"></a><span class="c1"># Stage 3: Book deals (runs multi-seller orchestration per channel)</span>
+<a href="#__codelineno-3-10" id="__codelineno-3-10" name="__codelineno-3-10"></a><span class="n">results</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">execute_booking</span><span class="p">(</span><span class="n">campaign_id</span><span class="p">)</span>
+<a href="#__codelineno-3-11" id="__codelineno-3-11" name="__codelineno-3-11"></a><span class="k">for</span> <span class="n">ch</span><span class="p">,</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<a href="#__codelineno-3-12" id="__codelineno-3-12" name="__codelineno-3-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">ch</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">selection</span><span class="o">.</span><span class="n">booked_deals</span><span class="p">)</span><span class="si">}</span><span class="s2"> deals booked"</span><span class="p">)</span>
+<a href="#__codelineno-3-13" id="__codelineno-3-13" name="__codelineno-3-13"></a>
+<a href="#__codelineno-3-14" id="__codelineno-3-14" name="__codelineno-3-14"></a><span class="c1"># Stage 4: Finalize</span>
+<a href="#__codelineno-3-15" id="__codelineno-3-15" name="__codelineno-3-15"></a><span class="k">await</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">finalize</span><span class="p">(</span><span class="n">campaign_id</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h2 id="stage-details">Stage Details<a class="headerlink" href="#stage-details" title="Permanent link">¶</a></h2>
+<h3 id="stage-1-ingest-brief">Stage 1: Ingest Brief<a class="headerlink" href="#stage-1-ingest-brief" title="Permanent link">¶</a></h3>
+<p><code>ingest_brief()</code> accepts a campaign brief as either a JSON string or a Python dict. It:</p>
+<ol>
+<li><strong>Parses and validates</strong> the brief using the <code>CampaignBrief</code> Pydantic model. Invalid JSON raises <code>ValueError</code>; schema violations raise <code>pydantic.ValidationError</code>.</li>
+<li><strong>Computes budget amounts</strong> --- Each channel's <code>budget_amount</code> is calculated from <code>total_budget * budget_pct / 100</code>.</li>
+<li><strong>Creates a campaign record</strong> in the <code>CampaignStore</code> in DRAFT status.</li>
+<li><strong>Emits</strong> a <code>campaign.created</code> event.</li>
+</ol>
+<h3 id="stage-2-plan-campaign">Stage 2: Plan Campaign<a class="headerlink" href="#stage-2-plan-campaign" title="Permanent link">¶</a></h3>
+<p><code>plan_campaign()</code> transitions the campaign from DRAFT to PLANNING and produces a <code>CampaignPlan</code> with per-channel <code>ChannelPlan</code> entries.</p>
+<p>For each channel in the brief, the planner determines:</p>
+<ul>
+<li><strong>Media type</strong> for seller discovery (e.g., CTV maps to <code>"ctv"</code>, DISPLAY maps to <code>"display"</code>)</li>
+<li><strong>Deal types</strong> to request (e.g., CTV defaults to <code>["PG", "PD"]</code>, DISPLAY to <code>["PD", "PA"]</code>)</li>
+<li><strong>Budget</strong> allocated from the total</li>
+<li><strong>Format preferences</strong> from the brief</li>
+</ul>
+<p>The channel-to-deal-type mapping:</p>
+<table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Default Deal Types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>CTV</td>
+<td>PG, PD</td>
+</tr>
+<tr>
+<td>DISPLAY</td>
+<td>PD, PA</td>
+</tr>
+<tr>
+<td>AUDIO</td>
+<td>PD, PA</td>
+</tr>
+<tr>
+<td>NATIVE</td>
+<td>PD, PA</td>
+</tr>
+<tr>
+<td>DOOH</td>
+<td>PG, PD</td>
+</tr>
+<tr>
+<td>LINEAR_TV</td>
+<td>PG</td>
+</tr>
+</tbody>
+</table>
+<h3 id="stage-3-execute-booking">Stage 3: Execute Booking<a class="headerlink" href="#stage-3-execute-booking" title="Permanent link">¶</a></h3>
+<p><code>execute_booking()</code> transitions the campaign from PLANNING to BOOKING and calls the <a href="../multi-seller-orchestration/">MultiSellerOrchestrator</a> once per channel.</p>
+<p>For each channel plan, the pipeline:</p>
+<ol>
+<li>Builds an <code>InventoryRequirements</code> from the channel's media type, deal types, and the brief's excluded sellers and max CPM</li>
+<li>Constructs <code>DealParams</code> with estimated impressions (derived from channel budget at an assumed $15 CPM)</li>
+<li>Calls <code>orchestrator.orchestrate()</code> with the channel's budget and a max of 3 deals per channel</li>
+<li>Collects the <code>OrchestrationResult</code></li>
+</ol>
+<p>If a channel's orchestration fails, the error is logged and an empty result is recorded for that channel --- other channels proceed normally. After all channels complete, the pipeline emits a <code>campaign.booking_completed</code> event with a summary.</p>
+<h3 id="stage-4-finalize">Stage 4: Finalize<a class="headerlink" href="#stage-4-finalize" title="Permanent link">¶</a></h3>
+<p><code>finalize()</code> transitions the campaign from BOOKING to READY and emits a <code>campaign.ready</code> event. The campaign is now prepared for activation --- it awaits its flight start date or manual activation to move to ACTIVE status.</p>
+<hr/>
+<h2 id="campaign-state-machine">Campaign State Machine<a class="headerlink" href="#campaign-state-machine" title="Permanent link">¶</a></h2>
+<p>The pipeline drives the campaign through a formal state machine. After the pipeline completes, the campaign is in READY. From there, it can be activated and managed through its full lifecycle:</p>
+<pre class="mermaid"><code>stateDiagram-v2
+    [*] --&gt; DRAFT
+    DRAFT --&gt; PLANNING : plan_campaign()
+    PLANNING --&gt; BOOKING : execute_booking()
+    BOOKING --&gt; READY : finalize()
+    READY --&gt; ACTIVE : activate (auto or manual)
+    ACTIVE --&gt; COMPLETED : flight end
+    ACTIVE --&gt; PAUSED : manual pause
+    ACTIVE --&gt; PACING_HOLD : automated pacing threshold
+    PAUSED --&gt; ACTIVE : resume
+    PACING_HOLD --&gt; ACTIVE : deviation resolved
+    PACING_HOLD --&gt; PAUSED : escalate to manual
+
+    PLANNING --&gt; CANCELED : cancel
+    BOOKING --&gt; CANCELED : cancel
+    READY --&gt; CANCELED : cancel
+    ACTIVE --&gt; CANCELED : cancel
+    PAUSED --&gt; CANCELED : cancel
+    PACING_HOLD --&gt; CANCELED : cancel
+
+    BOOKING --&gt; PLANNING : replan
+    READY --&gt; PLANNING : replan
+</code></pre>
+<div class="admonition info">
+<p class="admonition-title">PAUSED vs PACING_HOLD</p>
+<p><strong>PAUSED</strong> is a manual hold --- a human decided to pause the campaign. <strong>PACING_HOLD</strong> is an automated hold triggered by the <a href="../budget-pacing/">pacing engine</a> when spend deviation exceeds a configurable threshold. PACING_HOLD can auto-resolve back to ACTIVE or be escalated to PAUSED.</p>
+</div>
+<hr/>
+<h2 id="human-approval-gates">Human Approval Gates<a class="headerlink" href="#human-approval-gates" title="Permanent link">¶</a></h2>
+<p>The pipeline supports configurable human approval gates at four stages, controlled by the brief's <code>approval_config</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Default</th>
+<th>Controls</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>plan_review</code></td>
+<td><strong>Enabled</strong></td>
+<td>Approval after plan generation, before booking</td>
+</tr>
+<tr>
+<td><code>booking</code></td>
+<td><strong>Enabled</strong></td>
+<td>Approval after deals selected, before committing budget</td>
+</tr>
+<tr>
+<td><code>creative</code></td>
+<td>Disabled</td>
+<td>Approval after creative matched, before ad server push</td>
+</tr>
+<tr>
+<td><code>pacing_adjustment</code></td>
+<td>Disabled</td>
+<td>Approval after pacing reallocation recommended</td>
+</tr>
+</tbody>
+</table>
+<p>Set all to <code>false</code> in the brief for fully automated execution:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="p">{</span>
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="w">  </span><span class="nt">"approval_config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="w">    </span><span class="nt">"plan_review"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a href="#__codelineno-4-4" id="__codelineno-4-4" name="__codelineno-4-4"></a><span class="w">    </span><span class="nt">"booking"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a href="#__codelineno-4-5" id="__codelineno-4-5" name="__codelineno-4-5"></a><span class="w">    </span><span class="nt">"creative"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a href="#__codelineno-4-6" id="__codelineno-4-6" name="__codelineno-4-6"></a><span class="w">    </span><span class="nt">"pacing_adjustment"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<a href="#__codelineno-4-7" id="__codelineno-4-7" name="__codelineno-4-7"></a><span class="w">  </span><span class="p">}</span>
+<a href="#__codelineno-4-8" id="__codelineno-4-8" name="__codelineno-4-8"></a><span class="p">}</span>
+</code></pre></div>
+<p>The <code>ApprovalGate</code> class integrates with the <code>CampaignStore</code> to persist approval requests and emits <code>approval.requested</code>, <code>approval.granted</code>, and <code>approval.rejected</code> events. See the <code>ad_buyer.pipelines.approval</code> module for full details.</p>
+<hr/>
+<h2 id="events-emitted">Events Emitted<a class="headerlink" href="#events-emitted" title="Permanent link">¶</a></h2>
+<p>The pipeline emits these events across its lifecycle:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>Stage</th>
+<th>Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>campaign.created</code></td>
+<td>Ingest</td>
+<td><code>campaign_name</code>, <code>advertiser_id</code>, <code>total_budget</code>, <code>channels</code></td>
+</tr>
+<tr>
+<td><code>campaign.plan_generated</code></td>
+<td>Plan</td>
+<td>Channel details with budget, media type, and deal types</td>
+</tr>
+<tr>
+<td><code>campaign.booking_started</code></td>
+<td>Book</td>
+<td>(no payload)</td>
+</tr>
+<tr>
+<td><code>campaign.booking_completed</code></td>
+<td>Book</td>
+<td><code>channels_booked</code>, <code>total_deals</code>, <code>total_spend</code>, per-channel summary</td>
+</tr>
+<tr>
+<td><code>campaign.ready</code></td>
+<td>Finalize</td>
+<td><code>campaign_id</code></td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="persistence">Persistence<a class="headerlink" href="#persistence" title="Permanent link">¶</a></h2>
+<p>Campaign state is persisted in SQLite via <code>CampaignStore</code>. The store manages six tables:</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>campaigns</code></td>
+<td>Core campaign records (brief fields, status, timestamps)</td>
+</tr>
+<tr>
+<td><code>pacing_snapshots</code></td>
+<td>Periodic pacing data points</td>
+</tr>
+<tr>
+<td><code>creative_assets</code></td>
+<td>Creative files and metadata</td>
+</tr>
+<tr>
+<td><code>ad_server_campaigns</code></td>
+<td>Ad server integration records</td>
+</tr>
+<tr>
+<td><code>campaign_events</code></td>
+<td>Lifecycle event audit trail</td>
+</tr>
+<tr>
+<td><code>approval_requests</code></td>
+<td>Human approval gate requests</td>
+</tr>
+</tbody>
+</table>
+<p>All status transitions are validated by the <code>CampaignAutomationStateMachine</code> before being persisted, ensuring the campaign never enters an invalid state.</p>
+<hr/>
+<h2 id="tips">Tips<a class="headerlink" href="#tips" title="Permanent link">¶</a></h2>
+<p><strong>Start with the brief schema.</strong> The most common pipeline error is a malformed brief. Validate your brief structure against the <code>CampaignBrief</code> model before calling the pipeline --- the <code>parse_campaign_brief()</code> function gives clear validation errors.</p>
+<p><strong>Use stage-by-stage for debugging.</strong> If the pipeline produces unexpected results, call each stage individually and inspect the intermediate outputs: the <code>CampaignPlan</code> from <code>plan_campaign()</code> and the per-channel <code>OrchestrationResult</code> from <code>execute_booking()</code>.</p>
+<p><strong>Watch the events.</strong> Subscribe to the event bus to monitor pipeline progress in real time. The <code>campaign.booking_completed</code> event gives you a per-channel breakdown of deals booked, spend, and failures.</p>
+<p><strong>Budget estimation.</strong> The pipeline estimates impressions from budget using an assumed $15 CPM. This is a planning heuristic --- actual CPMs depend on what the sellers quote.</p>
+<hr/>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="../multi-seller/">Multi-Seller Discovery</a> --- Manual multi-seller workflow (the pipeline automates this)</li>
+<li><a href="../multi-seller-orchestration/">Multi-Seller Orchestration</a> --- The orchestration engine the pipeline calls internally</li>
+<li><a href="../../api/deals/">Deals API</a> --- The underlying quote-then-book API</li>
+<li><a href="../budget-pacing/">Budget Pacing &amp; Reallocation</a> --- Mid-flight budget management (builds on the pipeline)</li>
+<li><a href="../negotiation/">Negotiation</a> --- Automated multi-turn price negotiation</li>
+<li><a href="../deal-booking/">Deal Booking</a> --- Lower-level booking flow details</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>

@@ -1,0 +1,2618 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="API &amp; Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent" name="description"/>
+<link href="https://iabtechlab.github.io/buyer-agent/event-bus/overview/" rel="canonical"/>
+<link href="../../state-machines/change-request-flow/" rel="prev"/>
+<link href="../../guides/overview/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Overview - IAB Tech Lab — Buyer Agent</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="indigo" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#event-bus">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+<aside class="md-banner">
+<div class="md-banner__inner md-grid md-typeset">
+<a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here →
+  </a>
+</div>
+</aside>
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Overview
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting-started/quickstart/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/overview/">
+          
+  
+  
+  API Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../architecture/overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../state-machines/order-lifecycle/">
+          
+  
+  
+  State Machines
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="./">
+          
+  
+  
+  Event Bus
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../guides/overview/">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../integration/seller-agent/">
+          
+  
+  
+  Integration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../claude-desktop-setup/">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../ai-assistant/mcp-tools/">
+          
+  
+  
+  MCP Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="https://iabtechlab.github.io/seller-agent/">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/quickstart/">
+<span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/protocols/">
+<span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/mcp-client/">
+<span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/a2a-client/">
+<span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/authentication/">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/change-requests/">
+<span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/deals/">
+<span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/bookings/">
+<span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/seller-discovery/">
+<span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/products/">
+<span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/agent-hierarchy/">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/booking-flow/">
+<span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/buyer-deal-flow/">
+<span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/deal-store/">
+<span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/models/">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/mcp-server/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/order-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/change-request-flow/">
+<span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#why-an-event-bus">
+<span class="md-ellipsis">
+      
+        Why an Event Bus
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#architecture">
+<span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#event-model">
+<span class="md-ellipsis">
+      
+        Event Model
+      
+    </span>
+</a>
+<nav aria-label="Event Model" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#correlation">
+<span class="md-ellipsis">
+      
+        Correlation
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#event-types">
+<span class="md-ellipsis">
+      
+        Event Types
+      
+    </span>
+</a>
+<nav aria-label="Event Types" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#quote-lifecycle">
+<span class="md-ellipsis">
+      
+        Quote Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#deal-lifecycle">
+<span class="md-ellipsis">
+      
+        Deal Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#campaign-lifecycle">
+<span class="md-ellipsis">
+      
+        Campaign Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#budget-lifecycle">
+<span class="md-ellipsis">
+      
+        Budget Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#booking-lifecycle">
+<span class="md-ellipsis">
+      
+        Booking Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inventory-lifecycle">
+<span class="md-ellipsis">
+      
+        Inventory Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#negotiation-lifecycle">
+<span class="md-ellipsis">
+      
+        Negotiation Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#session-lifecycle">
+<span class="md-ellipsis">
+      
+        Session Lifecycle
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inmemoryeventbus">
+<span class="md-ellipsis">
+      
+        InMemoryEventBus
+      
+    </span>
+</a>
+<nav aria-label="InMemoryEventBus" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#methods">
+<span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#subscriber-dispatch">
+<span class="md-ellipsis">
+      
+        Subscriber Dispatch
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#singleton-access">
+<span class="md-ellipsis">
+      
+        Singleton Access
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emitting-events">
+<span class="md-ellipsis">
+      
+        Emitting Events
+      
+    </span>
+</a>
+<nav aria-label="Emitting Events" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emit_event-async">
+<span class="md-ellipsis">
+      
+        emit_event() --- Async
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emit_event_sync-synchronous">
+<span class="md-ellipsis">
+      
+        emit_event_sync() --- Synchronous
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#how-emit_event_sync-works">
+<span class="md-ellipsis">
+      
+        How emit_event_sync() Works
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#helper-parameters">
+<span class="md-ellipsis">
+      
+        Helper Parameters
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#sqlite-persistence">
+<span class="md-ellipsis">
+      
+        SQLite Persistence
+      
+    </span>
+</a>
+<nav aria-label="SQLite Persistence" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#events-table-schema">
+<span class="md-ellipsis">
+      
+        Events Table Schema
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#indexes">
+<span class="md-ellipsis">
+      
+        Indexes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#dealstore-event-methods">
+<span class="md-ellipsis">
+      
+        DealStore Event Methods
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-endpoints">
+<span class="md-ellipsis">
+      
+        API Endpoints
+      
+    </span>
+</a>
+<nav aria-label="API Endpoints" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#get-events">
+<span class="md-ellipsis">
+      
+        GET /events
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#get-eventsevent_id">
+<span class="md-ellipsis">
+      
+        GET /events/{event_id}
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#event-flow-diagram">
+<span class="md-ellipsis">
+      
+        Event Flow Diagram
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#usage-examples">
+<span class="md-ellipsis">
+      
+        Usage Examples
+      
+    </span>
+</a>
+<nav aria-label="Usage Examples" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emitting-events-from-a-flow">
+<span class="md-ellipsis">
+      
+        Emitting Events from a Flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#subscribing-to-events">
+<span class="md-ellipsis">
+      
+        Subscribing to Events
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#querying-events-via-api">
+<span class="md-ellipsis">
+      
+        Querying Events via API
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-booking/">
+<span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/negotiation/">
+<span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/identity/">
+<span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/linear-tv/">
+<span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/configuration/">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deployment-ops-guide/">
+<span class="md-ellipsis">
+    
+  
+    Deployment &amp; Operations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller-orchestration/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/campaign-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/budget-pacing/">
+<span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/creative-management/">
+<span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/opendirect/">
+<span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../claude-desktop-setup/">
+<span class="md-ellipsis">
+    
+  
+    Claude (Desktop &amp; Web)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../multi-client-setup/">
+<span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex &amp; AI IDEs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/developer-setup/">
+<span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/mcp-tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/slash-commands/">
+<span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/setup-wizard/">
+<span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="https://iabtechlab.github.io/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#why-an-event-bus">
+<span class="md-ellipsis">
+      
+        Why an Event Bus
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#architecture">
+<span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#event-model">
+<span class="md-ellipsis">
+      
+        Event Model
+      
+    </span>
+</a>
+<nav aria-label="Event Model" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#correlation">
+<span class="md-ellipsis">
+      
+        Correlation
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#event-types">
+<span class="md-ellipsis">
+      
+        Event Types
+      
+    </span>
+</a>
+<nav aria-label="Event Types" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#quote-lifecycle">
+<span class="md-ellipsis">
+      
+        Quote Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#deal-lifecycle">
+<span class="md-ellipsis">
+      
+        Deal Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#campaign-lifecycle">
+<span class="md-ellipsis">
+      
+        Campaign Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#budget-lifecycle">
+<span class="md-ellipsis">
+      
+        Budget Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#booking-lifecycle">
+<span class="md-ellipsis">
+      
+        Booking Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inventory-lifecycle">
+<span class="md-ellipsis">
+      
+        Inventory Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#negotiation-lifecycle">
+<span class="md-ellipsis">
+      
+        Negotiation Lifecycle
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#session-lifecycle">
+<span class="md-ellipsis">
+      
+        Session Lifecycle
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inmemoryeventbus">
+<span class="md-ellipsis">
+      
+        InMemoryEventBus
+      
+    </span>
+</a>
+<nav aria-label="InMemoryEventBus" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#methods">
+<span class="md-ellipsis">
+      
+        Methods
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#subscriber-dispatch">
+<span class="md-ellipsis">
+      
+        Subscriber Dispatch
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#singleton-access">
+<span class="md-ellipsis">
+      
+        Singleton Access
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emitting-events">
+<span class="md-ellipsis">
+      
+        Emitting Events
+      
+    </span>
+</a>
+<nav aria-label="Emitting Events" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emit_event-async">
+<span class="md-ellipsis">
+      
+        emit_event() --- Async
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emit_event_sync-synchronous">
+<span class="md-ellipsis">
+      
+        emit_event_sync() --- Synchronous
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#how-emit_event_sync-works">
+<span class="md-ellipsis">
+      
+        How emit_event_sync() Works
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#helper-parameters">
+<span class="md-ellipsis">
+      
+        Helper Parameters
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#sqlite-persistence">
+<span class="md-ellipsis">
+      
+        SQLite Persistence
+      
+    </span>
+</a>
+<nav aria-label="SQLite Persistence" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#events-table-schema">
+<span class="md-ellipsis">
+      
+        Events Table Schema
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#indexes">
+<span class="md-ellipsis">
+      
+        Indexes
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#dealstore-event-methods">
+<span class="md-ellipsis">
+      
+        DealStore Event Methods
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-endpoints">
+<span class="md-ellipsis">
+      
+        API Endpoints
+      
+    </span>
+</a>
+<nav aria-label="API Endpoints" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#get-events">
+<span class="md-ellipsis">
+      
+        GET /events
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#get-eventsevent_id">
+<span class="md-ellipsis">
+      
+        GET /events/{event_id}
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#event-flow-diagram">
+<span class="md-ellipsis">
+      
+        Event Flow Diagram
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#usage-examples">
+<span class="md-ellipsis">
+      
+        Usage Examples
+      
+    </span>
+</a>
+<nav aria-label="Usage Examples" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#emitting-events-from-a-flow">
+<span class="md-ellipsis">
+      
+        Emitting Events from a Flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#subscribing-to-events">
+<span class="md-ellipsis">
+      
+        Subscribing to Events
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#querying-events-via-api">
+<span class="md-ellipsis">
+      
+        Querying Events via API
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="event-bus">Event Bus<a class="headerlink" href="#event-bus" title="Permanent link">¶</a></h1>
+<p>The event bus provides structured, append-only event logging for all significant actions in the buyer agent. Every quote request, negotiation round, deal booking, and budget allocation is recorded as a typed event --- giving operators full observability into what the buyer did, when, and why.</p>
+<h2 id="why-an-event-bus">Why an Event Bus<a class="headerlink" href="#why-an-event-bus" title="Permanent link">¶</a></h2>
+<p>Standard Python logging captures text messages. The event bus captures structured records that can be filtered, queried, and subscribed to programmatically:</p>
+<ul>
+<li><strong>Auditability</strong> --- Regulators, advertisers, and agency partners can trace every action the buyer agent took on their behalf.</li>
+<li><strong>Debugging</strong> --- Reconstruct the exact sequence of events that led to a deal outcome by querying <code>flow_id</code> or <code>deal_id</code>.</li>
+<li><strong>Analytics</strong> --- Query historical events for reporting (e.g., average negotiation rounds, win rates by seller, time-to-book).</li>
+<li><strong>Integration</strong> --- External systems can subscribe to events for real-time dashboards, alerting, or downstream processing.</li>
+</ul>
+<div class="admonition info">
+<p class="admonition-title">Fail-open by design</p>
+<p>Event emission never blocks or breaks the calling flow. If the bus is unavailable, the helpers log a warning and return <code>None</code>. Deal execution always takes priority over observability.</p>
+</div>
+<hr/>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">¶</a></h2>
+<p>The diagram below shows how events flow from the buyer's deal and campaign flows through helper functions into the event bus, and from there to subscribers and the persistence layer. Flows emit events via sync or async helpers; the bus dispatches to subscribers and the API layer exposes events for external queries.</p>
+<pre class="mermaid"><code>graph TB
+    subgraph Flows
+        DSP["BuyerDealFlow"]
+        DBF["DealBookingFlow"]
+    end
+
+    subgraph "Event Helpers"
+        ES["emit_event_sync()"]
+        EA["emit_event()"]
+    end
+
+    subgraph "Event Bus"
+        BUS["InMemoryEventBus"]
+        SUBS["Subscribers"]
+    end
+
+    subgraph "Persistence"
+        STORE["DealStore.save_event()"]
+        DB[("SQLite events table")]
+    end
+
+    subgraph "API Layer"
+        LIST["/events"]
+        GET["/events/{event_id}"]
+    end
+
+    DSP --&gt;|sync calls| ES
+    DBF --&gt;|sync calls| ES
+    EA --&gt; BUS
+    ES --&gt;|async bridge| BUS
+    BUS --&gt;|notify| SUBS
+    BUS --&gt; LIST
+    BUS --&gt; GET
+    STORE --&gt; DB
+</code></pre>
+<hr/>
+<h2 id="event-model">Event Model<a class="headerlink" href="#event-model" title="Permanent link">¶</a></h2>
+<p>Every event is a Pydantic <code>Event</code> instance with the following fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_id</code></td>
+<td><code>str</code></td>
+<td>Auto-generated UUID</td>
+<td>Unique identifier for this event</td>
+</tr>
+<tr>
+<td><code>event_type</code></td>
+<td><code>EventType</code></td>
+<td><em>(required)</em></td>
+<td>Enum value identifying what happened</td>
+</tr>
+<tr>
+<td><code>timestamp</code></td>
+<td><code>datetime</code></td>
+<td><code>datetime.now(timezone.utc)</code></td>
+<td>When the event was created</td>
+</tr>
+<tr>
+<td><code>flow_id</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>ID of the flow instance that produced this event</td>
+</tr>
+<tr>
+<td><code>flow_type</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Type of flow (e.g., <code>"buyer_deal"</code>, <code>"deal_booking"</code>)</td>
+</tr>
+<tr>
+<td><code>deal_id</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Associated deal ID, if applicable</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Associated session ID, if applicable</td>
+</tr>
+<tr>
+<td><code>payload</code></td>
+<td><code>dict[str, Any]</code></td>
+<td><code>{}</code></td>
+<td>Event-specific data (see per-type examples below)</td>
+</tr>
+<tr>
+<td><code>metadata</code></td>
+<td><code>dict[str, Any]</code></td>
+<td><code>{}</code></td>
+<td>Additional context passed via <code>**kwargs</code> to helpers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="correlation">Correlation<a class="headerlink" href="#correlation" title="Permanent link">¶</a></h3>
+<p>Events can be correlated across a workflow using three keys:</p>
+<ul>
+<li><strong><code>flow_id</code></strong> --- Groups all events from a single flow execution.</li>
+<li><strong><code>deal_id</code></strong> --- Groups all events related to a specific deal across multiple flows.</li>
+<li><strong><code>session_id</code></strong> --- Groups all events within a user session.</li>
+</ul>
+<hr/>
+<h2 id="event-types">Event Types<a class="headerlink" href="#event-types" title="Permanent link">¶</a></h2>
+<p>The <code>EventType</code> enum defines 13 event types organized by domain.</p>
+<h3 id="quote-lifecycle">Quote Lifecycle<a class="headerlink" href="#quote-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QUOTE_REQUESTED</code></td>
+<td><code>quote.requested</code></td>
+<td>Quote request sent to seller</td>
+<td><code>{"request": "...", "deal_type": "PD"}</code></td>
+</tr>
+<tr>
+<td><code>QUOTE_RECEIVED</code></td>
+<td><code>quote.received</code></td>
+<td>Pricing response received</td>
+<td><code>{"product_id": "prod-ctv-001"}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="deal-lifecycle">Deal Lifecycle<a class="headerlink" href="#deal-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEAL_BOOKED</code></td>
+<td><code>deal.booked</code></td>
+<td>Deal booking confirmed</td>
+<td><code>{"product_id": "prod-001", "deal_id": "..."}</code></td>
+</tr>
+<tr>
+<td><code>DEAL_CANCELLED</code></td>
+<td><code>deal.cancelled</code></td>
+<td>Deal cancelled</td>
+<td><code>{"deal_id": "...", "reason": "..."}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="campaign-lifecycle">Campaign Lifecycle<a class="headerlink" href="#campaign-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CAMPAIGN_CREATED</code></td>
+<td><code>campaign.created</code></td>
+<td>Campaign brief parsed</td>
+<td><code>{"name": "Q3 CTV", "budget": 50000}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="budget-lifecycle">Budget Lifecycle<a class="headerlink" href="#budget-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BUDGET_ALLOCATED</code></td>
+<td><code>budget.allocated</code></td>
+<td>Budget distributed across channels</td>
+<td><code>{"channels": ["ctv", "mobile"], "total_budget": 50000}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="booking-lifecycle">Booking Lifecycle<a class="headerlink" href="#booking-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BOOKING_SUBMITTED</code></td>
+<td><code>booking.submitted</code></td>
+<td>Booking request sent to seller</td>
+<td><code>{"order_id": "...", "line_id": "..."}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="inventory-lifecycle">Inventory Lifecycle<a class="headerlink" href="#inventory-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>INVENTORY_DISCOVERED</code></td>
+<td><code>inventory.discovered</code></td>
+<td>Seller inventory query returned results</td>
+<td><code>{"query": "..."}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="negotiation-lifecycle">Negotiation Lifecycle<a class="headerlink" href="#negotiation-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NEGOTIATION_STARTED</code></td>
+<td><code>negotiation.started</code></td>
+<td>Negotiation session opened</td>
+<td><code>{"proposal_id": "...", "strategy": "anchor_high"}</code></td>
+</tr>
+<tr>
+<td><code>NEGOTIATION_ROUND</code></td>
+<td><code>negotiation.round</code></td>
+<td>A negotiation round completed</td>
+<td><code>{"round": 2, "buyer_price": 12.0, "seller_price": 15.0}</code></td>
+</tr>
+<tr>
+<td><code>NEGOTIATION_CONCLUDED</code></td>
+<td><code>negotiation.concluded</code></td>
+<td>Negotiation session ended</td>
+<td><code>{"outcome": "accepted", "final_price": 14.0}</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="session-lifecycle">Session Lifecycle<a class="headerlink" href="#session-lifecycle" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Value</th>
+<th>Emitted When</th>
+<th>Example Payload</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SESSION_CREATED</code></td>
+<td><code>session.created</code></td>
+<td>New buyer session started</td>
+<td><code>{"session_id": "..."}</code></td>
+</tr>
+<tr>
+<td><code>SESSION_CLOSED</code></td>
+<td><code>session.closed</code></td>
+<td>Buyer session ended</td>
+<td><code>{"session_id": "...", "deals_count": 3}</code></td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="inmemoryeventbus">InMemoryEventBus<a class="headerlink" href="#inmemoryeventbus" title="Permanent link">¶</a></h2>
+<p>The <code>InMemoryEventBus</code> is the default (and currently only) backend. It stores events in a Python list and dispatches to subscribers synchronously during <code>publish()</code>.</p>
+<h3 id="methods">Methods<a class="headerlink" href="#methods" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>publish</code></td>
+<td><code>async (event: Event) -&gt; None</code></td>
+<td>Append event to store, notify subscribers</td>
+</tr>
+<tr>
+<td><code>subscribe</code></td>
+<td><code>async (event_type: str, callback: Subscriber) -&gt; None</code></td>
+<td>Register a callback for a specific event type or <code>"*"</code> for all</td>
+</tr>
+<tr>
+<td><code>get_event</code></td>
+<td><code>async (event_id: str) -&gt; Event \| None</code></td>
+<td>Look up a single event by ID</td>
+</tr>
+<tr>
+<td><code>list_events</code></td>
+<td><code>async (flow_id?, event_type?, session_id?, limit=50) -&gt; list[Event]</code></td>
+<td>Query events with optional filters</td>
+</tr>
+</tbody>
+</table>
+<h3 id="subscriber-dispatch">Subscriber Dispatch<a class="headerlink" href="#subscriber-dispatch" title="Permanent link">¶</a></h3>
+<p>When <code>publish()</code> is called:</p>
+<ol>
+<li>The event is appended to the internal list.</li>
+<li>All callbacks registered for the event's type are invoked.</li>
+<li>All callbacks registered for <code>"*"</code> (wildcard) are invoked.</li>
+<li>If a subscriber raises an exception, it is logged and the next subscriber is called. One failing subscriber never blocks others.</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_event_bus</span><span class="p">,</span> <span class="n">EventType</span><span class="p">,</span> <span class="n">Event</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="n">bus</span> <span class="o">=</span> <span class="k">await</span> <span class="n">get_event_bus</span><span class="p">()</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="c1"># Subscribe to all deal.booked events</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_deal_booked</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">):</span>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Deal booked: </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">deal_id</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="k">await</span> <span class="n">bus</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"deal.booked"</span><span class="p">,</span> <span class="n">on_deal_booked</span><span class="p">)</span>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a>
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="c1"># Subscribe to ALL events</span>
+<a href="#__codelineno-0-12" id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">audit_logger</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">):</span>
+<a href="#__codelineno-0-13" id="__codelineno-0-13" name="__codelineno-0-13"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"[AUDIT] </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">event_type</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">payload</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a href="#__codelineno-0-14" id="__codelineno-0-14" name="__codelineno-0-14"></a>
+<a href="#__codelineno-0-15" id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="k">await</span> <span class="n">bus</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"*"</span><span class="p">,</span> <span class="n">audit_logger</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="singleton-access">Singleton Access<a class="headerlink" href="#singleton-access" title="Permanent link">¶</a></h3>
+<p>The module provides a singleton factory:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.bus</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_event_bus</span><span class="p">,</span> <span class="n">close_event_bus</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="n">bus</span> <span class="o">=</span> <span class="k">await</span> <span class="n">get_event_bus</span><span class="p">()</span>   <span class="c1"># Creates InMemoryEventBus on first call</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="n">bus2</span> <span class="o">=</span> <span class="k">await</span> <span class="n">get_event_bus</span><span class="p">()</span>  <span class="c1"># Returns same instance</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="k">assert</span> <span class="n">bus</span> <span class="ow">is</span> <span class="n">bus2</span>
+<a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a>
+<a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="k">await</span> <span class="n">close_event_bus</span><span class="p">()</span>       <span class="c1"># Resets the singleton (for testing)</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">No persistence across restarts</p>
+<p><code>InMemoryEventBus</code> stores events in a Python list. Events are lost when the process exits. For durable storage, events are separately persisted to the SQLite <code>events</code> table via <code>DealStore.save_event()</code>.</p>
+</div>
+<hr/>
+<h2 id="emitting-events">Emitting Events<a class="headerlink" href="#emitting-events" title="Permanent link">¶</a></h2>
+<p>Two helper functions make it easy to emit events from any code path. Both follow the fail-open pattern: they catch all exceptions, log a warning, and return <code>None</code>.</p>
+<h3 id="emit_event-async"><code>emit_event()</code> --- Async<a class="headerlink" href="#emit_event-async" title="Permanent link">¶</a></h3>
+<p>Use in async code (FastAPI endpoints, async handlers):</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.helpers</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit_event</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventType</span>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="n">event</span> <span class="o">=</span> <span class="k">await</span> <span class="n">emit_event</span><span class="p">(</span>
+<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a>    <span class="n">EventType</span><span class="o">.</span><span class="n">DEAL_BOOKED</span><span class="p">,</span>
+<a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a>    <span class="n">flow_id</span><span class="o">=</span><span class="s2">"flow-abc-123"</span><span class="p">,</span>
+<a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a>    <span class="n">flow_type</span><span class="o">=</span><span class="s2">"buyer_deal"</span><span class="p">,</span>
+<a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a>    <span class="n">deal_id</span><span class="o">=</span><span class="s2">"deal-456"</span><span class="p">,</span>
+<a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a>    <span class="n">payload</span><span class="o">=</span><span class="p">{</span>
+<a href="#__codelineno-2-10" id="__codelineno-2-10" name="__codelineno-2-10"></a>        <span class="s2">"product_id"</span><span class="p">:</span> <span class="s2">"prod-ctv-sports-001"</span><span class="p">,</span>
+<a href="#__codelineno-2-11" id="__codelineno-2-11" name="__codelineno-2-11"></a>        <span class="s2">"final_cpm"</span><span class="p">:</span> <span class="mf">14.50</span><span class="p">,</span>
+<a href="#__codelineno-2-12" id="__codelineno-2-12" name="__codelineno-2-12"></a>    <span class="p">},</span>
+<a href="#__codelineno-2-13" id="__codelineno-2-13" name="__codelineno-2-13"></a><span class="p">)</span>
+<a href="#__codelineno-2-14" id="__codelineno-2-14" name="__codelineno-2-14"></a><span class="c1"># event is an Event instance, or None if the bus was unavailable</span>
+</code></pre></div>
+<h3 id="emit_event_sync-synchronous"><code>emit_event_sync()</code> --- Synchronous<a class="headerlink" href="#emit_event_sync-synchronous" title="Permanent link">¶</a></h3>
+<p>Use in synchronous code, particularly CrewAI flow methods that run in worker threads without an asyncio event loop:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.helpers</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit_event_sync</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventType</span>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="n">event</span> <span class="o">=</span> <span class="n">emit_event_sync</span><span class="p">(</span>
+<a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a>    <span class="n">EventType</span><span class="o">.</span><span class="n">CAMPAIGN_CREATED</span><span class="p">,</span>
+<a href="#__codelineno-3-6" id="__codelineno-3-6" name="__codelineno-3-6"></a>    <span class="n">flow_type</span><span class="o">=</span><span class="s2">"deal_booking"</span><span class="p">,</span>
+<a href="#__codelineno-3-7" id="__codelineno-3-7" name="__codelineno-3-7"></a>    <span class="n">payload</span><span class="o">=</span><span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Q3 CTV Campaign"</span><span class="p">,</span> <span class="s2">"budget"</span><span class="p">:</span> <span class="mi">50000</span><span class="p">},</span>
+<a href="#__codelineno-3-8" id="__codelineno-3-8" name="__codelineno-3-8"></a><span class="p">)</span>
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">When to use which</p>
+<p>Use <code>emit_event_sync()</code> in CrewAI flow methods (<code>@listen</code>, <code>@start</code>, <code>@router</code> decorated methods). Use <code>emit_event()</code> in FastAPI endpoints and other async contexts. When in doubt, <code>emit_event_sync()</code> works everywhere.</p>
+</div>
+<h3 id="how-emit_event_sync-works">How <code>emit_event_sync()</code> Works<a class="headerlink" href="#how-emit_event_sync-works" title="Permanent link">¶</a></h3>
+<p>CrewAI runs flow steps in worker threads that may not have an asyncio event loop. The sync helper handles three scenarios:</p>
+<ol>
+<li><strong>Running event loop detected</strong> --- Schedules the publish as a future on the existing loop.</li>
+<li><strong>Event loop exists but is not running</strong> --- Calls <code>loop.run_until_complete()</code>.</li>
+<li><strong>No event loop at all</strong> --- Creates a new loop via <code>asyncio.run()</code>.</li>
+</ol>
+<p>If the singleton bus does not exist yet, <code>emit_event_sync()</code> creates an <code>InMemoryEventBus</code> directly (bypassing the async <code>get_event_bus()</code> factory).</p>
+<h3 id="helper-parameters">Helper Parameters<a class="headerlink" href="#helper-parameters" title="Permanent link">¶</a></h3>
+<p>Both <code>emit_event()</code> and <code>emit_event_sync()</code> accept the same parameters:</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_type</code></td>
+<td><code>EventType</code></td>
+<td><em>(required)</em></td>
+<td>The type of event to emit</td>
+</tr>
+<tr>
+<td><code>flow_id</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Flow instance identifier</td>
+</tr>
+<tr>
+<td><code>flow_type</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Flow type name</td>
+</tr>
+<tr>
+<td><code>deal_id</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Associated deal ID</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>str</code></td>
+<td><code>""</code></td>
+<td>Associated session ID</td>
+</tr>
+<tr>
+<td><code>payload</code></td>
+<td><code>dict</code></td>
+<td><code>None</code></td>
+<td>Event-specific data</td>
+</tr>
+<tr>
+<td><code>**kwargs</code></td>
+<td><code>Any</code></td>
+<td>---</td>
+<td>Extra key-value pairs stored in <code>metadata</code></td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="sqlite-persistence">SQLite Persistence<a class="headerlink" href="#sqlite-persistence" title="Permanent link">¶</a></h2>
+<p>Events are persisted to a SQLite <code>events</code> table managed by the <a href="deal-store.md">DealStore</a>. This provides durability across process restarts, independent of the in-memory bus.</p>
+<h3 id="events-table-schema">Events Table Schema<a class="headerlink" href="#events-table-schema" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">events</span><span class="w"> </span><span class="p">(</span>
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="w">    </span><span class="n">id</span><span class="w">              </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="w">    </span><span class="n">event_type</span><span class="w">      </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a href="#__codelineno-4-4" id="__codelineno-4-4" name="__codelineno-4-4"></a><span class="w">    </span><span class="n">flow_id</span><span class="w">         </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">''</span><span class="p">,</span>
+<a href="#__codelineno-4-5" id="__codelineno-4-5" name="__codelineno-4-5"></a><span class="w">    </span><span class="n">flow_type</span><span class="w">       </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">''</span><span class="p">,</span>
+<a href="#__codelineno-4-6" id="__codelineno-4-6" name="__codelineno-4-6"></a><span class="w">    </span><span class="n">deal_id</span><span class="w">         </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">''</span><span class="p">,</span>
+<a href="#__codelineno-4-7" id="__codelineno-4-7" name="__codelineno-4-7"></a><span class="w">    </span><span class="n">session_id</span><span class="w">      </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">''</span><span class="p">,</span>
+<a href="#__codelineno-4-8" id="__codelineno-4-8" name="__codelineno-4-8"></a><span class="w">    </span><span class="n">payload</span><span class="w">         </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">'{}'</span><span class="p">,</span>
+<a href="#__codelineno-4-9" id="__codelineno-4-9" name="__codelineno-4-9"></a><span class="w">    </span><span class="n">metadata</span><span class="w">        </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">'{}'</span><span class="p">,</span>
+<a href="#__codelineno-4-10" id="__codelineno-4-10" name="__codelineno-4-10"></a><span class="w">    </span><span class="n">created_at</span><span class="w">      </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="p">(</span><span class="n">strftime</span><span class="p">(</span><span class="s1">'%Y-%m-%dT%H:%M:%fZ'</span><span class="p">,</span><span class="w"> </span><span class="s1">'now'</span><span class="p">))</span>
+<a href="#__codelineno-4-11" id="__codelineno-4-11" name="__codelineno-4-11"></a><span class="p">);</span>
+</code></pre></div>
+<h3 id="indexes">Indexes<a class="headerlink" href="#indexes" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Column(s)</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>idx_events_type</code></td>
+<td><code>event_type</code></td>
+<td>Filter by event type</td>
+</tr>
+<tr>
+<td><code>idx_events_flow_id</code></td>
+<td><code>flow_id</code></td>
+<td>Correlate events within a flow</td>
+</tr>
+<tr>
+<td><code>idx_events_deal_id</code></td>
+<td><code>deal_id</code></td>
+<td>Find all events for a deal</td>
+</tr>
+<tr>
+<td><code>idx_events_session_id</code></td>
+<td><code>session_id</code></td>
+<td>Find all events in a session</td>
+</tr>
+<tr>
+<td><code>idx_events_created_at</code></td>
+<td><code>created_at</code></td>
+<td>Time-range queries</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dealstore-event-methods">DealStore Event Methods<a class="headerlink" href="#dealstore-event-methods" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>save_event</code></td>
+<td><code>(**kwargs) -&gt; str</code></td>
+<td>Insert an event row. Returns the event ID (auto-generated if not provided).</td>
+</tr>
+<tr>
+<td><code>get_event</code></td>
+<td><code>(event_id: str) -&gt; dict \| None</code></td>
+<td>Retrieve a single event by ID.</td>
+</tr>
+<tr>
+<td><code>list_events</code></td>
+<td><code>(event_type?, flow_id?, session_id?, limit=50) -&gt; list[dict]</code></td>
+<td>Query events with optional filters, ordered by <code>created_at</code> descending.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.storage.deal_store</span><span class="w"> </span><span class="kn">import</span> <span class="n">DealStore</span>
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<a href="#__codelineno-5-3" id="__codelineno-5-3" name="__codelineno-5-3"></a>
+<a href="#__codelineno-5-4" id="__codelineno-5-4" name="__codelineno-5-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">DealStore</span><span class="p">(</span><span class="s2">"sqlite:///./ad_buyer.db"</span><span class="p">)</span>
+<a href="#__codelineno-5-5" id="__codelineno-5-5" name="__codelineno-5-5"></a><span class="n">store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+<a href="#__codelineno-5-6" id="__codelineno-5-6" name="__codelineno-5-6"></a>
+<a href="#__codelineno-5-7" id="__codelineno-5-7" name="__codelineno-5-7"></a><span class="c1"># Persist an event</span>
+<a href="#__codelineno-5-8" id="__codelineno-5-8" name="__codelineno-5-8"></a><span class="n">event_id</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">save_event</span><span class="p">(</span>
+<a href="#__codelineno-5-9" id="__codelineno-5-9" name="__codelineno-5-9"></a>    <span class="n">event_type</span><span class="o">=</span><span class="s2">"deal.booked"</span><span class="p">,</span>
+<a href="#__codelineno-5-10" id="__codelineno-5-10" name="__codelineno-5-10"></a>    <span class="n">flow_id</span><span class="o">=</span><span class="s2">"flow-abc"</span><span class="p">,</span>
+<a href="#__codelineno-5-11" id="__codelineno-5-11" name="__codelineno-5-11"></a>    <span class="n">deal_id</span><span class="o">=</span><span class="s2">"deal-456"</span><span class="p">,</span>
+<a href="#__codelineno-5-12" id="__codelineno-5-12" name="__codelineno-5-12"></a>    <span class="n">payload</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">"product_id"</span><span class="p">:</span> <span class="s2">"prod-001"</span><span class="p">,</span> <span class="s2">"cpm"</span><span class="p">:</span> <span class="mf">14.50</span><span class="p">}),</span>
+<a href="#__codelineno-5-13" id="__codelineno-5-13" name="__codelineno-5-13"></a><span class="p">)</span>
+<a href="#__codelineno-5-14" id="__codelineno-5-14" name="__codelineno-5-14"></a>
+<a href="#__codelineno-5-15" id="__codelineno-5-15" name="__codelineno-5-15"></a><span class="c1"># Query events for a deal</span>
+<a href="#__codelineno-5-16" id="__codelineno-5-16" name="__codelineno-5-16"></a><span class="n">events</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">list_events</span><span class="p">(</span><span class="n">flow_id</span><span class="o">=</span><span class="s2">"flow-abc"</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h2 id="api-endpoints">API Endpoints<a class="headerlink" href="#api-endpoints" title="Permanent link">¶</a></h2>
+<p>Two REST endpoints expose events from the in-memory bus.</p>
+<h3 id="get-events"><code>GET /events</code><a class="headerlink" href="#get-events" title="Permanent link">¶</a></h3>
+<p>List events with optional filters.</p>
+<p><strong>Query Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_type</code></td>
+<td><code>str</code></td>
+<td><code>None</code></td>
+<td>Filter by event type value (e.g., <code>"deal.booked"</code>)</td>
+</tr>
+<tr>
+<td><code>flow_id</code></td>
+<td><code>str</code></td>
+<td><code>None</code></td>
+<td>Filter by flow ID</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>str</code></td>
+<td><code>None</code></td>
+<td>Filter by session ID</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>int</code></td>
+<td><code>50</code></td>
+<td>Maximum number of events to return</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Response:</strong></p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="p">{</span>
+<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a><span class="w">  </span><span class="nt">"events"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a href="#__codelineno-6-3" id="__codelineno-6-3" name="__codelineno-6-3"></a><span class="w">    </span><span class="p">{</span>
+<a href="#__codelineno-6-4" id="__codelineno-6-4" name="__codelineno-6-4"></a><span class="w">      </span><span class="nt">"event_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a1b2c3d4-..."</span><span class="p">,</span>
+<a href="#__codelineno-6-5" id="__codelineno-6-5" name="__codelineno-6-5"></a><span class="w">      </span><span class="nt">"event_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"deal.booked"</span><span class="p">,</span>
+<a href="#__codelineno-6-6" id="__codelineno-6-6" name="__codelineno-6-6"></a><span class="w">      </span><span class="nt">"timestamp"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-03-11T14:30:00Z"</span><span class="p">,</span>
+<a href="#__codelineno-6-7" id="__codelineno-6-7" name="__codelineno-6-7"></a><span class="w">      </span><span class="nt">"flow_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"flow-abc-123"</span><span class="p">,</span>
+<a href="#__codelineno-6-8" id="__codelineno-6-8" name="__codelineno-6-8"></a><span class="w">      </span><span class="nt">"flow_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"buyer_deal"</span><span class="p">,</span>
+<a href="#__codelineno-6-9" id="__codelineno-6-9" name="__codelineno-6-9"></a><span class="w">      </span><span class="nt">"deal_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"deal-456"</span><span class="p">,</span>
+<a href="#__codelineno-6-10" id="__codelineno-6-10" name="__codelineno-6-10"></a><span class="w">      </span><span class="nt">"session_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span>
+<a href="#__codelineno-6-11" id="__codelineno-6-11" name="__codelineno-6-11"></a><span class="w">      </span><span class="nt">"payload"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"product_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"prod-001"</span><span class="p">,</span><span class="w"> </span><span class="nt">"final_cpm"</span><span class="p">:</span><span class="w"> </span><span class="mf">14.50</span><span class="p">},</span>
+<a href="#__codelineno-6-12" id="__codelineno-6-12" name="__codelineno-6-12"></a><span class="w">      </span><span class="nt">"metadata"</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<a href="#__codelineno-6-13" id="__codelineno-6-13" name="__codelineno-6-13"></a><span class="w">    </span><span class="p">}</span>
+<a href="#__codelineno-6-14" id="__codelineno-6-14" name="__codelineno-6-14"></a><span class="w">  </span><span class="p">],</span>
+<a href="#__codelineno-6-15" id="__codelineno-6-15" name="__codelineno-6-15"></a><span class="w">  </span><span class="nt">"total"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<a href="#__codelineno-6-16" id="__codelineno-6-16" name="__codelineno-6-16"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="get-eventsevent_id"><code>GET /events/{event_id}</code><a class="headerlink" href="#get-eventsevent_id" title="Permanent link">¶</a></h3>
+<p>Retrieve a single event by ID.</p>
+<p><strong>Path Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>event_id</code></td>
+<td><code>str</code></td>
+<td>The event's UUID</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Response:</strong> The event object (same shape as array elements above).</p>
+<p><strong>Errors:</strong> Returns <code>404</code> if the event ID is not found.</p>
+<div class="admonition note">
+<p class="admonition-title">In-memory only</p>
+<p>These endpoints query the <code>InMemoryEventBus</code>, not the SQLite <code>events</code> table. Events are available only for the lifetime of the current process. For historical queries across restarts, query the DealStore directly.</p>
+</div>
+<hr/>
+<h2 id="event-flow-diagram">Event Flow Diagram<a class="headerlink" href="#event-flow-diagram" title="Permanent link">¶</a></h2>
+<p>This sequence diagram shows how events flow through the system during a typical buyer deal:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Flow as BuyerDealFlow
+    participant Helper as emit_event_sync()
+    participant Bus as InMemoryEventBus
+    participant Sub as Subscribers
+    participant API as GET /events
+
+    Flow-&gt;&gt;Helper: emit_event_sync(QUOTE_REQUESTED, ...)
+    Helper-&gt;&gt;Bus: publish(event)
+    Bus-&gt;&gt;Bus: Append to event list
+    Bus-&gt;&gt;Sub: Notify type subscribers
+    Bus-&gt;&gt;Sub: Notify wildcard subscribers
+
+    Note over Flow: Seller responds...
+
+    Flow-&gt;&gt;Helper: emit_event_sync(QUOTE_RECEIVED, ...)
+    Helper-&gt;&gt;Bus: publish(event)
+
+    Note over Flow: Deal negotiated and booked...
+
+    Flow-&gt;&gt;Helper: emit_event_sync(DEAL_BOOKED, ...)
+    Helper-&gt;&gt;Bus: publish(event)
+
+    API-&gt;&gt;Bus: list_events(flow_id=...)
+    Bus--&gt;&gt;API: [event1, event2, event3]
+</code></pre>
+<hr/>
+<h2 id="usage-examples">Usage Examples<a class="headerlink" href="#usage-examples" title="Permanent link">¶</a></h2>
+<h3 id="emitting-events-from-a-flow">Emitting Events from a Flow<a class="headerlink" href="#emitting-events-from-a-flow" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.helpers</span><span class="w"> </span><span class="kn">import</span> <span class="n">emit_event_sync</span>
+<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventType</span>
+<a href="#__codelineno-7-3" id="__codelineno-7-3" name="__codelineno-7-3"></a>
+<a href="#__codelineno-7-4" id="__codelineno-7-4" name="__codelineno-7-4"></a><span class="c1"># In a CrewAI flow method</span>
+<a href="#__codelineno-7-5" id="__codelineno-7-5" name="__codelineno-7-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">negotiate_price</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a href="#__codelineno-7-6" id="__codelineno-7-6" name="__codelineno-7-6"></a>    <span class="c1"># ... negotiation logic ...</span>
+<a href="#__codelineno-7-7" id="__codelineno-7-7" name="__codelineno-7-7"></a>
+<a href="#__codelineno-7-8" id="__codelineno-7-8" name="__codelineno-7-8"></a>    <span class="n">emit_event_sync</span><span class="p">(</span>
+<a href="#__codelineno-7-9" id="__codelineno-7-9" name="__codelineno-7-9"></a>        <span class="n">EventType</span><span class="o">.</span><span class="n">NEGOTIATION_ROUND</span><span class="p">,</span>
+<a href="#__codelineno-7-10" id="__codelineno-7-10" name="__codelineno-7-10"></a>        <span class="n">flow_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">flow_id</span><span class="p">,</span>
+<a href="#__codelineno-7-11" id="__codelineno-7-11" name="__codelineno-7-11"></a>        <span class="n">flow_type</span><span class="o">=</span><span class="s2">"buyer_deal"</span><span class="p">,</span>
+<a href="#__codelineno-7-12" id="__codelineno-7-12" name="__codelineno-7-12"></a>        <span class="n">deal_id</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="o">.</span><span class="n">deal_id</span><span class="p">,</span>
+<a href="#__codelineno-7-13" id="__codelineno-7-13" name="__codelineno-7-13"></a>        <span class="n">payload</span><span class="o">=</span><span class="p">{</span>
+<a href="#__codelineno-7-14" id="__codelineno-7-14" name="__codelineno-7-14"></a>            <span class="s2">"round"</span><span class="p">:</span> <span class="n">round_number</span><span class="p">,</span>
+<a href="#__codelineno-7-15" id="__codelineno-7-15" name="__codelineno-7-15"></a>            <span class="s2">"buyer_price"</span><span class="p">:</span> <span class="n">our_offer</span><span class="p">,</span>
+<a href="#__codelineno-7-16" id="__codelineno-7-16" name="__codelineno-7-16"></a>            <span class="s2">"seller_price"</span><span class="p">:</span> <span class="n">their_ask</span><span class="p">,</span>
+<a href="#__codelineno-7-17" id="__codelineno-7-17" name="__codelineno-7-17"></a>            <span class="s2">"action"</span><span class="p">:</span> <span class="s2">"counter"</span><span class="p">,</span>
+<a href="#__codelineno-7-18" id="__codelineno-7-18" name="__codelineno-7-18"></a>        <span class="p">},</span>
+<a href="#__codelineno-7-19" id="__codelineno-7-19" name="__codelineno-7-19"></a>    <span class="p">)</span>
+</code></pre></div>
+<h3 id="subscribing-to-events">Subscribing to Events<a class="headerlink" href="#subscribing-to-events" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.events</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_event_bus</span><span class="p">,</span> <span class="n">Event</span>
+<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>
+<a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a><span class="n">bus</span> <span class="o">=</span> <span class="k">await</span> <span class="n">get_event_bus</span><span class="p">()</span>
+<a href="#__codelineno-8-4" id="__codelineno-8-4" name="__codelineno-8-4"></a>
+<a href="#__codelineno-8-5" id="__codelineno-8-5" name="__codelineno-8-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">on_deal_booked</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">Event</span><span class="p">):</span>
+<a href="#__codelineno-8-6" id="__codelineno-8-6" name="__codelineno-8-6"></a><span class="w">    </span><span class="sd">"""React to deal bookings (e.g., update a dashboard)."""</span>
+<a href="#__codelineno-8-7" id="__codelineno-8-7" name="__codelineno-8-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"New deal: </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">deal_id</span><span class="si">}</span><span class="s2"> at </span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'final_cpm'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a href="#__codelineno-8-8" id="__codelineno-8-8" name="__codelineno-8-8"></a>
+<a href="#__codelineno-8-9" id="__codelineno-8-9" name="__codelineno-8-9"></a><span class="k">await</span> <span class="n">bus</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"deal.booked"</span><span class="p">,</span> <span class="n">on_deal_booked</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="querying-events-via-api">Querying Events via API<a class="headerlink" href="#querying-events-via-api" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a><span class="c1"># All events for a specific flow</span>
+<a href="#__codelineno-9-2" id="__codelineno-9-2" name="__codelineno-9-2"></a>curl<span class="w"> </span><span class="s2">"http://localhost:8002/events?flow_id=flow-abc-123"</span>
+<a href="#__codelineno-9-3" id="__codelineno-9-3" name="__codelineno-9-3"></a>
+<a href="#__codelineno-9-4" id="__codelineno-9-4" name="__codelineno-9-4"></a><span class="c1"># All deal.booked events</span>
+<a href="#__codelineno-9-5" id="__codelineno-9-5" name="__codelineno-9-5"></a>curl<span class="w"> </span><span class="s2">"http://localhost:8002/events?event_type=deal.booked"</span>
+<a href="#__codelineno-9-6" id="__codelineno-9-6" name="__codelineno-9-6"></a>
+<a href="#__codelineno-9-7" id="__codelineno-9-7" name="__codelineno-9-7"></a><span class="c1"># A specific event</span>
+<a href="#__codelineno-9-8" id="__codelineno-9-8" name="__codelineno-9-8"></a>curl<span class="w"> </span><span class="s2">"http://localhost:8002/events/a1b2c3d4-5678-..."</span>
+</code></pre></div>
+<hr/>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="deal-store.md">Deal Store</a> --- SQLite persistence layer including the <code>events</code> table</li>
+<li><a href="state-machine.md">Order State Machine</a> --- State transitions emit events for observability</li>
+<li><a href="./">Architecture Overview</a> --- System architecture context</li>
+<li><a href="booking-flow.md">Booking Flow</a> --- End-to-end workflow that emits campaign and deal events</li>
+<li><a href="https://iabtechlab.github.io/seller-agent/event-bus/overview/">Seller Event Bus</a> --- Seller-side event bus implementation</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>

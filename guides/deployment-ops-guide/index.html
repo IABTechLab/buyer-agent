@@ -1,0 +1,5149 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="API & Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent">
+      
+      
+      
+        <link rel="canonical" href="https://iabtechlab.github.io/buyer-agent/guides/deployment-ops-guide/">
+      
+      
+        <link rel="prev" href="../configuration/">
+      
+      
+        <link rel="next" href="../multi-seller-orchestration/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Deployment & Operations - IAB Tech Lab — Buyer Agent</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deployment-operations-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+        <aside class="md-banner">
+          <div class="md-banner__inner md-grid md-typeset">
+            
+            
+  <a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here &rarr;
+  </a>
+
+          </div>
+          
+        </aside>
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" aria-label="IAB Tech Lab — Buyer Agent" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Deployment & Operations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="amber"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/IABTechLab/buyer-agent" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../getting-started/quickstart/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/overview/" class="md-tabs__link">
+          
+  
+  
+  API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../architecture/overview/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../state-machines/order-lifecycle/" class="md-tabs__link">
+          
+  
+  
+  State Machines
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../event-bus/overview/" class="md-tabs__link">
+          
+  
+  
+  Event Bus
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../overview/" class="md-tabs__link">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integration/seller-agent/" class="md-tabs__link">
+          
+  
+  
+  Integration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../claude-desktop-setup/" class="md-tabs__link">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../ai-assistant/mcp-tools/" class="md-tabs__link">
+          
+  
+  
+  MCP Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="https://iabtechlab.github.io/seller-agent/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" aria-label="IAB Tech Lab — Buyer Agent" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/IABTechLab/buyer-agent" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/mcp-client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/a2a-client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/authentication/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/change-requests/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/media-kit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/deals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/bookings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/seller-discovery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/products/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/agent-hierarchy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/booking-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/buyer-deal-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/deal-store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/mcp-server/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/deal-library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ssp-connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../state-machines/order-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../state-machines/change-request-flow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../event-bus/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deal-booking/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../negotiation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../identity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../media-kit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sessions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-seller/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../linear-tv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment & Operations
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment & Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-development-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Development Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local Development Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configure-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-the-development-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the Development Server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify-the-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the Installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables-in-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables in Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#starting-in-background-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting in Background Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rebuilding-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rebuilding the Image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stopping-and-cleaning-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping and Cleaning Up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-with-a-seller-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running with a Seller Agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-image-for-ecr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the Image for ECR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AWS Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-a-cloudformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: CloudFormation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-terraform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Terraform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables &amp; Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment Variables &amp; Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seller-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seller Connectivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llm-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cors-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS &amp; Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Configurations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-secrets-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Secrets Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-checks-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Checks &amp; Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Health Checks &amp; Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#health-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Endpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-job-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking Job Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-bus-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Bus Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudwatch-logging-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CloudWatch Logging (AWS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#budget-pacing-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budget Pacing Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mcp-server-setup-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP Server Setup &amp; Connectivity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MCP Server Setup &amp; Connectivity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connecting-claude-desktop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting Claude Desktop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connecting-other-mcp-clients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting Other MCP Clients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buyer-to-seller-mcp-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Buyer-to-Seller MCP Connectivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-on-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP on AWS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backup-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backup &amp; Recovery
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backup &amp; Recovery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-needs-to-be-backed-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Needs to Be Backed Up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Backup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AWS Backup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#efs-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EFS Backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-backup-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Backup Policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovery-from-efs-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery from EFS Backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-efs-export-point-in-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual EFS Export (Point-in-Time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#server-will-not-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Will Not Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-check-returns-503-container-keeps-restarting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Check Returns 503 / Container Keeps Restarting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-stuck-in-running-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Job Stuck in "running" Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llm-api-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM API Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seller-connection-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seller Connection Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-client-cannot-connect-to-seller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP Client Cannot Connect to Seller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-hierarchy-scaling-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Hierarchy Scaling Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multi-seller-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../campaign-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../budget-pacing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../creative-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deal-library/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ssp-connectors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integration/seller-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integration/opendirect/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../claude-desktop-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Claude (Desktop & Web)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../multi-client-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex & AI IDEs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-assistant/developer-setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-assistant/mcp-tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-assistant/slash-commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-assistant/setup-wizard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://iabtechlab.github.io/seller-agent/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#table-of-contents" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Table of Contents
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-development-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Development Setup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local Development Setup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#install-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#configure-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configure Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-the-development-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run the Development Server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verify-the-installation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Verify the Installation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#docker-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Docker Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Docker Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables-in-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables in Docker
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#starting-in-background-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting in Background Mode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rebuilding-the-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rebuilding the Image
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stopping-and-cleaning-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stopping and Cleaning Up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#running-with-a-seller-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Running with a Seller Agent
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#building-the-image-for-ecr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the Image for ECR
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AWS Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#prerequisites_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-a-cloudformation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: CloudFormation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-terraform" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Terraform
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment Variables &amp; Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment Variables &amp; Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seller-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seller Connectivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llm-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Behavior
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cors-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS &amp; Environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-configurations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example Configurations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-secrets-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Secrets Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-checks-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Checks &amp; Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Health Checks &amp; Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#health-endpoint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Endpoint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-job-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Checking Job Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#event-bus-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Event Bus Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cloudwatch-logging-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CloudWatch Logging (AWS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#budget-pacing-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Budget Pacing Monitoring
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mcp-server-setup-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP Server Setup &amp; Connectivity
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MCP Server Setup &amp; Connectivity">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connecting-claude-desktop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting Claude Desktop
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#connecting-other-mcp-clients" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting Other MCP Clients
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buyer-to-seller-mcp-connectivity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Buyer-to-Seller MCP Connectivity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-on-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP on AWS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backup-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backup &amp; Recovery
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backup &amp; Recovery">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-needs-to-be-backed-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Needs to Be Backed Up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#local-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#aws-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS Backup
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AWS Backup">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#efs-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EFS Backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-backup-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended Backup Policy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recovery-from-efs-backup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recovery from EFS Backup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manual-efs-export-point-in-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manual EFS Export (Point-in-Time)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#server-will-not-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Server Will Not Start
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-check-returns-503-container-keeps-restarting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Check Returns 503 / Container Keeps Restarting
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#job-stuck-in-running-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Job Stuck in "running" Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#llm-api-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM API Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#seller-connection-failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Seller Connection Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#database-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mcp-client-cannot-connect-to-seller" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MCP Client Cannot Connect to Seller
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#agent-hierarchy-scaling-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Hierarchy Scaling Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="deployment-operations-guide">Deployment &amp; Operations Guide<a class="headerlink" href="#deployment-operations-guide" title="Permanent link">&para;</a></h1>
+<p>This guide covers everything needed to run the buyer agent in any environment — from a local development setup to a production AWS deployment — and how to operate and troubleshoot it once it is running.</p>
+<hr />
+<h2 id="table-of-contents">Table of Contents<a class="headerlink" href="#table-of-contents" title="Permanent link">&para;</a></h2>
+<ol>
+<li><a href="#local-development-setup">Local Development Setup</a></li>
+<li><a href="#docker-deployment">Docker Deployment</a></li>
+<li><a href="#aws-deployment">AWS Deployment</a></li>
+<li><a href="#environment-variables--configuration">Environment Variables &amp; Configuration</a></li>
+<li><a href="#health-checks--monitoring">Health Checks &amp; Monitoring</a></li>
+<li><a href="#mcp-server-setup--connectivity">MCP Server Setup &amp; Connectivity</a></li>
+<li><a href="#backup--recovery">Backup &amp; Recovery</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+</ol>
+<hr />
+<h2 id="local-development-setup">Local Development Setup<a class="headerlink" href="#local-development-setup" title="Permanent link">&para;</a></h2>
+<h3 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Python 3.11 or later (3.12 recommended)</li>
+<li><code>pip</code> or <code>uv</code></li>
+<li>An LLM API key (Anthropic, OpenAI, Gemini, Azure, or Bedrock)</li>
+<li>Git</li>
+</ul>
+<h3 id="install-dependencies">Install Dependencies<a class="headerlink" href="#install-dependencies" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/IABTechLab/buyer-agent.git
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">cd</span><span class="w"> </span>buyer-agent
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Create and activate a virtual environment</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="nb">source</span><span class="w"> </span>venv/bin/activate<span class="w">   </span><span class="c1"># macOS/Linux</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># .\venv\Scripts\activate  # Windows</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Install with development extras</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+</code></pre></div>
+<p>For production (no test or linting extras):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
+</code></pre></div>
+<h3 id="configure-environment">Configure Environment<a class="headerlink" href="#configure-environment" title="Permanent link">&para;</a></h3>
+<p>Copy the example environment file and set your credentials:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>cp<span class="w"> </span>.env.example<span class="w"> </span>.env
+</code></pre></div>
+<p>Minimum required settings:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>ANTHROPIC_API_KEY=sk-ant-...
+</code></pre></div>
+<p>Full development configuration:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># LLM provider (Anthropic default; install crewai[openai] etc. for others)
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ANTHROPIC_API_KEY=sk-ant-...
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a># Inbound API key for this service (leave empty to disable auth in dev)
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>API_KEY=
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a># Seller connection
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>SELLER_ENDPOINTS=http://localhost:8000
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>IAB_SERVER_URL=http://localhost:8000
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a># LLM models
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a># Storage
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>DATABASE_URL=sqlite:///./ad_buyer.db
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a># Logging
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>ENVIRONMENT=development
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>LOG_LEVEL=INFO
+</code></pre></div>
+<p>See the <a href="#environment-variables--configuration">Configuration Reference</a> below for the full variable list.</p>
+<h3 id="run-the-development-server">Run the Development Server<a class="headerlink" href="#run-the-development-server" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uvicorn<span class="w"> </span>ad_buyer.interfaces.api.main:app<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">8001</span>
+</code></pre></div>
+<p>The API is available at <code>http://localhost:8001</code>.</p>
+<p>Interactive API docs:</p>
+<ul>
+<li>Swagger UI: <code>http://localhost:8001/docs</code></li>
+<li>ReDoc: <code>http://localhost:8001/redoc</code></li>
+</ul>
+<h3 id="verify-the-installation">Verify the Installation<a class="headerlink" href="#verify-the-installation" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>curl<span class="w"> </span>http://localhost:8001/health
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># Expected: {&quot;status&quot;: &quot;healthy&quot;, &quot;version&quot;: &quot;1.0.0&quot;}</span>
+</code></pre></div>
+<h3 id="running-tests">Running Tests<a class="headerlink" href="#running-tests" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nv">ANTHROPIC_API_KEY</span><span class="o">=</span><span class="nb">test</span><span class="w"> </span>pytest<span class="w"> </span>tests/<span class="w"> </span>-v
+</code></pre></div>
+<p>Run with coverage:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>pytest<span class="w"> </span>tests/<span class="w"> </span>-v<span class="w"> </span>--cov<span class="o">=</span>src/ad_buyer<span class="w"> </span>--cov-report<span class="o">=</span>term-missing
+</code></pre></div>
+<p>Lint:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>src/
+</code></pre></div>
+<hr />
+<h2 id="docker-deployment">Docker Deployment<a class="headerlink" href="#docker-deployment" title="Permanent link">&para;</a></h2>
+<h3 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h3>
+<p>The fastest way to run the buyer agent in a container:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">cd</span><span class="w"> </span>infra/docker
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up
+</code></pre></div>
+<p>This starts a single container:</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Port</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>app</strong></td>
+<td>8001</td>
+<td>Buyer agent API</td>
+</tr>
+</tbody>
+</table>
+<p>The SQLite database is persisted on a Docker volume (<code>buyerdata</code>) and survives container restarts.</p>
+<p>Verify it is running:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>curl<span class="w"> </span>http://localhost:8001/health
+</code></pre></div>
+<h3 id="environment-variables-in-docker">Environment Variables in Docker<a class="headerlink" href="#environment-variables-in-docker" title="Permanent link">&para;</a></h3>
+<p>The Docker Compose file reads from <code>../../.env</code> (the project root) via <code>env_file</code>. Set at minimum:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>ANTHROPIC_API_KEY=sk-ant-...
+</code></pre></div>
+<p>The <code>DATABASE_URL</code> is overridden inside <code>docker-compose.yml</code> to point at the container-local path:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">DATABASE_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sqlite:///./data/ad_buyer.db</span>
+</code></pre></div>
+<p>Do not change this unless you are mounting a different volume path.</p>
+<h3 id="starting-in-background-mode">Starting in Background Mode<a class="headerlink" href="#starting-in-background-mode" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<p>Follow logs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>-f<span class="w"> </span>app
+</code></pre></div>
+<h3 id="rebuilding-the-image">Rebuilding the Image<a class="headerlink" href="#rebuilding-the-image" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>docker<span class="w"> </span>compose<span class="w"> </span>build<span class="w"> </span>--no-cache<span class="w"> </span>app
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+<h3 id="stopping-and-cleaning-up">Stopping and Cleaning Up<a class="headerlink" href="#stopping-and-cleaning-up" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Stop without removing data</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>down
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Stop and remove volumes (destroys the SQLite database)</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>docker<span class="w"> </span>compose<span class="w"> </span>down<span class="w"> </span>-v
+</code></pre></div>
+<h3 id="running-with-a-seller-agent">Running with a Seller Agent<a class="headerlink" href="#running-with-a-seller-agent" title="Permanent link">&para;</a></h3>
+<p>For end-to-end testing, run both agents simultaneously:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Terminal 1 — Seller agent</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="nb">cd</span><span class="w"> </span>../ad_seller_system/infra/docker
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>docker<span class="w"> </span>compose<span class="w"> </span>up
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="c1"># Terminal 2 — Buyer agent (pointing at the seller)</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="nb">cd</span><span class="w"> </span>../ad_buyer_system
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="nv">SELLER_ENDPOINTS</span><span class="o">=</span>http://host.docker.internal:8000<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>infra/docker/docker-compose.yml<span class="w"> </span>up
+</code></pre></div>
+<p>Or uncomment the <code>seller</code> service block in <code>infra/docker/docker-compose.yml</code> to run both from a single compose file.</p>
+<h3 id="building-the-image-for-ecr">Building the Image for ECR<a class="headerlink" href="#building-the-image-for-ecr" title="Permanent link">&para;</a></h3>
+<p>For AWS ECR deployment, build and push manually:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Build from the project root</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>ad-buyer<span class="w"> </span>-f<span class="w"> </span>infra/docker/Dockerfile<span class="w"> </span>.
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Authenticate with ECR</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>aws<span class="w"> </span>ecr<span class="w"> </span>get-login-password<span class="w"> </span>--region<span class="w"> </span>us-east-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>docker<span class="w"> </span>login<span class="w"> </span>--username<span class="w"> </span>AWS<span class="w"> </span>--password-stdin<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">      </span><span class="m">123456789</span>.dkr.ecr.us-east-1.amazonaws.com
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="c1"># Tag and push</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a>docker<span class="w"> </span>tag<span class="w"> </span>ad-buyer:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">  </span><span class="m">123456789</span>.dkr.ecr.us-east-1.amazonaws.com/ad-buyer:latest
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a>docker<span class="w"> </span>push<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">  </span><span class="m">123456789</span>.dkr.ecr.us-east-1.amazonaws.com/ad-buyer:latest
+</code></pre></div>
+<p>Replace <code>123456789</code> with your AWS account ID and adjust the region as needed.</p>
+<hr />
+<h2 id="aws-deployment">AWS Deployment<a class="headerlink" href="#aws-deployment" title="Permanent link">&para;</a></h2>
+<p>The buyer agent runs on <strong>ECS Fargate</strong> with <strong>EFS-backed SQLite persistence</strong>. Two IaC options are provided; both deploy the same architecture.</p>
+<h3 id="architecture-overview">Architecture Overview<a class="headerlink" href="#architecture-overview" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>AWS Service</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compute</td>
+<td>ECS Fargate</td>
+<td>256 CPU / 512 MB, single task</td>
+</tr>
+<tr>
+<td>Storage</td>
+<td>EFS (Elastic File System)</td>
+<td>SQLite file mounted at <code>/app/data</code></td>
+</tr>
+<tr>
+<td>Networking</td>
+<td>VPC, public + private subnets</td>
+<td>2 AZs</td>
+</tr>
+<tr>
+<td>Load balancer</td>
+<td>Application Load Balancer</td>
+<td>HTTPS with ACM cert, HTTP → HTTPS redirect</td>
+</tr>
+<tr>
+<td>Secrets</td>
+<td>SSM Parameter Store (SecureString)</td>
+<td>Anthropic API key</td>
+</tr>
+<tr>
+<td>Logging</td>
+<td>CloudWatch Logs</td>
+<td>30-day retention by default</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition warning">
+<p class="admonition-title">Single-task constraint</p>
+<p>SQLite supports only one concurrent writer. AWS deployments must run exactly <strong>one ECS task</strong> (<code>DesiredCount: 1</code>). Running multiple tasks will corrupt the database. A PostgreSQL migration is planned for horizontal scaling.</p>
+</div>
+<h3 id="prerequisites_1">Prerequisites<a class="headerlink" href="#prerequisites_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>AWS CLI configured with appropriate permissions</li>
+<li>An ACM certificate ARN for your domain (or use the HTTP listener only during evaluation)</li>
+<li>A container image pushed to ECR (see <a href="#building-the-image-for-ecr">Building the Image for ECR</a> above)</li>
+<li>An S3 bucket for CloudFormation template storage (CloudFormation option only)</li>
+</ul>
+<h3 id="option-a-cloudformation">Option A: CloudFormation<a class="headerlink" href="#option-a-cloudformation" title="Permanent link">&para;</a></h3>
+<p>Template layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>infra/aws/cloudformation/
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>├── main.yaml       # Root stack — orchestrates nested stacks
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>├── network.yaml    # VPC, subnets, NAT gateway, security groups
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>└── compute.yaml    # ECS Fargate, ALB, EFS, CloudWatch, IAM roles
+</code></pre></div>
+<p><strong>Step 1 — Store your Anthropic API key in SSM:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>aws<span class="w"> </span>ssm<span class="w"> </span>put-parameter<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span>--name<span class="w"> </span>/ad-buyer-system/anthropic-api-key<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span>--value<span class="w"> </span><span class="s2">&quot;sk-ant-...&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">  </span>--type<span class="w"> </span>SecureString<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<p><strong>Step 2 — Upload nested templates to S3:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>aws<span class="w"> </span>s3<span class="w"> </span>sync<span class="w"> </span>infra/aws/cloudformation/<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span>s3://your-bucket/ad-buyer-system/cloudformation/
+</code></pre></div>
+<p><strong>Step 3 — Deploy the stack:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>create-stack<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span>--stack-name<span class="w"> </span>ad-buyer-prod<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span>--template-url<span class="w"> </span>https://your-bucket.s3.amazonaws.com/ad-buyer-system/cloudformation/main.yaml<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span>--parameters<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>Environment,ParameterValue<span class="o">=</span>production<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>TemplatesBucketName,ParameterValue<span class="o">=</span>your-bucket<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>ContainerImage,ParameterValue<span class="o">=</span><span class="m">123456789</span>.dkr.ecr.us-east-1.amazonaws.com/ad-buyer:latest<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>CertificateArn,ParameterValue<span class="o">=</span>arn:aws:acm:us-east-1:123456789:certificate/...<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>AnthropicApiKeyParameter,ParameterValue<span class="o">=</span>/ad-buyer-system/anthropic-api-key<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="w">  </span>--capabilities<span class="w"> </span>CAPABILITY_NAMED_IAM<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<p><strong>Monitor the deployment:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>describe-stack-events<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span>--stack-name<span class="w"> </span>ad-buyer-prod<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;StackEvents[*].[LogicalResourceId,ResourceStatus,ResourceStatusReason]&#39;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">  </span>--output<span class="w"> </span>table
+</code></pre></div>
+<p><strong>Update the stack after a new image push:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>aws<span class="w"> </span>cloudformation<span class="w"> </span>update-stack<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span>--stack-name<span class="w"> </span>ad-buyer-prod<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">  </span>--use-previous-template<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">  </span>--parameters<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>ContainerImage,ParameterValue<span class="o">=</span><span class="m">123456789</span>.dkr.ecr.us-east-1.amazonaws.com/ad-buyer:v1.2.0<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>Environment,UsePreviousValue<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>TemplatesBucketName,UsePreviousValue<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>CertificateArn,UsePreviousValue<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a><span class="w">    </span><span class="nv">ParameterKey</span><span class="o">=</span>AnthropicApiKeyParameter,UsePreviousValue<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a><span class="w">  </span>--capabilities<span class="w"> </span>CAPABILITY_NAMED_IAM<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<h3 id="option-b-terraform">Option B: Terraform<a class="headerlink" href="#option-b-terraform" title="Permanent link">&para;</a></h3>
+<p>Module layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>infra/aws/terraform/
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>├── main.tf
+<a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>├── variables.tf
+<a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>├── outputs.tf
+<a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>├── terraform.tfvars.example
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a>└── modules/
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>    ├── network/
+<a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>    └── compute/
+</code></pre></div>
+<p><strong>Step 1 — Initialize Terraform:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nb">cd</span><span class="w"> </span>infra/aws/terraform
+<a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a>terraform<span class="w"> </span>init
+</code></pre></div>
+<p>Terraform uses an S3 backend for state:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="kr">backend</span><span class="w"> </span><span class="nv">&quot;s3&quot;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span><span class="na">bucket</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;ad-buyer-system-terraform-state&quot;</span>
+<a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">  </span><span class="na">key</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;terraform.tfstate&quot;</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="w">  </span><span class="na">region</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;us-east-1&quot;</span>
+<a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="w">  </span><span class="na">dynamodb_table</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;ad-buyer-system-terraform-lock&quot;</span>
+<a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="w">  </span><span class="na">encrypt</span><span class="w">        </span><span class="o">=</span><span class="w"> </span><span class="no">true</span>
+<a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="p">}</span>
+</code></pre></div>
+<p>Create the S3 bucket and DynamoDB table before running <code>terraform init</code> for the first time.</p>
+<p><strong>Step 2 — Configure variables:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>cp<span class="w"> </span>terraform.tfvars.example<span class="w"> </span>terraform.tfvars
+</code></pre></div>
+<p>Edit <code>terraform.tfvars</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="na">environment</span><span class="w">         </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;prod&quot;</span>
+<a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="na">region</span><span class="w">              </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;us-east-1&quot;</span>
+<a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="na">vpc_cidr</span><span class="w">            </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;10.0.0.0/16&quot;</span>
+<a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="na">container_image_tag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;latest&quot;</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="na">certificate_arn</span><span class="w">     </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;arn:aws:acm:us-east-1:123456789:certificate/...&quot;</span>
+</code></pre></div>
+<p><strong>Step 3 — Plan and apply:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>terraform<span class="w"> </span>plan
+<a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>terraform<span class="w"> </span>apply
+</code></pre></div>
+<p><strong>Key outputs after apply:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>terraform<span class="w"> </span>output<span class="w"> </span>alb_dns_name<span class="w">       </span><span class="c1"># Point your DNS CNAME here</span>
+<a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>terraform<span class="w"> </span>output<span class="w"> </span>ecs_cluster_name
+<a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>terraform<span class="w"> </span>output<span class="w"> </span>ecs_service_name
+<a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>terraform<span class="w"> </span>output<span class="w"> </span>cloudwatch_log_group
+</code></pre></div>
+<p><strong>Deploy a new image:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>terraform<span class="w"> </span>apply<span class="w"> </span>-var<span class="o">=</span><span class="s2">&quot;container_image_tag=v1.2.0&quot;</span>
+</code></pre></div>
+<hr />
+<h2 id="environment-variables-configuration">Environment Variables &amp; Configuration<a class="headerlink" href="#environment-variables-configuration" title="Permanent link">&para;</a></h2>
+<p>All settings are loaded from environment variables or a <code>.env</code> file via <code>pydantic-settings</code>. Shell environment variables take precedence over <code>.env</code> values.</p>
+<h3 id="api-keys">API Keys<a class="headerlink" href="#api-keys" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td>Yes</td>
+<td><code>""</code></td>
+<td>Anthropic API key for Claude models. Required for all agent functionality.</td>
+</tr>
+<tr>
+<td><code>API_KEY</code></td>
+<td>No</td>
+<td><code>""</code></td>
+<td>Inbound API key for authenticating requests to this service. When empty, authentication is disabled (development mode). Set a value in production.</td>
+</tr>
+</tbody>
+</table>
+<p>Authentication is enforced via the <code>X-API-Key</code> header. Public paths (<code>/health</code>, <code>/docs</code>, <code>/openapi.json</code>, <code>/redoc</code>) are always unauthenticated.</p>
+<h3 id="seller-connectivity">Seller Connectivity<a class="headerlink" href="#seller-connectivity" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SELLER_ENDPOINTS</code></td>
+<td>No</td>
+<td><code>""</code></td>
+<td>Comma-separated list of seller MCP/A2A server URLs. Used by the <code>UnifiedClient</code> for multi-seller workflows.</td>
+</tr>
+<tr>
+<td><code>IAB_SERVER_URL</code></td>
+<td>No</td>
+<td><code>http://localhost:8001</code></td>
+<td>Primary seller server URL. Used as the default <code>base_url</code> for single-seller flows and protocol clients.</td>
+</tr>
+<tr>
+<td><code>OPENDIRECT_BASE_URL</code></td>
+<td>No</td>
+<td><code>http://localhost:3000/api/v2.1</code></td>
+<td>Base URL for the OpenDirect 2.1 REST API (legacy single-seller mode).</td>
+</tr>
+<tr>
+<td><code>OPENDIRECT_TOKEN</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>Bearer token for OpenDirect authentication.</td>
+</tr>
+<tr>
+<td><code>OPENDIRECT_API_KEY</code></td>
+<td>No</td>
+<td><code>None</code></td>
+<td>API key for OpenDirect authentication.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="llm-configuration">LLM Configuration<a class="headerlink" href="#llm-configuration" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEFAULT_LLM_MODEL</code></td>
+<td><code>anthropic/claude-sonnet-4-5-20250929</code></td>
+<td>Model for Level 2 channel specialists and Level 3 functional agents.</td>
+</tr>
+<tr>
+<td><code>MANAGER_LLM_MODEL</code></td>
+<td><code>anthropic/claude-opus-4-20250514</code></td>
+<td>Model for the Level 1 Portfolio Manager. Opus is used for strategic reasoning.</td>
+</tr>
+<tr>
+<td><code>LLM_TEMPERATURE</code></td>
+<td><code>0.3</code></td>
+<td>Default temperature. Individual agents use tuned values (0.1–0.5).</td>
+</tr>
+<tr>
+<td><code>LLM_MAX_TOKENS</code></td>
+<td><code>4096</code></td>
+<td>Maximum token output per LLM call.</td>
+</tr>
+</tbody>
+</table>
+<p>Models use <code>provider/model-name</code> format with CrewAI's native provider integrations (Anthropic, OpenAI, Gemini, Azure, Bedrock):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>DEFAULT_LLM_MODEL=openai/gpt-4o
+<a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+</code></pre></div>
+<h3 id="database">Database<a class="headerlink" href="#database" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DATABASE_URL</code></td>
+<td><code>sqlite:///./ad_buyer.db</code></td>
+<td>SQLAlchemy connection string for deal storage. SQLite for development; PostgreSQL for production multi-instance deployments.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a># SQLite (default, development)
+<a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>DATABASE_URL=sqlite:///./ad_buyer.db
+<a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>
+<a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a># PostgreSQL (production, when horizontal scaling is needed)
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a>DATABASE_URL=postgresql://buyer:pass@db.example.com:5432/ad_buyer
+</code></pre></div>
+<h3 id="agent-behavior">Agent Behavior<a class="headerlink" href="#agent-behavior" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>REDIS_URL</code></td>
+<td><code>None</code></td>
+<td>Redis URL for CrewAI memory persistence and session caching. When unset, in-memory storage is used.</td>
+</tr>
+<tr>
+<td><code>CREW_MEMORY_ENABLED</code></td>
+<td><code>True</code></td>
+<td>Enable CrewAI agent memory across tasks.</td>
+</tr>
+<tr>
+<td><code>CREW_VERBOSE</code></td>
+<td><code>True</code></td>
+<td>Enable verbose CrewAI logging. Set to <code>False</code> in production.</td>
+</tr>
+<tr>
+<td><code>CREW_MAX_ITERATIONS</code></td>
+<td><code>15</code></td>
+<td>Maximum iterations per crew task before forced completion.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cors-environment">CORS &amp; Environment<a class="headerlink" href="#cors-environment" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CORS_ALLOWED_ORIGINS</code></td>
+<td><code>http://localhost:3000,http://localhost:8080</code></td>
+<td>Comma-separated list of allowed CORS origins.</td>
+</tr>
+<tr>
+<td><code>ENVIRONMENT</code></td>
+<td><code>development</code></td>
+<td>Runtime environment identifier (<code>development</code>, <code>staging</code>, <code>production</code>).</td>
+</tr>
+<tr>
+<td><code>LOG_LEVEL</code></td>
+<td><code>INFO</code></td>
+<td>Logging level: <code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code>, <code>CRITICAL</code>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="example-configurations">Example Configurations<a class="headerlink" href="#example-configurations" title="Permanent link">&para;</a></h3>
+<p><strong>Minimal local development:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>ANTHROPIC_API_KEY=sk-ant-...
+</code></pre></div>
+<p><strong>Full production:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>ANTHROPIC_API_KEY=sk-ant-...
+<a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a>API_KEY=your-service-api-key
+<a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a>
+<a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a>SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a>IAB_SERVER_URL=https://primary-seller.example.com
+<a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a>
+<a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a>DATABASE_URL=postgresql://buyer:pass@db.example.com:5432/ad_buyer
+<a id="__codelineno-37-8" name="__codelineno-37-8" href="#__codelineno-37-8"></a>REDIS_URL=redis://cache.example.com:6379/0
+<a id="__codelineno-37-9" name="__codelineno-37-9" href="#__codelineno-37-9"></a>
+<a id="__codelineno-37-10" name="__codelineno-37-10" href="#__codelineno-37-10"></a>CREW_VERBOSE=False
+<a id="__codelineno-37-11" name="__codelineno-37-11" href="#__codelineno-37-11"></a>CREW_MAX_ITERATIONS=10
+<a id="__codelineno-37-12" name="__codelineno-37-12" href="#__codelineno-37-12"></a>
+<a id="__codelineno-37-13" name="__codelineno-37-13" href="#__codelineno-37-13"></a>CORS_ALLOWED_ORIGINS=https://dashboard.example.com
+<a id="__codelineno-37-14" name="__codelineno-37-14" href="#__codelineno-37-14"></a>ENVIRONMENT=production
+<a id="__codelineno-37-15" name="__codelineno-37-15" href="#__codelineno-37-15"></a>LOG_LEVEL=WARNING
+</code></pre></div>
+<p><strong>Testing:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>ANTHROPIC_API_KEY=test-key
+<a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a>API_KEY=test-api-key
+<a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a>DATABASE_URL=sqlite:///./test_ad_buyer.db
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a>ENVIRONMENT=testing
+<a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a>LOG_LEVEL=DEBUG
+<a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a>CREW_VERBOSE=True
+<a id="__codelineno-38-7" name="__codelineno-38-7" href="#__codelineno-38-7"></a>CREW_MAX_ITERATIONS=5
+</code></pre></div>
+<h3 id="aws-secrets-management">AWS Secrets Management<a class="headerlink" href="#aws-secrets-management" title="Permanent link">&para;</a></h3>
+<p>In AWS deployments, the Anthropic API key is stored in SSM Parameter Store as a SecureString and injected into the container as an environment variable at runtime. The ECS task execution role is granted <code>ssm:GetParameter</code> on the specific parameter ARN.</p>
+<p>To add additional secrets (seller API keys, service credentials):</p>
+<ol>
+<li>Store in SSM: <code>aws ssm put-parameter --name /ad-buyer-system/my-secret --value "..." --type SecureString</code></li>
+<li>Add the parameter ARN to the <code>SSMParameterAccess</code> IAM policy in <code>compute.yaml</code> or the Terraform compute module</li>
+<li>Add a <code>Secrets</code> entry to the container definition referencing the parameter ARN</li>
+</ol>
+<hr />
+<h2 id="health-checks-monitoring">Health Checks &amp; Monitoring<a class="headerlink" href="#health-checks-monitoring" title="Permanent link">&para;</a></h2>
+<h3 id="health-endpoint">Health Endpoint<a class="headerlink" href="#health-endpoint" title="Permanent link">&para;</a></h3>
+<p>The <code>/health</code> endpoint is always unauthenticated and returns immediately:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>curl<span class="w"> </span>http://localhost:8001/health
+<a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="c1"># {&quot;status&quot;: &quot;healthy&quot;, &quot;version&quot;: &quot;1.0.0&quot;}</span>
+</code></pre></div>
+<p>This endpoint is used by:</p>
+<ul>
+<li>Docker HEALTHCHECK (30-second interval, 5-second timeout, 3 retries)</li>
+<li>ALB target group health check (30-second interval, 10-second timeout, 2 healthy / 3 unhealthy threshold)</li>
+<li>ECS task health check (30-second interval, 5-second timeout, 60-second start period)</li>
+</ul>
+<p>A non-200 response or timeout causes the container to be replaced automatically.</p>
+<h3 id="checking-job-status">Checking Job Status<a class="headerlink" href="#checking-job-status" title="Permanent link">&para;</a></h3>
+<p>Monitor active booking jobs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="c1"># List all jobs</span>
+<a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>curl<span class="w"> </span>http://localhost:8001/bookings
+<a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>
+<a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="c1"># Filter by status</span>
+<a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8001/bookings?status=running&quot;</span>
+<a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>
+<a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a><span class="c1"># Get a specific job</span>
+<a id="__codelineno-40-8" name="__codelineno-40-8" href="#__codelineno-40-8"></a>curl<span class="w"> </span>http://localhost:8001/bookings/&lt;job-id&gt;
+</code></pre></div>
+<p>Job status values:</p>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pending</code></td>
+<td>Job created, flow not yet started</td>
+</tr>
+<tr>
+<td><code>running</code></td>
+<td>Flow is executing (budget allocation, research)</td>
+</tr>
+<tr>
+<td><code>awaiting_approval</code></td>
+<td>Recommendations ready for human review</td>
+</tr>
+<tr>
+<td><code>completed</code></td>
+<td>All deals booked successfully</td>
+</tr>
+<tr>
+<td><code>failed</code></td>
+<td>Flow encountered an unrecoverable error</td>
+</tr>
+</tbody>
+</table>
+<h3 id="event-bus-monitoring">Event Bus Monitoring<a class="headerlink" href="#event-bus-monitoring" title="Permanent link">&para;</a></h3>
+<p>The event bus provides structured observability across all flows. Query recent events:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1"># All recent events</span>
+<a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8001/events?limit=50&quot;</span>
+<a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>
+<a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="c1"># Events for a specific flow</span>
+<a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8001/events?flow_id=&lt;flow-id&gt;&quot;</span>
+<a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>
+<a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="c1"># Events by type (e.g., pacing alerts)</span>
+<a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8001/events?event_type=pacing.deviation_detected&quot;</span>
+</code></pre></div>
+<p>Key event types to monitor:</p>
+<table>
+<thead>
+<tr>
+<th>Event Type</th>
+<th>Significance</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pacing.deviation_detected</code></td>
+<td>Campaign is over/underpacing — may need intervention</td>
+</tr>
+<tr>
+<td><code>pacing.reallocation_recommended</code></td>
+<td>Budget reallocation proposal generated</td>
+</tr>
+<tr>
+<td><code>booking.failed</code></td>
+<td>Deal booking failed — check <code>errors</code> on the job</td>
+</tr>
+<tr>
+<td><code>negotiation.completed</code></td>
+<td>Price negotiation finished</td>
+</tr>
+</tbody>
+</table>
+<h3 id="cloudwatch-logging-aws">CloudWatch Logging (AWS)<a class="headerlink" href="#cloudwatch-logging-aws" title="Permanent link">&para;</a></h3>
+<p>All application logs are sent to CloudWatch. The log group is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>/ecs/{environment}/ad-buyer
+</code></pre></div>
+<p>Retrieve recent logs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>aws<span class="w"> </span>logs<span class="w"> </span>tail<span class="w"> </span>/ecs/production/ad-buyer<span class="w"> </span>--follow<span class="w"> </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<p>Filter for errors:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>aws<span class="w"> </span>logs<span class="w"> </span>filter-log-events<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="w">  </span>--log-group-name<span class="w"> </span>/ecs/production/ad-buyer<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">  </span>--filter-pattern<span class="w"> </span><span class="s2">&quot;ERROR&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<h3 id="budget-pacing-monitoring">Budget Pacing Monitoring<a class="headerlink" href="#budget-pacing-monitoring" title="Permanent link">&para;</a></h3>
+<p>The pacing engine generates snapshots that capture campaign delivery health. Use the event bus to watch for deviation alerts:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="c1"># Check for critical pacing alerts</span>
+<a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>curl<span class="w"> </span><span class="s2">&quot;http://localhost:8001/events?event_type=pacing.deviation_detected&quot;</span>
+</code></pre></div>
+<p>A <code>deviation_detected</code> event with <code>alert_level: critical</code> means the campaign is more than 25% off expected pace and may need manual intervention.</p>
+<p>Pacing alert levels:</p>
+<table>
+<thead>
+<tr>
+<th>Direction</th>
+<th>Warning (&gt;10% deviation)</th>
+<th>Critical (&gt;25% deviation)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Underpacing</td>
+<td>Monitor; may self-correct</td>
+<td>Investigate delivery issues</td>
+</tr>
+<tr>
+<td>Overpacing</td>
+<td>Monitor budget burn</td>
+<td>Pause or reduce bids</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="mcp-server-setup-connectivity">MCP Server Setup &amp; Connectivity<a class="headerlink" href="#mcp-server-setup-connectivity" title="Permanent link">&para;</a></h2>
+<h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
+<p>The buyer agent exposes its own MCP server for external clients (Claude Desktop, Cursor, Windsurf, custom agents). The MCP server is mounted automatically on the FastAPI app at startup and exposes buyer operations as structured tools.</p>
+<p>MCP endpoint:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>http://localhost:8001/mcp/sse
+</code></pre></div>
+<p>Available tool categories:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Tools</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Foundation</td>
+<td><code>get_setup_status</code>, <code>health_check</code>, <code>get_config</code></td>
+</tr>
+<tr>
+<td>Campaign Management</td>
+<td><code>list_campaigns</code>, <code>get_campaign_status</code>, <code>check_pacing</code>, <code>review_budgets</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="connecting-claude-desktop">Connecting Claude Desktop<a class="headerlink" href="#connecting-claude-desktop" title="Permanent link">&para;</a></h3>
+<p>Add the buyer agent to your Claude Desktop MCP configuration (<code>~/Library/Application Support/Claude/claude_desktop_config.json</code> on macOS):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="p">{</span>
+<a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="w">  </span><span class="nt">&quot;mcpServers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a><span class="w">    </span><span class="nt">&quot;ad-buyer-agent&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a><span class="w">      </span><span class="nt">&quot;command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;npx&quot;</span><span class="p">,</span>
+<a id="__codelineno-47-5" name="__codelineno-47-5" href="#__codelineno-47-5"></a><span class="w">      </span><span class="nt">&quot;args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-47-6" name="__codelineno-47-6" href="#__codelineno-47-6"></a><span class="w">        </span><span class="s2">&quot;mcp-remote&quot;</span><span class="p">,</span>
+<a id="__codelineno-47-7" name="__codelineno-47-7" href="#__codelineno-47-7"></a><span class="w">        </span><span class="s2">&quot;http://localhost:8001/mcp/sse&quot;</span>
+<a id="__codelineno-47-8" name="__codelineno-47-8" href="#__codelineno-47-8"></a><span class="w">      </span><span class="p">]</span>
+<a id="__codelineno-47-9" name="__codelineno-47-9" href="#__codelineno-47-9"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-47-10" name="__codelineno-47-10" href="#__codelineno-47-10"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-47-11" name="__codelineno-47-11" href="#__codelineno-47-11"></a><span class="p">}</span>
+</code></pre></div>
+<p>Restart Claude Desktop after editing the configuration. The buyer agent tools will appear in the Claude tool panel.</p>
+<h3 id="connecting-other-mcp-clients">Connecting Other MCP Clients<a class="headerlink" href="#connecting-other-mcp-clients" title="Permanent link">&para;</a></h3>
+<p>Any client supporting Streamable HTTP (SSE) transport can connect:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClientSession</span>
+<a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcp.client.streamable_http</span><span class="w"> </span><span class="kn">import</span> <span class="n">streamablehttp_client</span>
+<a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>
+<a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a><span class="k">async</span> <span class="k">with</span> <span class="n">streamablehttp_client</span><span class="p">(</span><span class="s2">&quot;http://localhost:8001/mcp/sse&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="n">write</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
+<a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">ClientSession</span><span class="p">(</span><span class="n">read</span><span class="p">,</span> <span class="n">write</span><span class="p">)</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+<a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>        <span class="k">await</span> <span class="n">session</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
+<a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a>        <span class="n">tools</span> <span class="o">=</span> <span class="k">await</span> <span class="n">session</span><span class="o">.</span><span class="n">list_tools</span><span class="p">()</span>
+<a id="__codelineno-48-8" name="__codelineno-48-8" href="#__codelineno-48-8"></a>        <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">session</span><span class="o">.</span><span class="n">call_tool</span><span class="p">(</span><span class="s2">&quot;health_check&quot;</span><span class="p">,</span> <span class="p">{})</span>
+</code></pre></div>
+<h3 id="buyer-to-seller-mcp-connectivity">Buyer-to-Seller MCP Connectivity<a class="headerlink" href="#buyer-to-seller-mcp-connectivity" title="Permanent link">&para;</a></h3>
+<p>The buyer agent acts as an <strong>MCP client</strong> to seller agents (in addition to exposing its own MCP server). Configure seller connectivity via:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>SELLER_ENDPOINTS=http://seller1.example.com:8000,http://seller2.example.com:8000
+</code></pre></div>
+<p>The buyer's <code>UnifiedClient</code> connects to the seller's MCP SSE endpoint at <code>{base_url}/mcp/sse</code>. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.</p>
+<p><strong>Test seller MCP connectivity manually:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="c1"># List available seller tools</span>
+<a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>curl<span class="w"> </span>http://seller.example.com:8000/mcp/tools
+<a id="__codelineno-50-3" name="__codelineno-50-3" href="#__codelineno-50-3"></a>
+<a id="__codelineno-50-4" name="__codelineno-50-4" href="#__codelineno-50-4"></a><span class="c1"># Or call a tool directly (SimpleMCP fallback)</span>
+<a id="__codelineno-50-5" name="__codelineno-50-5" href="#__codelineno-50-5"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://seller.example.com:8000/mcp/call<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-50-6" name="__codelineno-50-6" href="#__codelineno-50-6"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-50-7" name="__codelineno-50-7" href="#__codelineno-50-7"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">&#39;{&quot;name&quot;: &quot;list_products&quot;, &quot;arguments&quot;: {}}&#39;</span>
+</code></pre></div>
+<h3 id="mcp-on-aws">MCP on AWS<a class="headerlink" href="#mcp-on-aws" title="Permanent link">&para;</a></h3>
+<p>In production AWS deployments, MCP connectivity between buyer and seller agents is typically over private VPC networking. If both are running in the same VPC:</p>
+<ul>
+<li>Seller URL uses the ECS service discovery DNS name or ALB internal endpoint</li>
+<li>No public internet required for agent-to-agent communication</li>
+</ul>
+<p>If connecting to an external seller:</p>
+<ul>
+<li>Ensure the ECS task's security group allows outbound HTTPS (port 443)</li>
+<li>Use the seller's ALB DNS name as the <code>SELLER_ENDPOINTS</code> value</li>
+</ul>
+<hr />
+<h2 id="backup-recovery">Backup &amp; Recovery<a class="headerlink" href="#backup-recovery" title="Permanent link">&para;</a></h2>
+<h3 id="what-needs-to-be-backed-up">What Needs to Be Backed Up<a class="headerlink" href="#what-needs-to-be-backed-up" title="Permanent link">&para;</a></h3>
+<p>The buyer agent has two types of state:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Location</th>
+<th>Durability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Active jobs</strong></td>
+<td>In-memory (<code>jobs</code> dict)</td>
+<td>Lost on restart; dual-written to SQLite</td>
+</tr>
+<tr>
+<td><strong>Deal store</strong></td>
+<td>SQLite (<code>ad_buyer.db</code>)</td>
+<td>Durable on disk; on EFS in AWS</td>
+</tr>
+<tr>
+<td><strong>Pacing snapshots</strong></td>
+<td>SQLite (<code>ad_buyer.db</code>)</td>
+<td>Same as deal store</td>
+</tr>
+</tbody>
+</table>
+<p>The in-memory <code>jobs</code> dict is the primary job store. SQLite is a best-effort duplicate for recovery after restarts. On restart, completed and failed jobs are readable from SQLite; running jobs that were interrupted will show stale <code>running</code> status in memory and must be resubmitted.</p>
+<h3 id="local-backup">Local Backup<a class="headerlink" href="#local-backup" title="Permanent link">&para;</a></h3>
+<p>Back up the SQLite database file directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="c1"># Simple copy</span>
+<a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>cp<span class="w"> </span>ad_buyer.db<span class="w"> </span>ad_buyer_backup_<span class="k">$(</span>date<span class="w"> </span>+%Y%m%d<span class="k">)</span>.db
+<a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>
+<a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a><span class="c1"># Or use SQLite&#39;s online backup (safe with live connections)</span>
+<a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>sqlite3<span class="w"> </span>ad_buyer.db<span class="w"> </span><span class="s2">&quot;.backup &#39;ad_buyer_backup.db&#39;&quot;</span>
+</code></pre></div>
+<p>Schedule periodic backups with cron:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a><span class="c1"># /etc/cron.d/ad-buyer-backup</span>
+<a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a><span class="m">0</span><span class="w"> </span><span class="m">2</span><span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>buyer<span class="w"> </span>sqlite3<span class="w"> </span>/data/ad_buyer.db<span class="w"> </span><span class="s2">&quot;.backup &#39;/backups/ad_buyer_</span><span class="k">$(</span>date<span class="w"> </span>+<span class="se">\%</span>Y<span class="se">\%</span>m<span class="se">\%</span>d<span class="k">)</span><span class="s2">.db&#39;&quot;</span>
+</code></pre></div>
+<h3 id="aws-backup">AWS Backup<a class="headerlink" href="#aws-backup" title="Permanent link">&para;</a></h3>
+<h4 id="efs-backup">EFS Backup<a class="headerlink" href="#efs-backup" title="Permanent link">&para;</a></h4>
+<p>AWS Backup automatically backs up EFS volumes. Enable it in the CloudFormation/Terraform templates or manually:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a>aws<span class="w"> </span>backup<span class="w"> </span>start-backup-job<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a><span class="w">  </span>--backup-vault-name<span class="w"> </span>ad-buyer-backup-vault<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a><span class="w">  </span>--resource-arn<span class="w"> </span>arn:aws:elasticfilesystem:us-east-1:123456789:file-system/fs-xxxxxx<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a><span class="w">  </span>--iam-role-arn<span class="w"> </span>arn:aws:iam::123456789:role/AWSBackupDefaultServiceRole<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-53-5" name="__codelineno-53-5" href="#__codelineno-53-5"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<h4 id="recommended-backup-policy">Recommended Backup Policy<a class="headerlink" href="#recommended-backup-policy" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th>Frequency</th>
+<th>Retention</th>
+<th>Storage Class</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Daily</td>
+<td>30 days</td>
+<td>EFS Standard</td>
+</tr>
+<tr>
+<td>Weekly</td>
+<td>12 weeks</td>
+<td>EFS Standard-IA</td>
+</tr>
+<tr>
+<td>Monthly</td>
+<td>12 months</td>
+<td>EFS Standard-IA</td>
+</tr>
+</tbody>
+</table>
+<h4 id="recovery-from-efs-backup">Recovery from EFS Backup<a class="headerlink" href="#recovery-from-efs-backup" title="Permanent link">&para;</a></h4>
+<p>To restore from an AWS Backup recovery point:</p>
+<ol>
+<li>In the AWS Console, go to AWS Backup → Recovery Points</li>
+<li>Select the recovery point for the EFS file system</li>
+<li>Choose <strong>Restore</strong> — this creates a new EFS volume from the point-in-time backup</li>
+<li>Update the ECS task definition to mount the restored EFS volume</li>
+<li>Deploy the updated task definition</li>
+</ol>
+<h4 id="manual-efs-export-point-in-time">Manual EFS Export (Point-in-Time)<a class="headerlink" href="#manual-efs-export-point-in-time" title="Permanent link">&para;</a></h4>
+<p>To export the database file from a running ECS task:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a><span class="c1"># Use ECS Execute Command (enabled in the CloudFormation/Terraform templates)</span>
+<a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a>aws<span class="w"> </span>ecs<span class="w"> </span>execute-command<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a><span class="w">  </span>--cluster<span class="w"> </span>production-ad-buyer-cluster<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a><span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a><span class="w">  </span>--container<span class="w"> </span>ad-buyer<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-54-6" name="__codelineno-54-6" href="#__codelineno-54-6"></a><span class="w">  </span>--interactive<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-54-7" name="__codelineno-54-7" href="#__codelineno-54-7"></a><span class="w">  </span>--command<span class="w"> </span><span class="s2">&quot;/bin/sh&quot;</span>
+<a id="__codelineno-54-8" name="__codelineno-54-8" href="#__codelineno-54-8"></a>
+<a id="__codelineno-54-9" name="__codelineno-54-9" href="#__codelineno-54-9"></a><span class="c1"># Inside the container:</span>
+<a id="__codelineno-54-10" name="__codelineno-54-10" href="#__codelineno-54-10"></a>cp<span class="w"> </span>/app/data/ad_buyer.db<span class="w"> </span>/tmp/ad_buyer_export.db
+</code></pre></div>
+<p>Then use <code>aws s3 cp</code> from within the container, or pipe the file through the session.</p>
+<h3 id="database-migration">Database Migration<a class="headerlink" href="#database-migration" title="Permanent link">&para;</a></h3>
+<p>When upgrading the buyer agent to a new version that adds schema changes:</p>
+<ol>
+<li>Back up the current database before deploying</li>
+<li>Deploy the new container image</li>
+<li>The <code>DealStore</code> and <code>PacingStore</code> use <code>CREATE TABLE IF NOT EXISTS</code> — new tables are added automatically</li>
+<li>Existing rows are preserved; new columns require manual <code>ALTER TABLE</code> migrations if the schema changes</li>
+</ol>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="server-will-not-start">Server Will Not Start<a class="headerlink" href="#server-will-not-start" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> <code>uvicorn</code> fails to start, or the container exits immediately.</p>
+<p><strong>Check 1 — Missing dependencies:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
+<a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a><span class="c1"># Verify the package is installed</span>
+<a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import ad_buyer; print(&#39;OK&#39;)&quot;</span>
+</code></pre></div>
+<p><strong>Check 2 — Port already in use:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>lsof<span class="w"> </span>-i<span class="w"> </span>:8001
+<a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a><span class="c1"># If something is already on port 8001, stop it or change the port:</span>
+<a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>uvicorn<span class="w"> </span>ad_buyer.interfaces.api.main:app<span class="w"> </span>--reload<span class="w"> </span>--port<span class="w"> </span><span class="m">8002</span>
+</code></pre></div>
+<p><strong>Check 3 — Invalid environment variables:</strong></p>
+<p>The settings module validates on startup. Look for <code>ValidationError</code> in the output:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;from ad_buyer.config.settings import settings; print(settings)&quot;</span>
+</code></pre></div>
+<hr />
+<h3 id="health-check-returns-503-container-keeps-restarting">Health Check Returns 503 / Container Keeps Restarting<a class="headerlink" href="#health-check-returns-503-container-keeps-restarting" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> <code>curl http://localhost:8001/health</code> returns 503, or ECS tasks fail health checks and restart repeatedly.</p>
+<p><strong>Check 1 — Application logs:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a><span class="c1"># Docker</span>
+<a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>app
+<a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>
+<a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a><span class="c1"># AWS CloudWatch</span>
+<a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>aws<span class="w"> </span>logs<span class="w"> </span>tail<span class="w"> </span>/ecs/production/ad-buyer<span class="w"> </span>--follow<span class="w"> </span>--region<span class="w"> </span>us-east-1
+</code></pre></div>
+<p><strong>Check 2 — Start period too short (AWS):</strong></p>
+<p>The ECS health check has a 60-second <code>startPeriod</code>. If the application takes longer to start (e.g., during a cold start with heavy dependency loading), increase the <code>StartPeriod</code> in <code>compute.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="nt">HealthCheck</span><span class="p">:</span>
+<a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a><span class="w">  </span><span class="nt">StartPeriod</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">120</span>
+</code></pre></div>
+<p><strong>Check 3 — EFS mount failure (AWS):</strong></p>
+<p>EFS mount issues cause the task to fail before the app starts. Check ECS task stopped reason:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a>aws<span class="w"> </span>ecs<span class="w"> </span>describe-tasks<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a><span class="w">  </span>--cluster<span class="w"> </span>production-ad-buyer-cluster<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a><span class="w">  </span>--tasks<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="w">  </span>--region<span class="w"> </span>us-east-1<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a><span class="w">  </span>--query<span class="w"> </span><span class="s1">&#39;tasks[*].stoppedReason&#39;</span>
+</code></pre></div>
+<p>Common cause: EFS mount targets are not yet available in the subnets. Wait a few minutes after EFS creation before deploying tasks.</p>
+<hr />
+<h3 id="job-stuck-in-running-status">Job Stuck in "running" Status<a class="headerlink" href="#job-stuck-in-running-status" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> A booking job shows <code>status: running</code> indefinitely and never transitions.</p>
+<p><strong>Cause:</strong> The background task failed silently or the process was interrupted.</p>
+<p><strong>Resolution:</strong></p>
+<ol>
+<li>Check the job's error list: <code>curl http://localhost:8001/bookings/&lt;job-id&gt;</code></li>
+<li>If <code>errors</code> is empty but the job is stuck, the process was likely killed mid-flow (e.g., container restart)</li>
+<li>The job cannot automatically recover. Resubmit the campaign brief as a new booking</li>
+<li>In production, implement a watchdog that detects stale <code>running</code> jobs and marks them <code>failed</code> after a timeout</li>
+</ol>
+<hr />
+<h3 id="llm-api-errors">LLM API Errors<a class="headerlink" href="#llm-api-errors" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> Jobs fail with errors like <code>AuthenticationError</code>, <code>RateLimitError</code>, or <code>APIConnectionError</code>.</p>
+<p><strong>Check 1 — API key validity:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a><span class="c1"># Test the Anthropic API key directly</span>
+<a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;x-api-key: </span><span class="nv">$ANTHROPIC_API_KEY</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a><span class="w">     </span>-H<span class="w"> </span><span class="s2">&quot;anthropic-version: 2023-06-01&quot;</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a><span class="w">     </span>https://api.anthropic.com/v1/models<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.models[0]&#39;</span>
+</code></pre></div>
+<p><strong>Check 2 — Rate limits:</strong></p>
+<p>Reduce concurrency by lowering <code>CREW_MAX_ITERATIONS</code> and limiting the number of concurrent bookings. CrewAI's multi-agent workflows make many LLM calls in parallel.</p>
+<p><strong>Check 3 — Model availability:</strong></p>
+<p>If a specific model is unavailable, switch to a different model:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a>DEFAULT_LLM_MODEL=anthropic/claude-haiku-3-5-20241022
+<a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>MANAGER_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
+</code></pre></div>
+<hr />
+<h3 id="seller-connection-failures">Seller Connection Failures<a class="headerlink" href="#seller-connection-failures" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> Jobs fail with <code>ConnectionRefusedError</code>, <code>ConnectTimeout</code>, or seller tools return empty results.</p>
+<p><strong>Check 1 — Seller is running:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>curl<span class="w"> </span>http://localhost:8000/health<span class="w">  </span><span class="c1"># or the seller&#39;s configured URL</span>
+</code></pre></div>
+<p><strong>Check 2 — SELLER_ENDPOINTS configuration:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;from ad_buyer.config.settings import settings; print(settings.get_seller_endpoints())&quot;</span>
+</code></pre></div>
+<p><strong>Check 3 — Network reachability (Docker):</strong></p>
+<p>If the buyer and seller are in separate Docker networks, use <code>host.docker.internal</code> as the seller hostname:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a>SELLER_ENDPOINTS=http://host.docker.internal:8000
+</code></pre></div>
+<p><strong>Check 4 — MCP SSE endpoint:</strong></p>
+<p>Test the seller's MCP endpoint directly:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>http://seller.example.com:8000/mcp/sse<span class="w">  </span><span class="c1"># Should stream SSE events</span>
+</code></pre></div>
+<hr />
+<h3 id="database-errors">Database Errors<a class="headerlink" href="#database-errors" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> <code>sqlite3.OperationalError: database is locked</code> or <code>disk I/O error</code>.</p>
+<p><strong>Cause 1 — Multiple writers (SQLite limitation):</strong></p>
+<p>Only one process may write to SQLite at a time. Ensure <code>DesiredCount: 1</code> in ECS, and that no other process is accessing the database file concurrently.</p>
+<p><strong>Cause 2 — File permissions (Docker volume):</strong></p>
+<p>The container runs as user <code>buyer</code> (UID 1000). The Docker volume or EFS mount must be writable by this user. The EFS access point in <code>compute.yaml</code> is pre-configured with <code>OwnerUid: "1000"</code>.</p>
+<p><strong>Check database integrity:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a>sqlite3<span class="w"> </span>ad_buyer.db<span class="w"> </span><span class="s2">&quot;PRAGMA integrity_check;&quot;</span>
+<a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a><span class="c1"># Should return: ok</span>
+</code></pre></div>
+<p><strong>Recover a corrupted database:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a>sqlite3<span class="w"> </span>corrupt.db<span class="w"> </span><span class="s2">&quot;.recover&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sqlite3<span class="w"> </span>recovered.db
+</code></pre></div>
+<hr />
+<h3 id="mcp-client-cannot-connect-to-seller">MCP Client Cannot Connect to Seller<a class="headerlink" href="#mcp-client-cannot-connect-to-seller" title="Permanent link">&para;</a></h3>
+<p><strong>Symptom:</strong> <code>IABMCPClient</code> raises <code>ConnectionError</code> or falls back to <code>SimpleMCPClient</code> unexpectedly.</p>
+<p><strong>Check 1 — MCP SDK installed:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import mcp; print(mcp.__version__)&quot;</span>
+</code></pre></div>
+<p>If not installed, install it: <code>pip install mcp</code></p>
+<p><strong>Check 2 — Seller SSE endpoint:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a><span class="c1"># The SSE endpoint should keep the connection open</span>
+<a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a>curl<span class="w"> </span>-N<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Accept: text/event-stream&quot;</span><span class="w"> </span>http://seller.example.com:8000/mcp/sse
+</code></pre></div>
+<p><strong>Check 3 — Firewall / security groups:</strong></p>
+<p>SSE connections use long-lived HTTP connections. Ensure that any load balancer or proxy has a sufficiently long idle timeout (300+ seconds recommended).</p>
+<hr />
+<h3 id="agent-hierarchy-scaling-considerations">Agent Hierarchy Scaling Considerations<a class="headerlink" href="#agent-hierarchy-scaling-considerations" title="Permanent link">&para;</a></h3>
+<p>The buyer agent runs a three-level agent hierarchy for campaign bookings:</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Agent</th>
+<th>Model</th>
+<th>LLM Calls per Run</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L1</td>
+<td>Portfolio Manager</td>
+<td>Opus (manager)</td>
+<td>1–3</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>Channel Specialists (×4)</td>
+<td>Sonnet (default)</td>
+<td>4–8 each</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>Functional Agents</td>
+<td>Sonnet (default)</td>
+<td>2–5 each</td>
+</tr>
+</tbody>
+</table>
+<p>A full campaign run makes 20–50+ LLM calls. For high-volume environments:</p>
+<ul>
+<li>Monitor LLM API rate limits and request quotas</li>
+<li>Consider separate API keys for the Portfolio Manager (Opus) vs. specialist agents (Sonnet)</li>
+<li>Use <code>CREW_MAX_ITERATIONS</code> to cap runaway agent loops</li>
+<li>Set <code>CREW_VERBOSE=False</code> in production to reduce log volume</li>
+</ul>
+<hr />
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="../configuration/">Configuration Reference</a> — Full environment variable documentation</li>
+<li><a href="../../architecture/overview/">Architecture Overview</a> — Agent hierarchy and system components</li>
+<li><a href="../budget-pacing/">Budget Pacing</a> — Pacing engine and reallocation logic</li>
+<li><a href="../deal-booking/">Deal Booking Guide</a> — Booking flow and deal lifecycle</li>
+<li><a href="../../event-bus/overview/">Event Bus</a> — Structured observability events</li>
+<li><a href="../../getting-started/quickstart/">Quickstart</a> — First-run walkthrough</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

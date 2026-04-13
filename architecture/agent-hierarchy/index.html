@@ -1,0 +1,2094 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="API &amp; Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent" name="description"/>
+<link href="https://iabtechlab.github.io/buyer-agent/architecture/agent-hierarchy/" rel="canonical"/>
+<link href="../overview/" rel="prev"/>
+<link href="../booking-flow/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Agent Hierarchy - IAB Tech Lab — Buyer Agent</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="indigo" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#agent-hierarchy">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+<aside class="md-banner">
+<div class="md-banner__inner md-grid md-typeset">
+<a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here →
+  </a>
+</div>
+</aside>
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Agent Hierarchy
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting-started/quickstart/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/overview/">
+          
+  
+  
+  API Reference
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../state-machines/order-lifecycle/">
+          
+  
+  
+  State Machines
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../event-bus/overview/">
+          
+  
+  
+  Event Bus
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../guides/overview/">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../integration/seller-agent/">
+          
+  
+  
+  Integration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../claude-desktop-setup/">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../ai-assistant/mcp-tools/">
+          
+  
+  
+  MCP Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="https://iabtechlab.github.io/seller-agent/">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/quickstart/">
+<span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/protocols/">
+<span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/mcp-client/">
+<span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/a2a-client/">
+<span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/authentication/">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/change-requests/">
+<span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/deals/">
+<span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/bookings/">
+<span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/seller-discovery/">
+<span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/products/">
+<span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#overview">
+<span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#level-1-portfolio-manager">
+<span class="md-ellipsis">
+      
+        Level 1 --- Portfolio Manager
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#level-2-channel-specialists">
+<span class="md-ellipsis">
+      
+        Level 2 --- Channel Specialists
+      
+    </span>
+</a>
+<nav aria-label="Level 2 --- Channel Specialists" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#branding-specialist">
+<span class="md-ellipsis">
+      
+        Branding Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ctv-specialist">
+<span class="md-ellipsis">
+      
+        CTV Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#mobile-app-specialist">
+<span class="md-ellipsis">
+      
+        Mobile App Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#performance-specialist">
+<span class="md-ellipsis">
+      
+        Performance Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#buyer-deal-discovery-specialist">
+<span class="md-ellipsis">
+      
+        Buyer Deal Discovery Specialist
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#level-3-functional-agents">
+<span class="md-ellipsis">
+      
+        Level 3 --- Functional Agents
+      
+    </span>
+</a>
+<nav aria-label="Level 3 --- Functional Agents" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audience-planner-ucp">
+<span class="md-ellipsis">
+      
+        Audience Planner (UCP)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#research-agent">
+<span class="md-ellipsis">
+      
+        Research Agent
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#execution-agent">
+<span class="md-ellipsis">
+      
+        Execution Agent
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reporting-agent">
+<span class="md-ellipsis">
+      
+        Reporting Agent
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#crew-coordination">
+<span class="md-ellipsis">
+      
+        Crew Coordination
+      
+    </span>
+</a>
+<nav aria-label="Crew Coordination" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#portfolio-crew">
+<span class="md-ellipsis">
+      
+        Portfolio Crew
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channel-crews">
+<span class="md-ellipsis">
+      
+        Channel Crews
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#execution-flow">
+<span class="md-ellipsis">
+      
+        Execution Flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../booking-flow/">
+<span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../buyer-deal-flow/">
+<span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-store/">
+<span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../models/">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../mcp-server/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/order-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/change-request-flow/">
+<span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../event-bus/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-booking/">
+<span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/negotiation/">
+<span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/identity/">
+<span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/linear-tv/">
+<span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/configuration/">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deployment-ops-guide/">
+<span class="md-ellipsis">
+    
+  
+    Deployment &amp; Operations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller-orchestration/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/campaign-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/budget-pacing/">
+<span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/creative-management/">
+<span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/opendirect/">
+<span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../claude-desktop-setup/">
+<span class="md-ellipsis">
+    
+  
+    Claude (Desktop &amp; Web)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../multi-client-setup/">
+<span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex &amp; AI IDEs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/developer-setup/">
+<span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/mcp-tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/slash-commands/">
+<span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/setup-wizard/">
+<span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="https://iabtechlab.github.io/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#overview">
+<span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#level-1-portfolio-manager">
+<span class="md-ellipsis">
+      
+        Level 1 --- Portfolio Manager
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#level-2-channel-specialists">
+<span class="md-ellipsis">
+      
+        Level 2 --- Channel Specialists
+      
+    </span>
+</a>
+<nav aria-label="Level 2 --- Channel Specialists" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#branding-specialist">
+<span class="md-ellipsis">
+      
+        Branding Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#ctv-specialist">
+<span class="md-ellipsis">
+      
+        CTV Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#mobile-app-specialist">
+<span class="md-ellipsis">
+      
+        Mobile App Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#performance-specialist">
+<span class="md-ellipsis">
+      
+        Performance Specialist
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#buyer-deal-discovery-specialist">
+<span class="md-ellipsis">
+      
+        Buyer Deal Discovery Specialist
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#level-3-functional-agents">
+<span class="md-ellipsis">
+      
+        Level 3 --- Functional Agents
+      
+    </span>
+</a>
+<nav aria-label="Level 3 --- Functional Agents" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audience-planner-ucp">
+<span class="md-ellipsis">
+      
+        Audience Planner (UCP)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#research-agent">
+<span class="md-ellipsis">
+      
+        Research Agent
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#execution-agent">
+<span class="md-ellipsis">
+      
+        Execution Agent
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reporting-agent">
+<span class="md-ellipsis">
+      
+        Reporting Agent
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#crew-coordination">
+<span class="md-ellipsis">
+      
+        Crew Coordination
+      
+    </span>
+</a>
+<nav aria-label="Crew Coordination" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#portfolio-crew">
+<span class="md-ellipsis">
+      
+        Portfolio Crew
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channel-crews">
+<span class="md-ellipsis">
+      
+        Channel Crews
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#execution-flow">
+<span class="md-ellipsis">
+      
+        Execution Flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="agent-hierarchy">Agent Hierarchy<a class="headerlink" href="#agent-hierarchy" title="Permanent link">¶</a></h1>
+<p>The buyer agent uses a three-level agent hierarchy powered by <a href="https://www.crewai.com/">CrewAI</a>. Each level has a distinct responsibility: strategic orchestration, channel-specific expertise, and functional execution.</p>
+<p>Three levels exist because advertising campaigns require decisions at three different scopes. A single agent cannot efficiently reason about both portfolio-wide budget strategy and the mechanics of reserving a line item --- the context windows, LLM costs, and failure modes are fundamentally different at each scope. By separating strategic reasoning (Level 1) from channel expertise (Level 2) and task execution (Level 3), the system keeps each agent focused on a narrow responsibility, reduces per-call token cost by using smaller models where appropriate, and allows channel specialists to run in parallel without blocking the portfolio-level plan.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">¶</a></h2>
+<pre class="mermaid"><code>graph TB
+    subgraph Level1["Level 1 — Strategic"]
+        PM["Portfolio Manager<br/>(Claude Opus)"]
+    end
+
+    subgraph Level2["Level 2 — Channel Specialists"]
+        BR["Branding Specialist<br/>(display / video)"]
+        CTV["CTV Specialist<br/>(streaming)"]
+        MOB["Mobile App Specialist<br/>(app install)"]
+        PERF["Performance Specialist<br/>(remarketing)"]
+        DSP["Buyer Deal Specialist<br/>(deal discovery)"]
+    end
+
+    subgraph Level3["Level 3 — Functional Agents"]
+        AUD["Audience Planner<br/>(UCP)"]
+        RES["Research Agent<br/>(inventory)"]
+        EXEC["Execution Agent<br/>(orders / lines)"]
+        REP["Reporting Agent<br/>(stats / analysis)<br/><i>Coming Soon</i>"]
+    end
+
+    PM --&gt;|budget allocation| BR
+    PM --&gt;|budget allocation| CTV
+    PM --&gt;|budget allocation| MOB
+    PM --&gt;|budget allocation| PERF
+    PM -.-&gt;|deal requests| DSP
+
+    BR --&gt; RES
+    BR --&gt; EXEC
+    BR --&gt; AUD
+    CTV --&gt; RES
+    CTV --&gt; EXEC
+    CTV --&gt; AUD
+    MOB --&gt; RES
+    MOB --&gt; EXEC
+    MOB --&gt; AUD
+    PERF --&gt; RES
+    PERF --&gt; EXEC
+    PERF --&gt; AUD
+    DSP --&gt; RES
+</code></pre>
+<hr/>
+<h2 id="level-1-portfolio-manager">Level 1 --- Portfolio Manager<a class="headerlink" href="#level-1-portfolio-manager" title="Permanent link">¶</a></h2>
+<p>The Portfolio Manager is the top-level orchestrator. It receives a campaign brief and determines how to allocate budget across channels.</p>
+<p><strong>Key file:</strong> <code>src/ad_buyer/agents/level1/portfolio_manager.py</code></p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Role</td>
+<td>Portfolio Manager</td>
+</tr>
+<tr>
+<td>LLM</td>
+<td><code>anthropic/claude-opus-4-20250514</code> (configurable via <code>MANAGER_LLM_MODEL</code>)</td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td>0.3</td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td>Enabled --- delegates to Level 2 agents</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Enabled</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Responsibilities:</strong></p>
+<ul>
+<li>Analyze campaign briefs and extract objectives, constraints, and KPIs</li>
+<li>Allocate budget across channels (Branding, CTV, Mobile, Performance)</li>
+<li>Provide channel-specific guidance to specialists</li>
+<li>Monitor overall campaign coherence</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.agents.level1.portfolio_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_portfolio_manager</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="n">manager</span> <span class="o">=</span> <span class="n">create_portfolio_manager</span><span class="p">(</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>    <span class="n">tools</span><span class="o">=</span><span class="p">[],</span>       <span class="c1"># Tools added by crews</span>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>    <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="p">)</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">LLM Selection</p>
+<p>The Portfolio Manager uses Opus (the most capable model) because it handles strategic reasoning across the full campaign. Channel specialists use Sonnet for cost-efficient execution of narrower tasks.</p>
+</div>
+<hr/>
+<h2 id="level-2-channel-specialists">Level 2 --- Channel Specialists<a class="headerlink" href="#level-2-channel-specialists" title="Permanent link">¶</a></h2>
+<p>Each Level 2 agent owns a specific advertising channel. They receive budget allocations from the Portfolio Manager and coordinate Level 3 agents to research inventory and execute bookings.</p>
+<p><strong>Key directory:</strong> <code>src/ad_buyer/agents/level2/</code></p>
+<p>All channel specialists share these defaults:</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLM</td>
+<td><code>anthropic/claude-sonnet-4-5-20250929</code> (configurable via <code>DEFAULT_LLM_MODEL</code>)</td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td>0.5</td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td>Enabled --- delegates to Level 3 agents</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Enabled</td>
+</tr>
+</tbody>
+</table>
+<h3 id="branding-specialist">Branding Specialist<a class="headerlink" href="#branding-specialist" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level2/branding_agent.py</code></p>
+<p>Focuses on premium display and video placements for upper-funnel brand awareness.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Formats</td>
+<td>Homepage takeovers, roadblocks, premium video (in-stream, outstream)</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>Viewability (70%+ target), brand recall, engagement</td>
+</tr>
+<tr>
+<td>Safety</td>
+<td>Brand safety verification, contextual relevance</td>
+</tr>
+<tr>
+<td>Reach</td>
+<td>Cross-device frequency management</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.agents.level2</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_branding_agent</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="n">agent</span> <span class="o">=</span> <span class="n">create_branding_agent</span><span class="p">(</span><span class="n">tools</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">])</span>
+</code></pre></div>
+<h3 id="ctv-specialist">CTV Specialist<a class="headerlink" href="#ctv-specialist" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level2/ctv_agent.py</code></p>
+<p>Expert in Connected TV and streaming inventory.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Platforms</td>
+<td>Roku, Fire TV, Apple TV, Samsung TV+</td>
+</tr>
+<tr>
+<td>Content</td>
+<td>Hulu, Peacock, Paramount+, Max, FAST channels (Pluto, Tubi)</td>
+</tr>
+<tr>
+<td>Targeting</td>
+<td>Household-level, device graphs, cross-screen frequency</td>
+</tr>
+<tr>
+<td>Standards</td>
+<td>VAST/VPAID creative specs, addressable TV</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mobile-app-specialist">Mobile App Specialist<a class="headerlink" href="#mobile-app-specialist" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level2/mobile_app_agent.py</code></p>
+<p>Drives efficient app installs and post-install conversions.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Attribution</td>
+<td>MMP integrations (AppsFlyer, Adjust, Branch, Kochava)</td>
+</tr>
+<tr>
+<td>Formats</td>
+<td>Rewarded video, interstitials, mobile web</td>
+</tr>
+<tr>
+<td>Fraud</td>
+<td>Click injection detection, install farm prevention</td>
+</tr>
+<tr>
+<td>Privacy</td>
+<td>SKAdNetwork, attribution windows</td>
+</tr>
+</tbody>
+</table>
+<h3 id="performance-specialist">Performance Specialist<a class="headerlink" href="#performance-specialist" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level2/performance_agent.py</code></p>
+<p>Maximizes conversions and ROAS through lower-funnel tactics.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Strategies</td>
+<td>Retargeting, remarketing, lookalike modeling</td>
+</tr>
+<tr>
+<td>Optimization</td>
+<td>CPA/ROAS targets, bid optimization, pacing</td>
+</tr>
+<tr>
+<td>Creative</td>
+<td>Dynamic creative optimization, A/B testing</td>
+</tr>
+<tr>
+<td>Tracking</td>
+<td>Pixel implementation, cross-device attribution</td>
+</tr>
+</tbody>
+</table>
+<h3 id="buyer-deal-discovery-specialist">Buyer Deal Discovery Specialist<a class="headerlink" href="#buyer-deal-discovery-specialist" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level2/buyer_deal_specialist_agent.py</code></p>
+<p>Discovers inventory and obtains Deal IDs for activation in traditional DSP platforms.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Focus</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Platforms</td>
+<td>The Trade Desk, DV360, Amazon DSP, Xandr, Yahoo DSP</td>
+</tr>
+<tr>
+<td>Deal types</td>
+<td>PG (guaranteed), PD (preferred), PA (private auction)</td>
+</tr>
+<tr>
+<td>Pricing</td>
+<td>Identity-based tiered pricing, volume discounts</td>
+</tr>
+<tr>
+<td>Negotiation</td>
+<td>Price negotiation for agency/advertiser tiers</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Buyer Deal Specialist vs. other specialists</p>
+<p>The Buyer Deal Specialist works alongside the channel specialists, not in place of them. Channel specialists decide <em>what</em> inventory to buy; the Buyer Deal Specialist handles the mechanics of obtaining Deal IDs for programmatic activation. See <a href="../buyer-deal-flow/">Buyer Deal Flow</a> for the full workflow.</p>
+</div>
+<hr/>
+<h2 id="level-3-functional-agents">Level 3 --- Functional Agents<a class="headerlink" href="#level-3-functional-agents" title="Permanent link">¶</a></h2>
+<p>Level 3 agents are shared across channels. They do not make strategic decisions --- they execute specific functions on behalf of the Level 2 specialists.</p>
+<p><strong>Key directory:</strong> <code>src/ad_buyer/agents/level3/</code></p>
+<p>All functional agents share these defaults:</p>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LLM</td>
+<td><code>anthropic/claude-sonnet-4-5-20250929</code></td>
+</tr>
+<tr>
+<td>Delegation</td>
+<td>Disabled --- they are leaf-level executors</td>
+</tr>
+<tr>
+<td>Memory</td>
+<td>Enabled</td>
+</tr>
+</tbody>
+</table>
+<h3 id="audience-planner-ucp">Audience Planner (UCP)<a class="headerlink" href="#audience-planner-ucp" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level3/audience_planner_agent.py</code></p>
+<p>Plans and selects audiences using the IAB Tech Lab <a href="https://iabtechlab.com/ucp">User Context Protocol (UCP)</a> for real-time audience matching with seller inventory.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temperature</td>
+<td>0.3 (balanced for strategic audience recommendations)</td>
+</tr>
+<tr>
+<td>Signals</td>
+<td>Identity (hashed IDs, device graphs), Contextual (page content, keywords), Reinforcement (feedback loops, conversion data)</td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td>256--1024 dimension UCP vectors, cosine similarity</td>
+</tr>
+<tr>
+<td>Threshold</td>
+<td>Score &gt; 0.7 = strong match</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Key capabilities:</strong></p>
+<ul>
+<li>Signal analysis using UCP protocol</li>
+<li>Audience segment discovery from seller capabilities</li>
+<li>Coverage estimation for targeting combinations</li>
+<li>Audience expansion recommendations</li>
+<li>Gap analysis when requirements cannot be fully met</li>
+</ul>
+<p><strong>Tools used:</strong> <code>AudienceDiscoveryTool</code>, <code>AudienceMatchingTool</code>, <code>CoverageEstimationTool</code></p>
+<h3 id="research-agent">Research Agent<a class="headerlink" href="#research-agent" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level3/research_agent.py</code></p>
+<p>Discovers and evaluates advertising inventory across publishers.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temperature</td>
+<td>0.2 (low creativity, high precision for data analysis)</td>
+</tr>
+<tr>
+<td>Focus</td>
+<td>Product search, availability checks, pricing evaluation, publisher comparison</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tools used:</strong> <code>ProductSearchTool</code>, <code>AvailsCheckTool</code></p>
+<h3 id="execution-agent">Execution Agent<a class="headerlink" href="#execution-agent" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level3/execution_agent.py</code></p>
+<p>Handles the <a href="https://iabtechlab.com/standards/opendirect/">OpenDirect</a> booking lifecycle.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temperature</td>
+<td>0.1 (minimal creativity, precision execution)</td>
+</tr>
+<tr>
+<td>Workflow</td>
+<td>Draft --&gt; PendingReservation --&gt; Reserved --&gt; PendingBooking --&gt; Booked --&gt; InFlight --&gt; Finished</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tools used:</strong> <code>CreateOrderTool</code>, <code>CreateLineTool</code>, <code>ReserveLineTool</code>, <code>BookLineTool</code></p>
+<h3 id="reporting-agent">Reporting Agent<a class="headerlink" href="#reporting-agent" title="Permanent link">¶</a></h3>
+<div class="admonition info">
+<p class="admonition-title">Coming Soon</p>
+<p>The Reporting Agent (buyer-brn) is planned for a future phase. This section describes the planned reporting functionality.</p>
+</div>
+<p><strong>File:</strong> <code>src/ad_buyer/agents/level3/reporting_agent.py</code></p>
+<p>Retrieves and analyzes campaign performance data.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Temperature</td>
+<td>0.2 (analytical, data-focused)</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>Impressions, CPM, CTR, VCR, viewability, pacing, spend</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tools used:</strong> <code>GetStatsTool</code></p>
+<hr/>
+<h2 id="crew-coordination">Crew Coordination<a class="headerlink" href="#crew-coordination" title="Permanent link">¶</a></h2>
+<p>Agents are organized into <strong>crews</strong> --- CrewAI constructs that define which agents work together, what tasks they perform, and how authority flows.</p>
+<h3 id="portfolio-crew">Portfolio Crew<a class="headerlink" href="#portfolio-crew" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/crews/portfolio_crew.py</code></p>
+<p>The top-level crew uses a <strong>hierarchical process</strong> with the Portfolio Manager as the manager agent.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.crews.portfolio_crew</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_portfolio_crew</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a><span class="n">crew</span> <span class="o">=</span> <span class="n">create_portfolio_crew</span><span class="p">(</span>
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a>    <span class="n">client</span><span class="o">=</span><span class="n">opendirect_client</span><span class="p">,</span>
+<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a>    <span class="n">campaign_brief</span><span class="o">=</span><span class="p">{</span>
+<a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a>        <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"Q3 Awareness Campaign"</span><span class="p">,</span>
+<a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a>        <span class="s2">"objectives"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"brand_awareness"</span><span class="p">,</span> <span class="s2">"reach"</span><span class="p">],</span>
+<a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a>        <span class="s2">"budget"</span><span class="p">:</span> <span class="mi">500_000</span><span class="p">,</span>
+<a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a>        <span class="s2">"start_date"</span><span class="p">:</span> <span class="s2">"2026-07-01"</span><span class="p">,</span>
+<a href="#__codelineno-2-10" id="__codelineno-2-10" name="__codelineno-2-10"></a>        <span class="s2">"end_date"</span><span class="p">:</span> <span class="s2">"2026-09-30"</span><span class="p">,</span>
+<a href="#__codelineno-2-11" id="__codelineno-2-11" name="__codelineno-2-11"></a>        <span class="s2">"target_audience"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"age"</span><span class="p">:</span> <span class="s2">"25-54"</span><span class="p">,</span> <span class="s2">"interests"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"sports"</span><span class="p">,</span> <span class="s2">"news"</span><span class="p">]},</span>
+<a href="#__codelineno-2-12" id="__codelineno-2-12" name="__codelineno-2-12"></a>        <span class="s2">"kpis"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"viewability"</span><span class="p">:</span> <span class="mf">0.70</span><span class="p">,</span> <span class="s2">"reach"</span><span class="p">:</span> <span class="mi">2_000_000</span><span class="p">},</span>
+<a href="#__codelineno-2-13" id="__codelineno-2-13" name="__codelineno-2-13"></a>    <span class="p">},</span>
+<a href="#__codelineno-2-14" id="__codelineno-2-14" name="__codelineno-2-14"></a><span class="p">)</span>
+<a href="#__codelineno-2-15" id="__codelineno-2-15" name="__codelineno-2-15"></a>
+<a href="#__codelineno-2-16" id="__codelineno-2-16" name="__codelineno-2-16"></a><span class="n">result</span> <span class="o">=</span> <span class="n">crew</span><span class="o">.</span><span class="n">kickoff</span><span class="p">()</span>
+</code></pre></div>
+<p><strong>Structure:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Agent</th>
+<th>Process</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Manager</td>
+<td>Portfolio Manager (L1)</td>
+<td>Hierarchical --- assigns tasks and reviews output</td>
+</tr>
+<tr>
+<td>Workers</td>
+<td>Branding, CTV, Mobile, Performance (L2)</td>
+<td>Receive budget allocation and channel guidance</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tasks:</strong></p>
+<ol>
+<li><strong>Budget Allocation</strong> --- Analyze the brief, determine optimal channel split</li>
+<li><strong>Channel Coordination</strong> --- Provide targeting and quality guidance per channel</li>
+</ol>
+<h3 id="channel-crews">Channel Crews<a class="headerlink" href="#channel-crews" title="Permanent link">¶</a></h3>
+<p><strong>File:</strong> <code>src/ad_buyer/crews/channel_crews.py</code></p>
+<p>Each channel has its own crew. The channel specialist acts as the manager, with Research and Execution agents as workers.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.crews.channel_crews</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_branding_crew</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="n">crew</span> <span class="o">=</span> <span class="n">create_branding_crew</span><span class="p">(</span>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a>    <span class="n">client</span><span class="o">=</span><span class="n">opendirect_client</span><span class="p">,</span>
+<a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a>    <span class="n">channel_brief</span><span class="o">=</span><span class="p">{</span>
+<a href="#__codelineno-3-6" id="__codelineno-3-6" name="__codelineno-3-6"></a>        <span class="s2">"budget"</span><span class="p">:</span> <span class="mi">150_000</span><span class="p">,</span>
+<a href="#__codelineno-3-7" id="__codelineno-3-7" name="__codelineno-3-7"></a>        <span class="s2">"start_date"</span><span class="p">:</span> <span class="s2">"2026-07-01"</span><span class="p">,</span>
+<a href="#__codelineno-3-8" id="__codelineno-3-8" name="__codelineno-3-8"></a>        <span class="s2">"end_date"</span><span class="p">:</span> <span class="s2">"2026-09-30"</span><span class="p">,</span>
+<a href="#__codelineno-3-9" id="__codelineno-3-9" name="__codelineno-3-9"></a>        <span class="s2">"target_audience"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"age"</span><span class="p">:</span> <span class="s2">"25-54"</span><span class="p">},</span>
+<a href="#__codelineno-3-10" id="__codelineno-3-10" name="__codelineno-3-10"></a>        <span class="s2">"objectives"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"brand_awareness"</span><span class="p">],</span>
+<a href="#__codelineno-3-11" id="__codelineno-3-11" name="__codelineno-3-11"></a>    <span class="p">},</span>
+<a href="#__codelineno-3-12" id="__codelineno-3-12" name="__codelineno-3-12"></a>    <span class="n">audience_plan</span><span class="o">=</span><span class="p">{</span>
+<a href="#__codelineno-3-13" id="__codelineno-3-13" name="__codelineno-3-13"></a>        <span class="s2">"target_demographics"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"age"</span><span class="p">:</span> <span class="s2">"25-54"</span><span class="p">,</span> <span class="s2">"gender"</span><span class="p">:</span> <span class="s2">"all"</span><span class="p">},</span>
+<a href="#__codelineno-3-14" id="__codelineno-3-14" name="__codelineno-3-14"></a>        <span class="s2">"target_interests"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"sports"</span><span class="p">,</span> <span class="s2">"news"</span><span class="p">,</span> <span class="s2">"entertainment"</span><span class="p">],</span>
+<a href="#__codelineno-3-15" id="__codelineno-3-15" name="__codelineno-3-15"></a>    <span class="p">},</span>
+<a href="#__codelineno-3-16" id="__codelineno-3-16" name="__codelineno-3-16"></a><span class="p">)</span>
+<a href="#__codelineno-3-17" id="__codelineno-3-17" name="__codelineno-3-17"></a>
+<a href="#__codelineno-3-18" id="__codelineno-3-18" name="__codelineno-3-18"></a><span class="n">result</span> <span class="o">=</span> <span class="n">crew</span><span class="o">.</span><span class="n">kickoff</span><span class="p">()</span>
+</code></pre></div>
+<p>Four channel crew factory functions are available:</p>
+<table>
+<thead>
+<tr>
+<th>Function</th>
+<th>Manager Agent</th>
+<th>Workers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>create_branding_crew()</code></td>
+<td>Branding Specialist</td>
+<td>Research + Execution</td>
+</tr>
+<tr>
+<td><code>create_ctv_crew()</code></td>
+<td>CTV Specialist</td>
+<td>Research + Execution</td>
+</tr>
+<tr>
+<td><code>create_mobile_crew()</code></td>
+<td>Mobile App Specialist</td>
+<td>Research + Execution</td>
+</tr>
+<tr>
+<td><code>create_performance_crew()</code></td>
+<td>Performance Specialist</td>
+<td>Research + Execution</td>
+</tr>
+</tbody>
+</table>
+<p>All channel crews follow the same two-task pattern:</p>
+<ol>
+<li><strong>Research Task</strong> --- The Research Agent searches inventory matching the channel brief and audience plan, using both research and audience tools</li>
+<li><strong>Recommendation Task</strong> --- The channel specialist reviews findings and selects the best inventory</li>
+</ol>
+<div class="admonition info">
+<p class="admonition-title">Audience context</p>
+<p>Channel crews accept an optional <code>audience_plan</code> parameter. When provided, the Research Agent incorporates UCP-compatible audience targeting into its inventory search. This plan typically comes from the Audience Planner agent.</p>
+</div>
+<hr/>
+<h2 id="execution-flow">Execution Flow<a class="headerlink" href="#execution-flow" title="Permanent link">¶</a></h2>
+<p>A typical end-to-end campaign follows this pattern:</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant User
+    participant PM as Portfolio Manager (L1)
+    participant CS as Channel Specialist (L2)
+    participant RA as Research Agent (L3)
+    participant EA as Execution Agent (L3)
+
+    User-&gt;&gt;PM: Campaign brief
+    PM-&gt;&gt;PM: Allocate budget across channels
+    PM-&gt;&gt;CS: Channel brief + budget
+
+    CS-&gt;&gt;RA: Research inventory
+    RA--&gt;&gt;CS: Ranked product recommendations
+    CS-&gt;&gt;CS: Select best inventory
+    opt Negotiation (eligible tiers)
+        CS-&gt;&gt;EA: Negotiate pricing
+        EA--&gt;&gt;CS: Negotiated terms
+    end
+    CS-&gt;&gt;EA: Book selected placements
+    EA--&gt;&gt;CS: Booking confirmations
+    CS--&gt;&gt;PM: Channel results
+    PM--&gt;&gt;User: Consolidated plan
+</code></pre>
+<hr/>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="../overview/">Architecture Overview</a> --- Full system architecture</li>
+<li><a href="../tools/">Tools Reference</a> --- All CrewAI tools available to agents</li>
+<li><a href="../buyer-deal-flow/">Buyer Deal Flow</a> --- Buyer deal discovery workflow</li>
+<li><a href="../booking-flow/">Booking Flow</a> --- Detailed booking sequence</li>
+<li><a href="../../guides/configuration/">Configuration</a> --- LLM and agent settings</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>
