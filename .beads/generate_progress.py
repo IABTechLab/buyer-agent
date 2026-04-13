@@ -21,6 +21,11 @@ BEADS_DIR = Path(__file__).parent
 JSONL_PATH = BEADS_DIR / "issues.jsonl"
 OUTPUT_PATH = BEADS_DIR / "PROGRESS.md"
 
+# Only include beads whose ID starts with this prefix.
+# Prevents parent-repo (ar-) or other-repo beads from leaking into this
+# repo's PROGRESS.md when the JSONL contains cross-repo entries.
+BEAD_PREFIX = "buyer-"
+
 # Cross-repo blockers that can't be tracked as formal bd dependencies.
 CROSS_REPO_BLOCKERS = {
     "buyer-4bg": ["seller-dcd"],
@@ -54,7 +59,7 @@ def refresh_jsonl():
 
 
 def load_issues():
-    """Load issues from JSONL, filtering tombstones and LEGACY beads."""
+    """Load issues from JSONL, filtering tombstones, LEGACY, and non-repo beads."""
     issues = []
     if not JSONL_PATH.exists():
         return issues
@@ -67,6 +72,10 @@ def load_issues():
             if issue.get("status") == "tombstone":
                 continue
             if "[LEGACY]" in issue.get("title", ""):
+                continue
+            # Only include beads belonging to this repo (buyer- prefix).
+            # Parent-repo (ar-) or other-repo beads should not appear.
+            if BEAD_PREFIX and not issue.get("id", "").startswith(BEAD_PREFIX):
                 continue
             issues.append(issue)
     return issues
