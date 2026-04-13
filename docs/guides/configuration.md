@@ -83,7 +83,7 @@ endpoints = settings.get_seller_endpoints()
 | `LLM_TEMPERATURE` | `float` | `0.3` | Default temperature for LLM calls. Individual agents may override this. |
 | `LLM_MAX_TOKENS` | `int` | `4096` | Maximum token output for LLM responses. |
 
-Models are specified in [litellm](https://docs.litellm.ai/) format: `provider/model-name`. This allows swapping providers without code changes.
+Models are specified in `provider/model-name` format using CrewAI's native provider integrations. Install the matching extra (e.g., `pip install "crewai[anthropic]"`) and set the API key. No code changes required to switch providers.
 
 ```bash
 # Use a different model provider
