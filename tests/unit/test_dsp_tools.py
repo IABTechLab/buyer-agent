@@ -11,7 +11,7 @@ from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,
 )
-from ad_buyer.tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
 
 @pytest.fixture
