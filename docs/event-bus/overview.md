@@ -23,7 +23,7 @@ The diagram below shows how events flow from the buyer's deal and campaign flows
 ```mermaid
 graph TB
     subgraph Flows
-        DSP["DSPDealFlow"]
+        DSP["BuyerDealFlow"]
         DBF["DealBookingFlow"]
     end
 
@@ -69,7 +69,7 @@ Every event is a Pydantic `Event` instance with the following fields:
 | `event_type` | `EventType` | *(required)* | Enum value identifying what happened |
 | `timestamp` | `datetime` | `datetime.now(timezone.utc)` | When the event was created |
 | `flow_id` | `str` | `""` | ID of the flow instance that produced this event |
-| `flow_type` | `str` | `""` | Type of flow (e.g., `"dsp_deal"`, `"deal_booking"`) |
+| `flow_type` | `str` | `""` | Type of flow (e.g., `"buyer_deal"`, `"deal_booking"`) |
 | `deal_id` | `str` | `""` | Associated deal ID, if applicable |
 | `session_id` | `str` | `""` | Associated session ID, if applicable |
 | `payload` | `dict[str, Any]` | `{}` | Event-specific data (see per-type examples below) |
@@ -218,7 +218,7 @@ from ad_buyer.events.models import EventType
 event = await emit_event(
     EventType.DEAL_BOOKED,
     flow_id="flow-abc-123",
-    flow_type="dsp_deal",
+    flow_type="buyer_deal",
     deal_id="deal-456",
     payload={
         "product_id": "prod-ctv-sports-001",
@@ -358,7 +358,7 @@ List events with optional filters.
       "event_type": "deal.booked",
       "timestamp": "2026-03-11T14:30:00Z",
       "flow_id": "flow-abc-123",
-      "flow_type": "dsp_deal",
+      "flow_type": "buyer_deal",
       "deal_id": "deal-456",
       "session_id": "",
       "payload": {"product_id": "prod-001", "final_cpm": 14.50},
@@ -390,11 +390,11 @@ Retrieve a single event by ID.
 
 ## Event Flow Diagram
 
-This sequence diagram shows how events flow through the system during a typical DSP deal:
+This sequence diagram shows how events flow through the system during a typical buyer deal:
 
 ```mermaid
 sequenceDiagram
-    participant Flow as DSPDealFlow
+    participant Flow as BuyerDealFlow
     participant Helper as emit_event_sync()
     participant Bus as InMemoryEventBus
     participant Sub as Subscribers
@@ -437,7 +437,7 @@ def negotiate_price(self):
     emit_event_sync(
         EventType.NEGOTIATION_ROUND,
         flow_id=self.state.flow_id,
-        flow_type="dsp_deal",
+        flow_type="buyer_deal",
         deal_id=self.state.deal_id,
         payload={
             "round": round_number,
