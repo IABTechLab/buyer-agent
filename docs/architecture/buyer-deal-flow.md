@@ -1,14 +1,14 @@
-# DSP Deal Flow
+# Buyer Deal Flow
 
-The `DSPDealFlow` is a CrewAI event-driven flow that discovers seller inventory, evaluates products, and obtains Deal IDs for activation in traditional DSP platforms. It is distinct from the [`DealBookingFlow`](booking-flow.md), which handles the full campaign booking lifecycle through [OpenDirect](https://iabtechlab.com/standards/opendirect/).
+The `BuyerDealFlow` is a CrewAI event-driven flow that discovers seller inventory, evaluates products, and obtains Deal IDs for activation in traditional DSP platforms. It is distinct from the [`DealBookingFlow`](booking-flow.md), which handles the full campaign booking lifecycle through [OpenDirect](https://iabtechlab.com/standards/opendirect/).
 
-**Key file:** `src/ad_buyer/flows/dsp_deal_flow.py`
+**Key file:** `src/ad_buyer/flows/buyer_deal_flow.py`
 
 ## When to Use This Flow
 
 | Scenario | Use |
 |----------|-----|
-| Obtain a Deal ID for a DSP platform (TTD, DV360, etc.) | DSP Deal Flow |
+| Obtain a Deal ID for a DSP platform (TTD, DV360, etc.) | Buyer Deal Flow |
 | Book a full campaign with orders and line items | [DealBookingFlow](booking-flow.md) |
 | Negotiate pricing with a seller | [NegotiationClient](../guides/negotiation.md) |
 
@@ -19,9 +19,9 @@ The `DSPDealFlow` is a CrewAI event-driven flow that discovers seller inventory,
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant Flow as DSPDealFlow
-    participant Tools as DSP Tools
-    participant Crew as DSP Agent Crew
+    participant Flow as BuyerDealFlow
+    participant Tools as Buyer Deal Tools
+    participant Crew as Buyer Deal Specialist Crew
     participant Seller as Seller Agent
 
     Caller->>Flow: kickoff(request, deal_type, ...)
@@ -33,7 +33,7 @@ sequenceDiagram
     Seller-->>Tools: Available inventory with tiered pricing
     Note over Flow: discover_inventory()
 
-    Flow->>Crew: DSP Agent evaluates products
+    Flow->>Crew: Buyer Deal Specialist evaluates products
     Crew->>Tools: GetPricingTool._run(product_id)
     Tools->>Seller: Get detailed pricing
     Seller-->>Tools: Tier-specific pricing breakdown
@@ -80,14 +80,14 @@ def discover_inventory(self, request_result) -> dict[str, Any]:
 
 ### Step 3: Evaluate and Select
 
-A CrewAI crew with the DSP Agent intelligently selects the best product.
+A CrewAI crew with the Buyer Deal Specialist intelligently selects the best product.
 
 ```python
 @listen(discover_inventory)
 def evaluate_and_select(self, discovery_result) -> dict[str, Any]:
 ```
 
-- Creates a `Crew` with the DSP Agent and the `DiscoverInventoryTool` + `GetPricingTool`
+- Creates a `Crew` with the Buyer Deal Specialist and the `DiscoverInventoryTool` + `GetPricingTool`
 - The agent analyzes discovery results against the request criteria (deal type, max CPM, volume)
 - Extracts the selected `product_id` from the agent's response
 - Fetches detailed pricing for the selected product via `GetPricingTool`
@@ -111,10 +111,10 @@ def request_deal_id(self, selection_result) -> dict[str, Any]:
 
 ## Flow State
 
-The `DSPFlowState` Pydantic model tracks the entire lifecycle:
+The `BuyerDealFlowState` Pydantic model tracks the entire lifecycle:
 
 ```python
-class DSPFlowState(BaseModel):
+class BuyerDealFlowState(BaseModel):
     # Input
     request: str                          # Natural language deal request
     deal_type: DealType                   # PG, PD, or PA
@@ -137,7 +137,7 @@ class DSPFlowState(BaseModel):
     deal_response: Optional[dict]         # Created deal info
 
     # Execution tracking
-    status: DSPFlowStatus                 # Current flow status
+    status: BuyerDealFlowStatus            # Current flow status
     errors: list[str]                     # Error messages
 ```
 
@@ -148,7 +148,7 @@ class DSPFlowState(BaseModel):
 | `INITIALIZED` | Flow created, not yet started |
 | `REQUEST_RECEIVED` | Request validated, buyer context stored |
 | `DISCOVERING_INVENTORY` | Querying sellers for available inventory |
-| `EVALUATING_PRICING` | DSP Agent selecting product and getting pricing |
+| `EVALUATING_PRICING` | Buyer Deal Specialist selecting product and getting pricing |
 | `REQUESTING_DEAL` | Deal ID request sent to seller |
 | `DEAL_CREATED` | Deal ID obtained successfully |
 | `FAILED` | An error occurred at any step |
@@ -160,7 +160,7 @@ class DSPFlowState(BaseModel):
 ### Direct Flow Instantiation
 
 ```python
-from ad_buyer.flows.dsp_deal_flow import DSPDealFlow
+from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow
 from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.models.buyer_identity import (
     BuyerContext, BuyerIdentity, DealType,
@@ -182,7 +182,7 @@ store = DealStore("sqlite:///./ad_buyer.db")
 store.connect()
 
 # Create and configure flow
-flow = DSPDealFlow(
+flow = BuyerDealFlow(
     client=client,
     buyer_context=buyer_context,
     store=store,
@@ -205,13 +205,13 @@ print(f"Deal: {status['deal_response']}")
 
 ### Convenience Function
 
-The `run_dsp_deal_flow()` async function handles client setup and flow configuration in a single call:
+The `run_buyer_deal_flow()` async function handles client setup and flow configuration in a single call:
 
 ```python
-from ad_buyer.flows.dsp_deal_flow import run_dsp_deal_flow
+from ad_buyer.flows.buyer_deal_flow import run_buyer_deal_flow
 from ad_buyer.models.buyer_identity import BuyerIdentity, DealType
 
-result = await run_dsp_deal_flow(
+result = await run_buyer_deal_flow(
     request="Premium CTV sports inventory for Q3",
     buyer_identity=BuyerIdentity(
         seat_id="ttd-seat-123",
@@ -279,8 +279,8 @@ if status["status"] == "failed":
 
 ## Related
 
-- [Agent Hierarchy](agent-hierarchy.md) --- DSP Specialist role in the hierarchy
-- [Tools Reference](tools.md) --- DSP tools used by this flow
+- [Agent Hierarchy](agent-hierarchy.md) --- Buyer Deal Specialist role in the hierarchy
+- [Tools Reference](tools.md) --- Buyer deal tools used by this flow
 - [Deals API](../api/deals.md) --- REST API for quote-then-book deals
 - [Booking Flow](booking-flow.md) --- Alternative flow for full campaign booking
 - [Identity Strategy](../guides/identity.md) --- How buyer identity affects pricing tiers

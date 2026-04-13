@@ -353,21 +353,21 @@ curl -X POST http://localhost:8001/bookings/{job_id}/approve-all
 
 ---
 
-## Using DSPDealFlow (Single-Deal, Direct Mode)
+## Using BuyerDealFlow (Single-Deal, Direct Mode)
 
-`DSPDealFlow` is for when you know roughly what you want and just need a Deal ID. It discovers inventory, picks the best match, and requests a deal --- all in one shot.
+`BuyerDealFlow` is for when you know roughly what you want and just need a Deal ID. It discovers inventory, picks the best match, and requests a deal --- all in one shot.
 
 Use this for **single-deal, targeted acquisition** rather than full-campaign planning.
 
 ```python
-from ad_buyer.flows.dsp_deal_flow import run_dsp_deal_flow
+from ad_buyer.flows.buyer_deal_flow import run_buyer_deal_flow
 from ad_buyer.models.buyer_identity import BuyerIdentity, DealType
 from ad_buyer.storage.deal_store import DealStore
 
 store = DealStore("sqlite:///./deals.db")
 store.connect()
 
-result = await run_dsp_deal_flow(
+result = await run_buyer_deal_flow(
     request="Premium sports video inventory for Q3 awareness campaign",
     buyer_identity=BuyerIdentity(
         seat_id="ttd-seat-123",
@@ -389,16 +389,16 @@ print(f"Deal: {result['status']['deal_response']}")
 
 1. **Receive request** --- Validates the natural-language request and buyer context.
 2. **Discover inventory** --- Searches the seller's catalog for matches.
-3. **Evaluate and select** --- Uses a DSP agent (CrewAI) to pick the best product.
+3. **Evaluate and select** --- Uses a Buyer Deal Specialist (CrewAI) to pick the best product.
 4. **Request Deal ID** --- Calls the seller's deal endpoint for the selected product.
 
 **Key difference from DealBookingFlow:**
 
-| | DealBookingFlow | DSPDealFlow |
+| | DealBookingFlow | BuyerDealFlow |
 |---|---|---|
 | **Scope** | Full campaign, multiple channels | Single deal |
 | **Input** | Campaign brief with budget | Natural language request |
-| **Selection** | Multi-channel specialists | Single DSP agent |
+| **Selection** | Multi-channel specialists | Single Buyer Deal Specialist |
 | **Approval** | Human checkpoint | Automatic |
 | **Output** | Multiple booked lines | One Deal ID |
 
@@ -482,7 +482,7 @@ The `DealsClient` and flow classes treat persistence as **best-effort**. If the 
 
 **Book promptly.** Quotes expire. If you're running a multi-step workflow (browse, quote, negotiate, book), don't let the quote sit too long. The seller may have reserved inventory capacity that times out.
 
-**Use `DealBookingFlow` for campaigns, `DSPDealFlow` for spot buys.** If you have a campaign brief with a budget to allocate across channels, use `DealBookingFlow`. If you just need a single Deal ID for a specific product, use `DSPDealFlow` or the `DealsClient` directly.
+**Use `DealBookingFlow` for campaigns, `BuyerDealFlow` for spot buys.** If you have a campaign brief with a budget to allocate across channels, use `DealBookingFlow`. If you just need a single Deal ID for a specific product, use `BuyerDealFlow` or the `DealsClient` directly.
 
 **Always use async context managers.** The `DealsClient` holds an HTTP connection pool. Use `async with` to ensure clean shutdown:
 

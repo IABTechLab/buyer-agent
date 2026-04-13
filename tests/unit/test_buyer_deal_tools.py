@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for DSP tools."""
+"""Tests for buyer deal tools."""
 
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,7 +11,7 @@ from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,
 )
-from ad_buyer.tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
 
 @pytest.fixture
@@ -328,7 +328,7 @@ class TestRequestDealTool:
 
     @pytest.mark.asyncio
     async def test_request_deal_includes_activation_instructions(self, mock_client, agency_context):
-        """Test that deal includes DSP activation instructions."""
+        """Test that deal includes buyer deal activation instructions."""
         mock_client.get_product.return_value = MagicMock(
             success=True,
             data={"id": "prod_1", "name": "Test", "basePrice": 20.00},
@@ -424,7 +424,7 @@ class TestRequestDealTool:
 
 
 class TestToolIntegration:
-    """Integration tests for DSP tools working together."""
+    """Integration tests for buyer deal tools working together."""
 
     @pytest.mark.asyncio
     async def test_discover_then_price_then_deal(self, mock_client, advertiser_context):

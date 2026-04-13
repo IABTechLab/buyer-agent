@@ -29,7 +29,7 @@ from crewai.tools import BaseTool
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent
 from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
-from ad_buyer.agents.level2.dsp_agent import create_dsp_agent
+from ad_buyer.agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
 from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.performance_agent import create_performance_agent
 from ad_buyer.agents.level3.audience_planner_agent import create_audience_planner_agent
@@ -343,25 +343,25 @@ class TestPerformanceAgent:
         assert agent.llm.temperature == 0.5
 
 
-class TestDSPAgent:
-    """Tests for the L2 DSP Deal Discovery Specialist (previously untested)."""
+class TestBuyerDealSpecialistAgent:
+    """Tests for the L2 Buyer Deal Specialist (previously untested)."""
 
     def test_creation(self):
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         assert isinstance(agent, Agent)
 
     def test_role_name(self):
-        agent = create_dsp_agent(verbose=False)
-        assert agent.role == "DSP Deal Discovery Specialist"
+        agent = create_buyer_deal_specialist_agent(verbose=False)
+        assert agent.role == "Buyer Deal Specialist"
 
     def test_goal_focuses_on_deals(self):
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         goal_lower = agent.goal.lower()
         assert "deal" in goal_lower or "inventory" in goal_lower
 
     def test_backstory_mentions_deal_types(self):
         """DSP agent backstory should mention PG, PD, PA deal types."""
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         backstory = agent.backstory
         assert "PG" in backstory or "Programmatic Guaranteed" in backstory
         assert "PD" in backstory or "Preferred Deal" in backstory
@@ -369,7 +369,7 @@ class TestDSPAgent:
 
     def test_backstory_mentions_tiered_pricing(self):
         """DSP agent backstory should cover tiered pricing tiers."""
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         backstory = agent.backstory
         assert "Public" in backstory
         assert "Seat" in backstory
@@ -377,23 +377,23 @@ class TestDSPAgent:
         assert "Advertiser" in backstory
 
     def test_delegation_enabled(self):
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         assert agent.allow_delegation is True
 
     def test_memory_enabled(self):
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         assert agent.memory
 
     def test_default_no_tools(self):
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         assert agent.tools == []
 
     def test_custom_tools(self, mock_tools):
-        agent = create_dsp_agent(tools=mock_tools, verbose=False)
+        agent = create_buyer_deal_specialist_agent(tools=mock_tools, verbose=False)
         assert len(agent.tools) == 3
 
     def test_llm_temperature(self):
-        agent = create_dsp_agent(verbose=False)
+        agent = create_buyer_deal_specialist_agent(verbose=False)
         assert agent.llm.temperature == 0.5
 
 
@@ -573,7 +573,7 @@ class TestHierarchyInvariants:
     L2_FACTORIES = [
         create_branding_agent,
         create_ctv_agent,
-        create_dsp_agent,
+        create_buyer_deal_specialist_agent,
         create_mobile_app_agent,
         create_performance_agent,
     ]
@@ -819,7 +819,7 @@ class TestModuleImports:
         from ad_buyer.agents.level2 import (
             create_branding_agent,
             create_ctv_agent,
-            create_dsp_agent,
+            create_buyer_deal_specialist_agent,
             create_mobile_app_agent,
             create_performance_agent,
         )
@@ -827,7 +827,7 @@ class TestModuleImports:
         for fn in [
             create_branding_agent,
             create_ctv_agent,
-            create_dsp_agent,
+            create_buyer_deal_specialist_agent,
             create_mobile_app_agent,
             create_performance_agent,
         ]:

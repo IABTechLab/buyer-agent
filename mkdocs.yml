@@ -72,7 +72,7 @@ nav:
       - Overview: architecture/overview.md
       - Agent Hierarchy: architecture/agent-hierarchy.md
       - Booking Flow: architecture/booking-flow.md
-      - DSP Deal Flow: architecture/dsp-deal-flow.md
+      - Buyer Deal Flow: architecture/buyer-deal-flow.md
       - Deal Store: architecture/deal-store.md
       - Models: architecture/models.md
       - Tools Reference: architecture/tools.md

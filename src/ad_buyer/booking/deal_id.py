@@ -5,7 +5,7 @@
 
 Extracts the deal ID generation logic previously duplicated in:
 - unified_client.py (request_deal method)
-- tools/dsp/request_deal.py (_generate_deal_id method)
+- tools/buyer_deals/request_deal.py (_generate_deal_id method)
 
 Deal IDs have the format: DEAL-XXXXXXXX
 where XXXXXXXX is 8 uppercase hex characters derived from

@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""DSP Deal Discovery Flow - workflow for obtaining Deal IDs for programmatic activation."""
+"""Buyer Deal Flow - workflow for obtaining Deal IDs for programmatic activation."""
 
 import logging
 import sqlite3
@@ -13,7 +13,7 @@ from crewai import Crew, Task
 from crewai.flow.flow import Flow, listen, start
 from pydantic import BaseModel, Field
 
-from ..agents.level2.dsp_agent import create_dsp_agent
+from ..agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
 from ..clients.unified_client import UnifiedClient
 from ..models.buyer_identity import (
     AccessTier,
@@ -27,13 +27,13 @@ from ..events.helpers import emit_event_sync
 from ..events.models import EventType
 from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
 from ..storage.deal_store import DealStore
-from ..tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+from ..tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
 logger = logging.getLogger(__name__)
 
 
-class DSPFlowStatus(str, Enum):
-    """Status values for the DSP deal flow."""
+class BuyerDealFlowStatus(str, Enum):
+    """Status values for the buyer deal flow."""
 
     INITIALIZED = "initialized"
     REQUEST_RECEIVED = "request_received"
@@ -58,8 +58,8 @@ class DiscoveredProduct(BaseModel):
     score: float = Field(default=0.0, description="Match score for the request")
 
 
-class DSPFlowState(BaseModel):
-    """State model for the DSP deal discovery flow."""
+class BuyerDealFlowState(BaseModel):
+    """State model for the buyer deal flow."""
 
     # Input
     request: str = Field(default="", description="Natural language deal request")
@@ -113,8 +113,8 @@ class DSPFlowState(BaseModel):
     )
 
     # Execution tracking
-    status: DSPFlowStatus = Field(
-        default=DSPFlowStatus.INITIALIZED,
+    status: BuyerDealFlowStatus = Field(
+        default=BuyerDealFlowStatus.INITIALIZED,
         description="Current flow status",
     )
     errors: list[str] = Field(default_factory=list)
@@ -124,10 +124,10 @@ class DSPFlowState(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class DSPDealFlow(Flow[DSPFlowState]):
-    """Event-driven flow for DSP deal discovery and Deal ID creation.
+class BuyerDealFlow(Flow[BuyerDealFlowState]):
+    """Event-driven flow for buyer deal discovery and Deal ID creation.
 
-    This flow enables the DSP use case where:
+    This flow enables the buyer deal use case where:
     1. Buyer discovers available inventory with identity-based pricing
     2. Buyer selects inventory and requests a Deal ID
     3. Deal ID is returned for activation in traditional DSPs
@@ -228,13 +228,13 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
         if not request:
             self.state.errors.append("No deal request provided")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "errors": self.state.errors}
 
         # Store buyer context in state
         self.state.buyer_context = self._buyer_context.model_dump()
 
-        self.state.status = DSPFlowStatus.REQUEST_RECEIVED
+        self.state.status = BuyerDealFlowStatus.REQUEST_RECEIVED
         self.state.updated_at = datetime.utcnow()
 
         # Emit quote.requested event
@@ -281,7 +281,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
             return request_result
 
         try:
-            self.state.status = DSPFlowStatus.DISCOVERING_INVENTORY
+            self.state.status = BuyerDealFlowStatus.DISCOVERING_INVENTORY
 
             # Extract filters from request
             discovery_result = self._discover_tool._run(
@@ -308,14 +308,14 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
         except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Inventory discovery failed: {e}")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
     @listen(discover_inventory)
     def evaluate_and_select(self, discovery_result: dict[str, Any]) -> dict[str, Any]:
         """Evaluate discovered products and select best match.
 
-        In a full implementation, this would use the DSP agent to
+        In a full implementation, this would use the buyer deal specialist agent to
         intelligently select the best product. For now, we use a
         simplified selection based on the first available product.
         """
@@ -323,10 +323,10 @@ class DSPDealFlow(Flow[DSPFlowState]):
             return discovery_result
 
         try:
-            self.state.status = DSPFlowStatus.EVALUATING_PRICING
+            self.state.status = BuyerDealFlowStatus.EVALUATING_PRICING
 
             # Create crew for intelligent selection
-            dsp_agent = create_dsp_agent(
+            deal_agent = create_buyer_deal_specialist_agent(
                 tools=[self._discover_tool, self._pricing_tool],
             )
 
@@ -344,11 +344,11 @@ Criteria:
 
 Return the product_id of the best matching product and explain why.""",
                 expected_output="Product ID and selection rationale",
-                agent=dsp_agent,
+                agent=deal_agent,
             )
 
             crew = Crew(
-                agents=[dsp_agent],
+                agents=[deal_agent],
                 tasks=[selection_task],
                 verbose=True,
             )
@@ -391,7 +391,7 @@ Return the product_id of the best matching product and explain why.""",
 
         except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Product selection failed: {e}")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
     def _extract_product_id(self, text: str) -> Optional[str]:
@@ -422,11 +422,11 @@ Return the product_id of the best matching product and explain why.""",
         product_id = self.state.selected_product_id
         if not product_id:
             self.state.errors.append("No product selected for deal creation")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": "No product selected"}
 
         try:
-            self.state.status = DSPFlowStatus.REQUESTING_DEAL
+            self.state.status = BuyerDealFlowStatus.REQUESTING_DEAL
 
             deal_result = self._deal_tool._run(
                 product_id=product_id,
@@ -438,7 +438,7 @@ Return the product_id of the best matching product and explain why.""",
 
             # Store deal response
             self.state.deal_response = {"raw": deal_result}
-            self.state.status = DSPFlowStatus.DEAL_CREATED
+            self.state.status = BuyerDealFlowStatus.DEAL_CREATED
             self.state.updated_at = datetime.utcnow()
 
             # Persist deal creation status
@@ -462,7 +462,7 @@ Return the product_id of the best matching product and explain why.""",
 
         except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Deal request failed: {e}")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             self._persist_deal_status("failed")
             return {"status": "failed", "error": str(e)}
 
@@ -488,7 +488,7 @@ Return the product_id of the best matching product and explain why.""",
         }
 
 
-async def run_dsp_deal_flow(
+async def run_buyer_deal_flow(
     request: str,
     buyer_identity: BuyerIdentity,
     deal_type: DealType = DealType.PREFERRED_DEAL,
@@ -499,7 +499,7 @@ async def run_dsp_deal_flow(
     base_url: Optional[str] = None,
     store: Optional[DealStore] = None,
 ) -> dict[str, Any]:
-    """Convenience function to run the DSP deal flow.
+    """Convenience function to run the buyer deal flow.
 
     Args:
         request: Natural language deal request
@@ -530,7 +530,7 @@ async def run_dsp_deal_flow(
     # Create client
     async with UnifiedClient(base_url=base_url) as client:
         # Create and run flow
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=client,
             buyer_context=buyer_context,
             store=store,

@@ -43,7 +43,7 @@ Campaign Brief ──→ Portfolio Manager (Opus)
           ┌──────────────┼──────────────┐
           ▼              ▼              ▼
     Channel Specialists (Sonnet)
-    Branding │ CTV │ Mobile │ Performance │ DSP
+    Branding │ CTV │ Mobile │ Performance │ Deals
           │              │              │
           ▼              ▼              ▼
     Functional Agents (Sonnet)

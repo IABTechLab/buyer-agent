@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Inventory discovery tool for DSP workflows."""
+"""Inventory discovery tool for buyer deal workflows."""
 
 from typing import Any
 

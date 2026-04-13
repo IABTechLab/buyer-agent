@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tiered pricing tool for DSP workflows."""
+"""Tiered pricing tool for buyer deal workflows."""
 
 from typing import Any
 

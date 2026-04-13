@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""DSP (Demand Side Platform) Deal Discovery Specialist agent."""
+"""Buyer Deal Specialist agent for deal discovery and Deal ID creation."""
 
 from typing import Any
 
@@ -10,13 +10,13 @@ from crewai import LLM, Agent
 from ...config.settings import settings
 
 
-def create_dsp_agent(
+def create_buyer_deal_specialist_agent(
     tools: list[Any] | None = None,
     verbose: bool = True,
 ) -> Agent:
-    """Create the DSP Deal Discovery Specialist agent.
+    """Create the Buyer Deal Specialist agent.
 
-    The DSP Specialist focuses on:
+    The Buyer Deal Specialist focuses on:
     - Discovering available inventory from sellers
     - Presenting buyer identity for tiered pricing
     - Negotiating and requesting Deal IDs
@@ -31,15 +31,15 @@ def create_dsp_agent(
         verbose: Whether to enable verbose logging
 
     Returns:
-        Configured DSP Deal Discovery Specialist Agent
+        Configured Buyer Deal Specialist Agent
     """
     return Agent(
-        role="DSP Deal Discovery Specialist",
+        role="Buyer Deal Specialist",
         goal="""Discover premium advertising inventory, secure optimal tiered pricing
 based on buyer identity, and obtain Deal IDs that can be activated in
 traditional DSP platforms for programmatic media buying.""",
-        backstory="""You are a programmatic advertising expert specializing in DSP
-(Demand Side Platform) operations and private marketplace deals. You understand
+        backstory="""You are a programmatic advertising expert specializing in buyer deal
+workflows and private marketplace deals. You understand
 the nuances of deal structures and how to leverage buyer identity for better pricing.
 
 Your expertise includes:
