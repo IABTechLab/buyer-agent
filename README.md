@@ -118,6 +118,12 @@ Reveal buyer identity progressively to unlock better pricing from sellers:
 
 → [Authentication Guide](https://iabtechlab.github.io/buyer-agent/api/authentication/)
 
+### Vendor Approval Gating (optional)
+
+Plug in a [SafeGuard Privacy](https://safeguardprivacy.com) tenant to block Deal IDs for sellers the buyer has not approved in their SGP vendor portfolio. Consults the `iabBuyerAgentApproval` flag via SGP's integration API; discovery annotates each product with APPROVED / NOT APPROVED / UNKNOWN, and `RequestDealTool` refuses to generate a Deal ID for unapproved vendors. Off by default — inert when `SGP_API_KEY` is empty.
+
+→ [IAB Buyer-Agent Approval](https://iabtechlab.github.io/buyer-agent/integration/safeguard-privacy/)
+
 ## Quick Start
 
 ### Install
