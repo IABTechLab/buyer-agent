@@ -148,7 +148,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         client: UnifiedClient,
         buyer_context: BuyerContext,
         store: Optional[DealStore] = None,
-        sgp_client: Optional[SGPClient] = None,
+        sgp_client: SGPClient | None = None,
     ):
         """Initialize the flow with client, buyer context, and optional persistence.
 
@@ -201,7 +201,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
         )
         # Agent-callable vendor approval tool — only useful with an SGP client.
-        self._vendor_approval_tool: Optional[SGPVendorApprovalTool] = (
+        self._vendor_approval_tool: SGPVendorApprovalTool | None = (
             SGPVendorApprovalTool(client=sgp_client) if sgp_client is not None else None
         )
 

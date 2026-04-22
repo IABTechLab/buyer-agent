@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -39,7 +38,7 @@ _DOMAIN_KEYS = ("seller_url", "sellerUrl", "publisher_domain", "publisherDomain"
 _PUBLISHER_KEYS = ("publisherId", "publisher")
 
 
-def extract_product_domain(product: dict) -> Optional[str]:
+def extract_product_domain(product: dict) -> str | None:
     """Best-guess seller domain from a product dict for an SGP lookup.
 
     Checks explicit domain/URL fields first, then falls back to
@@ -99,7 +98,7 @@ class SGPClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._cache_ttl = cache_ttl_seconds
-        self._cache: dict[str, tuple[float, Optional[ApprovalRecord]]] = {}
+        self._cache: dict[str, tuple[float, ApprovalRecord | None]] = {}
         self._http = httpx.AsyncClient(
             base_url=self._base_url,
             headers={"api-key": api_key},
@@ -133,9 +132,7 @@ class SGPClient:
             host = host[4:]
         return host
 
-    async def check_approvals(
-        self, domains: list[str]
-    ) -> dict[str, Optional[ApprovalRecord]]:
+    async def check_approvals(self, domains: list[str]) -> dict[str, ApprovalRecord | None]:
         """Look up IAB buyer-agent approval for a list of domains.
 
         Args:
@@ -152,7 +149,7 @@ class SGPClient:
             return {}
 
         now = time.monotonic()
-        result: dict[str, Optional[ApprovalRecord]] = {}
+        result: dict[str, ApprovalRecord | None] = {}
         to_fetch: list[str] = []
 
         seen: set[str] = set()
@@ -181,9 +178,7 @@ class SGPClient:
     # HTTP
     # ------------------------------------------------------------------
 
-    async def _fetch_chunk(
-        self, domains: list[str]
-    ) -> dict[str, Optional[ApprovalRecord]]:
+    async def _fetch_chunk(self, domains: list[str]) -> dict[str, ApprovalRecord | None]:
         """Fetch approvals for up to 10 domains in a single HTTP call."""
         params = {"domain": ",".join(domains)}
         try:
@@ -202,8 +197,7 @@ class SGPClient:
 
         if resp.status_code == 401:
             raise SGPAuthError(
-                "SafeGuard Privacy rejected the api-key "
-                "(missing or lacks iab:buyerAgent scope)",
+                "SafeGuard Privacy rejected the api-key (missing or lacks iab:buyerAgent scope)",
                 status_code=401,
             )
 
@@ -231,7 +225,7 @@ class SGPClient:
             raise SGPClientError(f"SGP response was not JSON: {exc}") from None
 
         raw_records = payload.get("data") or []
-        by_domain: dict[str, Optional[ApprovalRecord]] = {d: None for d in domains}
+        by_domain: dict[str, ApprovalRecord | None] = {d: None for d in domains}
         for raw in raw_records:
             try:
                 record = ApprovalRecord.model_validate(raw)

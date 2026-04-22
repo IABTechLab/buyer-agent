@@ -115,10 +115,12 @@ class TestCheckApprovalsSuccess:
             seen_params.append(request.url.params["domain"])
             return httpx.Response(
                 200,
-                json=_success_body([
-                    _record("a.com", True),
-                    _record("b.com", False),
-                ]),
+                json=_success_body(
+                    [
+                        _record("a.com", True),
+                        _record("b.com", False),
+                    ]
+                ),
             )
 
         client = _make_client(handler)
@@ -151,9 +153,7 @@ class TestCheckApprovalsSuccess:
 
         def handler(request: httpx.Request) -> httpx.Response:
             captured_domains.extend(request.url.params["domain"].split(","))
-            return httpx.Response(
-                200, json=_success_body([_record("example.com", True)])
-            )
+            return httpx.Response(200, json=_success_body([_record("example.com", True)]))
 
         client = _make_client(handler)
         await client.check_approvals(["example.com", "www.example.com", "EXAMPLE.COM"])
@@ -180,9 +180,7 @@ class TestUnknownVendor:
         def handler(request: httpx.Request) -> httpx.Response:
             # SGP only returns records for domains it actually knows; the
             # unknown ones are simply absent from the data array.
-            return httpx.Response(
-                200, json=_success_body([_record("known.com", True)])
-            )
+            return httpx.Response(200, json=_success_body([_record("known.com", True)]))
 
         client = _make_client(handler)
         results = await client.check_approvals(["known.com", "mystery.com"])
@@ -228,6 +226,7 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_transport_error_wrapped_as_client_error(self) -> None:
         """Real httpx transport failures (connect/timeout/DNS) surface as SGPClientError."""
+
         def handler(request: httpx.Request) -> httpx.Response:
             raise httpx.ConnectError("connection refused")
 
@@ -249,9 +248,7 @@ class TestCache:
 
         def handler(request: httpx.Request) -> httpx.Response:
             calls["n"] += 1
-            return httpx.Response(
-                200, json=_success_body([_record("cached.com", True)])
-            )
+            return httpx.Response(200, json=_success_body([_record("cached.com", True)]))
 
         client = _make_client(handler)
         first = await client.check_approvals(["cached.com"])

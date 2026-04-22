@@ -44,27 +44,31 @@ def mock_client() -> MagicMock:
 
 
 def _approved(domain: str) -> ApprovalRecord:
-    return ApprovalRecord.model_validate({
-        "vendorId": 1,
-        "vendorCompanyId": 10,
-        "companyName": "Example Seller",
-        "domain": domain,
-        "internalId": "",
-        "iabBuyerAgentApproval": True,
-        "iabBuyerAgentApprovedAt": "2026-03-01T00:00:00Z",
-    })
+    return ApprovalRecord.model_validate(
+        {
+            "vendorId": 1,
+            "vendorCompanyId": 10,
+            "companyName": "Example Seller",
+            "domain": domain,
+            "internalId": "",
+            "iabBuyerAgentApproval": True,
+            "iabBuyerAgentApprovedAt": "2026-03-01T00:00:00Z",
+        }
+    )
 
 
 def _denied(domain: str) -> ApprovalRecord:
-    return ApprovalRecord.model_validate({
-        "vendorId": 2,
-        "vendorCompanyId": 20,
-        "companyName": "Shady Seller",
-        "domain": domain,
-        "internalId": "",
-        "iabBuyerAgentApproval": False,
-        "iabBuyerAgentApprovedAt": None,
-    })
+    return ApprovalRecord.model_validate(
+        {
+            "vendorId": 2,
+            "vendorCompanyId": 20,
+            "companyName": "Shady Seller",
+            "domain": domain,
+            "internalId": "",
+            "iabBuyerAgentApproval": False,
+            "iabBuyerAgentApprovedAt": None,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

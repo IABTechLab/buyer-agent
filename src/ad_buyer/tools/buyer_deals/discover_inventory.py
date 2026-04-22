@@ -214,7 +214,11 @@ Returns:
         try:
             return await self._sgp_client.check_approvals(raw_domains)
         except SGPClientError:
-            logger.warning("SGP approval lookup failed during discovery; continuing without annotations", exc_info=True)
+            logger.warning(
+                "SGP approval lookup failed during discovery; "
+                "continuing without annotations",
+                exc_info=True,
+            )
             return {}
 
     def _format_results(
