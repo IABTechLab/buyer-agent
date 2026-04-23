@@ -3,6 +3,7 @@
 
 """Inventory discovery tool for buyer deal workflows."""
 
+import logging
 from typing import Any
 
 from crewai.tools import BaseTool
@@ -10,8 +11,12 @@ from pydantic import BaseModel, Field
 
 from ...async_utils import run_async
 from ...booking.pricing import PricingCalculator
+from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
 from ...clients.unified_client import UnifiedClient
 from ...models.buyer_identity import BuyerContext
+from ...models.sgp import ApprovalRecord
+
+logger = logging.getLogger(__name__)
 
 
 class DiscoverInventoryInput(BaseModel):
@@ -76,11 +81,13 @@ Returns:
     args_schema: type[BaseModel] = DiscoverInventoryInput
     _client: UnifiedClient
     _buyer_context: BuyerContext
+    _sgp_client: SGPClient | None
 
     def __init__(
         self,
         client: UnifiedClient,
         buyer_context: BuyerContext,
+        sgp_client: SGPClient | None = None,
         **kwargs: Any,
     ):
         """Initialize with unified client and buyer context.
@@ -88,10 +95,14 @@ Returns:
         Args:
             client: UnifiedClient for seller communication
             buyer_context: BuyerContext with identity for tiered access
+            sgp_client: Optional SafeGuard Privacy client. When provided,
+                each returned product is annotated with the seller's
+                IAB buyer-agent approval status.
         """
         super().__init__(**kwargs)
         self._client = client
         self._buyer_context = buyer_context
+        self._sgp_client = sgp_client
 
     def _run(
         self,
@@ -154,15 +165,67 @@ Returns:
             if not result.success:
                 return f"Error discovering inventory: {result.error}"
 
-            return self._format_results(result.data, identity_context)
+            approvals = await self._fetch_approvals(result.data)
+            return self._format_results(result.data, identity_context, approvals)
 
         except (OSError, ValueError, RuntimeError) as e:
             return f"Error discovering inventory: {e}"
+
+    def _approval_line(
+        self,
+        product: dict,
+        approvals: dict[str, ApprovalRecord | None] | None,
+    ) -> str | None:
+        """Render the SGP approval annotation for a single product row."""
+        if not approvals or self._sgp_client is None:
+            return None
+        raw_domain = extract_product_domain(product)
+        if not raw_domain:
+            return "   SGP Approval: ? UNKNOWN (no seller domain on product)"
+        normalized = self._sgp_client.normalize_domain(raw_domain)
+        record = approvals.get(normalized)
+        if record is None:
+            return f"   SGP Approval: ? UNKNOWN — {normalized} not in SGP portfolio"
+        if record.iab_buyer_agent_approval:
+            return f"   SGP Approval: ✓ APPROVED — {normalized}"
+        return f"   SGP Approval: ✗ NOT APPROVED — {normalized}"
+
+    async def _fetch_approvals(
+        self, products: Any
+    ) -> dict[str, ApprovalRecord | None]:
+        """Batch-check SGP approvals for the distinct seller domains in the result.
+
+        Returns a dict keyed by normalized domain. Empty dict when no
+        SGP client is configured or when a transport error occurs
+        (discovery fails open — the gate lives in RequestDealTool).
+        """
+        if self._sgp_client is None:
+            return {}
+        product_list = products if isinstance(products, list) else [products]
+        raw_domains: list[str] = []
+        for product in product_list:
+            if not isinstance(product, dict):
+                continue
+            domain = extract_product_domain(product)
+            if domain:
+                raw_domains.append(domain)
+        if not raw_domains:
+            return {}
+        try:
+            return await self._sgp_client.check_approvals(raw_domains)
+        except SGPClientError:
+            logger.warning(
+                "SGP approval lookup failed during discovery; "
+                "continuing without annotations",
+                exc_info=True,
+            )
+            return {}
 
     def _format_results(
         self,
         products: Any,
         identity_context: dict,
+        approvals: dict[str, ApprovalRecord | None] | None = None,
     ) -> str:
         """Format discovery results with tier information."""
         if not products:
@@ -210,6 +273,8 @@ Returns:
                         else str(base_price)
                     )
 
+                approval_line = self._approval_line(product, approvals)
+
                 output_lines.extend(
                     [
                         f"{i}. {name}",
@@ -221,9 +286,11 @@ Returns:
                         if isinstance(impressions, int)
                         else f"   Available: {impressions}",
                         f"   Targeting: {', '.join(targeting) if targeting else 'Standard'}",
-                        "",
                     ]
                 )
+                if approval_line:
+                    output_lines.append(approval_line)
+                output_lines.append("")
             else:
                 output_lines.append(f"{i}. {product}")
                 output_lines.append("")
