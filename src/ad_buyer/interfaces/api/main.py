@@ -59,8 +59,8 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_origins=settings.get_cors_origins(),
+    allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=False,
     expose_headers=["*"],
