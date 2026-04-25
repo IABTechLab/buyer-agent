@@ -21,7 +21,7 @@ graph TB
     end
 
     subgraph Level3["Level 3 — Functional Agents"]
-        AUD["Audience Planner<br/>(UCP)"]
+        AUD["Audience Planner<br/>(Agentic Audiences / UCP)"]
         RES["Research Agent<br/>(inventory)"]
         EXEC["Execution Agent<br/>(orders / lines)"]
         REP["Reporting Agent<br/>(stats / analysis)<br/><i>Coming Soon</i>"]
@@ -190,28 +190,81 @@ All functional agents share these defaults:
 | Delegation | Disabled --- they are leaf-level executors |
 | Memory | Enabled |
 
-### Audience Planner (UCP)
+### Audience Planner (Agentic Audiences / UCP)
 
 **File:** `src/ad_buyer/agents/level3/audience_planner_agent.py`
 
-Plans and selects audiences using the IAB Tech Lab [User Context Protocol (UCP)](https://iabtechlab.com/ucp) for real-time audience matching with seller inventory.
+The Audience Planner composes audience targets for a campaign by selecting and arranging references across three IAB-standardized audience types. It is the only agent in the buyer that owns the audience surface end-to-end --- from brief ingestion through the deal request that goes to sellers.
+
+!!! note "Naming: Agentic Audiences (UCP)"
+    The IAB renamed *User Context Protocol (UCP)* to *Agentic Audiences* in early 2026; the spec is still DRAFT. Code keeps the existing `ucp_*` module names internally to avoid a churning rename, but the public surface (docs, error messages, log identifiers) uses the dual form **"Agentic Audiences (UCP)"** so readers familiar with either name can follow. See `docs/architecture/naming.md` in the agent_range parent repo for the locked decision and rationale.
+
+#### The three audience types
+
+| Type | Source | Format | Best for |
+|------|--------|--------|----------|
+| **Standard** | IAB Audience Taxonomy 1.1 | Tier-1 (Demographic / Interest-based / Purchase-intent) IDs | Portable third-party-aligned segments |
+| **Contextual** | IAB Content Taxonomy 3.1 | ~1,500 hierarchical category IDs | Privacy-resilient adjacency targeting |
+| **Agentic** | IAB Agentic Audiences (DRAFT, 2026-01) | 256--1024 dim signal embeddings | Advertiser first-party signal, lookalikes, dynamic audiences |
+
+Taxonomies are vendored at `data/taxonomies/` with version + sha256 + `fetched_at` tracked in `taxonomies.lock.json`. License attribution per IAB CC-BY 3.0 / 4.0 is preserved alongside each taxonomy file.
+
+#### Composable overlay model
+
+A campaign carries one **primary** audience and zero or more **constraint**, **extension**, or **exclusion** audiences. Each is an `AudienceRef` carrying its type, taxonomy, version, and identifier (or embedding URI for agentic refs).
+
+```text
+AudiencePlan
+  primary:     AudienceRef(type=standard,   id="3-7",        version="1.1")
+  constraints: [AudienceRef(type=contextual, id="IAB1-2",     version="3.1")]
+  extensions:  [AudienceRef(type=agentic,    ref="emb://...", version="draft-2026-01")]
+  exclusions:  []
+```
+
+| Role | Set semantics |
+|------|---------------|
+| `primary` | base audience (exactly one) |
+| `constraints` | intersect with primary (precision) |
+| `extensions` | union with primary (reach) |
+| `exclusions` | set-difference from the assembled set |
+
+The planner mixes types freely --- a Standard primary narrowed by a Contextual constraint and broadened by an Agentic extension is the canonical shape.
+
+#### Reasoning loop
+
+| Phase | Action |
+|-------|--------|
+| Classify intent | Resolve `target_audience` strings against vendored taxonomies |
+| Pick primary | Standard for demographic/intent briefs; Contextual for content-adjacent; Agentic for first-party-driven |
+| Add constraints | When KPI is precision (CPA, ROAS) |
+| Add extensions | When KPI is reach (impressions, frequency) |
+| Validate | Run discovery + coverage tools; reshuffle if projected reach falls short |
+| Emit plan | With human-readable rationale |
+
+#### Configuration
 
 | Area | Detail |
 |------|--------|
-| Temperature | 0.3 (balanced for strategic audience recommendations) |
-| Signals | Identity (hashed IDs, device graphs), Contextual (page content, keywords), Reinforcement (feedback loops, conversion data) |
-| Embeddings | 256--1024 dimension UCP vectors, cosine similarity |
+| Temperature | 0.3 (balanced for strategic recommendations) |
+| Signals (agentic) | Identity (hashed IDs, device graphs), Contextual (page content, keywords), Reinforcement (feedback loops, conversion data) |
+| Embeddings | 256--1024 dim, cosine similarity |
 | Threshold | Score > 0.7 = strong match |
+| Wire format | `application/vnd.ucp.embedding+json; v=1` (alias: `application/vnd.iab.agentic-audiences+json; v=1`) |
 
-**Key capabilities:**
+#### Tools
 
-- Signal analysis using UCP protocol
-- Audience segment discovery from seller capabilities
-- Coverage estimation for targeting combinations
-- Audience expansion recommendations
-- Gap analysis when requirements cannot be fully met
+- `TaxonomyLookupTool` --- resolve a string against vendored Standard / Contextual taxonomies (no network)
+- `AudienceDiscoveryTool` --- query sellers for available segments matching a ref
+- `AudienceMatchingTool` --- score a candidate `AudienceRef` against seller capabilities
+- `CoverageEstimationTool` --- project unique reach for a composed plan
+- `EmbeddingMintTool` --- mint or reference an Agentic embedding (mock generator at present; real model tracked separately)
 
-**Tools used:** `AudienceDiscoveryTool`, `AudienceMatchingTool`, `CoverageEstimationTool`
+#### Where the plan goes
+
+The `AudiencePlan` rides on `CampaignPlan` and propagates into `InventoryRequirements`, `DealParams`, `QuoteRequest`, and `DealBookingRequest`. Sellers receive the full plan and evaluate each ref against their package capabilities --- see the seller media-kit docs for how packages declare which audience types they support, and `docs/architecture/capability-negotiation.md` in the agent_range parent repo for the pre-flight + structured-rejection contract.
+
+!!! tip "Wire-format spec"
+    The canonical on-the-wire shape of `AudiencePlan` and `AudienceRef` lives in `docs/api/audience_plan_wire_format.md` at the agent_range parent repo. That doc is the single source of truth for buyer↔seller integration; this page describes the agent that produces the plan.
 
 ### Research Agent
 
@@ -340,7 +393,7 @@ All channel crews follow the same two-task pattern:
 2. **Recommendation Task** --- The channel specialist reviews findings and selects the best inventory
 
 !!! info "Audience context"
-    Channel crews accept an optional `audience_plan` parameter. When provided, the Research Agent incorporates UCP-compatible audience targeting into its inventory search. This plan typically comes from the Audience Planner agent.
+    Channel crews accept an optional `audience_plan` parameter. When provided, the Research Agent incorporates Agentic-Audiences-compatible audience targeting (a typed `AudiencePlan` carrying Standard / Contextual / Agentic refs) into its inventory search. This plan typically comes from the Audience Planner agent.
 
 ---
 
