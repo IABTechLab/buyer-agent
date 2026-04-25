@@ -1,0 +1,31 @@
+{
+  "audience": {
+    "version": "1.1",
+    "source": "https://raw.githubusercontent.com/InteractiveAdvertisingBureau/Taxonomies/main/Audience%20Taxonomies/Audience%20Taxonomy%201.1.tsv",
+    "path": "audience-1.1/Audience Taxonomy 1.1.tsv",
+    "sha256": "0216547402f3dc028f5ec1bb78c648eed68a81ea3b3b94862e6f6caa9db3ad3b",
+    "fetched_at": "2026-04-25T19:27:21Z",
+    "license": "CC-BY-3.0",
+    "format": "tsv"
+  },
+  "content": {
+    "version": "3.1",
+    "source": "https://raw.githubusercontent.com/InteractiveAdvertisingBureau/Taxonomies/main/Content%20Taxonomies/Content%20Taxonomy%203.1.tsv",
+    "path": "content-3.1/Content Taxonomy 3.1.tsv",
+    "sha256": "7212cdc496ba347a03e703b1932bdcdd4fd29089b058f4edeb4d3da1f1222ea7",
+    "fetched_at": "2026-04-25T19:27:21Z",
+    "license": "CC-BY-3.0",
+    "format": "tsv"
+  },
+  "agentic": {
+    "version": "draft-2026-01",
+    "source": "https://github.com/IABTechLab/agentic-audiences",
+    "spec_url": "https://github.com/IABTechLab/agentic-audiences",
+    "path": "agentic-audiences-draft-2026-01/spec/",
+    "sha256": "a84ef73e28517288c917278181c563d0bf5d85e24fbce5cefd2f85e8a52861ba",
+    "sha256_method": "shasum -a 256 of (sorted file list with per-file shasum -a 256), then shasum -a 256 of that listing",
+    "fetched_at": "2026-04-25T19:27:21Z",
+    "license": "CC-BY-4.0 (spec) + Apache-2.0 (impl)",
+    "format": "directory"
+  }
+}
