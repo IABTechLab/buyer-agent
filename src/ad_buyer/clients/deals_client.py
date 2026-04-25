@@ -36,12 +36,36 @@ from ..models.linear_tv import CancellationRequest, MakegoodRequest
 
 logger = logging.getLogger(__name__)
 
+# Dedicated logger for booking-time forensic events. Per proposal §5.1 Step 2
+# / §6 row 14b, the buyer logs the `audience_plan_id` hash at the moment a
+# `DealBookingRequest` carrying an audience plan is sent. The seller logs the
+# same hash on its side. Both sides logging the same hash is the forensic
+# anchor for any future dispute about what was actually frozen at booking.
+booking_logger = logging.getLogger("ad_buyer.audience.booking")
+
 # HTTP status codes that indicate transient failures worth retrying
 _RETRYABLE_STATUS_CODES = {502, 503, 504}
 
 # Default configuration
 _DEFAULT_TIMEOUT = 30.0
 _DEFAULT_MAX_RETRIES = 3
+
+# Wire-format media types for `AudiencePlan`-bearing requests. Per proposal
+# §5.6 (locked decision: dual-name "Agentic Audiences (UCP)") and the
+# wire-format spec §8 (docs/api/audience_plan_wire_format.md):
+#
+#   - The legacy UCP carrier remains the primary `Content-Type` the buyer
+#     emits during the transition window, for backward compat with sellers
+#     that pre-date the rename.
+#   - The new IAB Agentic Audiences alias is advertised in `Accept` so
+#     compliant sellers know the buyer can read either.
+#
+# Code-internal naming continues to use `ucp_*` (no rename per §5.6 lock).
+_UCP_CONTENT_TYPE = "application/vnd.ucp.embedding+json; v=1"
+_AGENTIC_AUDIENCES_CONTENT_TYPE = "application/vnd.iab.agentic-audiences+json; v=1"
+_AUDIENCE_PLAN_ACCEPT = (
+    f"{_UCP_CONTENT_TYPE}, {_AGENTIC_AUDIENCES_CONTENT_TYPE}"
+)
 
 
 class DealsClientError(Exception):
@@ -170,6 +194,22 @@ class DealsClient:
 
         POST /api/v1/deals
 
+        When the request carries an ``audience_plan`` (proposal §5.1 Step 1),
+        the request goes out with the dual wire-format media types per
+        proposal §5.6 + §6 row 14b:
+
+          - ``Content-Type: application/vnd.ucp.embedding+json; v=1``
+            (legacy UCP carrier, kept as the emit name for backward compat
+            with pre-rename sellers).
+          - ``Accept: application/vnd.ucp.embedding+json; v=1,
+            application/vnd.iab.agentic-audiences+json; v=1`` -- advertises
+            that the buyer can read either name on the seller's response.
+
+        The buyer additionally logs the plan's ``audience_plan_id`` hash at
+        INFO via ``ad_buyer.audience.booking``. The seller logs the same
+        hash on its side; matching log entries are the forensic anchor for
+        post-booking dispute resolution.
+
         Args:
             booking_request: Deal booking parameters including the quote_id.
 
@@ -180,7 +220,30 @@ class DealsClient:
             DealsClientError: On HTTP or transport errors.
         """
         body = booking_request.model_dump(exclude_none=True)
-        response = await self._request_with_retry("POST", "/api/v1/deals", json=body)
+
+        # Build per-request headers when the booking carries an audience plan.
+        # Otherwise we let the client's default JSON headers ride (which is
+        # what every non-audience booking has always done).
+        headers: dict[str, str] | None = None
+        plan = booking_request.audience_plan
+        if plan is not None:
+            headers = {
+                "Content-Type": _UCP_CONTENT_TYPE,
+                "Accept": _AUDIENCE_PLAN_ACCEPT,
+            }
+            # Log forensic anchor hash (proposal §5.1 Step 2 / bead 14b).
+            # Use the canonical id if populated; otherwise compute it now.
+            plan_id = plan.audience_plan_id or plan.compute_id()
+            booking_logger.info(
+                "deal_booking audience_plan_id=%s quote_id=%s",
+                plan_id,
+                booking_request.quote_id,
+            )
+
+        kwargs: dict[str, Any] = {"json": body}
+        if headers:
+            kwargs["headers"] = headers
+        response = await self._request_with_retry("POST", "/api/v1/deals", **kwargs)
         data = response.json()
         result = DealResponse.model_validate(data)
 
