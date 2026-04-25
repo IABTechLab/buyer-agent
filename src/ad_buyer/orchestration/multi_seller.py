@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
+from ..clients.deals_client import DealsClientError
 from ..events.models import Event, EventType
 from ..models.audience_plan import AudiencePlan
 from ..models.deals import (
@@ -44,8 +45,49 @@ from ..models.deals import (
     QuoteResponse,
 )
 from ..registry.models import AgentCard, TrustLevel
+from .audience_degradation import (
+    CannotFulfillPlan,
+    DegradationLog,
+    SellerAudienceCapabilities,
+    degrade_plan_for_seller,
+    synthesize_capabilities_from_unsupported,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# Error code emitted by the seller per proposal §5.7 layer 3 when the
+# AudiencePlan carries parts the seller can't honor. Used by the retry-on-
+# rejection path in `select_and_book` to detect the structured rejection.
+_AUDIENCE_PLAN_UNSUPPORTED_CODE = "audience_plan_unsupported"
+
+
+class _SellerIncompatibleForCampaign(Exception):
+    """Internal signal: seller cannot fulfill the campaign's audience plan.
+
+    Raised inside `_book_with_audience_retry` after the degrade-and-retry
+    path has been exhausted. Caught by `select_and_book`, which records
+    the seller in `DealSelection.incompatible_sellers`. NOT a public type
+    -- the higher-level orchestrator surfaces incompatibility via the
+    selection result, not by exception type.
+    """
+
+
+def _is_audience_plan_unsupported(exc: DealsClientError) -> bool:
+    """True when the seller error is the structured audience-plan rejection.
+
+    The check is forgiving: we accept a 400 with `error_code` matching the
+    spec's code, OR a 400 whose payload contained an `unsupported` list (in
+    case a seller variant emits a different top-level code but still carries
+    the structured list). Either way, we have a list of `{path, reason}`
+    entries to drive `degrade_plan_for_seller`.
+    """
+
+    if exc.status_code != 400:
+        return False
+    if exc.error_code == _AUDIENCE_PLAN_UNSUPPORTED_CODE:
+        return True
+    return bool(exc.unsupported)
 
 
 # ---------------------------------------------------------------------------
@@ -144,12 +186,23 @@ class DealSelection:
         failed_bookings: List of dicts with quote_id and error details.
         total_spend: Total estimated spend across booked deals.
         remaining_budget: Budget remaining after booking.
+        incompatible_sellers: Seller IDs the orchestrator decided not to
+            route this campaign to because their audience-plan capabilities
+            cannot be reconciled even after degradation+retry. Surfaced for
+            the higher-level error path; this orchestrator does not auto-
+            route to a different seller (that's a higher-level concern).
+        degradation_logs: Per-deal degradation logs produced when
+            `degrade_plan_for_seller` fired during a retry-on-rejection.
+            Keyed by quote_id; absent when the original plan booked
+            cleanly. Surfaced into the audit-trail surface (proposal §13a).
     """
 
     booked_deals: list[DealResponse]
     failed_bookings: list[dict[str, Any]]
     total_spend: float
     remaining_budget: float
+    incompatible_sellers: list[str] = field(default_factory=list)
+    degradation_logs: dict[str, DegradationLog] = field(default_factory=dict)
 
 
 @dataclass
@@ -522,6 +575,8 @@ class MultiSellerOrchestrator:
         """
         booked_deals: list[DealResponse] = []
         failed_bookings: list[dict[str, Any]] = []
+        incompatible_sellers: list[str] = []
+        degradation_logs: dict[str, DegradationLog] = {}
         remaining_budget = budget
         total_spend = 0.0
 
@@ -553,13 +608,15 @@ class MultiSellerOrchestrator:
 
             try:
                 client = self._deals_client_factory(seller_url)
-                booking_request = DealBookingRequest(
+                deal, deg_log = await self._book_with_audience_retry(
+                    client=client,
                     quote_id=nq.quote_id,
+                    seller_id=nq.seller_id,
                     audience_plan=audience_plan,
                 )
-
-                deal = await client.book_deal(booking_request)
                 booked_deals.append(deal)
+                if deg_log:
+                    degradation_logs[nq.quote_id] = deg_log
 
                 # Track spend
                 deal_spend = nq.minimum_spend if nq.minimum_spend > 0 else 0.0
@@ -585,6 +642,26 @@ class MultiSellerOrchestrator:
                     deal.pricing.final_cpm,
                 )
 
+            except _SellerIncompatibleForCampaign as exc:
+                # Audience-plan negotiation exhausted -- the seller stays in the
+                # ranked list for other campaigns but is marked incompatible
+                # for this one. The orchestrator does NOT auto-route to a
+                # different seller; that's a higher-level concern.
+                logger.warning(
+                    "Seller %s incompatible for quote %s: %s",
+                    nq.seller_id,
+                    nq.quote_id,
+                    exc,
+                )
+                if nq.seller_id not in incompatible_sellers:
+                    incompatible_sellers.append(nq.seller_id)
+                failed_bookings.append({
+                    "quote_id": nq.quote_id,
+                    "error": str(exc),
+                    "error_code": "audience_plan_unsupported",
+                    "seller_id": nq.seller_id,
+                })
+
             except Exception as exc:  # noqa: BLE001 - per-deal isolation; continue booking remaining deals
                 logger.warning(
                     "Failed to book deal from quote %s: %s",
@@ -601,7 +678,106 @@ class MultiSellerOrchestrator:
             failed_bookings=failed_bookings,
             total_spend=total_spend,
             remaining_budget=remaining_budget,
+            incompatible_sellers=incompatible_sellers,
+            degradation_logs=degradation_logs,
         )
+
+    # ------------------------------------------------------------------
+    # Internal: retry-on-audience_plan_unsupported wrapper around book_deal
+    # ------------------------------------------------------------------
+
+    async def _book_with_audience_retry(
+        self,
+        *,
+        client: Any,
+        quote_id: str,
+        seller_id: str,
+        audience_plan: AudiencePlan | None,
+    ) -> tuple[DealResponse, DegradationLog]:
+        """Book a deal with one retry on `audience_plan_unsupported`.
+
+        Implements proposal §5.7 layer 2's retry path. On the first attempt,
+        the buyer's plan goes to the seller as-is. If the seller responds
+        with the structured ``audience_plan_unsupported`` error, the buyer
+        synthesizes a downgraded capability view from the rejection,
+        runs ``degrade_plan_for_seller``, and retries ONCE with the
+        degraded plan. Other errors propagate unchanged.
+
+        If the retry also fails (any reason -- second
+        ``audience_plan_unsupported``, primary stripped, network error,
+        etc.) the seller is marked incompatible for this campaign by
+        raising `_SellerIncompatibleForCampaign`. The caller surfaces it
+        to `DealSelection.incompatible_sellers`.
+
+        Returns (deal_response, degradation_log). The log is empty when
+        the original plan booked cleanly (no retry needed).
+        """
+
+        # First attempt with the original plan.
+        booking_request = DealBookingRequest(
+            quote_id=quote_id,
+            audience_plan=audience_plan,
+        )
+        unsupported: list[dict[str, Any]]
+        try:
+            deal = await client.book_deal(booking_request)
+            return deal, []
+        except DealsClientError as exc:
+            if not _is_audience_plan_unsupported(exc):
+                # Not an audience-negotiation rejection -- surface as-is.
+                raise
+
+            # Cannot retry without a plan to degrade.
+            if audience_plan is None:
+                raise
+
+            logger.info(
+                "Seller %s rejected audience_plan on quote %s; degrading and "
+                "retrying once. Unsupported parts: %s",
+                seller_id,
+                quote_id,
+                exc.unsupported,
+            )
+            # Stash the unsupported list so the post-except block can use it
+            # (Python does not preserve `except` variable bindings outside
+            # the block).
+            unsupported = list(exc.unsupported)
+
+        # Synthesize what the seller doesn't support, run degradation, retry.
+        try:
+            caps = synthesize_capabilities_from_unsupported(unsupported)
+            degraded_plan, degradation_log = degrade_plan_for_seller(
+                audience_plan, caps
+            )
+        except CannotFulfillPlan as cfp:
+            # Degradation stripped the primary -- no usable plan to retry.
+            raise _SellerIncompatibleForCampaign(
+                f"Cannot reconcile audience_plan with seller {seller_id}: "
+                f"{cfp.reason}"
+            ) from cfp
+
+        retry_request = DealBookingRequest(
+            quote_id=quote_id,
+            audience_plan=degraded_plan,
+        )
+        try:
+            deal = await client.book_deal(retry_request)
+        except DealsClientError as retry_exc:
+            # The retry failed too. Per scope: mark seller incompatible for
+            # this campaign so the higher-level error path can route around
+            # it. We do NOT auto-route here.
+            raise _SellerIncompatibleForCampaign(
+                f"Seller {seller_id} rejected even the degraded plan: "
+                f"{retry_exc}"
+            ) from retry_exc
+
+        logger.info(
+            "Booked deal from seller %s on retry after degrading "
+            "audience_plan (%d log entries)",
+            seller_id,
+            len(degradation_log),
+        )
+        return deal, degradation_log
 
     # ------------------------------------------------------------------
     # End-to-end orchestration

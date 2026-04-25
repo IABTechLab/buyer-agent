@@ -51,6 +51,12 @@ class DealsClientError(Exception):
         status_code: HTTP status code (0 for transport errors like timeout).
         error_code: Machine-readable error code from the seller, if available.
         detail: Human-readable detail message.
+        unsupported: When the seller rejects with the structured
+            `audience_plan_unsupported` shape (proposal §5.7 layer 3),
+            this carries the list of `{"path": ..., "reason": ...}` entries
+            so the orchestrator's retry path can run
+            `degrade_plan_for_seller` against the precise drops the seller
+            asked for. Empty list for any other error.
     """
 
     def __init__(
@@ -59,11 +65,13 @@ class DealsClientError(Exception):
         status_code: int = 0,
         error_code: str = "",
         detail: str = "",
+        unsupported: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.error_code = error_code
         self.detail = detail
+        self.unsupported: list[dict[str, Any]] = unsupported or []
 
 
 class DealsClient:
@@ -363,17 +371,50 @@ class DealsClient:
     def _build_error_from_response(response: httpx.Response) -> DealsClientError:
         """Extract error details from an HTTP error response.
 
-        Tries to parse the seller's structured error JSON. Falls back
-        to the raw response text if parsing fails.
+        Handles two seller error shapes:
+
+        1. Flat: ``{"error": "...", "detail": "..."}`` -- legacy / non-
+           HTTPException-wrapped errors. The buyer's pre-existing tests use
+           this shape.
+        2. FastAPI-wrapped: ``{"detail": {"error": "...", ...}}`` -- emitted
+           when the seller raises ``HTTPException(detail=<dict>)``. The
+           ``audience_plan_unsupported`` rejection (proposal §5.7 layer 3)
+           lives here, with an additional ``unsupported`` list inside the
+           wrapped ``detail``.
+
+        Falls back to the raw response text if JSON parsing fails entirely.
         """
         error_code = ""
-        detail = ""
+        detail: str = ""
+        unsupported: list[dict[str, Any]] = []
         try:
             data = response.json()
-            error_code = data.get("error", "")
-            detail = data.get("detail", "")
         except (json.JSONDecodeError, ValueError):
-            detail = response.text[:500] if response.text else ""
+            data = None
+
+        if isinstance(data, dict):
+            # Try the FastAPI-wrapped shape first: detail is itself a dict.
+            inner = data.get("detail")
+            if isinstance(inner, dict):
+                error_code = str(inner.get("error", "") or "")
+                # Surface the inner "message" / "detail" / repr for humans.
+                detail = str(
+                    inner.get("message")
+                    or inner.get("detail")
+                    or ""
+                )
+                raw_unsupported = inner.get("unsupported")
+                if isinstance(raw_unsupported, list):
+                    unsupported = [
+                        u for u in raw_unsupported if isinstance(u, dict)
+                    ]
+            else:
+                # Flat shape: {"error": "...", "detail": "..."}
+                error_code = str(data.get("error", "") or "")
+                detail = str(data.get("detail", "") or "")
+
+        if not detail and not error_code and response.text:
+            detail = response.text[:500]
 
         message = f"Seller API error {response.status_code}"
         if error_code:
@@ -386,6 +427,7 @@ class DealsClient:
             status_code=response.status_code,
             error_code=error_code,
             detail=detail,
+            unsupported=unsupported,
         )
 
     # ------------------------------------------------------------------
