@@ -31,6 +31,7 @@ from typing import Any, Optional, Union
 
 from ..events.bus import EventBus
 from ..events.models import Event, EventType
+from ..models.audience_plan import AudiencePlan, coerce_audience_field
 from ..models.campaign_brief import (
     CampaignBrief,
     ChannelAllocation,
@@ -111,7 +112,9 @@ class CampaignPlan:
         total_budget: Total campaign budget.
         flight_start: Campaign start date (ISO string).
         flight_end: Campaign end date (ISO string).
-        target_audience: Audience segment IDs from the brief.
+        target_audience: Typed AudiencePlan from the brief (may be None
+            when the brief omitted audience targeting; the Audience
+            Planner agent fills it in downstream per proposal §5.3).
     """
 
     campaign_id: str
@@ -119,7 +122,7 @@ class CampaignPlan:
     total_budget: float
     flight_start: str
     flight_end: str
-    target_audience: list[str] = field(default_factory=list)
+    target_audience: AudiencePlan | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +214,16 @@ class CampaignPipeline:
         )
 
         # Build the dict for CampaignStore.create_campaign
-        # Serialize complex fields to JSON strings for SQLite storage
+        # Serialize complex fields to JSON strings for SQLite storage.
+        # `target_audience` is now a typed AudiencePlan (or None); we
+        # persist it as a dict so future loads see the new shape and
+        # legacy rows lazily migrate as briefs are touched.
+        if brief.target_audience is None:
+            target_audience_json = json.dumps(None)
+        else:
+            target_audience_json = json.dumps(
+                brief.target_audience.model_dump(mode="json")
+            )
         store_brief = {
             "advertiser_id": brief.advertiser_id,
             "campaign_name": brief.campaign_name,
@@ -222,7 +234,7 @@ class CampaignPipeline:
             "channels": json.dumps(
                 [ch.model_dump(mode="json") for ch in brief.channels]
             ),
-            "target_audience": json.dumps(brief.target_audience),
+            "target_audience": target_audience_json,
         }
 
         # Include optional fields if present
@@ -600,7 +612,9 @@ class CampaignPipeline:
         """Reconstruct a CampaignBrief from stored campaign data.
 
         Used when the brief was not cached (e.g., pipeline stages
-        called independently across different instances).
+        called independently across different instances). Applies the
+        legacy-list compat shim on the way in so existing SQLite rows
+        carrying `list[str]` audiences keep working without a migration.
         """
         channels_raw = campaign.get("channels")
         if isinstance(channels_raw, str):
@@ -608,7 +622,24 @@ class CampaignPipeline:
 
         audience_raw = campaign.get("target_audience")
         if isinstance(audience_raw, str):
-            audience_raw = json.loads(audience_raw)
+            try:
+                audience_raw = json.loads(audience_raw)
+            except (json.JSONDecodeError, TypeError):
+                audience_raw = None
+
+        # Legacy rows store list[str]; new rows store an AudiencePlan
+        # dict. The shim handles both via coerce_audience_field. Empty
+        # legacy lists fall through to None so the brief schema treats
+        # the campaign as audience-less rather than rejecting it on
+        # reconstruction (different from the ingestion path, which
+        # rejects a fresh empty list).
+        if isinstance(audience_raw, list) and not audience_raw:
+            audience_raw = None
+        else:
+            audience_raw = coerce_audience_field(
+                audience_raw,
+                source_context="campaign_pipeline._reconstruct_brief",
+            )
 
         return parse_campaign_brief({
             "advertiser_id": campaign["advertiser_id"],
@@ -619,7 +650,7 @@ class CampaignPipeline:
             "flight_start": campaign["flight_start"],
             "flight_end": campaign["flight_end"],
             "channels": channels_raw or [],
-            "target_audience": audience_raw or ["default"],
+            "target_audience": audience_raw,
         })
 
     @staticmethod
