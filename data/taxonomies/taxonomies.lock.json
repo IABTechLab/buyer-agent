@@ -22,10 +22,23 @@
     "source": "https://github.com/IABTechLab/agentic-audiences",
     "spec_url": "https://github.com/IABTechLab/agentic-audiences",
     "path": "agentic-audiences-draft-2026-01/spec/",
-    "sha256": "a84ef73e28517288c917278181c563d0bf5d85e24fbce5cefd2f85e8a52861ba",
-    "sha256_method": "shasum -a 256 of (sorted file list with per-file shasum -a 256), then shasum -a 256 of that listing",
+    "sha256": "1b3266f92f478b738da701d8923980b7067f70a59d18cfa76c54ecfb5d6301b9",
+    "sha256_method": "sha256(sorted lines of '<relpath>\\t<sha256>\\n')",
     "fetched_at": "2026-04-25T19:27:21Z",
     "license": "CC-BY-4.0 (spec) + Apache-2.0 (impl)",
-    "format": "directory"
+    "format": "directory",
+    "files": {
+      "spec/LICENSE": "6beddc683797cc09a87fa410ca8898cd5f2fd3c86d4cb950528bbe46ae8078bc",
+      "spec/LICENSE-APACHE": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+      "spec/README.md": "15e1de07be1f2ff4820b8f90fae6837643be6a34930265a5d0a8c0f0f0d50393",
+      "spec/specs/roadmap.md": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spec/specs/v1.0/embedding-exchange.md": "476c82bd0d7aa2c603d2816e4949cfce4543c7f1638bcd1f37cd2064f159d1ff",
+      "spec/specs/v1.0/embedding-taxonomy.md": "19bc97157d34bddb7b52a792bf87e635eac8847874e586b3aa9a952c0b7e6dd7",
+      "spec/specs/v1.0/examples/buyer_agent_request.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spec/specs/v1.0/examples/embedding_update.json": "7cd0d362e80a3486a9399cf3bee5c3c8e041e78d97339432d106cfc21ef6d32a",
+      "spec/specs/v1.0/examples/seller_agent_response.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spec/specs/v1.0/schema/agent_interface.schema.json": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "spec/specs/v1.0/schema/embedding_format.schema.json": "1a5dc7f0e2821f7b312f2bd52a7c1c035fb9ded808b546d81824dd8ec440581b"
+    }
   }
 }

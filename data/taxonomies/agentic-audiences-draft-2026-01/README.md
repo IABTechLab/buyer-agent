@@ -68,8 +68,22 @@ for the rename rationale.
 This subset is vendored, not fetched at runtime. To upgrade:
 
 1. Re-fetch the files listed above from the upstream repo.
-2. Recompute the composite hash recorded in
-   `data/taxonomies/taxonomies.lock.json` under the `agentic` key.
+2. Recompute the composite hash and per-file map recorded in
+   `data/taxonomies/taxonomies.lock.json` under the `agentic` key by
+   running the canonical helper script:
+
+   ```bash
+   # from the buyer repo root
+   python3 scripts/hash_taxonomies.py            # print computed values to stdout
+   python3 scripts/hash_taxonomies.py --write    # rewrite taxonomies.lock.json in place
+   python3 scripts/hash_taxonomies.py --check    # verify lock matches the on-disk spec (CI)
+   ```
+
+   The script implements the same composite-hash algorithm used by the
+   seller (`sha256(sorted lines of '<relpath>\t<sha256>\n')`) so cross-
+   repo drift detection compares apples to apples. Per-file sha256
+   entries are emitted under `agentic.files` so a refresher can see
+   exactly which file changed when the composite changes.
 3. Update the `Fetched at` timestamp here and the `version` field in
    the lock file (e.g., `draft-2026-01` -> `draft-2026-04`).
 4. Re-run any wire-format validation tests; the spec is DRAFT and shapes
