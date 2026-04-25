@@ -18,6 +18,7 @@ Extended with linear TV support (Option C hybrid approach, bead buyer-6io):
 
 from pydantic import BaseModel, Field
 
+from .audience_plan import AudiencePlan
 from .linear_tv import LinearTVParams, LinearTVQuoteDetails
 
 # ---------------------------------------------------------------------------
@@ -127,6 +128,13 @@ class QuoteRequest(BaseModel):
     # Linear TV nested params (None for digital/CTV)
     linear_tv: LinearTVParams | None = None
 
+    # Typed audience plan threaded from CampaignPlan via the orchestrator
+    # (proposal §5.2 + §5.3). None on legacy paths that have not yet been
+    # wired through; populated by the Audience Planner in a follow-up bead.
+    # Wire-format serialization is governed by the seller-side contract
+    # (see beads §14a/14b for the agreed JSON shape).
+    audience_plan: AudiencePlan | None = None
+
 
 class DealBookingRequest(BaseModel):
     """Request body for POST /api/v1/deals.
@@ -137,6 +145,12 @@ class DealBookingRequest(BaseModel):
     quote_id: str
     buyer_identity: BuyerIdentityPayload | None = None
     notes: str | None = None
+
+    # Typed audience plan: deal-level targeting metadata enforced by the
+    # seller at impression-fulfillment time for PG deals. Frozen with the
+    # booking and hashed via audience_plan_id for cross-system parity. See
+    # proposal §5.1 Step 1.
+    audience_plan: AudiencePlan | None = None
 
 
 # ---------------------------------------------------------------------------

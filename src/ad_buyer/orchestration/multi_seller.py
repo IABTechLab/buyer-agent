@@ -36,6 +36,7 @@ from typing import Any, Callable, Optional
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..events.models import Event, EventType
+from ..models.audience_plan import AudiencePlan
 from ..models.deals import (
     DealBookingRequest,
     DealResponse,
@@ -66,6 +67,11 @@ class InventoryRequirements:
         excluded_sellers: Seller IDs to exclude from discovery.
         min_impressions: Minimum impression volume needed.
         max_cpm: Maximum acceptable CPM for filtering quotes.
+        audience_plan: Typed audience plan from the brief / Audience Planner.
+            None on legacy paths that have not yet been wired through.
+            Threaded onto DealParams / QuoteRequest / DealBookingRequest so
+            the audience surface survives all the way to the seller. See
+            proposal §5.2 + §5.3.
     """
 
     media_type: str
@@ -74,6 +80,7 @@ class InventoryRequirements:
     excluded_sellers: list[str] = field(default_factory=list)
     min_impressions: Optional[int] = None
     max_cpm: Optional[float] = None
+    audience_plan: AudiencePlan | None = None
 
 
 @dataclass
@@ -90,6 +97,10 @@ class DealParams:
         flight_end: Campaign end date (ISO string).
         target_cpm: Optional target CPM to include in the request.
         media_type: Media type (digital, ctv, linear_tv).
+        audience_plan: Typed audience plan threaded from
+            InventoryRequirements / CampaignPlan. None on legacy paths
+            that have not yet been wired through. Forwarded to QuoteRequest
+            so the seller receives the campaign's audience targeting.
     """
 
     product_id: str
@@ -99,6 +110,7 @@ class DealParams:
     flight_end: str
     target_cpm: Optional[float] = None
     media_type: str = "digital"
+    audience_plan: AudiencePlan | None = None
 
 
 @dataclass
@@ -345,6 +357,7 @@ class MultiSellerOrchestrator:
                     flight_end=deal_params.flight_end,
                     target_cpm=deal_params.target_cpm,
                     media_type=deal_params.media_type,
+                    audience_plan=deal_params.audience_plan,
                 )
 
                 # Apply timeout
@@ -484,6 +497,7 @@ class MultiSellerOrchestrator:
         budget: float,
         count: int,
         quote_seller_map: dict[str, str],
+        audience_plan: AudiencePlan | None = None,
     ) -> DealSelection:
         """Select and book optimal deals from ranked quotes.
 
@@ -498,6 +512,10 @@ class MultiSellerOrchestrator:
             count: Maximum number of deals to book.
             quote_seller_map: Mapping of quote_id to seller URL, needed
                 to create the correct DealsClient for booking.
+            audience_plan: Optional typed audience plan to attach to each
+                DealBookingRequest. Forwarded as deal-level targeting
+                metadata so the seller can enforce audience targeting at
+                impression-fulfillment time. See proposal §5.1 Step 1.
 
         Returns:
             DealSelection with booked deals, failures, and budget info.
@@ -535,7 +553,10 @@ class MultiSellerOrchestrator:
 
             try:
                 client = self._deals_client_factory(seller_url)
-                booking_request = DealBookingRequest(quote_id=nq.quote_id)
+                booking_request = DealBookingRequest(
+                    quote_id=nq.quote_id,
+                    audience_plan=audience_plan,
+                )
 
                 deal = await client.book_deal(booking_request)
                 booked_deals.append(deal)
@@ -662,6 +683,7 @@ class MultiSellerOrchestrator:
             budget=budget,
             count=max_deals,
             quote_seller_map=quote_seller_map,
+            audience_plan=deal_params.audience_plan,
         )
 
         # Emit campaign booking completed event
