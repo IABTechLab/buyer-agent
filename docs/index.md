@@ -71,6 +71,7 @@ See the [API Overview](api/overview.md) for full details.
 ### Architecture & Reference
 
 - [Agent Hierarchy](architecture/agent-hierarchy.md) --- portfolio manager, channel specialists, and tool agents
+- [AgentCore Architecture](architecture/agentcore.md) --- Bedrock AgentCore deployment topology
 - [Tools Reference](architecture/tools.md) --- all CrewAI tools available to agents
 - [Configuration](guides/configuration.md) --- environment variables, seller connections, and feature flags
 - [API Reference](api/overview.md) --- all endpoints, models, and curl examples
@@ -81,6 +82,7 @@ See the [API Overview](api/overview.md) for full details.
 ### Guides
 
 - [Buyer Guide Overview](guides/overview.md) --- end-to-end buyer workflow orientation and topic map
+- [AgentCore Deployment](guides/agentcore-deployment.md) --- Bedrock AgentCore managed runtime
 - [Deal Booking](guides/deal-booking.md) --- end-to-end quote-then-book workflow
 - [Negotiation](guides/negotiation.md) --- multi-turn negotiation strategies and deal flow
 - [Identity Strategy](guides/identity.md) --- tiered pricing and buyer identity resolution
