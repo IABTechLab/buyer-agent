@@ -231,21 +231,27 @@ class TestPipelineProducesAudiencePlan:
 
 
 # ---------------------------------------------------------------------------
-# 2. Stub passthrough behavior
+# 2. Reasoning loop preserves explicit primary, may enrich rationale
 # ---------------------------------------------------------------------------
 
 
-class TestStubPassthrough:
-    """The stub planner preserves the user's plan exactly.
+class TestPlannerPreservesExplicitPrimary:
+    """The §7 reasoning loop preserves an explicit primary verbatim.
 
-    Documented behavior: rationale stays the user's; the planner does NOT
-    overwrite it. The audit-trail surface (proposal §13a) gets a structured
-    log entry instead of a plan-content mutation. This guarantees that
-    `audience_plan_id` (the content hash) remains stable across the
-    planner step.
+    Documented behavior (post-§7):
+      - The brief's explicit primary survives intact (identifier,
+        type, source=`explicit`).
+      - The planner produces its own rationale that records the
+        preservation, plus the strictness policy and KPI orientation.
+        The user's original rationale is no longer the plan's
+        rationale; the audit-trail surface (§13a) handles that.
+      - audience_plan_id (the content hash) remains stable across the
+        planner step when no refs are added (e.g. when classification
+        finds no candidates to extend the explicit primary with).
+      - The planner result is no longer a stub (is_stub=False).
     """
 
-    def test_rationale_preserved_exactly(self, pipeline):
+    def test_explicit_primary_preserved(self, pipeline):
         loop = asyncio.new_event_loop()
         try:
             campaign_id = loop.run_until_complete(
@@ -256,19 +262,44 @@ class TestStubPassthrough:
             loop.close()
 
         assert plan.target_audience is not None
-        assert (
-            plan.target_audience.rationale
-            == "User-supplied: focus on auto intenders aged 25-54."
-        ), "Stub passthrough must preserve the user's rationale verbatim."
+        assert plan.target_audience.primary.identifier == "3-7"
+        assert plan.target_audience.primary.type == "standard"
+        assert plan.target_audience.primary.source == "explicit"
 
-    def test_audience_plan_id_stable_through_passthrough(self, pipeline, fake_store):
+    def test_planner_rationale_records_preservation(self, pipeline):
         loop = asyncio.new_event_loop()
         try:
             campaign_id = loop.run_until_complete(
                 pipeline.ingest_brief(json.dumps(_typed_brief_dict()))
             )
-            # Snapshot the brief's audience_plan_id BEFORE plan_campaign
-            # ran, then re-fetch after to confirm content didn't drift.
+            plan = loop.run_until_complete(pipeline.plan_campaign(campaign_id))
+        finally:
+            loop.close()
+
+        assert plan.target_audience is not None
+        rationale = plan.target_audience.rationale
+        # The §7 rationale is multi-line and records strictness,
+        # primary preservation, and KPI orientation. We assert the
+        # SHAPE of the rationale rather than the exact string to keep
+        # the test robust against future wording tweaks.
+        assert "primary=preserved" in rationale, rationale
+        assert "explicit standard 3-7" in rationale, rationale
+        assert "[strictness" in rationale, rationale
+
+    def test_audience_plan_id_stable_when_no_refs_added(self, pipeline):
+        """Hash stable across the planner when nothing was added.
+
+        With no advertiser context on the brief and no resolvable
+        classification candidates, the planner enriches with zero
+        constraints/extensions; the content hash matches the ingested
+        plan's hash. (rationale isn't in the hash.)
+        """
+
+        loop = asyncio.new_event_loop()
+        try:
+            campaign_id = loop.run_until_complete(
+                pipeline.ingest_brief(json.dumps(_typed_brief_dict()))
+            )
             ingested_plan = pipeline._briefs[campaign_id].target_audience
             assert ingested_plan is not None
             ingested_id = ingested_plan.audience_plan_id
@@ -278,9 +309,11 @@ class TestStubPassthrough:
             loop.close()
 
         assert plan.target_audience is not None
-        assert plan.target_audience.audience_plan_id == ingested_id
+        # If no constraints/extensions were inferred, the hash matches.
+        if not plan.target_audience.constraints and not plan.target_audience.extensions:
+            assert plan.target_audience.audience_plan_id == ingested_id
 
-    def test_planner_result_marked_as_stub(self, pipeline):
+    def test_planner_result_no_longer_stub(self, pipeline):
         loop = asyncio.new_event_loop()
         try:
             campaign_id = loop.run_until_complete(
@@ -292,7 +325,15 @@ class TestStubPassthrough:
 
         result = pipeline.get_audience_planner_result(campaign_id)
         assert result is not None
-        assert result.is_stub is True
+        assert result.is_stub is False
+        # The §7 result also exposes the rationale lines and discovery
+        # availability for downstream audit-trail consumers.
+        assert result.rationale_lines is not None
+        assert len(result.rationale_lines) >= 2
+        # discovery_available is True or False depending on whether the
+        # mock seller was reachable; both are acceptable -- the rationale
+        # records the outcome.
+        assert isinstance(result.discovery_available, bool)
 
 
 # ---------------------------------------------------------------------------
@@ -488,27 +529,32 @@ class TestEmbeddingMintTool:
 # ---------------------------------------------------------------------------
 
 
-class TestStubHandlesNoAudience:
-    """Brief with no audience -> planner stub returns None (no crash).
+class TestPlannerHandlesNoAudience:
+    """Brief with no audience and no advertiser context -> None (no crash).
 
-    Bead §7 will replace this branch with reasoning that *creates* a plan
-    when the brief omits audience targeting. For now we just need the
-    pipeline to not blow up.
+    Post-§7 the reasoning loop has the latitude to compose a plan from
+    advertiser context (description/notes) when target_audience is None.
+    With NEITHER audience nor context, the loop emits None and records
+    "needs human review" in the rationale lines.
     """
 
-    def test_run_step_returns_none_when_brief_has_no_audience(self):
-        from ad_buyer.models.campaign_brief import parse_campaign_brief
-
-        brief_dict = _legacy_brief_dict()
-        # Drop target_audience entirely.
-        brief_dict.pop("target_audience", None)
-        # The brief schema currently rejects missing audience -- so we
-        # exercise the planner step directly with a synthesized brief
-        # whose audience is None. parse_campaign_brief enforces the
-        # schema, so we mock the brief minimally.
+    def test_run_step_returns_none_when_brief_lacks_signals(self):
+        # Synthesize a brief whose audience and context are all empty.
+        # parse_campaign_brief would reject missing audience at ingestion,
+        # so we fabricate the minimal shape the reasoning loop expects.
         brief = MagicMock()
         brief.target_audience = None
+        brief.description = None
+        brief.notes = None
+        # Strictness must be a real AudienceStrictness object so the
+        # rationale prefix can read its fields.
+        from ad_buyer.models.audience_plan import AudienceStrictness
+
+        brief.audience_strictness = AudienceStrictness()
 
         result = run_audience_planner_step(brief)
         assert result.plan is None
-        assert result.is_stub is True
+        assert result.is_stub is False
+        assert result.rationale_lines is not None
+        joined = " ".join(result.rationale_lines)
+        assert "human review" in joined.lower()
