@@ -8,6 +8,7 @@ from .channel_crews import (
     create_ctv_crew,
     create_mobile_crew,
     create_performance_crew,
+    kickoff_channel_crew_with_audience,
 )
 from .portfolio_crew import create_portfolio_crew
 
@@ -17,4 +18,5 @@ __all__ = [
     "create_mobile_crew",
     "create_ctv_crew",
     "create_performance_crew",
+    "kickoff_channel_crew_with_audience",
 ]
