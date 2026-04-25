@@ -35,9 +35,13 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
+from ..clients.capability_client import (
+    CapabilityClient,
+    CapabilityDiscoveryResult,
+)
 from ..clients.deals_client import DealsClientError
 from ..events.models import Event, EventType
-from ..models.audience_plan import AudiencePlan
+from ..models.audience_plan import AudiencePlan, AudienceStrictness
 from ..models.deals import (
     DealBookingRequest,
     DealResponse,
@@ -49,6 +53,7 @@ from ..storage import audience_audit_log
 from .audience_degradation import (
     CannotFulfillPlan,
     DegradationLog,
+    DegradationLogEntry,
     SellerAudienceCapabilities,
     degrade_plan_for_seller,
     synthesize_capabilities_from_unsupported,
@@ -92,6 +97,87 @@ def _is_audience_plan_unsupported(exc: DealsClientError) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Pre-flight strictness gating helpers (proposal §5.7 layer 2)
+# ---------------------------------------------------------------------------
+
+# Map the path prefix in a `DegradationLogEntry` to the role whose strictness
+# governs whether the orchestrator skips the seller. Anything that isn't a
+# top-level role (e.g., "primary.taxonomy") is treated as "primary" so a
+# version-mismatch on the primary triggers the primary's strictness.
+_ROLE_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("primary", "primary"),
+    ("constraints", "constraints"),
+    ("extensions", "extensions"),
+    ("exclusions", "exclusions"),
+)
+
+
+def _entry_role(entry: DegradationLogEntry) -> str:
+    """Return the top-level role name from a degradation entry's path.
+
+    "primary" -> "primary"; "primary.taxonomy" -> "primary";
+    "extensions[0]" -> "extensions"; "constraints[2]" -> "constraints".
+    Falls back to "primary" if the path doesn't match a known role -- the
+    safest interpretation, since unrecognized drops shouldn't silently
+    pass through a relaxed role's policy.
+    """
+
+    path = entry.path or ""
+    for prefix, role in _ROLE_PREFIXES:
+        if path == prefix or path.startswith(f"{prefix}.") or path.startswith(
+            f"{prefix}["
+        ):
+            return role
+    return "primary"
+
+
+def _entry_is_agentic(entry: DegradationLogEntry) -> bool:
+    """True when the dropped ref had `type=agentic`.
+
+    Agentic refs are governed by their own strictness key (regardless of
+    which role they sat in) per proposal §5.7's policy table.
+    """
+
+    if entry.original_ref is None:
+        return False
+    return entry.original_ref.get("type") == "agentic"
+
+
+def _strictness_skip_required(
+    log: DegradationLog, strictness: AudienceStrictness
+) -> tuple[bool, str | None]:
+    """Decide whether to skip a seller given a pre-flight degradation log.
+
+    Walks each `DegradationLogEntry`, classifies it (agentic vs. role),
+    looks up the matching strictness level, and returns True if any entry
+    has its level set to "required". Per proposal §5.7's recommendation:
+
+    - `primary=required` and primary got dropped -> skip seller.
+    - `constraints=preferred` and constraints got dropped -> proceed (log).
+    - `extensions=optional` and extensions got dropped -> proceed.
+    - `agentic=optional` and agentic ref got dropped -> proceed.
+
+    Returns (skip, reason). `reason` is set when skip=True so the caller
+    can surface a human-readable cause into the failed_bookings list.
+    """
+
+    for entry in log:
+        if _entry_is_agentic(entry):
+            level = strictness.agentic
+            role_label = "agentic"
+        else:
+            role = _entry_role(entry)
+            level = getattr(strictness, role, "optional")
+            role_label = role
+        if level == "required":
+            return True, (
+                f"audience_strictness.{role_label}=required but seller dropped "
+                f"{entry.path} ({entry.reason})"
+            )
+    return False, None
+
+
+# ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
 
@@ -115,6 +201,12 @@ class InventoryRequirements:
             Threaded onto DealParams / QuoteRequest / DealBookingRequest so
             the audience surface survives all the way to the seller. See
             proposal §5.2 + §5.3.
+        audience_strictness: Per-role strictness policy (`primary`,
+            `constraints`, `extensions`, `agentic`). Defaults to None;
+            `select_and_book` falls back to `AudienceStrictness()` defaults
+            when None. Threaded from the campaign brief so the
+            orchestrator's pre-flight gate (§5.7 layer 2 + §13) knows
+            which roles must be preserved when degrading per seller.
     """
 
     media_type: str
@@ -124,6 +216,7 @@ class InventoryRequirements:
     min_impressions: Optional[int] = None
     max_cpm: Optional[float] = None
     audience_plan: AudiencePlan | None = None
+    audience_strictness: AudienceStrictness | None = None
 
 
 @dataclass
@@ -283,12 +376,18 @@ class MultiSellerOrchestrator:
         event_bus: Optional[Any] = None,
         quote_normalizer: Optional[QuoteNormalizer] = None,
         quote_timeout: float = 30.0,
+        capability_client: Optional[CapabilityClient] = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
         self._event_bus = event_bus
         self._normalizer = quote_normalizer or QuoteNormalizer()
         self._quote_timeout = quote_timeout
+        # Optional pre-flight capability client. When provided alongside an
+        # `audience_plan` and `audience_strictness` on `select_and_book`,
+        # the orchestrator runs the §5.7 layer 1+2 pre-flight before booking.
+        # When None, it falls back to the layer-3 retry-only path.
+        self._capability_client = capability_client
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -552,6 +651,7 @@ class MultiSellerOrchestrator:
         count: int,
         quote_seller_map: dict[str, str],
         audience_plan: AudiencePlan | None = None,
+        audience_strictness: AudienceStrictness | None = None,
     ) -> DealSelection:
         """Select and book optimal deals from ranked quotes.
 
@@ -559,21 +659,36 @@ class MultiSellerOrchestrator:
         minimum_spend exceeds the remaining budget, and books up to
         ``count`` deals.
 
+        When `audience_plan` and a configured `capability_client` are both
+        present, the orchestrator runs the §5.7 layer 1+2 pre-flight before
+        each booking: discover capabilities, degrade the plan, and decide
+        whether to skip the seller per `audience_strictness`. The §5.7
+        layer-3 retry path remains in place to catch stale-cache cases.
+
         Args:
             ranked_quotes: Quotes sorted by score (best first), from
                 evaluate_and_rank.
             budget: Total budget available for booking.
             count: Maximum number of deals to book.
             quote_seller_map: Mapping of quote_id to seller URL, needed
-                to create the correct DealsClient for booking.
+                to create the correct DealsClient for booking AND to
+                pre-flight the seller's capability discovery.
             audience_plan: Optional typed audience plan to attach to each
                 DealBookingRequest. Forwarded as deal-level targeting
                 metadata so the seller can enforce audience targeting at
                 impression-fulfillment time. See proposal §5.1 Step 1.
+            audience_strictness: Optional per-role strictness policy from
+                the campaign brief. When omitted, defaults are applied
+                (primary=required, constraints=preferred, extensions=
+                optional, agentic=optional) per proposal §5.7.
 
         Returns:
             DealSelection with booked deals, failures, and budget info.
         """
+        # Default strictness if the caller didn't pass one. Matches
+        # `AudienceStrictness()`'s pydantic defaults so unwired callers and
+        # explicit-default callers behave identically.
+        effective_strictness = audience_strictness or AudienceStrictness()
         booked_deals: list[DealResponse] = []
         failed_bookings: list[dict[str, Any]] = []
         incompatible_sellers: list[str] = []
@@ -609,12 +724,25 @@ class MultiSellerOrchestrator:
 
             try:
                 client = self._deals_client_factory(seller_url)
-                deal, deg_log = await self._book_with_audience_retry(
-                    client=client,
-                    quote_id=nq.quote_id,
-                    seller_id=nq.seller_id,
-                    audience_plan=audience_plan,
-                )
+                if (
+                    self._capability_client is not None
+                    and audience_plan is not None
+                ):
+                    deal, deg_log = await self._book_with_preflight_then_retry(
+                        client=client,
+                        quote_id=nq.quote_id,
+                        seller_id=nq.seller_id,
+                        seller_url=seller_url,
+                        audience_plan=audience_plan,
+                        audience_strictness=effective_strictness,
+                    )
+                else:
+                    deal, deg_log = await self._book_with_audience_retry(
+                        client=client,
+                        quote_id=nq.quote_id,
+                        seller_id=nq.seller_id,
+                        audience_plan=audience_plan,
+                    )
                 booked_deals.append(deal)
                 if deg_log:
                     degradation_logs[nq.quote_id] = deg_log
@@ -832,6 +960,162 @@ class MultiSellerOrchestrator:
         return deal, degradation_log
 
     # ------------------------------------------------------------------
+    # Internal: pre-flight capability discovery + degradation + retry
+    # ------------------------------------------------------------------
+
+    async def _book_with_preflight_then_retry(
+        self,
+        *,
+        client: Any,
+        quote_id: str,
+        seller_id: str,
+        seller_url: str,
+        audience_plan: AudiencePlan,
+        audience_strictness: AudienceStrictness,
+    ) -> tuple[DealResponse, DegradationLog]:
+        """Pre-flight a seller's capabilities, degrade the plan, then book.
+
+        Implements proposal §5.7 layer 1+2 and composes with layer 3
+        (the existing retry-on-rejection path):
+
+        1. Call `capability_client.discover_capabilities(seller_url)` to
+           get the seller's `audience_capabilities` (cached up to 1h,
+           honoring `Cache-Control: max-age`).
+        2. Run `degrade_plan_for_seller(plan, capabilities)` to produce
+           a degraded plan + structured log of what was stripped.
+        3. Apply `audience_strictness`: if any role marked "required"
+           was dropped, raise `_SellerIncompatibleForCampaign` so the
+           caller marks the seller incompatible. Otherwise proceed with
+           the degraded plan.
+        4. Delegate to `_book_with_audience_retry` with the degraded plan.
+           If the seller still rejects (e.g., the cache was stale and
+           the seller's caps tightened), the §12 retry path catches it
+           and applies a second degradation pass against the seller's
+           structured rejection.
+
+        Audit-trail emissions (§13a):
+
+        - One `EVENT_PREFLIGHT_CACHE` event per call with the cache
+          status, seller, and capability summary.
+        - One `EVENT_DEGRADATION` event when the pre-flight degraded
+          the plan (separate from the retry's own degradation event).
+
+        Args:
+            client: Per-seller `DealsClient`.
+            quote_id / seller_id: Booking identifiers.
+            seller_url: Seller's base URL for capability discovery.
+            audience_plan: Original plan from the campaign.
+            audience_strictness: Per-role strictness policy.
+
+        Returns:
+            (deal_response, combined_degradation_log). The combined log
+            stitches together pre-flight + retry-time entries so the
+            caller's audit surface sees both.
+
+        Raises:
+            _SellerIncompatibleForCampaign: When pre-flight degradation
+                strips a role marked "required" in the strictness
+                policy, or when `degrade_plan_for_seller` cannot keep a
+                primary at all.
+        """
+
+        assert self._capability_client is not None  # narrowed by select_and_book
+
+        # ---- 1. capability discovery ----
+        discovery: CapabilityDiscoveryResult = (
+            await self._capability_client.discover_capabilities(seller_url)
+        )
+
+        # Audit: every pre-flight call lands in the trail keyed by plan id.
+        # Failures here MUST NOT fail the booking -- audience_audit_log is
+        # already fail-open, so we just call it and move on.
+        audience_audit_log.log_event(
+            plan_id=audience_plan.audience_plan_id,
+            event_type=audience_audit_log.EVENT_PREFLIGHT_CACHE,
+            payload={
+                "seller_id": seller_id,
+                "seller_url": seller_url,
+                "quote_id": quote_id,
+                "cache_status": discovery.cache_status,
+                "fetched_at": discovery.fetched_at,
+                "capabilities": discovery.capabilities.model_dump(mode="json"),
+            },
+        )
+
+        # ---- 2. degrade per pre-flight caps ----
+        try:
+            degraded_plan, preflight_log = degrade_plan_for_seller(
+                audience_plan, discovery.capabilities
+            )
+        except CannotFulfillPlan as cfp:
+            # Pre-flight stripped the primary entirely. No retry would help;
+            # the seller advertises caps that can't carry this campaign.
+            raise _SellerIncompatibleForCampaign(
+                f"Pre-flight: seller {seller_id} cannot fulfill plan: "
+                f"{cfp.reason}"
+            ) from cfp
+
+        # ---- 3. apply strictness gate ----
+        skip, reason = _strictness_skip_required(preflight_log, audience_strictness)
+        if skip:
+            logger.info(
+                "Pre-flight strictness skip seller=%s quote=%s reason=%s",
+                seller_id,
+                quote_id,
+                reason,
+            )
+            raise _SellerIncompatibleForCampaign(
+                f"Pre-flight strictness gate: {reason}"
+            )
+
+        # Audit: when the pre-flight produced any drops we record them.
+        # The retry path emits its own degradation event keyed by the same
+        # plan id, so a reviewer pulling events for a plan sees both.
+        if preflight_log:
+            audience_audit_log.log_event(
+                plan_id=audience_plan.audience_plan_id,
+                event_type=audience_audit_log.EVENT_DEGRADATION,
+                payload={
+                    "phase": "preflight",
+                    "seller_id": seller_id,
+                    "seller_url": seller_url,
+                    "quote_id": quote_id,
+                    "degraded_plan_id": degraded_plan.audience_plan_id,
+                    "log": [entry.model_dump(mode="json") for entry in preflight_log],
+                },
+            )
+            logger.info(
+                "Pre-flight degraded plan for seller=%s quote=%s "
+                "(%d log entries)",
+                seller_id,
+                quote_id,
+                len(preflight_log),
+            )
+
+        # ---- 4. book with retry on stale-cache rejection ----
+        # §12's retry path takes care of layer 3: if the seller still
+        # rejects (cache went stale between pre-flight and booking), it
+        # synthesizes a tighter cap view, runs another degradation, and
+        # retries once.
+        try:
+            deal, retry_log = await self._book_with_audience_retry(
+                client=client,
+                quote_id=quote_id,
+                seller_id=seller_id,
+                audience_plan=degraded_plan,
+            )
+        except _SellerIncompatibleForCampaign:
+            # The retry path already decided incompatibility. Surface
+            # unchanged so the caller marks the seller.
+            raise
+
+        # The combined log: pre-flight drops first, then retry-time drops
+        # (if any). This is what the caller surfaces as `degradation_logs`
+        # so the audit-trail downstream sees the full sequence of strips.
+        combined_log: DegradationLog = list(preflight_log) + list(retry_log)
+        return deal, combined_log
+
+    # ------------------------------------------------------------------
     # End-to-end orchestration
     # ------------------------------------------------------------------
 
@@ -912,6 +1196,7 @@ class MultiSellerOrchestrator:
             count=max_deals,
             quote_seller_map=quote_seller_map,
             audience_plan=deal_params.audience_plan,
+            audience_strictness=inventory_requirements.audience_strictness,
         )
 
         # Emit campaign booking completed event
