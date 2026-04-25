@@ -5,6 +5,12 @@
 
 This client handles the exchange of embeddings between buyer and seller agents
 following the IAB Tech Lab UCP specification.
+
+NOTE: This module implements IAB Agentic Audiences (formerly User Context
+Protocol / UCP). Public-surface naming uses "Agentic Audiences (UCP)" per
+proposal AUDIENCE_PLANNER_3TYPE_EXTENSION_2026-04-25.md §5.6 -- the code
+keeps `ucp_*` names internally to avoid a churning rename of a still-DRAFT
+spec, but readers searching for either term land here.
 """
 
 import logging

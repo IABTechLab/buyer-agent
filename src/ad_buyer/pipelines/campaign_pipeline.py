@@ -46,6 +46,10 @@ from ..orchestration.multi_seller import (
     MultiSellerOrchestrator,
     OrchestrationResult,
 )
+from .audience_planner_step import (
+    AudiencePlannerResult,
+    run_audience_planner_step,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +163,11 @@ class CampaignPipeline:
         self._briefs: dict[str, CampaignBrief] = {}
         self._plans: dict[str, CampaignPlan] = {}
         self._booking_results: dict[str, dict[str, OrchestrationResult]] = {}
+
+        # Audience Planner outputs per campaign. Populated by
+        # `plan_campaign` and exposed via `get_audience_planner_result`
+        # for tests / observability. Bead ar-fgyq §6 wiring.
+        self._audience_planners: dict[str, AudiencePlannerResult] = {}
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -325,13 +334,24 @@ class CampaignPipeline:
                 format_prefs=ch.format_prefs,
             ))
 
+        # Run the Audience Planner step BEFORE building the CampaignPlan
+        # so the resolved plan rides on `target_audience` from this point
+        # forward (per proposal §5.3). This is the keystone bead ar-fgyq
+        # wiring -- the planner is a stub passthrough today; bead §7
+        # replaces the stub with the full reasoning loop.
+        planner_result = run_audience_planner_step(brief)
+        # Cache the agent for tests/introspection -- the agent's `tools`
+        # attribute is the source of truth for the §6 tool-relocation
+        # invariant (3 UCP tools + TaxonomyLookup + EmbeddingMint).
+        self._audience_planners[campaign_id] = planner_result
+
         plan = CampaignPlan(
             campaign_id=campaign_id,
             channel_plans=channel_plans,
             total_budget=brief.total_budget,
             flight_start=brief.flight_start.isoformat(),
             flight_end=brief.flight_end.isoformat(),
-            target_audience=brief.target_audience,
+            target_audience=planner_result.plan,
         )
 
         # Cache the plan for execute_booking
@@ -414,7 +434,10 @@ class CampaignPipeline:
         for cp in plan.channel_plans:
             channel_key = cp.channel.value
 
-            # Build inventory requirements for this channel
+            # Build inventory requirements for this channel.
+            # `audience_plan` is forwarded from the planner step's output
+            # (proposal §5.3 / bead ar-fgyq §6); §5 wired the
+            # `audience_plan` field on InventoryRequirements / DealParams.
             inv_req = InventoryRequirements(
                 media_type=cp.media_type,
                 deal_types=cp.deal_types,
@@ -424,6 +447,7 @@ class CampaignPipeline:
                     if brief and brief.deal_preferences
                     else None
                 ),
+                audience_plan=plan.target_audience,
             )
 
             # Build deal params
@@ -434,6 +458,7 @@ class CampaignPipeline:
                 flight_start=plan.flight_start,
                 flight_end=plan.flight_end,
                 media_type=cp.media_type,
+                audience_plan=plan.target_audience,
             )
 
             try:
@@ -603,6 +628,22 @@ class CampaignPipeline:
             sum(ch["deals_booked"] for ch in channels_summary.values()),
         )
         return summary
+
+    # ------------------------------------------------------------------
+    # Public accessors (Audience Planner introspection)
+    # ------------------------------------------------------------------
+
+    def get_audience_planner_result(
+        self, campaign_id: str
+    ) -> AudiencePlannerResult | None:
+        """Return the Audience Planner output for `campaign_id`, if any.
+
+        Populated by `plan_campaign`. Returns None when planning has not
+        yet run for the campaign. Tests use this to introspect the
+        agent's bound tools and the stub flag (bead ar-fgyq §6).
+        """
+
+        return self._audience_planners.get(campaign_id)
 
     # ------------------------------------------------------------------
     # Internal helpers

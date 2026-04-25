@@ -41,7 +41,18 @@ def _create_execution_tools(client: OpenDirectClient) -> list[Any]:
 
 
 def _create_audience_tools() -> list[Any]:
-    """Create audience planning tools."""
+    """Create the three UCP audience planning tools.
+
+    NOTE: As of proposal §5.3 / bead ar-fgyq, these tools are owned by the
+    Audience Planner agent (`agents/level3/audience_planner_agent.py`), not
+    by the Research Agent. The Research Agent operates on inventory; the
+    Audience Planner owns audience composition, discovery, matching, and
+    coverage estimation. This helper is kept here so the planner factory
+    in `pipelines/campaign_pipeline.py` can build the same three-tool
+    bundle, and so existing tests that assert "the bundle is these three
+    classes" continue to pass at the bundle level (just no longer attached
+    to the Research Agent's `tools` list).
+    """
     return [
         AudienceDiscoveryTool(),
         AudienceMatchingTool(),
@@ -94,13 +105,15 @@ def create_branding_crew(
         Configured Branding Crew
     """
     # Create tools
+    # NOTE (ar-fgyq / proposal §5.3): audience tools moved off the
+    # Research Agent and onto the Audience Planner upstream in
+    # CampaignPipeline. Research Agent now operates on inventory only.
     research_tools = _create_research_tools(client)
     execution_tools = _create_execution_tools(client)
-    audience_tools = _create_audience_tools()
 
     # Create agents with tools
     branding_agent = create_branding_agent()
-    research_agent = create_research_agent(tools=research_tools + audience_tools)
+    research_agent = create_research_agent(tools=research_tools)
     execution_agent = create_execution_agent(tools=execution_tools)
 
     # Format audience context
@@ -193,13 +206,14 @@ def create_mobile_crew(
         Configured Mobile App Crew
     """
     # Create tools
+    # NOTE (ar-fgyq / proposal §5.3): audience tools moved to the
+    # Audience Planner upstream in CampaignPipeline.
     research_tools = _create_research_tools(client)
     execution_tools = _create_execution_tools(client)
-    audience_tools = _create_audience_tools()
 
     # Create agents with tools
     mobile_agent = create_mobile_app_agent()
-    research_agent = create_research_agent(tools=research_tools + audience_tools)
+    research_agent = create_research_agent(tools=research_tools)
     execution_agent = create_execution_agent(tools=execution_tools)
 
     # Format audience context
@@ -266,13 +280,14 @@ def create_ctv_crew(
         Configured CTV Crew
     """
     # Create tools
+    # NOTE (ar-fgyq / proposal §5.3): audience tools moved to the
+    # Audience Planner upstream in CampaignPipeline.
     research_tools = _create_research_tools(client)
     execution_tools = _create_execution_tools(client)
-    audience_tools = _create_audience_tools()
 
     # Create agents with tools
     ctv_agent = create_ctv_agent()
-    research_agent = create_research_agent(tools=research_tools + audience_tools)
+    research_agent = create_research_agent(tools=research_tools)
     execution_agent = create_execution_agent(tools=execution_tools)
 
     # Format audience context
@@ -339,13 +354,14 @@ def create_performance_crew(
         Configured Performance Crew
     """
     # Create tools
+    # NOTE (ar-fgyq / proposal §5.3): audience tools moved to the
+    # Audience Planner upstream in CampaignPipeline.
     research_tools = _create_research_tools(client)
     execution_tools = _create_execution_tools(client)
-    audience_tools = _create_audience_tools()
 
     # Create agents with tools
     performance_agent = create_performance_agent()
-    research_agent = create_research_agent(tools=research_tools + audience_tools)
+    research_agent = create_research_agent(tools=research_tools)
     execution_agent = create_execution_agent(tools=execution_tools)
 
     # Format audience context
