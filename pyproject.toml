@@ -81,3 +81,6 @@ strict = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "agentcore: tests that invoke a deployed AgentCore runtime (require AWS credentials)",
+]
