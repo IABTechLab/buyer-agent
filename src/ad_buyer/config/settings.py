@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
 
+    # Feature flag (proposal §6 row 15 / wire-format spec §9):
+    # When True, the buyer's OpenRTB builder emits the temporary
+    # `user.ext.iab_agentic_audiences.refs[]` extension carrying agentic
+    # audience refs. Default off until IAB ratifies an extension shape;
+    # see the 90-day dual-emit migration policy in the wire-format spec.
+    enable_agentic_openrtb_ext: bool = False
+
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,
         "env_file_encoding": "utf-8",
