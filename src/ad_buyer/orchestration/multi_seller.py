@@ -45,6 +45,7 @@ from ..models.deals import (
     QuoteResponse,
 )
 from ..registry.models import AgentCard, TrustLevel
+from ..storage import audience_audit_log
 from .audience_degradation import (
     CannotFulfillPlan,
     DegradationLog,
@@ -743,6 +744,22 @@ class MultiSellerOrchestrator:
             # the block).
             unsupported = list(exc.unsupported)
 
+            # Surface the seller's structured rejection into the audit trail
+            # (proposal §13a). Keyed by the plan id so a reviewer can pull
+            # this event alongside the matching `degradation` entry.
+            if audience_plan is not None:
+                audience_audit_log.log_event(
+                    plan_id=audience_plan.audience_plan_id,
+                    event_type=audience_audit_log.EVENT_CAPABILITY_REJECTION,
+                    payload={
+                        "seller_id": seller_id,
+                        "quote_id": quote_id,
+                        "unsupported": unsupported,
+                        "error_code": exc.error_code,
+                        "status_code": exc.status_code,
+                    },
+                )
+
         # Synthesize what the seller doesn't support, run degradation, retry.
         try:
             caps = synthesize_capabilities_from_unsupported(unsupported)
@@ -751,6 +768,22 @@ class MultiSellerOrchestrator:
             )
         except CannotFulfillPlan as cfp:
             # Degradation stripped the primary -- no usable plan to retry.
+            # Record the would-be degradation log so the audit trail still
+            # captures what was attempted before the seller was marked
+            # incompatible (proposal §13a).
+            if cfp.log:
+                audience_audit_log.log_event(
+                    plan_id=audience_plan.audience_plan_id,
+                    event_type=audience_audit_log.EVENT_DEGRADATION,
+                    payload={
+                        "seller_id": seller_id,
+                        "quote_id": quote_id,
+                        "deal_id": None,
+                        "outcome": "cannot_fulfill",
+                        "reason": cfp.reason,
+                        "log": [entry.model_dump(mode="json") for entry in cfp.log],
+                    },
+                )
             raise _SellerIncompatibleForCampaign(
                 f"Cannot reconcile audience_plan with seller {seller_id}: "
                 f"{cfp.reason}"
@@ -777,6 +810,25 @@ class MultiSellerOrchestrator:
             seller_id,
             len(degradation_log),
         )
+
+        # Audit-trail entry for the degradation that produced the retry.
+        # We key the entry by the ORIGINAL plan id (what the user briefed)
+        # rather than the degraded plan's id so a reviewer can find every
+        # event for a campaign by looking up the planner's plan id. The
+        # degraded plan id is recorded in the payload for traceability.
+        if degradation_log:
+            audience_audit_log.log_event(
+                plan_id=audience_plan.audience_plan_id,
+                event_type=audience_audit_log.EVENT_DEGRADATION,
+                payload={
+                    "seller_id": seller_id,
+                    "quote_id": quote_id,
+                    "deal_id": deal.deal_id,
+                    "degraded_plan_id": degraded_plan.audience_plan_id,
+                    "log": [entry.model_dump(mode="json") for entry in degradation_log],
+                },
+            )
+
         return deal, degradation_log
 
     # ------------------------------------------------------------------
