@@ -247,7 +247,7 @@ The planner mixes types freely --- a Standard primary narrowed by a Contextual c
 |------|--------|
 | Temperature | 0.3 (balanced for strategic recommendations) |
 | Signals (agentic) | Identity (hashed IDs, device graphs), Contextual (page content, keywords), Reinforcement (feedback loops, conversion data) |
-| Embeddings | 256--1024 dim, cosine similarity |
+| Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-dim) for local; advertiser-supplied vectors accepted verbatim (256--1024 dim); mock SHA256-seeded fallback for CI. Mode controlled by `EMBEDDING_MODE` env var (default: `hybrid`). |
 | Threshold | Score > 0.7 = strong match |
 | Wire format | `application/vnd.ucp.embedding+json; v=1` (alias: `application/vnd.iab.agentic-audiences+json; v=1`) |
 
@@ -257,7 +257,18 @@ The planner mixes types freely --- a Standard primary narrowed by a Contextual c
 - `AudienceDiscoveryTool` --- query sellers for available segments matching a ref
 - `AudienceMatchingTool` --- score a candidate `AudienceRef` against seller capabilities
 - `CoverageEstimationTool` --- project unique reach for a composed plan
-- `EmbeddingMintTool` --- mint or reference an Agentic embedding (mock generator at present; real model tracked separately)
+- `EmbeddingMintTool` --- mint or reference an Agentic embedding. Honors `EMBEDDING_MODE` (`mock` | `local` | `advertiser` | `hybrid`) per the [Embedding Strategy](../../../../docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md) decision in the agent_range parent repo.
+
+#### Embedding provenance
+
+Every agentic `AudienceRef` carries `compliance_context.embedding_provenance` so downstream consumers know where the bytes came from:
+
+- `local_buyer` --- buyer's local sentence-transformers model
+- `advertiser_supplied` --- advertiser provided the vector verbatim
+- `hosted_external` --- third-party hosted embedding service (not enabled by default)
+- `mock` --- deterministic SHA256-seeded fallback for CI / demos
+
+This is the forensic anchor for cross-repo wire correlation and unblocks future privacy-regime fan-out (see the consent surface review at `docs/reports/CONSENT_SURFACE_REVIEW_2026-04-25.md` in the agent_range parent repo).
 
 #### Where the plan goes
 
