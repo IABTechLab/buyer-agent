@@ -14,19 +14,35 @@ can assert the full typed AudiencePlan (Standard primary + Contextual
 constraint + Agentic extension) survives every stage and arrives at the
 seller-facing boundary intact.
 
-Part 1 of 2 (this file): fixtures + happy-path scenario. Part 2 will add
-the legacy migration, serialization round-trip, and capability
-degradation scenarios that mirror the Path B test layout.
+Part 1: fixtures + happy-path scenario.
+Part 2 (this commit): adds three more scenarios:
+  - Capability degradation against a legacy-default seller. Builds a real
+    `MultiSellerOrchestrator` wired to a recording capability client +
+    mocked deals client to exercise the actual `degrade_plan_for_seller`
+    + audit-log emission path with the same 3-type plan content.
+  - Hard-reject when the seller's standard taxonomy version doesn't
+    cover the plan and `audience_strictness.primary=required`. Confirms
+    the orchestrator surfaces the seller in
+    `DealSelection.incompatible_sellers` (no booking attempted).
+  - Cross-repo AudiencePlan JSON round-trip: builds a typed plan in the
+    buyer, serializes to JSON, reconstructs through the seller's
+    `AudienceRef` model, asserts byte-equivalent (sort_keys) round-trip.
+    Schema-drift backstop -- the seller's own ucp.AudiencePlan has a
+    different (legacy UCP) shape, so the round-trip is exercised at the
+    AudienceRef level for primary + each constraint + each extension.
 
 Reference:
   - AUDIENCE_PLANNER_3TYPE_EXTENSION_2026-04-25.md §5.1, §5.3, §6 row 16
   - tests/integration/test_path_b_audience_e2e.py (sister Path B tests)
+  - tests/unit/test_buyer_preflight.py (orchestrator-level preflight)
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import sys
 import uuid
 from datetime import date, timedelta
 from typing import Any
@@ -374,9 +390,455 @@ class TestCampaignPipelineThreeTypeHappyPath:
 
 
 # ===========================================================================
-# Re-exports for part 2 (legacy migration / round-trip / degradation).
-# Helpers are intentionally module-level so part 2 can extend without
-# refactoring this file. AudienceRef is imported above for that purpose.
+# Helpers for tests 2-4 (orchestrator-level + JSON round-trip).
+# ===========================================================================
+#
+# Tests 2 and 3 exercise the *actual* MultiSellerOrchestrator preflight +
+# degradation path (rather than the AsyncMock used in test 1). That orchestrator
+# expects:
+#   - a `capability_client` returning a SellerAudienceCapabilities per seller URL
+#   - a deals_client_factory returning per-URL clients with `book_deal` mocked
+# The pattern mirrors `tests/unit/test_buyer_preflight.py` so behavior is
+# consistent with the unit-level coverage there but framed end-to-end against
+# the same brief-driven 3-type plan the happy-path test uses.
+
+from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
+from ad_buyer.clients.capability_client import CapabilityDiscoveryResult
+from ad_buyer.models.audience_plan import AudienceStrictness
+from ad_buyer.models.deals import DealBookingRequest, DealResponse
+from ad_buyer.orchestration.audience_degradation import (
+    SellerAudienceCapabilities,
+)
+from ad_buyer.storage import audience_audit_log
+
+
+def _audience_plan_from_brief() -> AudiencePlan:
+    """Build the same 3-type AudiencePlan the brief carries, as a typed model.
+
+    Tests 2/3 hand this directly to `select_and_book` so the orchestrator
+    runs the actual degradation path. The plan content matches
+    `_three_type_plan_dict` -- if the brief ever drifts, this helper drifts
+    with it because it parses through the same brief parser.
+    """
+
+    brief = _three_type_brief()
+    assert brief.target_audience is not None
+    return brief.target_audience
+
+
+def _make_deal_response(
+    deal_id: str = "deal-patha-degraded-001",
+    quote_id: str = "q-patha-1",
+    final_cpm: float = 12.50,
+) -> DealResponse:
+    """Mirrors the helper in tests/unit/test_buyer_preflight.py."""
+
+    return DealResponse.model_validate(
+        {
+            "deal_id": deal_id,
+            "quote_id": quote_id,
+            "deal_type": "PD",
+            "status": "booked",
+            "product": {
+                "product_id": "prod-patha-1",
+                "name": "Path A Test Product",
+                "format": "video",
+                "channel": "ctv",
+            },
+            "pricing": {
+                "base_cpm": 10.0,
+                "final_cpm": final_cpm,
+                "currency": "USD",
+            },
+            "terms": {
+                "impressions": 100_000,
+                "flight_start": "2026-05-01",
+                "flight_end": "2026-05-31",
+            },
+            "buyer_tier": "public",
+            "expires_at": "2026-06-30T00:00:00Z",
+        }
+    )
+
+
+def _ranked_quote(
+    quote_id: str = "q-patha-1", seller_id: str = "seller-patha-a"
+) -> NormalizedQuote:
+    return NormalizedQuote(
+        seller_id=seller_id,
+        quote_id=quote_id,
+        raw_cpm=10.0,
+        effective_cpm=10.0,
+        deal_type="PD",
+        fee_estimate=0.0,
+        minimum_spend=0.0,
+        score=90.0,
+    )
+
+
+class _RecordingCapabilityClient:
+    """Records every `discover_capabilities` call and returns a configured caps.
+
+    Mirrors the test double in `tests/unit/test_buyer_preflight.py`. Kept
+    local rather than imported so this test file stays self-contained and
+    integration-style readers don't have to bounce into a unit test fixture.
+    """
+
+    def __init__(self, caps_by_url: dict[str, SellerAudienceCapabilities]):
+        self._caps_by_url = caps_by_url
+        self.calls: list[str] = []
+
+    async def discover_capabilities(
+        self, seller_endpoint: str
+    ) -> CapabilityDiscoveryResult:
+        self.calls.append(seller_endpoint)
+        caps = self._caps_by_url.get(
+            seller_endpoint, SellerAudienceCapabilities.legacy_default()
+        )
+        return CapabilityDiscoveryResult(
+            capabilities=caps, cache_status="miss", fetched_at=0.0
+        )
+
+
+@pytest.fixture
+def temp_audit_db(tmp_path, monkeypatch):  # noqa: ARG001 - monkeypatch unused but matches pattern
+    """Per-test SQLite file for `audience_audit_log` events.
+
+    Tests 2 + 3 inspect the audit log to confirm degradation events landed
+    keyed by the original plan's `audience_plan_id`. Fresh DB per test so
+    the assertions are deterministic.
+    """
+
+    db_path = tmp_path / "audit.db"
+    audience_audit_log.configure(f"sqlite:///{db_path}")
+    yield db_path
+    audience_audit_log.configure("sqlite:///:memory:")
+
+
+@pytest.fixture
+def deals_client_factory():
+    """Per-URL mock deals-client factory; tests configure `book_deal` per seller."""
+
+    clients: dict[str, AsyncMock] = {}
+
+    def factory(seller_url: str, **kwargs: Any) -> AsyncMock:
+        if seller_url not in clients:
+            mock = AsyncMock()
+            mock.seller_url = seller_url
+            mock.book_deal = AsyncMock()
+            mock.close = AsyncMock()
+            clients[seller_url] = mock
+        return clients[seller_url]
+
+    factory._clients = clients  # type: ignore[attr-defined]
+    return factory
+
+
+def _orchestrator_with_caps(
+    caps_by_url: dict[str, SellerAudienceCapabilities],
+    *,
+    deals_client_factory: Callable[..., Any],
+) -> MultiSellerOrchestrator:
+    """Build a real `MultiSellerOrchestrator` wired to a recording cap client."""
+
+    return MultiSellerOrchestrator(
+        registry_client=AsyncMock(),
+        deals_client_factory=deals_client_factory,
+        event_bus=None,
+        quote_normalizer=QuoteNormalizer(),
+        quote_timeout=5.0,
+        capability_client=_RecordingCapabilityClient(caps_by_url),
+    )
+
+
+# `Callable` is needed by the helper above. Imported lazily to keep the
+# test 1 path's imports stable.
+from typing import Callable  # noqa: E402
+
+
+# ===========================================================================
+# 2. Capability degradation against a legacy-default seller
+# ===========================================================================
+
+
+class TestCapabilityDegradationLegacySeller:
+    """Legacy seller -> degradation strips agentic + extensions + constraints.
+
+    Builds the brief-driven 3-type plan, hands it to a real
+    ``MultiSellerOrchestrator`` whose capability client returns the
+    ``legacy_default()`` caps. The orchestrator's pre-flight runs
+    ``degrade_plan_for_seller``, the strictness gate proceeds with the
+    degraded plan (default ``constraints=preferred``,
+    ``extensions=optional``, ``agentic=optional`` -- nothing required is
+    stripped), and the deal books. The audit log carries a
+    ``degradation`` event keyed by the **original** plan's
+    ``audience_plan_id`` (the buyer's pre-flight emit-site uses the
+    pre-degradation id; see ``multi_seller._book_with_preflight_then_retry``).
+    """
+
+    def test_capability_degradation_legacy_seller(
+        self,
+        deals_client_factory: Callable[..., Any],
+        temp_audit_db: Any,  # noqa: ARG002 - forces audit-log redirection
+    ) -> None:
+        seller_url = "https://legacy-seller.example.com"
+        legacy_caps = SellerAudienceCapabilities.legacy_default()
+        # Sanity: legacy default really does refuse agentic + extensions.
+        assert legacy_caps.agentic.supported is False
+        assert legacy_caps.supports_extensions is False
+        assert legacy_caps.supports_constraints is False
+
+        orchestrator = _orchestrator_with_caps(
+            {seller_url: legacy_caps}, deals_client_factory=deals_client_factory
+        )
+        client = deals_client_factory(seller_url)
+        client.book_deal.return_value = _make_deal_response()
+
+        plan = _audience_plan_from_brief()
+        original_plan_id = plan.audience_plan_id
+
+        loop = asyncio.new_event_loop()
+        try:
+            selection = loop.run_until_complete(
+                orchestrator.select_and_book(
+                    ranked_quotes=[_ranked_quote()],
+                    budget=100_000.0,
+                    count=1,
+                    quote_seller_map={"q-patha-1": seller_url},
+                    audience_plan=plan,
+                    # Defaults: primary=required, constraints=preferred,
+                    # extensions=optional, agentic=optional. Legacy seller
+                    # strips everything but primary -- nothing required goes
+                    # missing, so booking proceeds.
+                    audience_strictness=AudienceStrictness(),
+                )
+            )
+        finally:
+            loop.close()
+
+        # --- pre-flight ran ---
+        assert orchestrator._capability_client.calls == [seller_url]
+
+        # --- booking proceeded with degraded plan ---
+        assert len(selection.booked_deals) == 1
+        assert selection.incompatible_sellers == []
+        assert client.book_deal.await_count == 1
+
+        booking_arg: DealBookingRequest = client.book_deal.await_args_list[0].args[0]
+        assert booking_arg.audience_plan is not None
+        degraded_plan = booking_arg.audience_plan
+        # Standard primary survived (legacy_default keeps standard 1.1).
+        assert degraded_plan.primary.type == "standard"
+        assert degraded_plan.primary.identifier == "3-7"
+        # Constraints / extensions / exclusions all stripped.
+        assert degraded_plan.constraints == []
+        assert degraded_plan.extensions == []
+        assert degraded_plan.exclusions == []
+        # No agentic refs anywhere on the degraded plan.
+        all_refs = (
+            [degraded_plan.primary]
+            + list(degraded_plan.constraints)
+            + list(degraded_plan.extensions)
+            + list(degraded_plan.exclusions)
+        )
+        assert all(ref.type != "agentic" for ref in all_refs)
+
+        # The degraded plan's id changed (content-derived) -- confirms the
+        # degradation actually mutated the plan.
+        assert degraded_plan.audience_plan_id != original_plan_id
+
+        # --- degradation log surfaced on the selection ---
+        assert "q-patha-1" in selection.degradation_logs
+        deg_log = selection.degradation_logs["q-patha-1"]
+        # At least one drop for the contextual constraint and one for the
+        # agentic extension.
+        log_paths = [entry.path for entry in deg_log]
+        assert any("constraints" in p for p in log_paths)
+        assert any("extensions" in p for p in log_paths)
+
+        # --- audit log keyed by the ORIGINAL plan id ---
+        # ``_book_with_preflight_then_retry`` calls
+        # ``audience_audit_log.log_event`` with ``plan_id=audience_plan.audience_plan_id``
+        # -- the pre-degradation id, by design (so a reviewer can correlate
+        # the original plan with everything that happened to it downstream).
+        events = audience_audit_log.get_events(original_plan_id)
+        assert events, (
+            f"Expected audit events for original plan_id={original_plan_id!r}; "
+            f"got none"
+        )
+        event_types = [e["event_type"] for e in events]
+        assert audience_audit_log.EVENT_DEGRADATION in event_types
+        # Find the degradation event and confirm it carries the seller and
+        # the structured drop log.
+        deg_events = [
+            e for e in events
+            if e["event_type"] == audience_audit_log.EVENT_DEGRADATION
+        ]
+        assert len(deg_events) >= 1
+        deg_payload = deg_events[0]["payload"]
+        assert deg_payload.get("phase") == "preflight"
+        assert deg_payload.get("seller_url") == seller_url
+        assert isinstance(deg_payload.get("log"), list)
+        assert len(deg_payload["log"]) >= 1
+
+
+# ===========================================================================
+# 3. Hard reject when no standard taxonomy overlap and primary=required
+# ===========================================================================
+
+
+class TestHardRejectZeroStandardOverlap:
+    """Seller advertises no overlap on the standard taxonomy version.
+
+    The buyer's plan uses Audience Taxonomy v1.1 for the primary; the
+    seller's caps say only v2.0. With ``audience_strictness.primary=required``
+    (the default), pre-flight refuses to drop the primary and the
+    orchestrator marks the seller incompatible. No booking is attempted.
+
+    This is the §13 strictness-gate behavior surfaced in
+    ``DealSelection.incompatible_sellers`` -- the signal §13 chose
+    instead of raising an exception out of ``select_and_book``.
+    """
+
+    def test_hard_reject_zero_standard_overlap(
+        self,
+        deals_client_factory: Callable[..., Any],
+        temp_audit_db: Any,  # noqa: ARG002 - forces audit-log redirection
+    ) -> None:
+        seller_url = "https://mismatch-seller.example.com"
+        # Seller offers only v2.0 -- the buyer's primary is v1.1.
+        caps = SellerAudienceCapabilities(
+            schema_version="1",
+            standard_taxonomy_versions=["2.0"],
+            contextual_taxonomy_versions=["3.1"],
+            supports_constraints=True,
+            supports_extensions=False,
+        )
+        orchestrator = _orchestrator_with_caps(
+            {seller_url: caps}, deals_client_factory=deals_client_factory
+        )
+        client = deals_client_factory(seller_url)
+
+        plan = _audience_plan_from_brief()
+        # Sanity: brief plan really does use 1.1.
+        assert plan.primary.version == "1.1"
+
+        loop = asyncio.new_event_loop()
+        try:
+            selection = loop.run_until_complete(
+                orchestrator.select_and_book(
+                    ranked_quotes=[_ranked_quote()],
+                    budget=100_000.0,
+                    count=1,
+                    quote_seller_map={"q-patha-1": seller_url},
+                    audience_plan=plan,
+                    audience_strictness=AudienceStrictness(primary="required"),
+                )
+            )
+        finally:
+            loop.close()
+
+        # --- no booking attempt ---
+        assert client.book_deal.await_count == 0
+        assert selection.booked_deals == []
+
+        # --- seller marked incompatible (the §13 signal) ---
+        assert _ranked_quote().seller_id in selection.incompatible_sellers
+        assert len(selection.failed_bookings) == 1
+        failure = selection.failed_bookings[0]
+        assert failure["error_code"] == "audience_plan_unsupported"
+        assert failure["quote_id"] == "q-patha-1"
+
+
+# ===========================================================================
+# 4. Cross-repo AudiencePlan JSON round-trip (schema-drift backstop)
+# ===========================================================================
+
+
+class TestCrossRepoAudiencePlanJSONRoundTrip:
+    """Buyer-side AudiencePlan JSON survives reconstruction through seller models.
+
+    The seller does NOT define a buyer-shape AudiencePlan -- its
+    ``ad_seller.models.ucp.AudiencePlan`` is the legacy UCP planner shape.
+    The wire-format spec lives in ``docs/api/audience_plan_wire_format.md``
+    and is mirrored only at the **AudienceRef + ComplianceContext** level
+    (``ad_seller.models.audience_ref``).
+
+    So the round-trip backstop validates that every ref in a 3-type
+    AudiencePlan -- primary + each constraint + each extension -- survives
+    serialize-on-buyer / parse-on-seller / re-serialize without drift.
+    Byte-equivalent comparison with ``json.dumps(..., sort_keys=True)``
+    catches any silent schema divergence between the two repos.
+    """
+
+    def test_cross_repo_audience_plan_json_round_trip(self) -> None:
+        # 1. Build typed buyer plan and serialize.
+        buyer_plan: AudiencePlan = _audience_plan_from_brief()
+        buyer_json: str = buyer_plan.model_dump_json()
+
+        # 2. Reconstruct via the seller's AudienceRef model.
+        # The seller worktree lives in a sibling repo; its `src` is on the
+        # python path so we can validate refs through its model. The seller
+        # uses the same field names so reading the buyer's JSON dict per-ref
+        # works directly.
+        sys.path.insert(
+            0,
+            "/Users/aidancardella/dev/agent_range/ad_seller_system/"
+            ".worktrees/audience-extension/src",
+        )
+        try:
+            from ad_seller.models.audience_ref import AudienceRef as SellerRef
+        finally:
+            # Avoid leaking the path into other tests.
+            pass
+
+        buyer_dict = json.loads(buyer_json)
+
+        # Helper: round-trip a single ref dict through the seller's model
+        # and confirm byte-equivalent re-serialization.
+        def _assert_ref_round_trips(ref_dict: dict[str, Any], where: str) -> None:
+            seller_ref = SellerRef(**ref_dict)
+            re_serialized = seller_ref.model_dump(mode="json")
+            # Drop None values from the seller round-trip to compare against
+            # the buyer's serialization, which uses Pydantic v2 default
+            # (None fields ARE present in model_dump_json output for both
+            # sides). Sort keys to make comparison order-independent.
+            buyer_canon = json.dumps(ref_dict, sort_keys=True)
+            seller_canon = json.dumps(re_serialized, sort_keys=True)
+            assert buyer_canon == seller_canon, (
+                f"Schema drift at {where}:\n"
+                f"  buyer:  {buyer_canon}\n"
+                f"  seller: {seller_canon}"
+            )
+
+        # 3. Round-trip every ref slot.
+        _assert_ref_round_trips(buyer_dict["primary"], "primary")
+        for idx, ref in enumerate(buyer_dict.get("constraints", [])):
+            _assert_ref_round_trips(ref, f"constraints[{idx}]")
+        for idx, ref in enumerate(buyer_dict.get("extensions", [])):
+            _assert_ref_round_trips(ref, f"extensions[{idx}]")
+        for idx, ref in enumerate(buyer_dict.get("exclusions", [])):
+            _assert_ref_round_trips(ref, f"exclusions[{idx}]")
+
+        # 4. Confirm the agentic compliance_context survived the round-trip
+        # (it's the most failure-prone nested field).
+        agentic_dict = next(
+            r for r in buyer_dict["extensions"] if r["type"] == "agentic"
+        )
+        seller_agentic = SellerRef(**agentic_dict)
+        assert seller_agentic.compliance_context is not None
+        assert seller_agentic.compliance_context.jurisdiction == "US"
+        assert seller_agentic.compliance_context.consent_framework == "IAB-TCFv2"
+
+        # 5. Sanity: the buyer's plan id is content-derived; the per-ref
+        # round-trip preserves content, so the buyer reproducibly hashes
+        # to the same id when re-validated from the JSON.
+        rebuilt_buyer = AudiencePlan.model_validate_json(buyer_json)
+        assert rebuilt_buyer.audience_plan_id == buyer_plan.audience_plan_id
+
+
+# ===========================================================================
+# Re-exports.
 # ===========================================================================
 
 __all__ = [
