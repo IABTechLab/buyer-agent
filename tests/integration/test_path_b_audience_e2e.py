@@ -402,7 +402,7 @@ class TestBuyerDealFlowSerializationParity:
         all break.
         """
 
-        from ad_buyer.tools.dsp.request_deal import RequestDealTool
+        from ad_buyer.tools.buyer_deals.request_deal import RequestDealTool
 
         # Real RequestDealTool so we exercise build_deal_request_payload
         # end to end -- the same code path the flow uses.

@@ -309,7 +309,7 @@ class TestAudiencePlanCrossesSellerBoundary:
     ) -> None:
         """The seller-bound DealRequest payload must carry the plan."""
 
-        from ad_buyer.tools.dsp.request_deal import RequestDealTool
+        from ad_buyer.tools.buyer_deals.request_deal import RequestDealTool
 
         # Real tool so we exercise build_deal_request_payload end to end.
         tool = RequestDealTool(
@@ -342,7 +342,7 @@ class TestAudiencePlanCrossesSellerBoundary:
     ) -> None:
         """No plan supplied -> DealRequest carries audience_plan=None."""
 
-        from ad_buyer.tools.dsp.request_deal import RequestDealTool
+        from ad_buyer.tools.buyer_deals.request_deal import RequestDealTool
 
         tool = RequestDealTool(
             client=mock_unified_client,
