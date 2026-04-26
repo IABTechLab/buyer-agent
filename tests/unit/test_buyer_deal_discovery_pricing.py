@@ -1,18 +1,18 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Comprehensive tests for DSP discovery and pricing flows.
+"""Comprehensive tests for buyer deal discovery and pricing flows.
 
 Covers:
 - DiscoverInventoryTool: filters, formatting, edge cases
 - GetPricingTool: tier calculations, volume discounts, cost projections
 - RequestDealTool: deal creation, negotiation, validation, deal ID generation
 - BuyerDealFlow: state machine, flow steps, error propagation
-- UnifiedClient DSP methods: discover_inventory, get_pricing, request_deal
+- UnifiedClient buyer deal methods: discover_inventory, get_pricing, request_deal
 - Cross-tier pricing consistency across tools and client
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,7 +32,7 @@ from ad_buyer.models.buyer_identity import (
     DealResponse,
     DealType,
 )
-from ad_buyer.tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
 # =============================================================================
 # Shared fixtures
@@ -740,8 +740,8 @@ class TestRequestDealOutput:
         assert match is not None, f"Expected DEAL-XXXXXXXX in output: {result}"
 
     @pytest.mark.asyncio
-    async def test_deal_includes_all_dsp_platforms(self, mock_client, agency_context):
-        """Deal should include activation instructions for all major DSPs."""
+    async def test_deal_includes_all_buyer_platforms(self, mock_client, agency_context):
+        """Deal should include activation instructions for all major buyer platforms."""
         mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
@@ -770,10 +770,7 @@ class TestRequestDealOutput:
         mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
-        # Production code uses datetime.now(timezone.utc) — match it here
-        # so the test stays green when run after local-time midnight crosses
-        # UTC midnight (E2-7's UAT flagged this; ar-szs0).
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now().strftime("%Y-%m-%d")
         assert today in result
 
     @pytest.mark.asyncio
@@ -966,7 +963,7 @@ class TestBuyerDealFlowInit:
     """Tests for BuyerDealFlow initialization."""
 
     def test_flow_creates_all_tools(self, mock_client, agency_context):
-        """Flow should initialize all three DSP tools."""
+        """Flow should initialize all three buyer deal tools."""
         flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         assert flow._discover_tool is not None
         assert flow._pricing_tool is not None
@@ -1149,12 +1146,12 @@ class TestBuyerDealFlowStatus:
 
 
 # =============================================================================
-# UnifiedClient DSP methods
+# UnifiedClient buyer deal methods
 # =============================================================================
 
 
-class TestUnifiedClientDSPMethods:
-    """Test DSP-specific methods on UnifiedClient."""
+class TestUnifiedClientBuyerDealMethods:
+    """Test buyer deal-specific methods on UnifiedClient."""
 
     def test_set_buyer_identity(self, advertiser_identity):
         """set_buyer_identity should store the identity."""

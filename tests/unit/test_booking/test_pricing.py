@@ -6,8 +6,8 @@
 These tests verify that the PricingCalculator produces identical results
 to the duplicated pricing logic previously in:
 - unified_client.py (get_pricing, request_deal)
-- tools/dsp/request_deal.py (_create_deal_response)
-- tools/dsp/get_pricing.py (_format_pricing)
+- tools/buyer_deals/request_deal.py (_create_deal_response)
+- tools/buyer_deals/get_pricing.py (_format_pricing)
 """
 
 import pytest

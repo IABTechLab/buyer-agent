@@ -36,7 +36,7 @@ flowchart LR
 The buyer supports two distinct entry points depending on your use case:
 
 - **DealBookingFlow** (campaign flow) --- The full multi-channel path. Starts from a campaign brief, allocates budget, researches across channels in parallel, builds recommendations, and books multiple deals after approval. This is the primary workflow for campaign managers.
-- **DSPDealFlow** (deal flow) --- The lightweight single-deal path. Discovers inventory and books one deal directly. Designed for programmatic DSP integration where the campaign planning happens externally.
+- **BuyerDealFlow** (deal flow) --- The lightweight single-deal path. Discovers inventory and books one deal directly. Designed for programmatic DSP integration where the campaign planning happens externally.
 
 Both flows share the same [deal state machine](../state-machines/order-lifecycle.md), [event bus](../event-bus/overview.md), and DealStore persistence. For architectural details, see [Architecture Overview](../architecture/overview.md).
 

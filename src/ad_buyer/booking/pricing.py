@@ -5,8 +5,8 @@
 
 Extracts the duplicated pricing logic from:
 - unified_client.py (get_pricing, request_deal methods)
-- tools/dsp/request_deal.py (_create_deal_response)
-- tools/dsp/get_pricing.py (_format_pricing)
+- tools/buyer_deals/request_deal.py (_create_deal_response)
+- tools/buyer_deals/get_pricing.py (_format_pricing)
 
 Pricing tiers:
     Public:     0% discount

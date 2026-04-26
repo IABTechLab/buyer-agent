@@ -23,7 +23,7 @@ This guide covers everything needed to run the buyer agent in any environment �
 
 - Python 3.11 or later (3.12 recommended)
 - `pip` or `uv`
-- An LLM API key (Anthropic, OpenAI, or any litellm-supported provider)
+- An LLM API key (Anthropic, OpenAI, Gemini, Azure, or Bedrock)
 - Git
 
 ### Install Dependencies
@@ -64,7 +64,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 Full development configuration:
 
 ```dotenv
-# LLM provider (Anthropic default; see litellm docs for others)
+# LLM provider (Anthropic default; install crewai[openai] etc. for others)
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Inbound API key for this service (leave empty to disable auth in dev)
@@ -442,7 +442,7 @@ Authentication is enforced via the `X-API-Key` header. Public paths (`/health`, 
 | `LLM_TEMPERATURE` | `0.3` | Default temperature. Individual agents use tuned values (0.1–0.5). |
 | `LLM_MAX_TOKENS` | `4096` | Maximum token output per LLM call. |
 
-Models use [litellm](https://docs.litellm.ai/) format — `provider/model-name`. Any litellm-supported provider works (OpenAI, Azure, Cohere, Ollama, Vertex AI, Bedrock, etc.):
+Models use `provider/model-name` format with CrewAI's native provider integrations (Anthropic, OpenAI, Gemini, Azure, Bedrock):
 
 ```dotenv
 DEFAULT_LLM_MODEL=openai/gpt-4o

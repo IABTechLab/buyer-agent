@@ -5,9 +5,8 @@ description = "CrewAI-based advertising buyer agent using IAB OpenDirect standar
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "crewai[tools]==1.10.1",
+    "crewai[tools,anthropic]==1.10.1",
     "anthropic>=0.40.0",
-    "litellm>=1.50.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",

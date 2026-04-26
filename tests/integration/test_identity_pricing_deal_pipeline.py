@@ -26,8 +26,8 @@ from ad_buyer.models.buyer_identity import (
     BuyerIdentity,
     DealType,
 )
-from ad_buyer.tools.dsp.get_pricing import GetPricingTool
-from ad_buyer.tools.dsp.request_deal import RequestDealTool
+from ad_buyer.tools.buyer_deals.get_pricing import GetPricingTool
+from ad_buyer.tools.buyer_deals.request_deal import RequestDealTool
 
 
 class TestIdentityToPricingPipeline:

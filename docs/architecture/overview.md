@@ -74,7 +74,7 @@ The Architecture section covers these topics:
 |-------|---------------|
 | **[Agent Hierarchy](agent-hierarchy.md)** | Three-level agent structure: portfolio manager, channel specialists, and tool-level agents |
 | **[Booking Flow](booking-flow.md)** | Detailed sequence diagram of the DealBookingFlow --- the campaign-level orchestration |
-| **[DSP Deal Flow](dsp-deal-flow.md)** | Single-deal flow for direct DSP integration without multi-channel orchestration |
+| **[Buyer Deal Flow](buyer-deal-flow.md)** | Single-deal flow for direct DSP integration without multi-channel orchestration |
 | **[Order State Machine](../state-machines/order-lifecycle.md)** | 12 deal states and 9 campaign states with guard conditions and audit trail |
 | **[Event Bus](../event-bus/overview.md)** | 13 event types providing structured observability across all flows |
 | **[Deal Store](deal-store.md)** | SQLite persistence for deals, events, and session state |
@@ -86,7 +86,7 @@ The Architecture section covers these topics:
 The buyer has two distinct flow entry points, depending on the use case:
 
 - **DealBookingFlow** (campaign flow) --- Starts from a campaign brief. The portfolio manager allocates budget across channels, channel specialists research inventory in parallel, recommendations are built and approved, then deals are booked. This is the multi-channel, orchestrated path.
-- **DSPDealFlow** (deal flow) --- Starts from a single deal request. Discovers inventory, evaluates pricing, and books one deal directly. This is the lightweight, single-deal path used for DSP integration.
+- **BuyerDealFlow** (deal flow) --- Starts from a single deal request. Discovers inventory, evaluates pricing, and books one deal directly. This is the lightweight, single-deal path used for DSP integration.
 
 Both flows share the same deal state machine, event bus, and DealStore persistence --- they differ in scope and orchestration, not in how individual deals are managed.
 
@@ -149,7 +149,7 @@ See also: [Seller Agent Architecture](https://iabtechlab.github.io/seller-agent/
 ## Related
 
 - [Booking Flow](booking-flow.md) --- detailed sequence diagram of the campaign-level DealBookingFlow
-- [DSP Deal Flow](dsp-deal-flow.md) --- single-deal flow for direct DSP integration
+- [Buyer Deal Flow](buyer-deal-flow.md) --- single-deal flow for direct DSP integration
 - [Order State Machine](../state-machines/order-lifecycle.md) --- deal and campaign lifecycle enforcement
 - [Event Bus](../event-bus/overview.md) --- structured observability across all flows
 - [Models](models.md) --- data model reference

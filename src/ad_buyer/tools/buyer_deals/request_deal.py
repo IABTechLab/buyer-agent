@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Deal ID request tool for DSP workflows."""
+"""Deal ID request tool for buyer deal workflows."""
 
 from datetime import datetime, timedelta, timezone
 from typing import Any

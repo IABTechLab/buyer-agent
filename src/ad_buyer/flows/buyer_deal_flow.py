@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""DSP Deal Discovery Flow - workflow for obtaining Deal IDs for programmatic activation.
+"""Buyer Deal Flow - workflow for obtaining Deal IDs for programmatic activation.
 
 Path B of the Audience Planner wiring (proposal §5.3 / bead ar-ts30 §18):
 this flow is the brief-driven counterpart to ``CampaignPipeline``. When a
@@ -21,7 +21,7 @@ from crewai import Crew, Task
 from crewai.flow.flow import Flow, listen, start
 from pydantic import BaseModel, Field
 
-from ..agents.level2.dsp_agent import create_dsp_agent
+from ..agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
 from ..clients.unified_client import UnifiedClient
 from ..models.audience_plan import AudiencePlan
 from ..time_utils import utc_now
@@ -42,13 +42,13 @@ from ..pipelines.audience_planner_step import (
     run_audience_planner_step,
 )
 from ..storage.deal_store import DealStore
-from ..tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+from ..tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 
 logger = logging.getLogger(__name__)
 
 
 class BuyerDealFlowStatus(str, Enum):
-    """Status values for the DSP deal flow."""
+    """Status values for the buyer deal flow."""
 
     INITIALIZED = "initialized"
     REQUEST_RECEIVED = "request_received"
@@ -74,7 +74,7 @@ class DiscoveredProduct(BaseModel):
 
 
 class BuyerDealFlowState(BaseModel):
-    """State model for the DSP deal discovery flow."""
+    """State model for the buyer deal flow."""
 
     # Input
     request: str = Field(default="", description="Natural language deal request")
@@ -150,9 +150,9 @@ class BuyerDealFlowState(BaseModel):
 
 
 class BuyerDealFlow(Flow[BuyerDealFlowState]):
-    """Event-driven flow for DSP deal discovery and Deal ID creation.
+    """Event-driven flow for buyer deal discovery and Deal ID creation.
 
-    This flow enables the DSP use case where:
+    This flow enables the buyer deal use case where:
     1. Buyer discovers available inventory with identity-based pricing
     2. Buyer selects inventory and requests a Deal ID
     3. Deal ID is returned for activation in traditional DSPs
@@ -389,7 +389,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
     def evaluate_and_select(self, discovery_result: dict[str, Any]) -> dict[str, Any]:
         """Evaluate discovered products and select best match.
 
-        In a full implementation, this would use the DSP agent to
+        In a full implementation, this would use the buyer deal specialist agent to
         intelligently select the best product. For now, we use a
         simplified selection based on the first available product.
         """
@@ -400,7 +400,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             self.state.status = BuyerDealFlowStatus.EVALUATING_PRICING
 
             # Create crew for intelligent selection
-            dsp_agent = create_dsp_agent(
+            deal_agent = create_buyer_deal_specialist_agent(
                 tools=[self._discover_tool, self._pricing_tool],
             )
 
@@ -418,11 +418,11 @@ Criteria:
 
 Return the product_id of the best matching product and explain why.""",
                 expected_output="Product ID and selection rationale",
-                agent=dsp_agent,
+                agent=deal_agent,
             )
 
             crew = Crew(
-                agents=[dsp_agent],
+                agents=[deal_agent],
                 tasks=[selection_task],
                 verbose=True,
             )
@@ -598,7 +598,7 @@ async def run_buyer_deal_flow(
     brief: Optional[CampaignBrief] = None,
     audience_plan: Optional[AudiencePlan] = None,
 ) -> dict[str, Any]:
-    """Convenience function to run the DSP deal flow.
+    """Convenience function to run the buyer deal flow.
 
     Args:
         request: Natural language deal request
