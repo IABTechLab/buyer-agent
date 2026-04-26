@@ -32,7 +32,7 @@ from ad_buyer.interfaces.mcp_server import mount_mcp
 mount_mcp(app)  # Creates /mcp/sse
 ```
 
-`mount_mcp` calls `mcp.sse_app()` and mounts the resulting ASGI application under `/mcp/sse`. MCP clients connect to `http://<host>:8001/mcp/sse`.
+`mount_mcp` calls `mcp.sse_app()` and mounts the resulting ASGI application under `/mcp/sse`. Due to Starlette sub-app routing, the FastMCP SSE app exposes its own `/sse` path internally, making the canonical client URL `http://<host>:8001/mcp/sse/sse`. Connecting to bare `/mcp/sse` returns a 307 redirect that most MCP clients cannot follow.
 
 ### Auth middleware note
 
@@ -115,7 +115,7 @@ graph TB
 
     subgraph BuyerAgent["Ad Buyer Agent (port 8001)"]
         FastAPI["FastAPI"]
-        SSE["/mcp/sse<br/>(FastMCP SSE)"]
+        SSE["/mcp/sse/sse<br/>(FastMCP SSE)"]
         Tools["MCP Tool Functions<br/>(12 categories, 40+ tools)"]
         Stores["Store Accessors<br/>DealStore / CampaignStore / OrderStore"]
         DB[(SQLite)]
@@ -137,5 +137,5 @@ graph TB
 
 - [Tools Reference](tools.md) --- CrewAI tools the buyer uses when calling sellers (outbound)
 - [Deal Library](deal-library.md) --- Architecture of the deal library surfaced by the Deal Library tool category
-- [Deal Store](deal-store.md) --- SQLite persistence layer that MCP tools read and write
-- [AI Assistant: Overview](../ai-assistant/overview.md) --- How to connect Claude Desktop or other clients to this server
+- Deal Store (`storage/deal_store.py`) --- SQLite persistence layer that MCP tools read and write
+- AI Assistant tooling (see `ai-assistant/mcp-tools.md` and `ai-assistant/developer-setup.md`) --- How to connect Claude Desktop or other clients to this server

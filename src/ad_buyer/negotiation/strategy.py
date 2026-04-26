@@ -13,6 +13,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from ..time_utils import utc_now
+
 
 class NegotiationContext(BaseModel):
     """Tracks negotiation state passed to strategy methods.
@@ -25,7 +27,7 @@ class NegotiationContext(BaseModel):
     seller_last_price: float
     our_last_offer: float | None = None
     seller_previous_price: float | None = None
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=utc_now)
 
 
 class NegotiationStrategy(ABC):

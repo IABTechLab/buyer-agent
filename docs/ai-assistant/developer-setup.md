@@ -118,7 +118,7 @@ Restart the server after setting `API_KEY`. All incoming MCP requests (from Clau
 
 Give your media buying team:
 
-1. **MCP URL**: `http://your-server:8001/mcp/sse` (or your public URL)
+1. **MCP URL**: `http://your-server:8001/mcp/sse/sse` (or your public URL)
 2. **API key**: the value you set in `API_KEY`
 
 They'll connect Claude Desktop using the [Claude Desktop Setup Guide](../claude-desktop-setup.md) and complete the business configuration (deal templates, approval thresholds, seller API keys) through the interactive setup wizard.
@@ -133,7 +133,7 @@ curl http://localhost:8001/health
 curl http://localhost:8001/api/v1/setup/status
 
 # MCP tools list (requires running SSE client — use Claude Desktop or curl with SSE)
-curl -N http://localhost:8001/mcp/sse
+curl -N http://localhost:8001/mcp/sse/sse
 ```
 
 Expected health response:

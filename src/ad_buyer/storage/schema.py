@@ -449,6 +449,36 @@ SUPPLY_PATH_TEMPLATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_supply_path_templates_name ON supply_path_templates(name);",
 ]
 
+# -- Audience audit log (proposal §5.7 + §6 row 13a) ------------------------
+#
+# Append-only audit trail for audience-plan degradation, capability rejection,
+# and snapshot-honor events. Keyed by `audience_plan_id` (the content hash on
+# `AudiencePlan`) so a human reviewer can reconstruct exactly what was stripped
+# or rejected for a given plan, and correlate buyer-side drops with seller-side
+# rejections via the shared plan id.
+#
+# Schema is intentionally minimal -- structured payload lives in `payload_json`
+# so adding new event types or fields does not require a migration. The
+# composite primary key (plan_id, created_at, event_type) makes inserts safe
+# under high write volume without an autoincrement column. The two indexes
+# support the common query patterns (read all events for a plan, scan recent
+# events across plans).
+
+AUDIENCE_AUDIT_LOG_TABLE = """
+CREATE TABLE IF NOT EXISTS audience_audit_log (
+    plan_id      TEXT NOT NULL,
+    event_type   TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (plan_id, created_at, event_type)
+);
+"""
+
+AUDIENCE_AUDIT_LOG_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_audience_audit_plan_id ON audience_audit_log(plan_id);",
+    "CREATE INDEX IF NOT EXISTS idx_audience_audit_created_at ON audience_audit_log(created_at);",
+]
+
 
 def create_tables(conn: sqlite3.Connection) -> None:
     """Create all tables and indexes if they don't already exist.
@@ -482,6 +512,8 @@ def create_tables(conn: sqlite3.Connection) -> None:
         # v5 template tables
         DEAL_TEMPLATE_TABLE,
         SUPPLY_PATH_TEMPLATE_TABLE,
+        # Audience audit log (additive; idempotent CREATE IF NOT EXISTS)
+        AUDIENCE_AUDIT_LOG_TABLE,
     ]:
         cursor.execute(ddl)
 
@@ -506,6 +538,8 @@ def create_tables(conn: sqlite3.Connection) -> None:
         # v5 template indexes
         DEAL_TEMPLATE_INDEXES,
         SUPPLY_PATH_TEMPLATE_INDEXES,
+        # Audience audit log indexes (idempotent CREATE INDEX IF NOT EXISTS)
+        AUDIENCE_AUDIT_LOG_INDEXES,
     ]:
         for idx in index_list:
             cursor.execute(idx)

@@ -52,6 +52,7 @@ class DealBookingFlow(Flow[BookingState]):
         self,
         client: OpenDirectClient,
         store: DealStore | None = None,
+        **state_kwargs: Any,
     ):
         """Initialize the flow with OpenDirect client and optional persistence.
 
@@ -59,8 +60,12 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
+            **state_kwargs: Initial state field values forwarded to
+                ``Flow.__init__``.  CrewAI 1.10.1 removed the ``state``
+                setter; callers must supply initial state here rather than
+                assigning to ``flow.state`` after construction.
         """
-        super().__init__()
+        super().__init__(**state_kwargs)
         self._client = client
         self._store = store
 

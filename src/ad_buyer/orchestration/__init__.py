@@ -8,6 +8,14 @@ This package contains:
   parallel quote collection, evaluation, and booking.
 """
 
+from .audience_degradation import (
+    CannotFulfillPlan,
+    DegradationLog,
+    DegradationLogEntry,
+    SellerAudienceCapabilities,
+    degrade_plan_for_seller,
+    synthesize_capabilities_from_unsupported,
+)
 from .multi_seller import (
     DealParams,
     DealSelection,
@@ -18,10 +26,16 @@ from .multi_seller import (
 )
 
 __all__ = [
+    "CannotFulfillPlan",
     "DealParams",
     "DealSelection",
+    "DegradationLog",
+    "DegradationLogEntry",
     "InventoryRequirements",
     "MultiSellerOrchestrator",
     "OrchestrationResult",
+    "SellerAudienceCapabilities",
     "SellerQuoteResult",
+    "degrade_plan_for_seller",
+    "synthesize_capabilities_from_unsupported",
 ]

@@ -9,10 +9,10 @@ This guide covers everything needed to run the buyer agent in any environment â€
 1. [Local Development Setup](#local-development-setup)
 2. [Docker Deployment](#docker-deployment)
 3. [AWS Deployment](#aws-deployment)
-4. [Environment Variables & Configuration](#environment-variables--configuration)
-5. [Health Checks & Monitoring](#health-checks--monitoring)
-6. [MCP Server Setup & Connectivity](#mcp-server-setup--connectivity)
-7. [Backup & Recovery](#backup--recovery)
+4. [Environment Variables and Configuration](#environment-variables-and-configuration)
+5. [Health Checks and Monitoring](#health-checks-and-monitoring)
+6. [MCP Server Setup and Connectivity](#mcp-server-setup-and-connectivity)
+7. [Backup and Recovery](#backup-and-recovery)
 8. [Troubleshooting](#troubleshooting)
 
 ---
@@ -86,7 +86,7 @@ ENVIRONMENT=development
 LOG_LEVEL=INFO
 ```
 
-See the [Configuration Reference](#environment-variables--configuration) below for the full variable list.
+See the [Configuration Reference](#environment-variables-and-configuration) below for the full variable list.
 
 ### Run the Development Server
 
@@ -410,7 +410,7 @@ terraform apply -var="container_image_tag=v1.2.0"
 
 ---
 
-## Environment Variables & Configuration
+## Environment Variables and Configuration
 
 All settings are loaded from environment variables or a `.env` file via `pydantic-settings`. Shell environment variables take precedence over `.env` values.
 
@@ -532,7 +532,7 @@ To add additional secrets (seller API keys, service credentials):
 
 ---
 
-## Health Checks & Monitoring
+## Health Checks and Monitoring
 
 ### Health Endpoint
 
@@ -643,7 +643,7 @@ Pacing alert levels:
 
 ---
 
-## MCP Server Setup & Connectivity
+## MCP Server Setup and Connectivity
 
 ### Overview
 
@@ -652,7 +652,7 @@ The buyer agent exposes its own MCP server for external clients (Claude Desktop,
 MCP endpoint:
 
 ```
-http://localhost:8001/mcp/sse
+http://localhost:8001/mcp/sse/sse
 ```
 
 Available tool categories:
@@ -673,7 +673,7 @@ Add the buyer agent to your Claude Desktop MCP configuration (`~/Library/Applica
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8001/mcp/sse"
+        "http://localhost:8001/mcp/sse/sse"
       ]
     }
   }
@@ -690,7 +690,7 @@ Any client supporting Streamable HTTP (SSE) transport can connect:
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-async with streamablehttp_client("http://localhost:8001/mcp/sse") as (read, write, _):
+async with streamablehttp_client("http://localhost:8001/mcp/sse/sse") as (read, write, _):
     async with ClientSession(read, write) as session:
         await session.initialize()
         tools = await session.list_tools()
@@ -733,7 +733,7 @@ If connecting to an external seller:
 
 ---
 
-## Backup & Recovery
+## Backup and Recovery
 
 ### What Needs to Be Backed Up
 
