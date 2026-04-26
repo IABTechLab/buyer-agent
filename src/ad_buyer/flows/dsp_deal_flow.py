@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from ..agents.level2.dsp_agent import create_dsp_agent
 from ..clients.unified_client import UnifiedClient
 from ..models.audience_plan import AudiencePlan
+from ..time_utils import utc_now
 from ..models.buyer_identity import (
     AccessTier,
     BuyerContext,
@@ -144,8 +145,8 @@ class DSPFlowState(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
     # Metadata
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class DSPDealFlow(Flow[DSPFlowState]):
@@ -308,7 +309,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
         self.state.buyer_context = self._buyer_context.model_dump()
 
         self.state.status = DSPFlowStatus.REQUEST_RECEIVED
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = utc_now()
 
         # Emit quote.requested event
         emit_event_sync(
@@ -365,7 +366,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
             # Parse discovery results (simplified - in production would parse structured data)
             # For now, store raw results and let the agent process
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = utc_now()
 
             # Emit inventory.discovered event
             emit_event_sync(
@@ -454,7 +455,7 @@ Return the product_id of the best matching product and explain why.""",
                 )
                 self.state.pricing_details = {"raw": pricing_result}
 
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = utc_now()
 
             return {
                 "status": "success",
@@ -518,7 +519,7 @@ Return the product_id of the best matching product and explain why.""",
             # Store deal response
             self.state.deal_response = {"raw": deal_result}
             self.state.status = DSPFlowStatus.DEAL_CREATED
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = utc_now()
 
             # Persist deal creation status
             self._persist_deal_status("deal_created")

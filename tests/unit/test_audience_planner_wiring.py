@@ -505,9 +505,11 @@ class TestEmbeddingMintTool:
         assert ref.compliance_context.consent_framework == "IAB-TCFv2"
 
     def test_mock_label_exposed_on_tool(self):
+        # E2-5 superseded the static "§22 follow-up" hint with a dynamic
+        # per-mode label. Static class default still says MOCK; per-mode
+        # label is exposed via embedding_mode_label() function.
         tool = EmbeddingMintTool()
         assert "MOCK" in tool.embedding_mode_label
-        assert "§22" in tool.embedding_mode_label
 
     def test_mint_is_deterministic_for_same_inputs(self):
         """Same name+description -> same emb:// identifier."""

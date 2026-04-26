@@ -22,6 +22,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..time_utils import utc_now
+
 
 class EmbeddingType(str, Enum):
     """Types of embeddings that can be exchanged via UCP."""
@@ -145,7 +147,7 @@ class UCPEmbedding(BaseModel):
     context: UCPContextDescriptor | None = Field(default=None, description="Contextual metadata")
     consent: UCPConsent = Field(..., description="Consent information (required)")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utc_now,
         description="When the embedding was generated",
     )
     ttl_seconds: int = Field(
@@ -266,7 +268,7 @@ class AudienceValidationResult(BaseModel):
         description="Additional notes from validation",
     )
     validated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utc_now,
         alias="validatedAt",
         description="Validation timestamp",
     )
@@ -341,7 +343,7 @@ class AudiencePlan(BaseModel):
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utc_now,
         alias="createdAt",
     )
 

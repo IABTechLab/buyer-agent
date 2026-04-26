@@ -9,6 +9,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..time_utils import utc_now
+
 
 class ExecutionStatus(str, Enum):
     """Execution status for the booking flow."""
@@ -132,8 +134,8 @@ class BookingState(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
     # Metadata
-    created_at: datetime = Field(default_factory=datetime.utcnow, alias="createdAt")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, alias="updatedAt")
+    created_at: datetime = Field(default_factory=utc_now, alias="createdAt")
+    updated_at: datetime = Field(default_factory=utc_now, alias="updatedAt")
 
     model_config = {"populate_by_name": True}
 
