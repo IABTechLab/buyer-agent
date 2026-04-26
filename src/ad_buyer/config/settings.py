@@ -4,6 +4,7 @@
 """Application settings loaded from environment variables."""
 
 from functools import lru_cache
+from typing import Literal
 
 from dotenv import find_dotenv
 from pydantic_settings import BaseSettings
@@ -81,6 +82,15 @@ class Settings(BaseSettings):
     # audience refs. Default off until IAB ratifies an extension shape;
     # see the 90-day dual-emit migration policy in the wire-format spec.
     enable_agentic_openrtb_ext: bool = False
+
+    # Embedding mode for the buyer's UCP query embeddings.
+    # Locked decision in docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md (E2-1):
+    # - "mock": SHA256-seeded deterministic vector (legacy; CI fallback)
+    # - "local": sentence-transformers all-MiniLM-L6-v2 (384-dim)
+    # - "advertiser": use advertiser-supplied vector verbatim
+    # - "hybrid": prefer advertiser-supplied; else local; else mock
+    # Override via EMBEDDING_MODE env var.
+    embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
 
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,

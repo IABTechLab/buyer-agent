@@ -59,6 +59,16 @@ class ComplianceContext(BaseModel):
         default=None,
         description="Hash or signature carrying any required attestation",
     )
+    embedding_provenance: Literal[
+        "local_buyer", "advertiser_supplied", "hosted_external", "mock"
+    ] | None = Field(
+        default=None,
+        description=(
+            "Provenance of the embedding bytes (E2-7 Gap 6). Populated by "
+            "UCPClient.create_query_embedding_with_provenance per the locked "
+            "EMBEDDING_MODE strategy in docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md."
+        ),
+    )
 
     model_config = {"populate_by_name": True}
 
