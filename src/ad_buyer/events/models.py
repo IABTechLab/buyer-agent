@@ -14,6 +14,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..time_utils import utc_now
+
 
 class EventType(str, Enum):
     """Types of events emitted by the buyer system."""
@@ -86,7 +88,7 @@ class Event(BaseModel):
 
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: EventType
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     flow_id: str = ""
     flow_type: str = ""
     deal_id: str = ""

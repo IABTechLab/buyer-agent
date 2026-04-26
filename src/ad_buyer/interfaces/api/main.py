@@ -19,6 +19,7 @@ import sys
 
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
+from ...time_utils import utc_now
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
 from ...storage import DealStore
@@ -317,7 +318,7 @@ async def create_booking(
     Use GET /bookings/{job_id} to check status.
     """
     job_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = utc_now().isoformat()
 
     jobs[job_id] = {
         "status": "pending",
@@ -399,7 +400,7 @@ async def approve_recommendations(
     # Update job
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-    job["updated_at"] = datetime.utcnow().isoformat()
+    job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
     # Dual-write to SQLite
@@ -437,7 +438,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-    job["updated_at"] = datetime.utcnow().isoformat()
+    job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
     # Dual-write to SQLite
@@ -540,7 +541,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
     try:
         job["status"] = "running"
         job["progress"] = 0.1
-        job["updated_at"] = datetime.utcnow().isoformat()
+        job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 
         client = _create_client()
@@ -569,13 +570,13 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
             job["status"] = "awaiting_approval"
 
         job["progress"] = 1.0 if job["status"] == "completed" else 0.9
-        job["updated_at"] = datetime.utcnow().isoformat()
+        job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 
     except Exception as e:  # noqa: BLE001 - top-level background task handler; must record any failure
         job["status"] = "failed"
         job["errors"].append(str(e))
-        job["updated_at"] = datetime.utcnow().isoformat()
+        job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 
 

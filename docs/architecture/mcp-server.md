@@ -137,5 +137,5 @@ graph TB
 
 - [Tools Reference](tools.md) --- CrewAI tools the buyer uses when calling sellers (outbound)
 - [Deal Library](deal-library.md) --- Architecture of the deal library surfaced by the Deal Library tool category
-- [Deal Store](deal-store.md) --- SQLite persistence layer that MCP tools read and write
-- [AI Assistant: Overview](../ai-assistant/overview.md) --- How to connect Claude Desktop or other clients to this server
+- Deal Store (`storage/deal_store.py`) --- SQLite persistence layer that MCP tools read and write
+- AI Assistant tooling (see `ai-assistant/mcp-tools.md` and `ai-assistant/developer-setup.md`) --- How to connect Claude Desktop or other clients to this server

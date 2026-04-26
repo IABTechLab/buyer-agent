@@ -5,11 +5,18 @@
 
 This client handles the exchange of embeddings between buyer and seller agents
 following the IAB Tech Lab UCP specification.
+
+NOTE: This module implements IAB Agentic Audiences (formerly User Context
+Protocol / UCP). Public-surface naming uses "Agentic Audiences (UCP)" per
+proposal AUDIENCE_PLANNER_3TYPE_EXTENSION_2026-04-25.md §5.6 -- the code
+keeps `ucp_*` names internally to avoid a churning rename of a still-DRAFT
+spec, but readers searching for either term land here.
 """
 
 import logging
 import math
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import httpx
 
@@ -28,6 +35,83 @@ logger = logging.getLogger(__name__)
 
 # UCP Content-Type header
 UCP_CONTENT_TYPE = "application/vnd.ucp.embedding+json; v=1"
+
+# Embedding provenance literal -- mirrors ComplianceContext.embedding_provenance.
+EmbeddingProvenance = Literal[
+    "mock", "local_buyer", "advertiser_supplied", "hosted_external"
+]
+
+# Local model details for "local" / "hybrid" embedding modes.
+# Locked in docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md (E2-1).
+LOCAL_EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+LOCAL_EMBEDDING_MODEL_DIM = 384
+
+# Per-mode similarity thresholds (E2-4). Mock SHA256-seeded vectors
+# saturate quickly because each fixture lands in a unique random subspace,
+# so the "strong" threshold has to be tighter to avoid false matches.
+# Real sentence-transformers vectors live in a smoother semantic space and
+# tolerate the original 0.7 strong threshold. Advertiser-supplied vectors
+# follow the same convention as the buyer's local model. Re-derive these
+# from `ad_buyer.eval.evaluate_embedding_modes()` whenever the model swaps.
+_SIMILARITY_THRESHOLDS: dict[str, dict[str, float]] = {
+    "mock":               {"strong": 0.85, "moderate": 0.65, "weak": 0.40},
+    "local":              {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "advertiser":         {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "hybrid":             {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+}
+_DEFAULT_THRESHOLDS = _SIMILARITY_THRESHOLDS["mock"]
+
+
+def _similarity_thresholds_for_mode() -> dict[str, float]:
+    """Return per-mode similarity thresholds (E2-4)."""
+
+    from ..config.settings import settings
+
+    return _SIMILARITY_THRESHOLDS.get(settings.embedding_mode, _DEFAULT_THRESHOLDS)
+
+# Process-wide cached SentenceTransformer instance. Lazy-loaded on first
+# use to avoid paying ~80MB model download cost at import time.
+_LOCAL_MODEL: Any = None
+_LOCAL_MODEL_LOAD_FAILED = False
+
+
+def _get_local_embedding_model() -> Any:
+    """Lazy-load and cache the local SentenceTransformer model.
+
+    Returns the model on success, or None if sentence-transformers is not
+    installed or the model fails to load (e.g. download blocked in CI).
+    """
+    global _LOCAL_MODEL, _LOCAL_MODEL_LOAD_FAILED
+    if _LOCAL_MODEL is not None:
+        return _LOCAL_MODEL
+    if _LOCAL_MODEL_LOAD_FAILED:
+        return None
+    try:
+        from sentence_transformers import SentenceTransformer  # type: ignore
+        _LOCAL_MODEL = SentenceTransformer(LOCAL_EMBEDDING_MODEL_NAME)
+        return _LOCAL_MODEL
+    except Exception as exc:  # ImportError, network errors, etc.
+        logger.warning(
+            "Local embedding model unavailable (%s); falling back to mock. "
+            "Install with: pip install 'ad-buyer-system[embeddings]'",
+            exc,
+        )
+        _LOCAL_MODEL_LOAD_FAILED = True
+        return None
+
+
+@dataclass
+class QueryEmbeddingResult:
+    """Result of `create_query_embedding_with_provenance`.
+
+    Carries the embedding vector together with provenance metadata so
+    downstream code can record where the bytes came from in the
+    ComplianceContext (E2-7 Gap 6).
+    """
+
+    embedding: UCPEmbedding
+    provenance: EmbeddingProvenance
+    dimension: int
 
 
 class UCPExchangeResult:
@@ -364,31 +448,107 @@ class UCPClient:
         self,
         audience_requirements: dict[str, Any],
         consent: UCPConsent | None = None,
+        advertiser_vector: list[float] | None = None,
     ) -> UCPEmbedding:
         """Create a query embedding from audience requirements.
 
-        Generates a synthetic embedding representing the audience intent.
-        In production, this would use a trained embedding model.
+        Backward-compatible entry point. Honors `settings.embedding_mode`
+        per E2-1's locked decision (mock | local | advertiser | hybrid).
+        For provenance metadata, use `create_query_embedding_with_provenance`.
 
         Args:
             audience_requirements: Audience targeting requirements
             consent: Consent information
+            advertiser_vector: Optional advertiser-supplied vector. Used
+                when `embedding_mode` is "advertiser" or "hybrid".
 
         Returns:
             UCPEmbedding representing the audience intent
         """
-        # Generate a deterministic embedding based on requirements
-        # In production, this would use a trained model
+        return self.create_query_embedding_with_provenance(
+            audience_requirements,
+            consent=consent,
+            advertiser_vector=advertiser_vector,
+        ).embedding
+
+    def create_query_embedding_with_provenance(
+        self,
+        audience_requirements: dict[str, Any],
+        consent: UCPConsent | None = None,
+        advertiser_vector: list[float] | None = None,
+    ) -> "QueryEmbeddingResult":
+        """Create a query embedding plus provenance metadata.
+
+        Selects the embedding source per `settings.embedding_mode`:
+        - "advertiser" / "hybrid" with advertiser_vector → use it verbatim
+        - "local" / "hybrid" → sentence-transformers local model
+        - "mock" or any fallback → deterministic SHA256-seeded synthetic
+
+        Provenance is also reported so downstream code (ComplianceContext
+        per E2-7 Gap 6) can record where the bytes came from.
+        """
+        from ad_buyer.config.settings import settings as _settings
+
+        mode = _settings.embedding_mode
+        vector: list[float]
+        provenance: EmbeddingProvenance
+
+        # Advertiser path: usable when mode permits + vector supplied.
+        if mode in ("advertiser", "hybrid") and advertiser_vector is not None:
+            if not (256 <= len(advertiser_vector) <= 1024):
+                logger.warning(
+                    "Advertiser-supplied vector dim=%d outside spec range "
+                    "[256, 1024]; falling back",
+                    len(advertiser_vector),
+                )
+            else:
+                vector = list(advertiser_vector)
+                provenance = "advertiser_supplied"
+                return QueryEmbeddingResult(
+                    embedding=self.create_embedding(
+                        vector=vector,
+                        embedding_type=EmbeddingType.QUERY,
+                        signal_type=SignalType.CONTEXTUAL,
+                        consent=consent,
+                    ),
+                    provenance=provenance,
+                    dimension=len(vector),
+                )
+
+        # Local path: sentence-transformers if available + mode permits.
+        if mode in ("local", "hybrid"):
+            model = _get_local_embedding_model()
+            if model is not None:
+                req_str = str(sorted(audience_requirements.items()))
+                raw = model.encode(req_str, convert_to_numpy=True)
+                vector = [float(x) for x in raw.tolist()]
+                provenance = "local_buyer"
+                return QueryEmbeddingResult(
+                    embedding=self.create_embedding(
+                        vector=vector,
+                        embedding_type=EmbeddingType.QUERY,
+                        signal_type=SignalType.CONTEXTUAL,
+                        consent=consent,
+                    ),
+                    provenance=provenance,
+                    dimension=len(vector),
+                )
+
+        # Mock fallback (also handles mode="mock" explicitly).
         vector = self._generate_synthetic_embedding(
             audience_requirements,
             self._default_dimension,
         )
-
-        return self.create_embedding(
-            vector=vector,
-            embedding_type=EmbeddingType.QUERY,
-            signal_type=SignalType.CONTEXTUAL,
-            consent=consent,
+        provenance = "mock"
+        return QueryEmbeddingResult(
+            embedding=self.create_embedding(
+                vector=vector,
+                embedding_type=EmbeddingType.QUERY,
+                signal_type=SignalType.CONTEXTUAL,
+                consent=consent,
+            ),
+            provenance=provenance,
+            dimension=len(vector),
         )
 
     def _generate_synthetic_embedding(
@@ -449,16 +609,18 @@ class UCPClient:
                 validation_notes=[f"Exchange failed: {exchange_result.error}"],
             )
 
-        # Determine validation status based on similarity
+        # Determine validation status based on similarity, with thresholds
+        # tuned per `settings.embedding_mode` per E2-4.
         similarity = exchange_result.similarity_score or 0.0
+        thresholds = _similarity_thresholds_for_mode()
 
-        if similarity >= 0.7:
+        if similarity >= thresholds["strong"]:
             status = "valid"
             compatible = True
-        elif similarity >= 0.5:
+        elif similarity >= thresholds["moderate"]:
             status = "partial_match"
             compatible = True
-        elif similarity >= 0.3:
+        elif similarity >= thresholds["weak"]:
             status = "partial_match"
             compatible = False
         else:

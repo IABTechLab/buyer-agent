@@ -13,6 +13,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from ..time_utils import utc_now
+
 
 class NegotiationOutcome(str, Enum):
     """Outcome of a completed negotiation."""
@@ -31,7 +33,7 @@ class NegotiationRound(BaseModel):
     seller_price: float
     action: str  # "counter", "accept", "reject", "final_offer"
     rationale: str = ""
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
 
 
 class NegotiationSession(BaseModel):
@@ -46,7 +48,7 @@ class NegotiationSession(BaseModel):
     current_seller_price: float
     our_last_offer: float | None = None
     rounds: list[NegotiationRound] = Field(default_factory=list)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=utc_now)
 
 
 class NegotiationResult(BaseModel):
@@ -57,4 +59,4 @@ class NegotiationResult(BaseModel):
     final_price: float | None = None
     rounds_count: int = 0
     rounds: list[NegotiationRound] = Field(default_factory=list)
-    completed_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime = Field(default_factory=utc_now)

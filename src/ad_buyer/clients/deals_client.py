@@ -36,12 +36,36 @@ from ..models.linear_tv import CancellationRequest, MakegoodRequest
 
 logger = logging.getLogger(__name__)
 
+# Dedicated logger for booking-time forensic events. Per proposal §5.1 Step 2
+# / §6 row 14b, the buyer logs the `audience_plan_id` hash at the moment a
+# `DealBookingRequest` carrying an audience plan is sent. The seller logs the
+# same hash on its side. Both sides logging the same hash is the forensic
+# anchor for any future dispute about what was actually frozen at booking.
+booking_logger = logging.getLogger("ad_buyer.audience.booking")
+
 # HTTP status codes that indicate transient failures worth retrying
 _RETRYABLE_STATUS_CODES = {502, 503, 504}
 
 # Default configuration
 _DEFAULT_TIMEOUT = 30.0
 _DEFAULT_MAX_RETRIES = 3
+
+# Wire-format media types for `AudiencePlan`-bearing requests. Per proposal
+# §5.6 (locked decision: dual-name "Agentic Audiences (UCP)") and the
+# wire-format spec §8 (docs/api/audience_plan_wire_format.md):
+#
+#   - The legacy UCP carrier remains the primary `Content-Type` the buyer
+#     emits during the transition window, for backward compat with sellers
+#     that pre-date the rename.
+#   - The new IAB Agentic Audiences alias is advertised in `Accept` so
+#     compliant sellers know the buyer can read either.
+#
+# Code-internal naming continues to use `ucp_*` (no rename per §5.6 lock).
+_UCP_CONTENT_TYPE = "application/vnd.ucp.embedding+json; v=1"
+_AGENTIC_AUDIENCES_CONTENT_TYPE = "application/vnd.iab.agentic-audiences+json; v=1"
+_AUDIENCE_PLAN_ACCEPT = (
+    f"{_UCP_CONTENT_TYPE}, {_AGENTIC_AUDIENCES_CONTENT_TYPE}"
+)
 
 
 class DealsClientError(Exception):
@@ -51,6 +75,12 @@ class DealsClientError(Exception):
         status_code: HTTP status code (0 for transport errors like timeout).
         error_code: Machine-readable error code from the seller, if available.
         detail: Human-readable detail message.
+        unsupported: When the seller rejects with the structured
+            `audience_plan_unsupported` shape (proposal §5.7 layer 3),
+            this carries the list of `{"path": ..., "reason": ...}` entries
+            so the orchestrator's retry path can run
+            `degrade_plan_for_seller` against the precise drops the seller
+            asked for. Empty list for any other error.
     """
 
     def __init__(
@@ -59,11 +89,13 @@ class DealsClientError(Exception):
         status_code: int = 0,
         error_code: str = "",
         detail: str = "",
+        unsupported: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.error_code = error_code
         self.detail = detail
+        self.unsupported: list[dict[str, Any]] = unsupported or []
 
 
 class DealsClient:
@@ -162,6 +194,22 @@ class DealsClient:
 
         POST /api/v1/deals
 
+        When the request carries an ``audience_plan`` (proposal §5.1 Step 1),
+        the request goes out with the dual wire-format media types per
+        proposal §5.6 + §6 row 14b:
+
+          - ``Content-Type: application/vnd.ucp.embedding+json; v=1``
+            (legacy UCP carrier, kept as the emit name for backward compat
+            with pre-rename sellers).
+          - ``Accept: application/vnd.ucp.embedding+json; v=1,
+            application/vnd.iab.agentic-audiences+json; v=1`` -- advertises
+            that the buyer can read either name on the seller's response.
+
+        The buyer additionally logs the plan's ``audience_plan_id`` hash at
+        INFO via ``ad_buyer.audience.booking``. The seller logs the same
+        hash on its side; matching log entries are the forensic anchor for
+        post-booking dispute resolution.
+
         Args:
             booking_request: Deal booking parameters including the quote_id.
 
@@ -172,7 +220,30 @@ class DealsClient:
             DealsClientError: On HTTP or transport errors.
         """
         body = booking_request.model_dump(exclude_none=True)
-        response = await self._request_with_retry("POST", "/api/v1/deals", json=body)
+
+        # Build per-request headers when the booking carries an audience plan.
+        # Otherwise we let the client's default JSON headers ride (which is
+        # what every non-audience booking has always done).
+        headers: dict[str, str] | None = None
+        plan = booking_request.audience_plan
+        if plan is not None:
+            headers = {
+                "Content-Type": _UCP_CONTENT_TYPE,
+                "Accept": _AUDIENCE_PLAN_ACCEPT,
+            }
+            # Log forensic anchor hash (proposal §5.1 Step 2 / bead 14b).
+            # Use the canonical id if populated; otherwise compute it now.
+            plan_id = plan.audience_plan_id or plan.compute_id()
+            booking_logger.info(
+                "deal_booking audience_plan_id=%s quote_id=%s",
+                plan_id,
+                booking_request.quote_id,
+            )
+
+        kwargs: dict[str, Any] = {"json": body}
+        if headers:
+            kwargs["headers"] = headers
+        response = await self._request_with_retry("POST", "/api/v1/deals", **kwargs)
         data = response.json()
         result = DealResponse.model_validate(data)
 
@@ -363,17 +434,50 @@ class DealsClient:
     def _build_error_from_response(response: httpx.Response) -> DealsClientError:
         """Extract error details from an HTTP error response.
 
-        Tries to parse the seller's structured error JSON. Falls back
-        to the raw response text if parsing fails.
+        Handles two seller error shapes:
+
+        1. Flat: ``{"error": "...", "detail": "..."}`` -- legacy / non-
+           HTTPException-wrapped errors. The buyer's pre-existing tests use
+           this shape.
+        2. FastAPI-wrapped: ``{"detail": {"error": "...", ...}}`` -- emitted
+           when the seller raises ``HTTPException(detail=<dict>)``. The
+           ``audience_plan_unsupported`` rejection (proposal §5.7 layer 3)
+           lives here, with an additional ``unsupported`` list inside the
+           wrapped ``detail``.
+
+        Falls back to the raw response text if JSON parsing fails entirely.
         """
         error_code = ""
-        detail = ""
+        detail: str = ""
+        unsupported: list[dict[str, Any]] = []
         try:
             data = response.json()
-            error_code = data.get("error", "")
-            detail = data.get("detail", "")
         except (json.JSONDecodeError, ValueError):
-            detail = response.text[:500] if response.text else ""
+            data = None
+
+        if isinstance(data, dict):
+            # Try the FastAPI-wrapped shape first: detail is itself a dict.
+            inner = data.get("detail")
+            if isinstance(inner, dict):
+                error_code = str(inner.get("error", "") or "")
+                # Surface the inner "message" / "detail" / repr for humans.
+                detail = str(
+                    inner.get("message")
+                    or inner.get("detail")
+                    or ""
+                )
+                raw_unsupported = inner.get("unsupported")
+                if isinstance(raw_unsupported, list):
+                    unsupported = [
+                        u for u in raw_unsupported if isinstance(u, dict)
+                    ]
+            else:
+                # Flat shape: {"error": "...", "detail": "..."}
+                error_code = str(data.get("error", "") or "")
+                detail = str(data.get("detail", "") or "")
+
+        if not detail and not error_code and response.text:
+            detail = response.text[:500]
 
         message = f"Seller API error {response.status_code}"
         if error_code:
@@ -386,6 +490,7 @@ class DealsClient:
             status_code=response.status_code,
             error_code=error_code,
             detail=detail,
+            unsupported=unsupported,
         )
 
     # ------------------------------------------------------------------

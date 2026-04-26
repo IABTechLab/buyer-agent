@@ -204,7 +204,15 @@ class DemoPipelineHelper:
         # Validate the brief using the real schema
         brief = parse_campaign_brief(brief_data)
 
-        # Build store-compatible dict
+        # Build store-compatible dict. target_audience is now a typed
+        # AudiencePlan (or None); persist as a dict so subsequent loads
+        # see the new shape (proposal §6 row 4 / bead ar-fe0h).
+        if brief.target_audience is None:
+            target_audience_json = json.dumps(None)
+        else:
+            target_audience_json = json.dumps(
+                brief.target_audience.model_dump(mode="json")
+            )
         store_brief = {
             "advertiser_id": brief.advertiser_id,
             "campaign_name": brief.campaign_name,
@@ -215,7 +223,7 @@ class DemoPipelineHelper:
             "channels": json.dumps(
                 [ch.model_dump(mode="json") for ch in brief.channels]
             ),
-            "target_audience": json.dumps(brief.target_audience),
+            "target_audience": target_audience_json,
         }
         if brief.kpis:
             store_brief["kpis"] = json.dumps(

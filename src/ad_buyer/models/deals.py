@@ -18,6 +18,7 @@ Extended with linear TV support (Option C hybrid approach, bead buyer-6io):
 
 from pydantic import BaseModel, Field
 
+from .audience_plan import AudiencePlan
 from .linear_tv import LinearTVParams, LinearTVQuoteDetails
 
 # ---------------------------------------------------------------------------
@@ -127,6 +128,13 @@ class QuoteRequest(BaseModel):
     # Linear TV nested params (None for digital/CTV)
     linear_tv: LinearTVParams | None = None
 
+    # Typed audience plan threaded from CampaignPlan via the orchestrator
+    # (proposal §5.2 + §5.3). None on legacy paths that have not yet been
+    # wired through; populated by the Audience Planner in a follow-up bead.
+    # Wire-format serialization is governed by the seller-side contract
+    # (see beads §14a/14b for the agreed JSON shape).
+    audience_plan: AudiencePlan | None = None
+
 
 class DealBookingRequest(BaseModel):
     """Request body for POST /api/v1/deals.
@@ -137,6 +145,12 @@ class DealBookingRequest(BaseModel):
     quote_id: str
     buyer_identity: BuyerIdentityPayload | None = None
     notes: str | None = None
+
+    # Typed audience plan: deal-level targeting metadata enforced by the
+    # seller at impression-fulfillment time for PG deals. Frozen with the
+    # booking and hashed via audience_plan_id for cross-system parity. See
+    # proposal §5.1 Step 1.
+    audience_plan: AudiencePlan | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +183,31 @@ class QuoteResponse(BaseModel):
     linear_tv: LinearTVQuoteDetails | None = None
 
 
+class MatchEntry(BaseModel):
+    """Per-role match score returned by the seller's package matcher.
+
+    Buckets follow the wire-format spec §6.5 (`STRONG | MODERATE | WEAK |
+    NONE`); the `score` is a continuous confidence in [0, 1].
+    """
+
+    match: str  # STRONG | MODERATE | WEAK | NONE
+    score: float
+
+
+class AudienceMatchSummary(BaseModel):
+    """Per-role audience match summary returned with a booked deal.
+
+    Mirrors the `audience_match_summary` shape defined in
+    `docs/api/audience_plan_wire_format.md` §6.5. Optional roles default to
+    empty lists so callers can iterate without `None` checks.
+    """
+
+    primary: MatchEntry | None = None
+    constraints: list[MatchEntry] = Field(default_factory=list)
+    extensions: list[MatchEntry] = Field(default_factory=list)
+    exclusions: list[MatchEntry] = Field(default_factory=list)
+
+
 class DealResponse(BaseModel):
     """Response from GET/POST /api/v1/deals.
 
@@ -187,6 +226,13 @@ class DealResponse(BaseModel):
     activation_instructions: dict[str, str] = Field(default_factory=dict)
     openrtb_params: OpenRTBParams | None = None
     created_at: str | None = None
+
+    # Frozen audience plan + per-role match scores returned by the seller
+    # when the booking carried an `audience_plan` (proposal §5.1 Step 2 +
+    # wire-format §6.5). Both fields are optional so legacy non-audience
+    # bookings continue to parse unchanged.
+    audience_plan_snapshot: AudiencePlan | None = None
+    audience_match_summary: AudienceMatchSummary | None = None
 
 
 # ---------------------------------------------------------------------------

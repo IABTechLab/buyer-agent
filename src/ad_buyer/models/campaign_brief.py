@@ -34,6 +34,16 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from .audience_plan import (
+    AudiencePlan,
+    AudienceStrictness,
+    ContentTaxonomyMigrationRequired,
+    GlobalAgenticUnsupported,
+    coerce_audience_field,
+    validate_content_taxonomy_version,
+    validate_no_global_agentic,
+)
+
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
@@ -241,8 +251,21 @@ class CampaignBrief(BaseModel):
     channels: list[ChannelAllocation] = Field(
         ..., min_length=1, description="Channel allocations (at least one)"
     )
-    target_audience: list[str] = Field(
-        ..., min_length=1, description="IAB Audience Taxonomy segment IDs"
+    # Typed audience plan (proposal §5.2). The compat shim below converts
+    # legacy `list[str]` inputs from old briefs / SQLite rows into a fully
+    # populated `AudiencePlan` per the locked migration policy (first
+    # element -> primary, rest -> extensions, source=inferred). Defaults to
+    # None so newly-authored briefs may omit it; downstream pipeline stages
+    # treat a None plan as "no audience targeting."
+    target_audience: AudiencePlan | None = Field(
+        default=None,
+        description="Typed audience plan; legacy list[str] is auto-migrated",
+    )
+    # Per-role strictness policy controlling buyer-side degradation when
+    # sellers don't support some refs (proposal §5.7).
+    audience_strictness: AudienceStrictness = Field(
+        default_factory=AudienceStrictness,
+        description="Per-role strictness for plan degradation decisions",
     )
 
     # --- Optional fields ---
@@ -277,6 +300,26 @@ class CampaignBrief(BaseModel):
 
     # --- Validators ---
 
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_target_audience(cls, data: Any) -> Any:
+        """Compat shim: convert legacy `list[str]` target_audience -> AudiencePlan.
+
+        Triggered before per-field validation so the typed field sees the
+        new shape. Logs every conversion via the migration logger so the
+        audit trail captures the rewrite. Untouched when the input is
+        already a dict / `AudiencePlan` / None.
+        """
+
+        if not isinstance(data, dict):
+            return data
+        if "target_audience" in data:
+            data["target_audience"] = coerce_audience_field(
+                data["target_audience"],
+                source_context="campaign_brief.target_audience",
+            )
+        return data
+
     @model_validator(mode="after")
     def _validate_brief(self) -> CampaignBrief:
         """Cross-field validations run after individual fields pass."""
@@ -303,6 +346,23 @@ class CampaignBrief(BaseModel):
         # Compute budget_amount for each channel
         for ch in self.channels:
             ch.budget_amount = round(self.total_budget * ch.budget_pct / 100.0, 2)
+
+        # Brief-ingestion validation: Content Taxonomy 2.x -> 3.x deletions.
+        # Pre-3.x Contextual refs (or 3.x IDs that don't resolve in our
+        # vendored 3.1 table) are rejected here with a clear pointer at
+        # the IAB Mapper migration tool. The validator is a no-op when
+        # the brief carries no contextual refs.
+        if self.target_audience is not None:
+            issues = validate_content_taxonomy_version(self.target_audience)
+            if issues:
+                raise ContentTaxonomyMigrationRequired(issues)
+
+            # Brief-ingestion validation: reject GLOBAL agentic refs (ar-ei0s).
+            # Single ComplianceContext can't honestly span multiple consent
+            # regimes; per-jurisdiction fan-out is a follow-on (proposal §7).
+            global_agentic_issues = validate_no_global_agentic(self.target_audience)
+            if global_agentic_issues:
+                raise GlobalAgenticUnsupported(global_agentic_issues)
 
         return self
 

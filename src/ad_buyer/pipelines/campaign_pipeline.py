@@ -31,6 +31,7 @@ from typing import Any, Optional, Union
 
 from ..events.bus import EventBus
 from ..events.models import Event, EventType
+from ..models.audience_plan import AudiencePlan, coerce_audience_field
 from ..models.campaign_brief import (
     CampaignBrief,
     ChannelAllocation,
@@ -44,6 +45,10 @@ from ..orchestration.multi_seller import (
     InventoryRequirements,
     MultiSellerOrchestrator,
     OrchestrationResult,
+)
+from .audience_planner_step import (
+    AudiencePlannerResult,
+    run_audience_planner_step,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,7 +116,9 @@ class CampaignPlan:
         total_budget: Total campaign budget.
         flight_start: Campaign start date (ISO string).
         flight_end: Campaign end date (ISO string).
-        target_audience: Audience segment IDs from the brief.
+        target_audience: Typed AudiencePlan from the brief (may be None
+            when the brief omitted audience targeting; the Audience
+            Planner agent fills it in downstream per proposal §5.3).
     """
 
     campaign_id: str
@@ -119,7 +126,7 @@ class CampaignPlan:
     total_budget: float
     flight_start: str
     flight_end: str
-    target_audience: list[str] = field(default_factory=list)
+    target_audience: AudiencePlan | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +163,11 @@ class CampaignPipeline:
         self._briefs: dict[str, CampaignBrief] = {}
         self._plans: dict[str, CampaignPlan] = {}
         self._booking_results: dict[str, dict[str, OrchestrationResult]] = {}
+
+        # Audience Planner outputs per campaign. Populated by
+        # `plan_campaign` and exposed via `get_audience_planner_result`
+        # for tests / observability. Bead ar-fgyq §6 wiring.
+        self._audience_planners: dict[str, AudiencePlannerResult] = {}
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -211,7 +223,16 @@ class CampaignPipeline:
         )
 
         # Build the dict for CampaignStore.create_campaign
-        # Serialize complex fields to JSON strings for SQLite storage
+        # Serialize complex fields to JSON strings for SQLite storage.
+        # `target_audience` is now a typed AudiencePlan (or None); we
+        # persist it as a dict so future loads see the new shape and
+        # legacy rows lazily migrate as briefs are touched.
+        if brief.target_audience is None:
+            target_audience_json = json.dumps(None)
+        else:
+            target_audience_json = json.dumps(
+                brief.target_audience.model_dump(mode="json")
+            )
         store_brief = {
             "advertiser_id": brief.advertiser_id,
             "campaign_name": brief.campaign_name,
@@ -222,7 +243,7 @@ class CampaignPipeline:
             "channels": json.dumps(
                 [ch.model_dump(mode="json") for ch in brief.channels]
             ),
-            "target_audience": json.dumps(brief.target_audience),
+            "target_audience": target_audience_json,
         }
 
         # Include optional fields if present
@@ -313,13 +334,24 @@ class CampaignPipeline:
                 format_prefs=ch.format_prefs,
             ))
 
+        # Run the Audience Planner step BEFORE building the CampaignPlan
+        # so the resolved plan rides on `target_audience` from this point
+        # forward (per proposal §5.3). This is the keystone bead ar-fgyq
+        # wiring -- the planner is a stub passthrough today; bead §7
+        # replaces the stub with the full reasoning loop.
+        planner_result = run_audience_planner_step(brief)
+        # Cache the agent for tests/introspection -- the agent's `tools`
+        # attribute is the source of truth for the §6 tool-relocation
+        # invariant (3 UCP tools + TaxonomyLookup + EmbeddingMint).
+        self._audience_planners[campaign_id] = planner_result
+
         plan = CampaignPlan(
             campaign_id=campaign_id,
             channel_plans=channel_plans,
             total_budget=brief.total_budget,
             flight_start=brief.flight_start.isoformat(),
             flight_end=brief.flight_end.isoformat(),
-            target_audience=brief.target_audience,
+            target_audience=planner_result.plan,
         )
 
         # Cache the plan for execute_booking
@@ -402,7 +434,10 @@ class CampaignPipeline:
         for cp in plan.channel_plans:
             channel_key = cp.channel.value
 
-            # Build inventory requirements for this channel
+            # Build inventory requirements for this channel.
+            # `audience_plan` is forwarded from the planner step's output
+            # (proposal §5.3 / bead ar-fgyq §6); §5 wired the
+            # `audience_plan` field on InventoryRequirements / DealParams.
             inv_req = InventoryRequirements(
                 media_type=cp.media_type,
                 deal_types=cp.deal_types,
@@ -412,6 +447,7 @@ class CampaignPipeline:
                     if brief and brief.deal_preferences
                     else None
                 ),
+                audience_plan=plan.target_audience,
             )
 
             # Build deal params
@@ -422,6 +458,7 @@ class CampaignPipeline:
                 flight_start=plan.flight_start,
                 flight_end=plan.flight_end,
                 media_type=cp.media_type,
+                audience_plan=plan.target_audience,
             )
 
             try:
@@ -593,6 +630,22 @@ class CampaignPipeline:
         return summary
 
     # ------------------------------------------------------------------
+    # Public accessors (Audience Planner introspection)
+    # ------------------------------------------------------------------
+
+    def get_audience_planner_result(
+        self, campaign_id: str
+    ) -> AudiencePlannerResult | None:
+        """Return the Audience Planner output for `campaign_id`, if any.
+
+        Populated by `plan_campaign`. Returns None when planning has not
+        yet run for the campaign. Tests use this to introspect the
+        agent's bound tools and the stub flag (bead ar-fgyq §6).
+        """
+
+        return self._audience_planners.get(campaign_id)
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
@@ -600,7 +653,9 @@ class CampaignPipeline:
         """Reconstruct a CampaignBrief from stored campaign data.
 
         Used when the brief was not cached (e.g., pipeline stages
-        called independently across different instances).
+        called independently across different instances). Applies the
+        legacy-list compat shim on the way in so existing SQLite rows
+        carrying `list[str]` audiences keep working without a migration.
         """
         channels_raw = campaign.get("channels")
         if isinstance(channels_raw, str):
@@ -608,7 +663,24 @@ class CampaignPipeline:
 
         audience_raw = campaign.get("target_audience")
         if isinstance(audience_raw, str):
-            audience_raw = json.loads(audience_raw)
+            try:
+                audience_raw = json.loads(audience_raw)
+            except (json.JSONDecodeError, TypeError):
+                audience_raw = None
+
+        # Legacy rows store list[str]; new rows store an AudiencePlan
+        # dict. The shim handles both via coerce_audience_field. Empty
+        # legacy lists fall through to None so the brief schema treats
+        # the campaign as audience-less rather than rejecting it on
+        # reconstruction (different from the ingestion path, which
+        # rejects a fresh empty list).
+        if isinstance(audience_raw, list) and not audience_raw:
+            audience_raw = None
+        else:
+            audience_raw = coerce_audience_field(
+                audience_raw,
+                source_context="campaign_pipeline._reconstruct_brief",
+            )
 
         return parse_campaign_brief({
             "advertiser_id": campaign["advertiser_id"],
@@ -619,7 +691,7 @@ class CampaignPipeline:
             "flight_start": campaign["flight_start"],
             "flight_end": campaign["flight_end"],
             "channels": channels_raw or [],
-            "target_audience": audience_raw or ["default"],
+            "target_audience": audience_raw,
         })
 
     @staticmethod

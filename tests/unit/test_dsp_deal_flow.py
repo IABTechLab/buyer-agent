@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for DSPDealFlow - DSP deal discovery and Deal ID creation workflow.
+"""Tests for BuyerDealFlow - DSP deal discovery and Deal ID creation workflow.
 
 Covers:
 - Request validation (empty request, valid request)
@@ -9,7 +9,7 @@ Covers:
 - Product evaluation and selection (crew-based, product ID extraction)
 - Deal ID request (success, no product selected, tool failure)
 - Status reporting
-- run_dsp_deal_flow convenience function
+- run_buyer_deal_flow convenience function
 - Edge cases: missing fields, state transitions
 """
 
@@ -18,12 +18,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ad_buyer.flows.dsp_deal_flow import (
+from ad_buyer.flows.buyer_deal_flow import (
     DiscoveredProduct,
-    DSPDealFlow,
-    DSPFlowState,
-    DSPFlowStatus,
-    run_dsp_deal_flow,
+    BuyerDealFlow,
+    BuyerDealFlowState,
+    BuyerDealFlowStatus,
+    run_buyer_deal_flow,
 )
 from ad_buyer.models.buyer_identity import (
     AccessTier,
@@ -79,8 +79,8 @@ def public_buyer_context():
 
 @pytest.fixture
 def dsp_flow(mock_unified_client, agency_buyer_context):
-    """Create a DSPDealFlow with mocked client and agency context."""
-    return DSPDealFlow(client=mock_unified_client, buyer_context=agency_buyer_context)
+    """Create a BuyerDealFlow with mocked client and agency context."""
+    return BuyerDealFlow(client=mock_unified_client, buyer_context=agency_buyer_context)
 
 
 @pytest.fixture
@@ -104,20 +104,20 @@ class TestDSPFlowModels:
     """Tests for DSP flow data models."""
 
     def test_dsp_flow_state_defaults(self):
-        """DSPFlowState initializes with correct defaults."""
-        state = DSPFlowState()
+        """BuyerDealFlowState initializes with correct defaults."""
+        state = BuyerDealFlowState()
 
         assert state.request == ""
         assert state.deal_type == DealType.PREFERRED_DEAL
         assert state.impressions is None
         assert state.max_cpm is None
-        assert state.status == DSPFlowStatus.INITIALIZED
+        assert state.status == BuyerDealFlowStatus.INITIALIZED
         assert state.errors == []
         assert state.discovered_products == []
 
     def test_dsp_flow_state_with_values(self):
-        """DSPFlowState can be created with custom values."""
-        state = DSPFlowState(
+        """BuyerDealFlowState can be created with custom values."""
+        state = BuyerDealFlowState(
             request="CTV inventory",
             deal_type=DealType.PROGRAMMATIC_GUARANTEED,
             impressions=5_000_000,
@@ -151,14 +151,14 @@ class TestDSPFlowModels:
         assert product.score == 0.85
 
     def test_dsp_flow_status_enum(self):
-        """DSPFlowStatus enum has all expected values."""
-        assert DSPFlowStatus.INITIALIZED.value == "initialized"
-        assert DSPFlowStatus.REQUEST_RECEIVED.value == "request_received"
-        assert DSPFlowStatus.DISCOVERING_INVENTORY.value == "discovering_inventory"
-        assert DSPFlowStatus.EVALUATING_PRICING.value == "evaluating_pricing"
-        assert DSPFlowStatus.REQUESTING_DEAL.value == "requesting_deal"
-        assert DSPFlowStatus.DEAL_CREATED.value == "deal_created"
-        assert DSPFlowStatus.FAILED.value == "failed"
+        """BuyerDealFlowStatus enum has all expected values."""
+        assert BuyerDealFlowStatus.INITIALIZED.value == "initialized"
+        assert BuyerDealFlowStatus.REQUEST_RECEIVED.value == "request_received"
+        assert BuyerDealFlowStatus.DISCOVERING_INVENTORY.value == "discovering_inventory"
+        assert BuyerDealFlowStatus.EVALUATING_PRICING.value == "evaluating_pricing"
+        assert BuyerDealFlowStatus.REQUESTING_DEAL.value == "requesting_deal"
+        assert BuyerDealFlowStatus.DEAL_CREATED.value == "deal_created"
+        assert BuyerDealFlowStatus.FAILED.value == "failed"
 
 
 # ===========================================================================
@@ -176,7 +176,7 @@ class TestReceiveRequest:
         assert result["status"] == "success"
         assert result["request"] == dsp_flow_with_request.state.request
         assert result["access_tier"] == AccessTier.AGENCY.value
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.REQUEST_RECEIVED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
 
     def test_empty_request_fails(self, dsp_flow):
         """Empty request string fails."""
@@ -185,7 +185,7 @@ class TestReceiveRequest:
         result = dsp_flow.receive_request()
 
         assert result["status"] == "failed"
-        assert dsp_flow.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow.state.status == BuyerDealFlowStatus.FAILED
         assert len(dsp_flow.state.errors) > 0
 
     def test_buyer_context_stored_in_state(self, dsp_flow_with_request):
@@ -198,7 +198,7 @@ class TestReceiveRequest:
 
     def test_advertiser_tier_access(self, mock_unified_client, advertiser_buyer_context):
         """Advertiser tier is correctly reported."""
-        flow = DSPDealFlow(client=mock_unified_client, buyer_context=advertiser_buyer_context)
+        flow = BuyerDealFlow(client=mock_unified_client, buyer_context=advertiser_buyer_context)
         flow.state.request = "Premium inventory"
 
         result = flow.receive_request()
@@ -207,7 +207,7 @@ class TestReceiveRequest:
 
     def test_public_tier_access(self, mock_unified_client, public_buyer_context):
         """Public tier is correctly reported."""
-        flow = DSPDealFlow(client=mock_unified_client, buyer_context=public_buyer_context)
+        flow = BuyerDealFlow(client=mock_unified_client, buyer_context=public_buyer_context)
         flow.state.request = "Any inventory"
 
         result = flow.receive_request()
@@ -229,7 +229,7 @@ class TestDiscoverInventory:
 
         assert result["status"] == "failed"
 
-    @patch.object(DSPDealFlow, "__init__", lambda self, **kw: None)
+    @patch.object(BuyerDealFlow, "__init__", lambda self, **kw: None)
     def test_discovery_success(self, dsp_flow_with_request):
         """Successful discovery returns results and updates status."""
         dsp_flow_with_request._discover_tool = MagicMock()
@@ -239,7 +239,7 @@ class TestDiscoverInventory:
 
         assert result["status"] == "success"
         assert "discovery_result" in result
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.DISCOVERING_INVENTORY
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.DISCOVERING_INVENTORY
 
     def test_discovery_tool_exception(self, dsp_flow_with_request):
         """Exception in discovery tool sets FAILED status."""
@@ -250,7 +250,7 @@ class TestDiscoverInventory:
         result = dsp_flow_with_request.discover_inventory({"status": "success"})
 
         assert result["status"] == "failed"
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.FAILED
         assert len(dsp_flow_with_request.state.errors) > 0
 
     def test_discovery_passes_filters(self, dsp_flow_with_request):
@@ -322,9 +322,9 @@ class TestEvaluateAndSelect:
         )
         assert result["status"] == "failed"
 
-    @patch("ad_buyer.flows.dsp_deal_flow.Task")
-    @patch("ad_buyer.flows.dsp_deal_flow.Crew")
-    @patch("ad_buyer.flows.dsp_deal_flow.create_dsp_agent")
+    @patch("ad_buyer.flows.buyer_deal_flow.Task")
+    @patch("ad_buyer.flows.buyer_deal_flow.Crew")
+    @patch("ad_buyer.flows.buyer_deal_flow.create_dsp_agent")
     def test_successful_selection(
         self, mock_agent, mock_crew_cls, mock_task, dsp_flow_with_request
     ):
@@ -346,9 +346,9 @@ class TestEvaluateAndSelect:
         assert dsp_flow_with_request.state.selected_product_id == "ctv_001"
         assert dsp_flow_with_request.state.pricing_details is not None
 
-    @patch("ad_buyer.flows.dsp_deal_flow.Task")
-    @patch("ad_buyer.flows.dsp_deal_flow.Crew")
-    @patch("ad_buyer.flows.dsp_deal_flow.create_dsp_agent")
+    @patch("ad_buyer.flows.buyer_deal_flow.Task")
+    @patch("ad_buyer.flows.buyer_deal_flow.Crew")
+    @patch("ad_buyer.flows.buyer_deal_flow.create_dsp_agent")
     def test_no_product_id_extracted(
         self, mock_agent, mock_crew_cls, mock_task, dsp_flow_with_request
     ):
@@ -364,9 +364,9 @@ class TestEvaluateAndSelect:
         assert result["status"] == "success"
         assert result["selected_product_id"] is None
 
-    @patch("ad_buyer.flows.dsp_deal_flow.Task")
-    @patch("ad_buyer.flows.dsp_deal_flow.Crew")
-    @patch("ad_buyer.flows.dsp_deal_flow.create_dsp_agent")
+    @patch("ad_buyer.flows.buyer_deal_flow.Task")
+    @patch("ad_buyer.flows.buyer_deal_flow.Crew")
+    @patch("ad_buyer.flows.buyer_deal_flow.create_dsp_agent")
     def test_evaluation_exception(
         self, mock_agent, mock_crew_cls, mock_task, dsp_flow_with_request
     ):
@@ -378,7 +378,7 @@ class TestEvaluateAndSelect:
         )
 
         assert result["status"] == "failed"
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.FAILED
 
 
 # ===========================================================================
@@ -404,7 +404,7 @@ class TestRequestDealId:
 
         assert result["status"] == "failed"
         assert "No product selected" in result["error"]
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.FAILED
 
     def test_successful_deal_creation(self, dsp_flow_with_request):
         """Successful deal request stores deal response and sets DEAL_CREATED."""
@@ -416,7 +416,7 @@ class TestRequestDealId:
         result = dsp_flow_with_request.request_deal_id({"status": "success"})
 
         assert result["status"] == "success"
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.DEAL_CREATED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.DEAL_CREATED
         assert dsp_flow_with_request.state.deal_response is not None
         assert "raw" in dsp_flow_with_request.state.deal_response
 
@@ -430,7 +430,7 @@ class TestRequestDealId:
         result = dsp_flow_with_request.request_deal_id({"status": "success"})
 
         assert result["status"] == "failed"
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.FAILED
         assert len(dsp_flow_with_request.state.errors) > 0
 
     def test_deal_passes_flight_dates(self, dsp_flow_with_request):
@@ -469,7 +469,7 @@ class TestDSPFlowGetStatus:
 
     def test_status_with_request(self, dsp_flow_with_request):
         """Status reflects configured request."""
-        dsp_flow_with_request.state.status = DSPFlowStatus.REQUEST_RECEIVED
+        dsp_flow_with_request.state.status = BuyerDealFlowStatus.REQUEST_RECEIVED
         status = dsp_flow_with_request.get_status()
 
         assert status["status"] == "request_received"
@@ -478,7 +478,7 @@ class TestDSPFlowGetStatus:
 
     def test_status_after_deal_creation(self, dsp_flow_with_request):
         """Status reflects deal creation."""
-        dsp_flow_with_request.state.status = DSPFlowStatus.DEAL_CREATED
+        dsp_flow_with_request.state.status = BuyerDealFlowStatus.DEAL_CREATED
         dsp_flow_with_request.state.selected_product_id = "ctv_001"
         dsp_flow_with_request.state.deal_response = {"raw": "DEAL-ABC123"}
 
@@ -514,7 +514,7 @@ class TestDSPFlowInitialization:
 
     def test_flow_creates_tools(self, mock_unified_client, agency_buyer_context):
         """Flow creates discover, pricing, and deal tools on init."""
-        flow = DSPDealFlow(client=mock_unified_client, buyer_context=agency_buyer_context)
+        flow = BuyerDealFlow(client=mock_unified_client, buyer_context=agency_buyer_context)
 
         assert flow._discover_tool is not None
         assert flow._pricing_tool is not None
@@ -526,7 +526,7 @@ class TestDSPFlowInitialization:
         """Flow state is initialized with defaults."""
         # crewai wraps the state model in a StateWithId subclass,
         # so we check attributes rather than exact type.
-        assert dsp_flow.state.status == DSPFlowStatus.INITIALIZED
+        assert dsp_flow.state.status == BuyerDealFlowStatus.INITIALIZED
         assert dsp_flow.state.request == ""
         assert dsp_flow.state.errors == []
 
@@ -536,14 +536,14 @@ class TestDSPFlowInitialization:
 # ===========================================================================
 
 
-class TestDSPFlowStateTransitions:
+class TestBuyerDealFlowStateTransitions:
     """Tests verifying status transitions through the flow."""
 
     def test_request_received_transition(self, dsp_flow_with_request):
         """receive_request transitions INITIALIZED -> REQUEST_RECEIVED."""
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.INITIALIZED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.INITIALIZED
         dsp_flow_with_request.receive_request()
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.REQUEST_RECEIVED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
 
     def test_discovering_inventory_transition(self, dsp_flow_with_request):
         """discover_inventory transitions to DISCOVERING_INVENTORY."""
@@ -551,11 +551,11 @@ class TestDSPFlowStateTransitions:
 
         dsp_flow_with_request.discover_inventory({"status": "success"})
 
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.DISCOVERING_INVENTORY
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.DISCOVERING_INVENTORY
 
-    @patch("ad_buyer.flows.dsp_deal_flow.Task")
-    @patch("ad_buyer.flows.dsp_deal_flow.Crew")
-    @patch("ad_buyer.flows.dsp_deal_flow.create_dsp_agent")
+    @patch("ad_buyer.flows.buyer_deal_flow.Task")
+    @patch("ad_buyer.flows.buyer_deal_flow.Crew")
+    @patch("ad_buyer.flows.buyer_deal_flow.create_dsp_agent")
     def test_evaluating_pricing_transition(
         self, mock_agent, mock_crew_cls, mock_task, dsp_flow_with_request
     ):
@@ -569,7 +569,7 @@ class TestDSPFlowStateTransitions:
             {"status": "success", "discovery_result": "results"}
         )
 
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.EVALUATING_PRICING
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.EVALUATING_PRICING
 
     def test_deal_created_transition(self, dsp_flow_with_request):
         """request_deal_id transitions to DEAL_CREATED on success."""
@@ -578,34 +578,34 @@ class TestDSPFlowStateTransitions:
 
         dsp_flow_with_request.request_deal_id({"status": "success"})
 
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.DEAL_CREATED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.DEAL_CREATED
 
     def test_failed_transition_on_empty_request(self, dsp_flow):
         """Empty request transitions to FAILED."""
         dsp_flow.state.request = ""
         dsp_flow.receive_request()
-        assert dsp_flow.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow.state.status == BuyerDealFlowStatus.FAILED
 
     def test_failed_transition_on_discovery_error(self, dsp_flow_with_request):
         """Discovery failure transitions to FAILED."""
         dsp_flow_with_request._discover_tool._run = MagicMock(side_effect=RuntimeError("error"))
         dsp_flow_with_request.discover_inventory({"status": "success"})
-        assert dsp_flow_with_request.state.status == DSPFlowStatus.FAILED
+        assert dsp_flow_with_request.state.status == BuyerDealFlowStatus.FAILED
 
 
 # ===========================================================================
-# run_dsp_deal_flow convenience function
+# run_buyer_deal_flow convenience function
 # ===========================================================================
 
 
 class TestRunDspDealFlowConvenience:
-    """Tests for the run_dsp_deal_flow helper function."""
+    """Tests for the run_buyer_deal_flow helper function."""
 
     def test_function_signature(self):
-        """run_dsp_deal_flow has the expected parameters."""
+        """run_buyer_deal_flow has the expected parameters."""
         import inspect
 
-        sig = inspect.signature(run_dsp_deal_flow)
+        sig = inspect.signature(run_buyer_deal_flow)
         params = list(sig.parameters.keys())
 
         assert "request" in params
@@ -621,7 +621,7 @@ class TestRunDspDealFlowConvenience:
         """Default deal type is PREFERRED_DEAL."""
         import inspect
 
-        sig = inspect.signature(run_dsp_deal_flow)
+        sig = inspect.signature(run_buyer_deal_flow)
         deal_type_default = sig.parameters["deal_type"].default
 
         assert deal_type_default == DealType.PREFERRED_DEAL

@@ -432,7 +432,7 @@ class TestMappingHelpers:
         assert result == BuyerCampaignStatus.INITIALIZED
 
     def test_from_dsp_flow_status_deal_created(self):
-        """Map DSPFlowStatus values to deal states."""
+        """Map BuyerDealFlowStatus values to deal states."""
         result = from_dsp_flow_status("deal_created")
         assert result == BuyerDealStatus.BOOKED
 

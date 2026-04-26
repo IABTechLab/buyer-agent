@@ -274,7 +274,7 @@ Both `emit_event()` and `emit_event_sync()` accept the same parameters:
 
 ## SQLite Persistence
 
-Events are persisted to a SQLite `events` table managed by the [DealStore](deal-store.md). This provides durability across process restarts, independent of the in-memory bus.
+Events are persisted to a SQLite `events` table managed by the DealStore (`storage/deal_store.py`). This provides durability across process restarts, independent of the in-memory bus.
 
 ### Events Table Schema
 
@@ -479,8 +479,8 @@ curl "http://localhost:8002/events/a1b2c3d4-5678-..."
 
 ## Related
 
-- [Deal Store](deal-store.md) --- SQLite persistence layer including the `events` table
-- [Order State Machine](state-machine.md) --- State transitions emit events for observability
+- Deal Store (`storage/deal_store.py`) --- SQLite persistence layer including the `events` table
+- Order State Machine (`models/state_machine.py`) --- State transitions emit events for observability
 - [Architecture Overview](overview.md) --- System architecture context
-- [Booking Flow](booking-flow.md) --- End-to-end workflow that emits campaign and deal events
+- Booking Flow (`flows/deal_booking_flow.py`) --- End-to-end workflow that emits campaign and deal events
 - [Seller Event Bus](https://iabtechlab.github.io/seller-agent/event-bus/overview/) --- Seller-side event bus implementation

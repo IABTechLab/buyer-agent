@@ -13,7 +13,7 @@ CLIENT_SOURCE_FILES = [
     "src/ad_buyer/clients/unified_client.py",
     "src/ad_buyer/clients/mcp_client.py",
     "src/ad_buyer/clients/a2a_client.py",
-    "src/ad_buyer/flows/dsp_deal_flow.py",
+    "src/ad_buyer/flows/buyer_deal_flow.py",
 ]
 
 # The URL pattern that should not appear as a default parameter value

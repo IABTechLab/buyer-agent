@@ -6,7 +6,7 @@
 These tests verify that:
 1. DealBookingFlow with store=None works unchanged (backward compatibility)
 2. DealBookingFlow with a store persists deal and booking data
-3. DSPDealFlow with a store persists deal data
+3. BuyerDealFlow with a store persists deal data
 4. API job tracking writes to the store via _persist_job
 """
 
@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
-from ad_buyer.flows.dsp_deal_flow import DSPDealFlow, DSPFlowStatus
+from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow, BuyerDealFlowStatus
 from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,
@@ -334,43 +334,43 @@ class TestDealBookingFlowWithStore:
 
 
 # -----------------------------------------------------------------------
-# DSPDealFlow backward compatibility (store=None)
+# BuyerDealFlow backward compatibility (store=None)
 # -----------------------------------------------------------------------
 
 
-class TestDSPDealFlowNoStore:
-    """Verify DSPDealFlow works identically when store=None."""
+class TestBuyerDealFlowNoStore:
+    """Verify BuyerDealFlow works identically when store=None."""
 
     def test_init_without_store(self, mock_unified_client, buyer_context):
         """Flow can be created without a store argument."""
-        flow = DSPDealFlow(mock_unified_client, buyer_context)
+        flow = BuyerDealFlow(mock_unified_client, buyer_context)
         assert flow._store is None
 
     def test_receive_request_no_store(self, mock_unified_client, buyer_context):
         """Request reception works without a store."""
-        flow = DSPDealFlow(mock_unified_client, buyer_context)
+        flow = BuyerDealFlow(mock_unified_client, buyer_context)
         flow.state.request = "Premium video inventory for Q2"
         result = flow.receive_request()
         assert result["status"] == "success"
-        assert flow.state.status == DSPFlowStatus.REQUEST_RECEIVED
+        assert flow.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
 
 
 # -----------------------------------------------------------------------
-# DSPDealFlow with store
+# BuyerDealFlow with store
 # -----------------------------------------------------------------------
 
 
-class TestDSPDealFlowWithStore:
-    """Verify DSPDealFlow persists data when store is provided."""
+class TestBuyerDealFlowWithStore:
+    """Verify BuyerDealFlow persists data when store is provided."""
 
     def test_init_with_store(self, mock_unified_client, buyer_context, deal_store):
         """Flow accepts and stores the DealStore reference."""
-        flow = DSPDealFlow(mock_unified_client, buyer_context, store=deal_store)
+        flow = BuyerDealFlow(mock_unified_client, buyer_context, store=deal_store)
         assert flow._store is deal_store
 
     def test_receive_request_persists_deal(self, mock_unified_client, buyer_context, deal_store):
         """Request reception creates a draft deal in the store."""
-        flow = DSPDealFlow(mock_unified_client, buyer_context, store=deal_store)
+        flow = BuyerDealFlow(mock_unified_client, buyer_context, store=deal_store)
         flow.state.request = "Premium video inventory for Q2"
         flow.state.deal_type = DealType.PREFERRED_DEAL
         flow.state.impressions = 500000
@@ -399,7 +399,7 @@ class TestDSPDealFlowWithStore:
         broken_store.connect()
         broken_store.disconnect()
 
-        flow = DSPDealFlow(mock_unified_client, buyer_context, store=broken_store)
+        flow = BuyerDealFlow(mock_unified_client, buyer_context, store=broken_store)
         flow.state.request = "Premium video inventory"
 
         # Should not raise
