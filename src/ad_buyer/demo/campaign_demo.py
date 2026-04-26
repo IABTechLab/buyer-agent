@@ -1194,15 +1194,127 @@ def _register_routes(
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
-    """Run the campaign demo development server."""
+def _run_headless(database_url: str, sample_index: int = 0, output: str = "json") -> int:
+    """Drive a sample campaign through all stages without Flask (ar-jzek).
+
+    Uses the same Flask app + test client so headless output stays consistent
+    with what the interactive demo would do — but never binds a port.
+
+    Stages emitted as one JSON object per stage to stdout:
+        {"stage": "1-brief", "status": "...", "campaign_id": "...", ...}
+
+    Args:
+        database_url: SQLite connection string (same as `main()`).
+        sample_index: which entry from `_build_sample_briefs()` to run.
+        output: "json" emits one JSON object per stage; "summary" emits
+            a short human-readable line per stage.
+
+    Returns:
+        Process exit code. 0 on success, non-zero on stage failure.
+    """
+
+    app = create_campaign_demo_app(database_url=database_url)
+    samples = _build_sample_briefs()
+    if not samples:
+        print(json.dumps({"error": "no sample briefs available"}))
+        return 2
+    if not 0 <= sample_index < len(samples):
+        print(json.dumps({
+            "error": f"sample_index {sample_index} out of range; have {len(samples)}",
+        }))
+        return 2
+
+    brief = samples[sample_index]["brief"]
+
+    def _emit(stage: str, payload: dict[str, Any]) -> None:
+        if output == "json":
+            print(json.dumps({"stage": stage, **payload}, default=str))
+        else:
+            print(f"[{stage}] {payload.get('status', '?')} "
+                  f"campaign={payload.get('campaign_id', '-')}")
+
+    client = app.test_client()
+
+    # Stage 1: Submit brief
+    r = client.post("/api/submit-brief", json=brief)
+    if r.status_code != 200 or not (r.get_json() or {}).get("success"):
+        body = r.get_json() or {}
+        _emit("1-brief", {"status": "failed", "http": r.status_code, "error": body.get("error", "?")})
+        return 1
+    campaign_id = r.get_json().get("campaign_id")
+    _emit("1-brief", {"status": "submitted", "campaign_id": campaign_id})
+
+    # Helper: POST to an approval endpoint with {campaign_id} body
+    def _approve(stage: str, route: str) -> int:
+        rr = client.post(route, json={"campaign_id": campaign_id})
+        body = rr.get_json() or {}
+        ok = rr.status_code == 200 and body.get("success") is True
+        _emit(stage, {
+            "status": "approved" if ok else "failed",
+            "campaign_id": campaign_id,
+            "http": rr.status_code,
+            **({"error": body.get("error", "?")} if not ok else {}),
+        })
+        return 0 if ok else 1
+
+    # Stage 2: Approve plan
+    if (rc := _approve("2-plan", "/api/approve-plan")) != 0:
+        return rc
+
+    # Stage 3: Approve booking (deals)
+    if (rc := _approve("3-booking", "/api/approve-booking")) != 0:
+        return rc
+
+    # Stage 4: Approve creative
+    if (rc := _approve("4-creative", "/api/approve-creative")) != 0:
+        return rc
+
+    # Stage 5: Activate campaign
+    if (rc := _approve("5-activate", "/api/activate-campaign")) != 0:
+        return rc
+
+    # Stage 6: Final report
+    r = client.get(f"/api/campaign/{campaign_id}/report")
+    body = r.get_json() if r.status_code == 200 else {}
+    _emit("6-report", {
+        "status": "ok" if r.status_code == 200 else "failed",
+        "campaign_id": campaign_id,
+        "http": r.status_code,
+        "report_keys": list(body.keys()) if isinstance(body, dict) else None,
+    })
+    return 0 if r.status_code == 200 else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Run the campaign demo. Default = Flask dev server; --headless skips it.
+
+    Per ar-jzek: --headless runs through all 6 stages programmatically and
+    emits JSON per stage. Useful for CI smoke tests, demo-canary scripts, and
+    one-shot validation without a browser.
+    """
+
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="campaign_demo")
+    parser.add_argument("--headless", action="store_true",
+                        help="Run all stages programmatically (no Flask server, no browser)")
+    parser.add_argument("--json", action="store_true",
+                        help="With --headless: emit one JSON object per stage to stdout (default)")
+    parser.add_argument("--summary", action="store_true",
+                        help="With --headless: emit one short human-readable line per stage")
+    parser.add_argument("--sample-index", type=int, default=0,
+                        help="With --headless: which sample brief (0-based)")
+    args = parser.parse_args(argv)
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    db_path = os.environ.get(
-        "CAMPAIGN_DEMO_DB", "sqlite:///campaign_demo.db"
-    )
-    app = create_campaign_demo_app(database_url=db_path)
+    db_path = os.environ.get("CAMPAIGN_DEMO_DB", "sqlite:///campaign_demo.db")
 
+    if args.headless:
+        output = "summary" if args.summary else "json"
+        return _run_headless(db_path, sample_index=args.sample_index, output=output)
+
+    app = create_campaign_demo_app(database_url=db_path)
     port = int(os.environ.get("CAMPAIGN_DEMO_PORT", "5055"))
     print(f"\n  Campaign Automation Demo running at http://localhost:{port}\n")
     print("  Stages:")
@@ -1214,7 +1326,8 @@ def main() -> None:
     print("    6. Active Campaign   -> Pacing dashboard, alerts, controls")
     print()
     app.run(host="0.0.0.0", port=port, debug=True)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
