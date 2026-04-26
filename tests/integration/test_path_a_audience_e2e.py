@@ -783,33 +783,50 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
         # uses the same field names so reading the buyer's JSON dict per-ref
         # works directly.
         #
-        # Path resolution (per ar-840n): default targets the canonical
-        # `.worktrees/audience-extension` companion alongside the buyer
-        # worktree, but tests can override via the `AD_SELLER_SRC_PATH`
-        # env var (e.g., when §20 / future Path B tests run from a
-        # different worktree name or a CI runner with a non-standard
-        # layout). Falls back to the seller repo's main `src/` when no
-        # worktree exists.
+        # Path resolution (per ar-840n / ar-e2rj): tests can override via
+        # the `AD_SELLER_SRC_PATH` env var (e.g., for CI runners with a
+        # non-standard layout). Otherwise, walk up from this file to find
+        # the buyer repo root (named `ad_buyer_system`) and its parent;
+        # the seller repo is at `<parent>/ad_seller_system`. If we're
+        # running inside a buyer worktree (`<repo>/.worktrees/<name>/...`),
+        # prefer the matching seller worktree; otherwise fall back to the
+        # seller repo's canonical `src/`.
         seller_src = os.environ.get("AD_SELLER_SRC_PATH")
         if not seller_src:
-            # File path layout:
-            #   parent/ad_buyer_system/.worktrees/<worktree>/tests/integration/<this>
-            #                                   ^^^^^^^^^^^^^^ buyer_worktree_root = parents[2]
-            # parent (agent_range root) = parents[5]
-            buyer_worktree_root = Path(__file__).resolve().parents[2]
-            worktree_name = buyer_worktree_root.name
-            agent_range_root = buyer_worktree_root.parents[2]
-            sibling_worktree = (
-                agent_range_root
-                / "ad_seller_system"
-                / ".worktrees"
-                / worktree_name
-                / "src"
+            here = Path(__file__).resolve()
+            buyer_repo_root = next(
+                (p for p in here.parents if p.name == "ad_buyer_system"),
+                None,
             )
+            if buyer_repo_root is None:
+                raise RuntimeError(
+                    "Could not locate ad_buyer_system in path ancestry "
+                    f"of {here}; set AD_SELLER_SRC_PATH to override."
+                )
+            agent_range_root = buyer_repo_root.parent
             seller_main = agent_range_root / "ad_seller_system" / "src"
-            seller_src = str(
-                sibling_worktree if sibling_worktree.is_dir() else seller_main
-            )
+            # Detect worktree: ad_buyer_system/.worktrees/<name>/...
+            worktree_name: str | None = None
+            for parent, grandparent in zip(here.parents, here.parents[1:]):
+                if (
+                    grandparent.name == ".worktrees"
+                    and grandparent.parent.name == "ad_buyer_system"
+                ):
+                    worktree_name = parent.name
+                    break
+            if worktree_name is not None:
+                sibling_worktree = (
+                    agent_range_root
+                    / "ad_seller_system"
+                    / ".worktrees"
+                    / worktree_name
+                    / "src"
+                )
+                seller_src = str(
+                    sibling_worktree if sibling_worktree.is_dir() else seller_main
+                )
+            else:
+                seller_src = str(seller_main)
         sys.path.insert(0, seller_src)
         try:
             from ad_seller.models.audience_ref import AudienceRef as SellerRef
