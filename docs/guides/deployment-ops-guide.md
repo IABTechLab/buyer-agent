@@ -652,7 +652,7 @@ The buyer agent exposes its own MCP server for external clients (Claude Desktop,
 MCP endpoint:
 
 ```
-http://localhost:8001/mcp/sse
+http://localhost:8001/mcp/sse/sse
 ```
 
 Available tool categories:
@@ -673,7 +673,7 @@ Add the buyer agent to your Claude Desktop MCP configuration (`~/Library/Applica
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8001/mcp/sse"
+        "http://localhost:8001/mcp/sse/sse"
       ]
     }
   }
@@ -690,7 +690,7 @@ Any client supporting Streamable HTTP (SSE) transport can connect:
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-async with streamablehttp_client("http://localhost:8001/mcp/sse") as (read, write, _):
+async with streamablehttp_client("http://localhost:8001/mcp/sse/sse") as (read, write, _):
     async with ClientSession(read, write) as session:
         await session.initialize()
         tools = await session.list_tools()
