@@ -47,7 +47,7 @@ from ..tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 logger = logging.getLogger(__name__)
 
 
-class DSPFlowStatus(str, Enum):
+class BuyerDealFlowStatus(str, Enum):
     """Status values for the DSP deal flow."""
 
     INITIALIZED = "initialized"
@@ -73,7 +73,7 @@ class DiscoveredProduct(BaseModel):
     score: float = Field(default=0.0, description="Match score for the request")
 
 
-class DSPFlowState(BaseModel):
+class BuyerDealFlowState(BaseModel):
     """State model for the DSP deal discovery flow."""
 
     # Input
@@ -138,8 +138,8 @@ class DSPFlowState(BaseModel):
     )
 
     # Execution tracking
-    status: DSPFlowStatus = Field(
-        default=DSPFlowStatus.INITIALIZED,
+    status: BuyerDealFlowStatus = Field(
+        default=BuyerDealFlowStatus.INITIALIZED,
         description="Current flow status",
     )
     errors: list[str] = Field(default_factory=list)
@@ -149,7 +149,7 @@ class DSPFlowState(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class DSPDealFlow(Flow[DSPFlowState]):
+class BuyerDealFlow(Flow[BuyerDealFlowState]):
     """Event-driven flow for DSP deal discovery and Deal ID creation.
 
     This flow enables the DSP use case where:
@@ -275,7 +275,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
         if not request:
             self.state.errors.append("No deal request provided")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "errors": self.state.errors}
 
         # Audience planning: run BEFORE any seller-bound call so the plan
@@ -290,7 +290,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
                 self.state.audience_plan = planner_result.plan
                 if planner_result.plan is not None:
                     logger.info(
-                        "dsp_deal_flow: audience plan resolved "
+                        "buyer_deal_flow: audience plan resolved "
                         "(audience_plan_id=%s)",
                         planner_result.plan.audience_plan_id,
                     )
@@ -299,7 +299,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
                 # not break the deal flow -- record the warning and keep
                 # going audience-blind so legacy callers see no regression.
                 logger.warning(
-                    "dsp_deal_flow: audience planner failed (%s); "
+                    "buyer_deal_flow: audience planner failed (%s); "
                     "continuing audience-blind",
                     e,
                 )
@@ -308,7 +308,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
         # Store buyer context in state
         self.state.buyer_context = self._buyer_context.model_dump()
 
-        self.state.status = DSPFlowStatus.REQUEST_RECEIVED
+        self.state.status = BuyerDealFlowStatus.REQUEST_RECEIVED
         self.state.updated_at = utc_now()
 
         # Emit quote.requested event
@@ -355,7 +355,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
             return request_result
 
         try:
-            self.state.status = DSPFlowStatus.DISCOVERING_INVENTORY
+            self.state.status = BuyerDealFlowStatus.DISCOVERING_INVENTORY
 
             # Extract filters from request
             discovery_result = self._discover_tool._run(
@@ -382,7 +382,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
 
         except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Inventory discovery failed: {e}")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
     @listen(discover_inventory)
@@ -397,7 +397,7 @@ class DSPDealFlow(Flow[DSPFlowState]):
             return discovery_result
 
         try:
-            self.state.status = DSPFlowStatus.EVALUATING_PRICING
+            self.state.status = BuyerDealFlowStatus.EVALUATING_PRICING
 
             # Create crew for intelligent selection
             dsp_agent = create_dsp_agent(
@@ -465,7 +465,7 @@ Return the product_id of the best matching product and explain why.""",
 
         except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Product selection failed: {e}")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
     def _extract_product_id(self, text: str) -> Optional[str]:
@@ -496,11 +496,11 @@ Return the product_id of the best matching product and explain why.""",
         product_id = self.state.selected_product_id
         if not product_id:
             self.state.errors.append("No product selected for deal creation")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": "No product selected"}
 
         try:
-            self.state.status = DSPFlowStatus.REQUESTING_DEAL
+            self.state.status = BuyerDealFlowStatus.REQUESTING_DEAL
 
             # Forward the AudiencePlan (when present) so the seller-bound
             # call carries the typed plan onto the wire per the §5
@@ -518,7 +518,7 @@ Return the product_id of the best matching product and explain why.""",
 
             # Store deal response
             self.state.deal_response = {"raw": deal_result}
-            self.state.status = DSPFlowStatus.DEAL_CREATED
+            self.state.status = BuyerDealFlowStatus.DEAL_CREATED
             self.state.updated_at = utc_now()
 
             # Persist deal creation status
@@ -542,7 +542,7 @@ Return the product_id of the best matching product and explain why.""",
 
         except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Deal request failed: {e}")
-            self.state.status = DSPFlowStatus.FAILED
+            self.state.status = BuyerDealFlowStatus.FAILED
             self._persist_deal_status("failed")
             return {"status": "failed", "error": str(e)}
 
@@ -585,7 +585,7 @@ Return the product_id of the best matching product and explain why.""",
         return self._audience_planner_result
 
 
-async def run_dsp_deal_flow(
+async def run_buyer_deal_flow(
     request: str,
     buyer_identity: BuyerIdentity,
     deal_type: DealType = DealType.PREFERRED_DEAL,
@@ -636,7 +636,7 @@ async def run_dsp_deal_flow(
     # Create client
     async with UnifiedClient(base_url=base_url) as client:
         # Create and run flow
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=client,
             buyer_context=buyer_context,
             store=store,

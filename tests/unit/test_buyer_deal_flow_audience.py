@@ -4,7 +4,7 @@
 """Tests for AudiencePlan threading through BuyerDealFlow (Path B).
 
 Bead ar-ts30 §18 -- Path B of the Audience Planner wiring. Verifies the
-deal-flow path (`DSPDealFlow`, the renamed BuyerDealFlow) invokes the
+deal-flow path (`BuyerDealFlow`, the renamed BuyerDealFlow) invokes the
 same Audience Planner step that ``CampaignPipeline`` (Path A) uses, and
 that the resulting ``AudiencePlan`` survives every flow stage and rides
 on the seller-bound ``DealRequest`` payload.
@@ -34,7 +34,7 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 
-from ad_buyer.flows.dsp_deal_flow import DSPDealFlow, DSPFlowStatus
+from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow, BuyerDealFlowStatus
 from ad_buyer.models.audience_plan import AudiencePlan, AudienceRef
 from ad_buyer.models.buyer_identity import (
     BuyerContext,
@@ -114,7 +114,7 @@ def mock_unified_client() -> MagicMock:
     return client
 
 
-def _seed_request_state(flow: DSPDealFlow) -> None:
+def _seed_request_state(flow: BuyerDealFlow) -> None:
     """Populate the minimal request fields the @start step expects."""
 
     flow.state.request = "CTV inventory for auto intenders under $30 CPM"
@@ -137,7 +137,7 @@ class TestPlannerRunsOnReceiveRequest:
         self, mock_unified_client: MagicMock
     ) -> None:
         brief = _make_brief()
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -147,7 +147,7 @@ class TestPlannerRunsOnReceiveRequest:
         result = flow.receive_request()
 
         assert result["status"] == "success"
-        assert flow.state.status == DSPFlowStatus.REQUEST_RECEIVED
+        assert flow.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
         # The planner must have produced a typed AudiencePlan on state.
         assert isinstance(flow.state.audience_plan, AudiencePlan)
         # And cached the planner result for introspection.
@@ -160,7 +160,7 @@ class TestPlannerRunsOnReceiveRequest:
     ) -> None:
         """Legacy callers (no brief) must keep the original audience-blind path."""
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
         )
@@ -192,7 +192,7 @@ class TestExplicitBriefPreserved:
         original_primary_identifier = original.primary.identifier
         original_primary_source = original.primary.source
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -234,7 +234,7 @@ class TestLegacyBriefMigration:
         assert brief.target_audience.primary.identifier == "auto_intenders_25_54"
         assert brief.target_audience.primary.source == "inferred"
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -278,7 +278,7 @@ class TestAudiencePlanCrossesSellerBoundary:
     ) -> None:
         """request_deal_id must call the deal tool with the AudiencePlan."""
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
         )
@@ -372,7 +372,7 @@ class TestPlanIdStableThroughStages:
         self, mock_unified_client: MagicMock
     ) -> None:
         brief = _make_brief()
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -408,7 +408,7 @@ class TestPlanIdStableThroughStages:
         """get_status() exposes audience_plan_id once the planner has run."""
 
         brief = _make_brief()
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -428,7 +428,7 @@ class TestPlanIdStableThroughStages:
         """A pre-set audience_plan on state must NOT be overwritten by the planner."""
 
         brief = _make_brief()
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,

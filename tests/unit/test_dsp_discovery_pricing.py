@@ -7,7 +7,7 @@ Covers:
 - DiscoverInventoryTool: filters, formatting, edge cases
 - GetPricingTool: tier calculations, volume discounts, cost projections
 - RequestDealTool: deal creation, negotiation, validation, deal ID generation
-- DSPDealFlow: state machine, flow steps, error propagation
+- BuyerDealFlow: state machine, flow steps, error propagation
 - UnifiedClient DSP methods: discover_inventory, get_pricing, request_deal
 - Cross-tier pricing consistency across tools and client
 """
@@ -18,11 +18,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ad_buyer.clients.unified_client import UnifiedClient
-from ad_buyer.flows.dsp_deal_flow import (
+from ad_buyer.flows.buyer_deal_flow import (
     DiscoveredProduct,
-    DSPDealFlow,
-    DSPFlowState,
-    DSPFlowStatus,
+    BuyerDealFlow,
+    BuyerDealFlowState,
+    BuyerDealFlowStatus,
 )
 from ad_buyer.models.buyer_identity import (
     AccessTier,
@@ -888,17 +888,17 @@ class TestDealResponseModel:
 
 
 # =============================================================================
-# DSPFlowState model tests
+# BuyerDealFlowState model tests
 # =============================================================================
 
 
-class TestDSPFlowState:
-    """Tests for DSPFlowState model."""
+class TestBuyerDealFlowState:
+    """Tests for BuyerDealFlowState model."""
 
     def test_default_state(self):
         """Default state should be initialized with sensible defaults."""
-        state = DSPFlowState()
-        assert state.status == DSPFlowStatus.INITIALIZED
+        state = BuyerDealFlowState()
+        assert state.status == BuyerDealFlowStatus.INITIALIZED
         assert state.request == ""
         assert state.deal_type == DealType.PREFERRED_DEAL
         assert state.impressions is None
@@ -908,7 +908,7 @@ class TestDSPFlowState:
 
     def test_state_with_values(self):
         """State should accept all field values."""
-        state = DSPFlowState(
+        state = BuyerDealFlowState(
             request="CTV inventory",
             deal_type=DealType.PROGRAMMATIC_GUARANTEED,
             impressions=5_000_000,
@@ -958,61 +958,61 @@ class TestDiscoveredProduct:
 
 
 # =============================================================================
-# DSPDealFlow - State Machine Tests
+# BuyerDealFlow - State Machine Tests
 # =============================================================================
 
 
-class TestDSPDealFlowInit:
-    """Tests for DSPDealFlow initialization."""
+class TestBuyerDealFlowInit:
+    """Tests for BuyerDealFlow initialization."""
 
     def test_flow_creates_all_tools(self, mock_client, agency_context):
         """Flow should initialize all three DSP tools."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         assert flow._discover_tool is not None
         assert flow._pricing_tool is not None
         assert flow._deal_tool is not None
 
     def test_flow_initial_state(self, mock_client, agency_context):
         """Flow state should start as INITIALIZED."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
-        assert flow.state.status == DSPFlowStatus.INITIALIZED
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
+        assert flow.state.status == BuyerDealFlowStatus.INITIALIZED
 
 
-class TestDSPDealFlowReceiveRequest:
+class TestBuyerDealFlowReceiveRequest:
     """Tests for the receive_request step."""
 
     def test_empty_request_fails(self, mock_client, agency_context):
         """Empty request should set status to FAILED."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = ""
         result = flow.receive_request()
         assert result["status"] == "failed"
-        assert flow.state.status == DSPFlowStatus.FAILED
+        assert flow.state.status == BuyerDealFlowStatus.FAILED
         assert len(flow.state.errors) > 0
 
     def test_valid_request_succeeds(self, mock_client, agency_context):
         """Valid request should set status to REQUEST_RECEIVED."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = "CTV inventory under $25"
         result = flow.receive_request()
         assert result["status"] == "success"
-        assert flow.state.status == DSPFlowStatus.REQUEST_RECEIVED
+        assert flow.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
         assert result["access_tier"] == "agency"
 
     def test_request_stores_buyer_context(self, mock_client, advertiser_context):
         """receive_request should store serialized buyer context."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=advertiser_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=advertiser_context)
         flow.state.request = "Display ads"
         flow.receive_request()
         assert flow.state.buyer_context is not None
 
 
-class TestDSPDealFlowGetStatus:
+class TestBuyerDealFlowGetStatus:
     """Tests for the get_status method."""
 
     def test_get_status_initial(self, mock_client, agency_context):
         """get_status should reflect current flow state."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = "test"
         status = flow.get_status()
         assert status["status"] == "initialized"
@@ -1021,7 +1021,7 @@ class TestDSPDealFlowGetStatus:
 
     def test_get_status_after_failure(self, mock_client, agency_context):
         """get_status should show failure state."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = ""
         flow.receive_request()
         status = flow.get_status()
@@ -1029,12 +1029,12 @@ class TestDSPDealFlowGetStatus:
         assert len(status["errors"]) > 0
 
 
-class TestDSPDealFlowDiscoverInventory:
+class TestBuyerDealFlowDiscoverInventory:
     """Tests for the discover_inventory step."""
 
     def test_discover_skips_on_failed_request(self, mock_client, agency_context):
         """discover_inventory should pass through failure."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         failed_result = {"status": "failed", "errors": ["bad request"]}
         result = flow.discover_inventory(failed_result)
         assert result["status"] == "failed"
@@ -1042,7 +1042,7 @@ class TestDSPDealFlowDiscoverInventory:
     def test_discover_calls_tool_run(self, mock_client, agency_context):
         """discover_inventory should call the discover tool's _run method."""
         mock_client.search_products.return_value = MagicMock(success=True, data=[_product()])
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = "CTV inventory"
         flow.state.max_cpm = 30.0
         flow.state.impressions = 2_000_000
@@ -1050,12 +1050,12 @@ class TestDSPDealFlowDiscoverInventory:
         result = flow.discover_inventory({"status": "success"})
         assert result["status"] == "success"
         assert "discovery_result" in result
-        assert flow.state.status == DSPFlowStatus.DISCOVERING_INVENTORY
+        assert flow.state.status == BuyerDealFlowStatus.DISCOVERING_INVENTORY
 
     def test_discover_handles_tool_exception(self, mock_client, agency_context):
         """Exception in discover tool should be caught and recorded."""
         mock_client.search_products.side_effect = ConnectionError("network down")
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.request = "anything"
 
         result = flow.discover_inventory({"status": "success"})
@@ -1065,73 +1065,73 @@ class TestDSPDealFlowDiscoverInventory:
         assert result["status"] in ("success", "failed")
 
 
-class TestDSPDealFlowRequestDealId:
+class TestBuyerDealFlowRequestDealId:
     """Tests for the request_deal_id step."""
 
     def test_request_deal_skips_on_failure(self, mock_client, agency_context):
         """request_deal_id should pass through failure."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         result = flow.request_deal_id({"status": "failed", "error": "no products"})
         assert result["status"] == "failed"
 
     def test_request_deal_no_product_selected(self, mock_client, agency_context):
         """request_deal_id with no selected product should fail."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.selected_product_id = None
         result = flow.request_deal_id({"status": "success"})
         assert result["status"] == "failed"
         assert "No product selected" in result.get("error", "")
-        assert flow.state.status == DSPFlowStatus.FAILED
+        assert flow.state.status == BuyerDealFlowStatus.FAILED
 
     def test_request_deal_creates_deal(self, mock_client, agency_context):
         """request_deal_id with valid product should create a deal."""
         mock_client.get_product.return_value = MagicMock(success=True, data=_product())
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         flow.state.selected_product_id = "prod_001"
         flow.state.deal_type = DealType.PREFERRED_DEAL
         flow.state.impressions = 1_000_000
 
         result = flow.request_deal_id({"status": "success"})
         assert result["status"] == "success"
-        assert flow.state.status == DSPFlowStatus.DEAL_CREATED
+        assert flow.state.status == BuyerDealFlowStatus.DEAL_CREATED
         assert flow.state.deal_response is not None
 
 
-class TestDSPDealFlowExtractProductId:
+class TestBuyerDealFlowExtractProductId:
     """Tests for _extract_product_id helper."""
 
     def test_extract_from_product_id_format(self, mock_client, agency_context):
         """Should extract from 'product_id: xxx' format."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         result = flow._extract_product_id("product_id: ctv_premium_001")
         assert result == "ctv_premium_001"
 
     def test_extract_from_product_id_colon(self, mock_client, agency_context):
         """Should extract from 'Product ID: xxx' format."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         result = flow._extract_product_id("The best option is Product ID: display_001")
         assert result == "display_001"
 
     def test_extract_returns_none_when_not_found(self, mock_client, agency_context):
         """Should return None if no product ID pattern found."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         result = flow._extract_product_id("This text has no product reference at all.")
         assert result is None
 
     def test_extract_from_id_format(self, mock_client, agency_context):
         """Should extract from generic 'id: xxx' format."""
-        flow = DSPDealFlow(client=mock_client, buyer_context=agency_context)
+        flow = BuyerDealFlow(client=mock_client, buyer_context=agency_context)
         result = flow._extract_product_id("id: prod_abc")
         assert result == "prod_abc"
 
 
 # =============================================================================
-# DSPFlowStatus enum tests
+# BuyerDealFlowStatus enum tests
 # =============================================================================
 
 
-class TestDSPFlowStatus:
-    """Tests for DSPFlowStatus enum values."""
+class TestBuyerDealFlowStatus:
+    """Tests for BuyerDealFlowStatus enum values."""
 
     def test_all_status_values(self):
         """All expected status values should be defined."""
@@ -1144,7 +1144,7 @@ class TestDSPFlowStatus:
             "deal_created",
             "failed",
         }
-        actual = {s.value for s in DSPFlowStatus}
+        actual = {s.value for s in BuyerDealFlowStatus}
         assert actual == expected
 
 

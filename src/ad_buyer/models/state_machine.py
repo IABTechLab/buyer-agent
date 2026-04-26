@@ -16,7 +16,7 @@ the seller's OrderStateMachine framework.  Provides:
   PAUSED/PACING_HOLD distinction, and validate_transition() method
 - Linear TV extensions: makegood_pending, partially_canceled
 
-Existing code continues to work: ExecutionStatus and DSPFlowStatus are
+Existing code continues to work: ExecutionStatus and BuyerDealFlowStatus are
 preserved and mapped into the new enums where flows need the machine.
 
 Pure Pydantic + stdlib -- no external dependencies.
@@ -639,5 +639,5 @@ def from_execution_status(value: str) -> BuyerCampaignStatus:
 
 
 def from_dsp_flow_status(value: str) -> BuyerDealStatus:
-    """Map a legacy DSPFlowStatus value to BuyerDealStatus."""
+    """Map a legacy BuyerDealFlowStatus value to BuyerDealStatus."""
     return _DSP_FLOW_STATUS_MAP.get(value, BuyerDealStatus.QUOTED)

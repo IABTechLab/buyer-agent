@@ -7,7 +7,7 @@ Bead ar-6ipo / proposal §6 row 20 -- the buyer-side end-to-end test for
 the two non-CampaignPipeline deal-finding entry points identified in
 proposal §5.3:
 
-  - **Path B1: BuyerDealFlow / DSPDealFlow** -- the brief-driven flow
+  - **Path B1: BuyerDealFlow / BuyerDealFlow** -- the brief-driven flow
     that materializes a seller-bound DealRequest payload.
   - **Path B2: direct channel-crew invocation** -- the demo/test path
     via ``kickoff_channel_crew_with_audience``.
@@ -55,7 +55,7 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-path-b-e2e")
 import pytest
 
 from ad_buyer.crews.channel_crews import kickoff_channel_crew_with_audience
-from ad_buyer.flows.dsp_deal_flow import DSPDealFlow, DSPFlowStatus
+from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow, BuyerDealFlowStatus
 from ad_buyer.models.audience_plan import (
     AudiencePlan,
     AudienceRef,
@@ -171,7 +171,7 @@ def _agency_buyer_context() -> BuyerContext:
     return BuyerContext(identity=identity, is_authenticated=True)
 
 
-def _seed_dsp_request_state(flow: DSPDealFlow) -> None:
+def _seed_dsp_request_state(flow: BuyerDealFlow) -> None:
     """Populate the @start step's required request fields on the flow."""
 
     flow.state.request = "CTV inventory for auto intenders under $30 CPM"
@@ -239,7 +239,7 @@ class TestBuyerDealFlowThreeTypeHappyPath:
         assert brief.target_audience is not None
         original_plan_id = brief.target_audience.audience_plan_id
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -249,7 +249,7 @@ class TestBuyerDealFlowThreeTypeHappyPath:
         result = flow.receive_request()
 
         assert result["status"] == "success"
-        assert flow.state.status == DSPFlowStatus.REQUEST_RECEIVED
+        assert flow.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
 
         plan = flow.state.audience_plan
         assert isinstance(plan, AudiencePlan)
@@ -282,7 +282,7 @@ class TestBuyerDealFlowThreeTypeHappyPath:
         """
 
         brief = _three_type_brief()
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -349,7 +349,7 @@ class TestBuyerDealFlowLegacyMigration:
             for ext in brief.target_audience.extensions
         )
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -467,7 +467,7 @@ class TestBuyerDealFlowSerializationParity:
 
         brief = _three_type_brief()
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -537,7 +537,7 @@ class TestBuyerDealFlowCapabilityDegradation:
             new=AsyncMock(return_value=[]),
         ):
             brief = _three_type_brief()
-            flow = DSPDealFlow(
+            flow = BuyerDealFlow(
                 client=mock_unified_client,
                 buyer_context=_agency_buyer_context(),
                 brief=brief,
@@ -599,7 +599,7 @@ class TestBuyerDealFlowCapabilityDegradation:
             # The brief threads through cleanly even with the seller
             # advertising the legacy profile.
             brief = _three_type_brief()
-            flow = DSPDealFlow(
+            flow = BuyerDealFlow(
                 client=mock_unified_client,
                 buyer_context=_agency_buyer_context(),
                 brief=brief,
@@ -640,7 +640,7 @@ class TestBuyerDealFlowPreSetPlanPrecedence:
         """
 
         brief = _three_type_brief()  # would drive a planner run if not preset
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
             brief=brief,
@@ -692,7 +692,7 @@ class TestBuyerDealFlowPreSetPlanPrecedence:
             rationale="Pre-seeded by parent pipeline (agentic primary).",
         )
 
-        flow = DSPDealFlow(
+        flow = BuyerDealFlow(
             client=mock_unified_client,
             buyer_context=_agency_buyer_context(),
         )

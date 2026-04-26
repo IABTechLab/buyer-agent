@@ -231,7 +231,7 @@ class DealRequest(BaseModel):
         description="Additional notes or requirements for the deal",
     )
 
-    # Typed audience plan threaded from BuyerDealFlow (formerly DSPDealFlow).
+    # Typed audience plan threaded from BuyerDealFlow (formerly BuyerDealFlow).
     # Mirrors the field added to QuoteRequest / DealBookingRequest in
     # `models/deals.py` per proposal §5.2 + §5.3 / bead ar-vp4q §5.
     # None on legacy paths that have not yet been wired through; populated
