@@ -45,6 +45,7 @@ import os
 import sys
 import uuid
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -781,11 +782,35 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
         # python path so we can validate refs through its model. The seller
         # uses the same field names so reading the buyer's JSON dict per-ref
         # works directly.
-        sys.path.insert(
-            0,
-            "/Users/aidancardella/dev/agent_range/ad_seller_system/"
-            ".worktrees/audience-extension/src",
-        )
+        #
+        # Path resolution (per ar-840n): default targets the canonical
+        # `.worktrees/audience-extension` companion alongside the buyer
+        # worktree, but tests can override via the `AD_SELLER_SRC_PATH`
+        # env var (e.g., when §20 / future Path B tests run from a
+        # different worktree name or a CI runner with a non-standard
+        # layout). Falls back to the seller repo's main `src/` when no
+        # worktree exists.
+        seller_src = os.environ.get("AD_SELLER_SRC_PATH")
+        if not seller_src:
+            # File path layout:
+            #   parent/ad_buyer_system/.worktrees/<worktree>/tests/integration/<this>
+            #                                   ^^^^^^^^^^^^^^ buyer_worktree_root = parents[2]
+            # parent (agent_range root) = parents[5]
+            buyer_worktree_root = Path(__file__).resolve().parents[2]
+            worktree_name = buyer_worktree_root.name
+            agent_range_root = buyer_worktree_root.parents[2]
+            sibling_worktree = (
+                agent_range_root
+                / "ad_seller_system"
+                / ".worktrees"
+                / worktree_name
+                / "src"
+            )
+            seller_main = agent_range_root / "ad_seller_system" / "src"
+            seller_src = str(
+                sibling_worktree if sibling_worktree.is_dir() else seller_main
+            )
+        sys.path.insert(0, seller_src)
         try:
             from ad_seller.models.audience_ref import AudienceRef as SellerRef
         finally:
