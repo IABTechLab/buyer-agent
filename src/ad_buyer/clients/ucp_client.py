@@ -46,6 +46,29 @@ EmbeddingProvenance = Literal[
 LOCAL_EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 LOCAL_EMBEDDING_MODEL_DIM = 384
 
+# Per-mode similarity thresholds (E2-4). Mock SHA256-seeded vectors
+# saturate quickly because each fixture lands in a unique random subspace,
+# so the "strong" threshold has to be tighter to avoid false matches.
+# Real sentence-transformers vectors live in a smoother semantic space and
+# tolerate the original 0.7 strong threshold. Advertiser-supplied vectors
+# follow the same convention as the buyer's local model. Re-derive these
+# from `ad_buyer.eval.evaluate_embedding_modes()` whenever the model swaps.
+_SIMILARITY_THRESHOLDS: dict[str, dict[str, float]] = {
+    "mock":               {"strong": 0.85, "moderate": 0.65, "weak": 0.40},
+    "local":              {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "advertiser":         {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "hybrid":             {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+}
+_DEFAULT_THRESHOLDS = _SIMILARITY_THRESHOLDS["mock"]
+
+
+def _similarity_thresholds_for_mode() -> dict[str, float]:
+    """Return per-mode similarity thresholds (E2-4)."""
+
+    from ..config.settings import settings
+
+    return _SIMILARITY_THRESHOLDS.get(settings.embedding_mode, _DEFAULT_THRESHOLDS)
+
 # Process-wide cached SentenceTransformer instance. Lazy-loaded on first
 # use to avoid paying ~80MB model download cost at import time.
 _LOCAL_MODEL: Any = None
@@ -586,16 +609,18 @@ class UCPClient:
                 validation_notes=[f"Exchange failed: {exchange_result.error}"],
             )
 
-        # Determine validation status based on similarity
+        # Determine validation status based on similarity, with thresholds
+        # tuned per `settings.embedding_mode` per E2-4.
         similarity = exchange_result.similarity_score or 0.0
+        thresholds = _similarity_thresholds_for_mode()
 
-        if similarity >= 0.7:
+        if similarity >= thresholds["strong"]:
             status = "valid"
             compatible = True
-        elif similarity >= 0.5:
+        elif similarity >= thresholds["moderate"]:
             status = "partial_match"
             compatible = True
-        elif similarity >= 0.3:
+        elif similarity >= thresholds["weak"]:
             status = "partial_match"
             compatible = False
         else:

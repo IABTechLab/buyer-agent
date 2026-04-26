@@ -248,7 +248,7 @@ The planner mixes types freely --- a Standard primary narrowed by a Contextual c
 | Temperature | 0.3 (balanced for strategic recommendations) |
 | Signals (agentic) | Identity (hashed IDs, device graphs), Contextual (page content, keywords), Reinforcement (feedback loops, conversion data) |
 | Embeddings | sentence-transformers `all-MiniLM-L6-v2` (384-dim) for local; advertiser-supplied vectors accepted verbatim (256--1024 dim); mock SHA256-seeded fallback for CI. Mode controlled by `EMBEDDING_MODE` env var (default: `hybrid`). |
-| Threshold | Score > 0.7 = strong match |
+| Threshold | Per-mode similarity thresholds (E2-4): `mock` strong≥0.85; `local`/`advertiser`/`hybrid` strong≥0.70. Re-derive via `ad_buyer.eval.evaluate_embedding_modes()` when the model swaps. |
 | Wire format | `application/vnd.ucp.embedding+json; v=1` (alias: `application/vnd.iab.agentic-audiences+json; v=1`) |
 
 #### Tools
