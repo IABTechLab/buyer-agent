@@ -12,7 +12,7 @@ Covers:
 - Cross-tier pricing consistency across tools and client
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -770,7 +770,10 @@ class TestRequestDealOutput:
         mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
-        today = datetime.now().strftime("%Y-%m-%d")
+        # Production code uses datetime.now(timezone.utc) — match it here
+        # so the test stays green when run after local-time midnight crosses
+        # UTC midnight (E2-7's UAT flagged this; ar-szs0).
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         assert today in result
 
     @pytest.mark.asyncio
