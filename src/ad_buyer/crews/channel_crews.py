@@ -24,6 +24,8 @@ The single `_format_audience_context` entry point dispatches on input
 type and renders the appropriate markdown.
 """
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from crewai import Crew, Process, Task
@@ -217,49 +219,94 @@ def _format_audience_context(
     return ""
 
 
-def create_branding_crew(
+# ---------------------------------------------------------------------------
+# Channel-crew specs + shared builder (ar-w5g — DRY refactor)
+# ---------------------------------------------------------------------------
+#
+# The four `create_*_crew` factories below all share an identical scaffolding
+# (3 agents — manager + research + execution; 2 tasks — research + recommendation;
+# hierarchical Crew). The only per-channel variation is:
+#   - which manager-agent factory to call
+#   - the body of the research task description
+#   - the body of the recommendation task description
+#   - the `expected_output` strings on each task
+#
+# `_ChannelCrewSpec` captures those four variations; `_build_channel_crew` does
+# the construction. Each `create_*_crew` is now a thin delegate. Public
+# signatures are unchanged so existing callers (CampaignPipeline,
+# BuyerDealFlow, direct invocation tests) are unaffected.
+#
+# Per proposal §5.3 + bead ar-fgyq: audience tools live on the Audience
+# Planner upstream — the Research Agent here operates on inventory only.
+
+
+@dataclass(frozen=True)
+class _ChannelCrewSpec:
+    """Per-channel variation captured for `_build_channel_crew`."""
+
+    manager_agent_factory: Callable[[], Any]
+    research_task_template: str
+    research_task_output: str
+    recommendation_task_description: str
+    recommendation_task_output: str
+
+
+def _build_channel_crew(
+    spec: _ChannelCrewSpec,
     client: OpenDirectClient,
     channel_brief: dict[str, Any],
-    audience_plan: AudiencePlan | dict[str, Any] | None = None,
+    audience_plan: AudiencePlan | dict[str, Any] | None,
 ) -> Crew:
-    """Create the Branding Specialist crew.
+    """Shared constructor for the 4 channel crews."""
 
-    Args:
-        client: OpenDirect API client
-        channel_brief: Channel-specific brief with budget, dates, etc.
-        audience_plan: Optional audience plan. Accepts either the typed
-            `AudiencePlan` produced by the Audience Planner agent's
-            reasoning loop (preferred, per proposal §5.3) or the legacy
-            dict shape used by `deal_booking_flow.py` (backward compat).
-            None disables the audience-context block in the research task.
-
-    Returns:
-        Configured Branding Crew
-    """
-    # Create tools
-    # NOTE (ar-fgyq / proposal §5.3): audience tools moved off the
-    # Research Agent and onto the Audience Planner upstream in
-    # CampaignPipeline. Research Agent now operates on inventory only.
     research_tools = _create_research_tools(client)
     execution_tools = _create_execution_tools(client)
 
-    # Create agents with tools
-    branding_agent = create_branding_agent()
+    manager_agent = spec.manager_agent_factory()
     research_agent = create_research_agent(tools=research_tools)
     execution_agent = create_execution_agent(tools=execution_tools)
 
-    # Format audience context
     audience_context = _format_audience_context(audience_plan)
 
-    # Define research task
     research_task = Task(
-        description=f"""
+        description=spec.research_task_template.format(
+            budget=channel_brief.get("budget", 0),
+            start_date=channel_brief.get("start_date"),
+            end_date=channel_brief.get("end_date"),
+            target_audience=channel_brief.get("target_audience", {}),
+            objectives=channel_brief.get("objectives", []),
+            kpis=channel_brief.get("kpis", {}),
+            audience_context=audience_context,
+        ),
+        expected_output=spec.research_task_output,
+        agent=research_agent,
+    )
+    recommendation_task = Task(
+        description=spec.recommendation_task_description,
+        expected_output=spec.recommendation_task_output,
+        agent=manager_agent,
+        context=[research_task],
+    )
+
+    return Crew(
+        agents=[research_agent, execution_agent],
+        tasks=[research_task, recommendation_task],
+        process=Process.hierarchical,
+        manager_agent=manager_agent,
+        memory=settings.crew_memory_enabled,
+        verbose=settings.crew_verbose,
+    )
+
+
+_BRANDING_SPEC = _ChannelCrewSpec(
+    manager_agent_factory=create_branding_agent,
+    research_task_template="""
 Research premium display and video inventory for a branding campaign:
 
-Budget: ${channel_brief.get("budget", 0):,.2f}
-Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
-Target Audience: {channel_brief.get("target_audience", {})}
-Objectives: {channel_brief.get("objectives", [])}
+Budget: ${budget:,.2f}
+Flight: {start_date} to {end_date}
+Target Audience: {target_audience}
+Objectives: {objectives}
 Quality Requirements: Viewability > 70%, Brand Safety verified
 {audience_context}
 
@@ -272,7 +319,7 @@ For the top 5 products, check availability and pricing for the flight dates.
 Use audience matching tools to verify targeting compatibility.
 Provide ranked recommendations with rationale.
 """,
-        expected_output="""List of recommended products:
+    research_task_output="""List of recommended products:
 [
     {
         "product_id": "...",
@@ -285,12 +332,7 @@ Provide ranked recommendations with rationale.
         "rationale": "..."
     }
 ]""",
-        agent=research_agent,
-    )
-
-    # Define recommendation task
-    recommendation_task = Task(
-        description="""
+    recommendation_task_description="""
 Review the research findings and select the best inventory for this
 branding campaign. Consider:
 
@@ -301,69 +343,25 @@ branding campaign. Consider:
 
 Finalize your recommendations for approval.
 """,
-        expected_output="""Final recommendations with booking priority:
+    recommendation_task_output="""Final recommendations with booking priority:
 {
     "recommendations": [...],
     "total_impressions": X,
     "total_cost": Y,
     "summary": "..."
 }""",
-        agent=branding_agent,
-        context=[research_task],
-    )
-
-    return Crew(
-        agents=[research_agent, execution_agent],
-        tasks=[research_task, recommendation_task],
-        process=Process.hierarchical,
-        manager_agent=branding_agent,
-        memory=settings.crew_memory_enabled,
-        verbose=settings.crew_verbose,
-    )
+)
 
 
-def create_mobile_crew(
-    client: OpenDirectClient,
-    channel_brief: dict[str, Any],
-    audience_plan: AudiencePlan | dict[str, Any] | None = None,
-) -> Crew:
-    """Create the Mobile App Install Specialist crew.
-
-    Args:
-        client: OpenDirect API client
-        channel_brief: Channel-specific brief with budget, dates, etc.
-        audience_plan: Optional audience plan. Accepts either the typed
-            `AudiencePlan` produced by the Audience Planner agent's
-            reasoning loop (preferred, per proposal §5.3) or the legacy
-            dict shape used by `deal_booking_flow.py` (backward compat).
-            None disables the audience-context block in the research task.
-
-    Returns:
-        Configured Mobile App Crew
-    """
-    # Create tools
-    # NOTE (ar-fgyq / proposal §5.3): audience tools moved to the
-    # Audience Planner upstream in CampaignPipeline.
-    research_tools = _create_research_tools(client)
-    execution_tools = _create_execution_tools(client)
-
-    # Create agents with tools
-    mobile_agent = create_mobile_app_agent()
-    research_agent = create_research_agent(tools=research_tools)
-    execution_agent = create_execution_agent(tools=execution_tools)
-
-    # Format audience context
-    audience_context = _format_audience_context(audience_plan)
-
-    # Define research task
-    research_task = Task(
-        description=f"""
+_MOBILE_SPEC = _ChannelCrewSpec(
+    manager_agent_factory=create_mobile_app_agent,
+    research_task_template="""
 Research mobile app install inventory:
 
-Budget: ${channel_brief.get("budget", 0):,.2f}
-Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
-Target Audience: {channel_brief.get("target_audience", {})}
-Objectives: {channel_brief.get("objectives", [])}
+Budget: ${budget:,.2f}
+Flight: {start_date} to {end_date}
+Target Audience: {target_audience}
+Objectives: {objectives}
 {audience_context}
 
 Search for:
@@ -376,72 +374,24 @@ Focus on publishers with MMP integrations for proper attribution.
 Use audience matching tools to verify targeting compatibility.
 Provide ranked recommendations with rationale.
 """,
-        expected_output="""List of recommended products with fraud scores and MMP support.""",
-        agent=research_agent,
-    )
-
-    recommendation_task = Task(
-        description="""
+    research_task_output="""List of recommended products with fraud scores and MMP support.""",
+    recommendation_task_description="""
 Review the research findings and select the best mobile inventory.
 Prioritize quality over scale - low fraud and proper attribution are critical.
 """,
-        expected_output="""Final recommendations with booking priority.""",
-        agent=mobile_agent,
-        context=[research_task],
-    )
-
-    return Crew(
-        agents=[research_agent, execution_agent],
-        tasks=[research_task, recommendation_task],
-        process=Process.hierarchical,
-        manager_agent=mobile_agent,
-        memory=settings.crew_memory_enabled,
-        verbose=settings.crew_verbose,
-    )
+    recommendation_task_output="""Final recommendations with booking priority.""",
+)
 
 
-def create_ctv_crew(
-    client: OpenDirectClient,
-    channel_brief: dict[str, Any],
-    audience_plan: AudiencePlan | dict[str, Any] | None = None,
-) -> Crew:
-    """Create the CTV Specialist crew.
-
-    Args:
-        client: OpenDirect API client
-        channel_brief: Channel-specific brief with budget, dates, etc.
-        audience_plan: Optional audience plan. Accepts either the typed
-            `AudiencePlan` produced by the Audience Planner agent's
-            reasoning loop (preferred, per proposal §5.3) or the legacy
-            dict shape used by `deal_booking_flow.py` (backward compat).
-            None disables the audience-context block in the research task.
-
-    Returns:
-        Configured CTV Crew
-    """
-    # Create tools
-    # NOTE (ar-fgyq / proposal §5.3): audience tools moved to the
-    # Audience Planner upstream in CampaignPipeline.
-    research_tools = _create_research_tools(client)
-    execution_tools = _create_execution_tools(client)
-
-    # Create agents with tools
-    ctv_agent = create_ctv_agent()
-    research_agent = create_research_agent(tools=research_tools)
-    execution_agent = create_execution_agent(tools=execution_tools)
-
-    # Format audience context
-    audience_context = _format_audience_context(audience_plan)
-
-    # Define research task
-    research_task = Task(
-        description=f"""
+_CTV_SPEC = _ChannelCrewSpec(
+    manager_agent_factory=create_ctv_agent,
+    research_task_template="""
 Research Connected TV and streaming inventory:
 
-Budget: ${channel_brief.get("budget", 0):,.2f}
-Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
-Target Audience: {channel_brief.get("target_audience", {})}
-Objectives: {channel_brief.get("objectives", [])}
+Budget: ${budget:,.2f}
+Flight: {start_date} to {end_date}
+Target Audience: {target_audience}
+Objectives: {objectives}
 {audience_context}
 
 Search for:
@@ -454,73 +404,25 @@ Prioritize brand-safe, premium content environments.
 Use audience matching tools to verify targeting compatibility.
 Provide ranked recommendations with rationale.
 """,
-        expected_output="""List of recommended CTV products with household reach estimates.""",
-        agent=research_agent,
-    )
-
-    recommendation_task = Task(
-        description="""
+    research_task_output="""List of recommended CTV products with household reach estimates.""",
+    recommendation_task_description="""
 Review the research findings and select the best CTV inventory.
 Balance reach with frequency management across devices.
 """,
-        expected_output="""Final recommendations with booking priority.""",
-        agent=ctv_agent,
-        context=[research_task],
-    )
-
-    return Crew(
-        agents=[research_agent, execution_agent],
-        tasks=[research_task, recommendation_task],
-        process=Process.hierarchical,
-        manager_agent=ctv_agent,
-        memory=settings.crew_memory_enabled,
-        verbose=settings.crew_verbose,
-    )
+    recommendation_task_output="""Final recommendations with booking priority.""",
+)
 
 
-def create_performance_crew(
-    client: OpenDirectClient,
-    channel_brief: dict[str, Any],
-    audience_plan: AudiencePlan | dict[str, Any] | None = None,
-) -> Crew:
-    """Create the Performance/Remarketing Specialist crew.
-
-    Args:
-        client: OpenDirect API client
-        channel_brief: Channel-specific brief with budget, dates, etc.
-        audience_plan: Optional audience plan. Accepts either the typed
-            `AudiencePlan` produced by the Audience Planner agent's
-            reasoning loop (preferred, per proposal §5.3) or the legacy
-            dict shape used by `deal_booking_flow.py` (backward compat).
-            None disables the audience-context block in the research task.
-
-    Returns:
-        Configured Performance Crew
-    """
-    # Create tools
-    # NOTE (ar-fgyq / proposal §5.3): audience tools moved to the
-    # Audience Planner upstream in CampaignPipeline.
-    research_tools = _create_research_tools(client)
-    execution_tools = _create_execution_tools(client)
-
-    # Create agents with tools
-    performance_agent = create_performance_agent()
-    research_agent = create_research_agent(tools=research_tools)
-    execution_agent = create_execution_agent(tools=execution_tools)
-
-    # Format audience context
-    audience_context = _format_audience_context(audience_plan)
-
-    # Define research task
-    research_task = Task(
-        description=f"""
+_PERFORMANCE_SPEC = _ChannelCrewSpec(
+    manager_agent_factory=create_performance_agent,
+    research_task_template="""
 Research performance and remarketing inventory:
 
-Budget: ${channel_brief.get("budget", 0):,.2f}
-Flight: {channel_brief.get("start_date")} to {channel_brief.get("end_date")}
-Target Audience: {channel_brief.get("target_audience", {})}
-Objectives: {channel_brief.get("objectives", [])}
-KPIs: {channel_brief.get("kpis", {})}
+Budget: ${budget:,.2f}
+Flight: {start_date} to {end_date}
+Target Audience: {target_audience}
+Objectives: {objectives}
+KPIs: {kpis}
 {audience_context}
 
 Search for:
@@ -533,28 +435,53 @@ Prioritize inventory with strong conversion histories.
 Use audience matching tools to verify targeting compatibility.
 Provide ranked recommendations with rationale.
 """,
-        expected_output="""List of recommended products with conversion rate estimates.""",
-        agent=research_agent,
-    )
-
-    recommendation_task = Task(
-        description="""
+    research_task_output="""List of recommended products with conversion rate estimates.""",
+    recommendation_task_description="""
 Review the research findings and select the best performance inventory.
 Optimize for ROAS and conversion efficiency.
 """,
-        expected_output="""Final recommendations with booking priority.""",
-        agent=performance_agent,
-        context=[research_task],
-    )
+    recommendation_task_output="""Final recommendations with booking priority.""",
+)
 
-    return Crew(
-        agents=[research_agent, execution_agent],
-        tasks=[research_task, recommendation_task],
-        process=Process.hierarchical,
-        manager_agent=performance_agent,
-        memory=settings.crew_memory_enabled,
-        verbose=settings.crew_verbose,
-    )
+
+def create_branding_crew(
+    client: OpenDirectClient,
+    channel_brief: dict[str, Any],
+    audience_plan: AudiencePlan | dict[str, Any] | None = None,
+) -> Crew:
+    """Create the Branding Specialist crew. See _build_channel_crew."""
+
+    return _build_channel_crew(_BRANDING_SPEC, client, channel_brief, audience_plan)
+
+
+def create_mobile_crew(
+    client: OpenDirectClient,
+    channel_brief: dict[str, Any],
+    audience_plan: AudiencePlan | dict[str, Any] | None = None,
+) -> Crew:
+    """Create the Mobile App Install Specialist crew. See _build_channel_crew."""
+
+    return _build_channel_crew(_MOBILE_SPEC, client, channel_brief, audience_plan)
+
+
+def create_ctv_crew(
+    client: OpenDirectClient,
+    channel_brief: dict[str, Any],
+    audience_plan: AudiencePlan | dict[str, Any] | None = None,
+) -> Crew:
+    """Create the CTV Specialist crew. See _build_channel_crew."""
+
+    return _build_channel_crew(_CTV_SPEC, client, channel_brief, audience_plan)
+
+
+def create_performance_crew(
+    client: OpenDirectClient,
+    channel_brief: dict[str, Any],
+    audience_plan: AudiencePlan | dict[str, Any] | None = None,
+) -> Crew:
+    """Create the Performance/Remarketing Specialist crew. See _build_channel_crew."""
+
+    return _build_channel_crew(_PERFORMANCE_SPEC, client, channel_brief, audience_plan)
 
 
 # ---------------------------------------------------------------------------

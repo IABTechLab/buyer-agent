@@ -202,46 +202,80 @@ class UnifiedClient:
             response = await self._a2a_client.send_message(message)
             return UnifiedResult.from_a2a(response)
 
-    def _tool_to_natural_language(self, tool_name: str, args: dict) -> str:
-        """Convert a tool call to natural language for A2A."""
-        # Map common tools to natural language
-        tool_mappings = {
-            "list_products": "List all available advertising products",
-            "list_accounts": "List all accounts",
-            "list_orders": "List all orders",
-            "list_lines": "List all line items",
-            "list_creatives": "List all creatives",
-        }
+    # Registry of tool name -> natural language renderer.
+    # Each entry is either a static string (for argument-less tools) or a
+    # callable taking the args dict and returning a string. Lookup is
+    # case-insensitive on the tool name to tolerate caller variations.
+    # Unknown tools fall back to a generic "Execute <name>" message rather
+    # than raising or returning an empty string.
+    _TOOL_NL_REGISTRY: dict[str, Any] = {
+        # Listing tools (no args required)
+        "list_products": "List all available advertising products",
+        "list_accounts": "List all accounts",
+        "list_orders": "List all orders",
+        "list_lines": "List all line items",
+        "list_creatives": "List all creatives",
+        # Create tools (args required)
+        "create_account": lambda a: (
+            f"Create an account named '{a.get('name')}' "
+            f"of type {a.get('type', 'advertiser')}"
+        ),
+        "create_order": lambda a: (
+            f"Create an order named '{a.get('name')}' "
+            f"for account {a.get('accountId')} "
+            f"with budget ${a.get('budget', 0):,.2f}"
+        ),
+        "create_line": lambda a: (
+            f"Create a line item named '{a.get('name')}' "
+            f"for order {a.get('orderId')} "
+            f"using product {a.get('productId')} "
+            f"with {a.get('quantity', 0):,} impressions"
+        ),
+        # Get-by-id tools
+        "get_product": lambda a: f"Get product with ID {a.get('id')}",
+        "get_account": lambda a: f"Get account with ID {a.get('id')}",
+        "get_order": lambda a: f"Get order with ID {a.get('id')}",
+    }
 
-        if tool_name in tool_mappings and not args:
-            return tool_mappings[tool_name]
-
-        # For other tools, construct a message
-        if tool_name == "create_account":
-            return f"Create an account named '{args.get('name')}' of type {args.get('type', 'advertiser')}"
-        elif tool_name == "create_order":
-            return (
-                f"Create an order named '{args.get('name')}' "
-                f"for account {args.get('accountId')} "
-                f"with budget ${args.get('budget', 0):,.2f}"
-            )
-        elif tool_name == "create_line":
-            return (
-                f"Create a line item named '{args.get('name')}' "
-                f"for order {args.get('orderId')} "
-                f"using product {args.get('productId')} "
-                f"with {args.get('quantity', 0):,} impressions"
-            )
-        elif tool_name == "get_product":
-            return f"Get product with ID {args.get('id')}"
-        elif tool_name == "get_account":
-            return f"Get account with ID {args.get('id')}"
-        elif tool_name == "get_order":
-            return f"Get order with ID {args.get('id')}"
-
-        # Generic fallback
+    @classmethod
+    def _generic_nl_fallback(cls, tool_name: str, args: dict) -> str:
+        """Generic, never-empty fallback for unknown tools."""
+        name = tool_name or "tool"
+        if not args:
+            return f"Execute {name}"
         args_str = ", ".join(f"{k}={v}" for k, v in args.items())
-        return f"Execute {tool_name} with {args_str}" if args_str else f"Execute {tool_name}"
+        return f"Execute {name} with {args_str}"
+
+    def _tool_to_natural_language(self, tool_name: str, args: dict) -> str:
+        """Convert a tool call to natural language for A2A.
+
+        Looks up ``tool_name`` (case-insensitive) in the registry. Static
+        string entries are used when ``args`` is falsy; callable entries
+        are invoked with ``args``. Anything not in the registry, or a
+        listing tool called *with* args, falls back to the generic
+        renderer so the result is always a non-empty descriptive string.
+        """
+        args = args or {}
+        # Case-insensitive lookup; preserves the original-cased name in fallback.
+        key = (tool_name or "").strip().lower()
+        entry = self._TOOL_NL_REGISTRY.get(key)
+
+        if entry is not None:
+            if callable(entry):
+                try:
+                    rendered = entry(args)
+                except Exception:
+                    rendered = ""
+                if rendered:
+                    return rendered
+            elif isinstance(entry, str):
+                # Static descriptions are for the no-arg case; if args were
+                # passed, fall through to the generic renderer so the args
+                # are included in the message.
+                if not args:
+                    return entry
+
+        return self._generic_nl_fallback(tool_name, args)
 
     async def send_natural_language(self, message: str) -> UnifiedResult:
         """Send a natural language request via A2A.

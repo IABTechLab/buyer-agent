@@ -105,4 +105,26 @@ def get_settings() -> Settings:
     return Settings()
 
 
-settings = get_settings()
+class _LazySettings:
+    """Lazy proxy that defers Settings() construction until first attribute access.
+
+    Many modules import the module-level `settings` symbol at import time.
+    Constructing Settings() eagerly at import time freezes env vars before
+    tests can override them. This proxy delegates all attribute access to a
+    cached Settings instance built on first use, so tests that patch env vars
+    before any settings.X read see the correct values.
+    """
+
+    __slots__ = ()
+
+    def __getattr__(self, name: str):
+        return getattr(get_settings(), name)
+
+    def __setattr__(self, name: str, value) -> None:
+        setattr(get_settings(), name, value)
+
+    def __repr__(self) -> str:
+        return f"_LazySettings(proxy_to={get_settings()!r})"
+
+
+settings = _LazySettings()
