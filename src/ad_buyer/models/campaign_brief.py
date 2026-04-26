@@ -38,8 +38,10 @@ from .audience_plan import (
     AudiencePlan,
     AudienceStrictness,
     ContentTaxonomyMigrationRequired,
+    GlobalAgenticUnsupported,
     coerce_audience_field,
     validate_content_taxonomy_version,
+    validate_no_global_agentic,
 )
 
 # ---------------------------------------------------------------------------
@@ -354,6 +356,13 @@ class CampaignBrief(BaseModel):
             issues = validate_content_taxonomy_version(self.target_audience)
             if issues:
                 raise ContentTaxonomyMigrationRequired(issues)
+
+            # Brief-ingestion validation: reject GLOBAL agentic refs (ar-ei0s).
+            # Single ComplianceContext can't honestly span multiple consent
+            # regimes; per-jurisdiction fan-out is a follow-on (proposal §7).
+            global_agentic_issues = validate_no_global_agentic(self.target_audience)
+            if global_agentic_issues:
+                raise GlobalAgenticUnsupported(global_agentic_issues)
 
         return self
 

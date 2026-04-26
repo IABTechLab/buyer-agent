@@ -523,6 +523,96 @@ def validate_content_taxonomy_version(plan: AudiencePlan) -> list[dict[str, Any]
     return issues
 
 
+# ---------------------------------------------------------------------------
+# Brief-ingestion validation: global-agentic correctness gap (proposal §7)
+# ---------------------------------------------------------------------------
+
+
+def validate_no_global_agentic(plan: AudiencePlan) -> list[dict[str, Any]]:
+    """Reject agentic refs declared with `jurisdiction='GLOBAL'` (ar-ei0s).
+
+    Per the consent-surface review at `docs/reports/CONSENT_SURFACE_REVIEW_2026-04-25.md`
+    Gap 5: a single `compliance_context` cannot honestly express per-region
+    consent for a global agentic campaign. A buyer that mints an agentic ref
+    with `jurisdiction='GLOBAL'` is effectively asserting the same consent
+    framework everywhere, which is wrong for any regime that actually varies
+    by region (TCFv2 in the EU vs. GPP in US states vs. none elsewhere).
+
+    Until E2-2's follow-on schema lands `compliance_contexts: list[...]`
+    (jurisdiction fan-out), the safe interim policy is to reject GLOBAL
+    agentic at brief ingestion. Standard / Contextual refs can carry
+    GLOBAL — those don't carry per-region consent semantics.
+
+    Returns a structured issues list (same shape as
+    `validate_content_taxonomy_version`).
+    """
+
+    issues: list[dict[str, Any]] = []
+
+    def _check(role: str, index: int, ref: AudienceRef) -> None:
+        if ref.type != "agentic":
+            return
+        cc = ref.compliance_context
+        if cc is None:
+            return  # The required-on-agentic validator catches this elsewhere.
+        if cc.jurisdiction == "GLOBAL":
+            issues.append(
+                {
+                    "role": role,
+                    "index": index,
+                    "identifier": ref.identifier,
+                    "type": ref.type,
+                    "jurisdiction": cc.jurisdiction,
+                    "consent_framework": cc.consent_framework,
+                    "reason": (
+                        "Agentic ref declared jurisdiction='GLOBAL', but a "
+                        "single ComplianceContext cannot honestly span multiple "
+                        "consent regimes. Until per-jurisdiction fan-out lands "
+                        "(see proposal §7), GLOBAL agentic refs are rejected."
+                    ),
+                    "suggestion": (
+                        "Replace the single GLOBAL ref with separate refs per "
+                        "target jurisdiction ('US', 'EU', etc.) carrying the "
+                        "matching consent_framework, or wait for the "
+                        "per-jurisdiction ComplianceContext fan-out."
+                    ),
+                }
+            )
+
+    _check("primary", 0, plan.primary)
+    for i, r in enumerate(plan.constraints):
+        _check("constraints", i, r)
+    for i, r in enumerate(plan.extensions):
+        _check("extensions", i, r)
+    for i, r in enumerate(plan.exclusions):
+        _check("exclusions", i, r)
+
+    return issues
+
+
+class GlobalAgenticUnsupported(ValueError):
+    """Raised when a brief carries an agentic ref with `jurisdiction='GLOBAL'`.
+
+    Carries the structured issue list as `.issues`.
+    """
+
+    def __init__(self, issues: list[dict[str, Any]]) -> None:
+        self.issues = issues
+        if not issues:
+            msg = "Global agentic refs are unsupported (no specific issues)"
+        else:
+            heads = [
+                f"{i['role']}[{i['index']}] id={i['identifier']!r}"
+                for i in issues
+            ]
+            msg = (
+                "Brief carries agentic refs with jurisdiction='GLOBAL', "
+                "which is unsupported until per-jurisdiction consent fan-out "
+                f"lands. Affected refs: {', '.join(heads)}"
+            )
+        super().__init__(msg)
+
+
 class ContentTaxonomyMigrationRequired(ValueError):
     """Raised when a brief carries pre-3.x or unresolved Content Taxonomy refs.
 
