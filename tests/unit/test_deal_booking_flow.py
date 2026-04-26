@@ -1051,3 +1051,51 @@ class TestEdgeCases:
         estimates = result["coverage_estimates"]
         for val in estimates.values():
             assert val >= 10.0
+
+
+# ===========================================================================
+# Regression: CrewAI 1.10.1 read-only flow.state setter (ar-x34o)
+# ===========================================================================
+
+
+class TestCrewAI110FlowStateRegression:
+    """Regression tests for CrewAI 1.10.1 Flow.state read-only change.
+
+    CrewAI 1.10.1 removed the ``flow.state = ...`` setter.  Initial state
+    must be passed via the constructor.  These tests verify the fix so that
+    the broken pattern never silently regresses.
+    """
+
+    def test_deal_booking_flow_construction_no_state(self, mock_opendirect_client):
+        """DealBookingFlow can be constructed without initial state kwargs."""
+        flow = DealBookingFlow(client=mock_opendirect_client)
+        # State should be initialised with defaults
+        assert flow.state is not None
+        assert flow.state.campaign_brief == {}
+
+    def test_deal_booking_flow_construction_with_campaign_brief(
+        self, mock_opendirect_client, valid_campaign_brief
+    ):
+        """DealBookingFlow accepts initial campaign_brief via constructor.
+
+        This is the pattern that replaced the broken ``flow.state = BookingState(...)``
+        assignment used in the API and CLI entry points.
+        """
+        # Must NOT raise ValueError: property 'state' of 'DealBookingFlow' object has no setter
+        flow = DealBookingFlow(
+            client=mock_opendirect_client,
+            campaign_brief=valid_campaign_brief,
+        )
+        assert flow.state.campaign_brief == valid_campaign_brief
+
+    def test_deal_booking_flow_state_setter_raises(self, mock_opendirect_client):
+        """Assigning to flow.state raises AttributeError (CrewAI 1.10.1 guard).
+
+        Pinning this behaviour so we notice if CrewAI ever re-adds the setter,
+        which would silently allow the old broken pattern to return.
+        """
+        flow = DealBookingFlow(client=mock_opendirect_client)
+        with pytest.raises((AttributeError, ValueError)):
+            from ad_buyer.models.flow_state import BookingState
+
+            flow.state = BookingState(campaign_brief={"name": "should_fail"})

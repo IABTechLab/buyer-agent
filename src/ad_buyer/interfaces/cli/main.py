@@ -97,10 +97,9 @@ def book(
     if dry_run:
         console.print("[yellow]DRY RUN MODE - No bookings will be made[/yellow]\n")
 
-    # Initialize flow
+    # Initialize flow — pass initial state via constructor (CrewAI 1.10.1 removed flow.state setter).
     client = _create_client()
-    flow = DealBookingFlow(client)
-    flow.state = BookingState(campaign_brief=brief)
+    flow = DealBookingFlow(client, campaign_brief=brief)
 
     # Run the flow
     with Progress(

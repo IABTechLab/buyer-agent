@@ -545,8 +545,12 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         _persist_job(job_id, job)
 
         client = _create_client()
-        flow = DealBookingFlow(client, store=_get_store())
-        flow.state = BookingState(campaign_brief=request.brief.model_dump())
+        # Pass initial state via constructor — CrewAI 1.10.1 removed flow.state setter.
+        flow = DealBookingFlow(
+            client,
+            store=_get_store(),
+            campaign_brief=request.brief.model_dump(),
+        )
 
         # Store flow reference for approval
         job["_flow"] = flow
