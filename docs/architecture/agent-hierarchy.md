@@ -257,7 +257,7 @@ The planner mixes types freely --- a Standard primary narrowed by a Contextual c
 - `AudienceDiscoveryTool` --- query sellers for available segments matching a ref
 - `AudienceMatchingTool` --- score a candidate `AudienceRef` against seller capabilities
 - `CoverageEstimationTool` --- project unique reach for a composed plan
-- `EmbeddingMintTool` --- mint or reference an Agentic embedding. Honors `EMBEDDING_MODE` (`mock` | `local` | `advertiser` | `hybrid`) per the [Embedding Strategy](../../../../docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md) decision in the agent_range parent repo.
+- `EmbeddingMintTool` --- mint or reference an Agentic embedding. Honors `EMBEDDING_MODE` (`mock` | `local` | `advertiser` | `hybrid`) per the locked Embedding Strategy decision (see `docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md` in the agent_range parent repo).
 
 #### Embedding provenance
 
