@@ -135,3 +135,34 @@ class TestComplianceContextProvenance:
                 embedding_provenance=provenance,
             )
             assert ctx.embedding_provenance == provenance
+
+
+class TestEmbeddingModeLabel:
+    def test_label_per_mode(self):
+        from unittest.mock import patch
+        from ad_buyer.config.settings import settings
+        from ad_buyer.tools.audience.embedding_mint import embedding_mode_label
+
+        for mode, expected_substring in [
+            ("mock", "MOCK"),
+            ("local", "LOCAL"),
+            ("advertiser", "ADVERTISER"),
+            ("hybrid", "HYBRID"),
+        ]:
+            with patch.object(settings, "embedding_mode", mode):
+                label = embedding_mode_label()
+                assert expected_substring in label, f"mode={mode}: {label}"
+
+    def test_mint_tool_format_uses_dynamic_label(self):
+        from unittest.mock import patch
+        from ad_buyer.config.settings import settings
+        from ad_buyer.tools.audience.embedding_mint import EmbeddingMintTool
+
+        tool = EmbeddingMintTool()
+        with patch.object(settings, "embedding_mode", "local"):
+            output = tool._run(name="test-cohort", description="auto intenders")
+        assert "LOCAL" in output, output
+
+    def test_backward_compat_static_constant(self):
+        from ad_buyer.tools.audience import EMBEDDING_MODE_LABEL_MOCK
+        assert "MOCK" in EMBEDDING_MODE_LABEL_MOCK

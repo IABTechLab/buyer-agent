@@ -37,10 +37,42 @@ from ...clients.ucp_client import UCPClient
 from ...models.audience_plan import AudienceRef, ComplianceContext
 
 
-# Public label exposed on the tool so debug surfaces (and §13a audit
-# trail consumers) can render the mock provenance without poking at
-# implementation details. Bumped when bead §22 swaps in a real model.
-EMBEDDING_MODE_LABEL_MOCK = "MOCK (SHA256-seeded; bead §22 follow-up)"
+# Static fallback label preserved for backward compatibility with
+# existing imports (`from ad_buyer.tools.audience import
+# EMBEDDING_MODE_LABEL_MOCK`). E2-5 superseded this single static label
+# with the dynamic `embedding_mode_label()` function below, which reads
+# `settings.embedding_mode` and emits a per-mode descriptive string.
+EMBEDDING_MODE_LABEL_MOCK = "MOCK (SHA256-seeded fallback)"
+
+
+# Per-mode label table. Used by `embedding_mode_label()` to render the
+# active embedding provenance to debug surfaces and §13a audit trails.
+# Keys must match the `embedding_mode` Literal in `config/settings.py`.
+_EMBEDDING_MODE_LABELS: dict[str, str] = {
+    "mock": "MOCK (SHA256-seeded fallback)",
+    "local": "LOCAL (sentence-transformers/all-MiniLM-L6-v2 384-dim)",
+    "advertiser": "ADVERTISER-SUPPLIED",
+    "hybrid": "HYBRID (advertiser → local → mock)",
+}
+
+
+def embedding_mode_label() -> str:
+    """Return a descriptive label for the current `settings.embedding_mode`.
+
+    Reads the live settings each call so tests that patch
+    `settings.embedding_mode` see the right label without import-time
+    caching surprises. Falls back to the static MOCK label if the mode
+    is unrecognized (defensive: shouldn't happen given the Literal type
+    on `Settings.embedding_mode`).
+    """
+
+    # Local import to avoid pulling settings at module import time
+    # (keeps test fixtures that patch settings simple).
+    from ...config.settings import settings
+
+    return _EMBEDDING_MODE_LABELS.get(
+        settings.embedding_mode, EMBEDDING_MODE_LABEL_MOCK
+    )
 
 
 class EmbeddingMintInput(BaseModel):
@@ -110,8 +142,11 @@ class EmbeddingMintTool(BaseTool):
     )
     args_schema: Type[BaseModel] = EmbeddingMintInput
 
-    # Public attribute so the planner / debugger can render the mock
-    # provenance without reaching into private state.
+    # Public attribute that renders the active mode's label per the
+    # current `settings.embedding_mode`. Backward-compat default points
+    # at the static MOCK constant; dynamic readers should call the
+    # module-level `embedding_mode_label()` to pick up live setting
+    # changes (e.g. tests that patch `settings.embedding_mode`).
     embedding_mode_label: str = EMBEDDING_MODE_LABEL_MOCK
 
     # Pydantic config: allow arbitrary attribute-style access on the
@@ -223,7 +258,7 @@ class EmbeddingMintTool(BaseTool):
             f"  taxonomy: {ref.taxonomy}",
             f"  version: {ref.version}",
             f"  source: {ref.source}",
-            f"  embedding_mode: {EMBEDDING_MODE_LABEL_MOCK}",
+            f"  embedding_mode: {embedding_mode_label()}",
             "  compliance_context:",
             *cc_lines,
         ]
