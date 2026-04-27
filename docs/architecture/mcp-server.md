@@ -1,6 +1,6 @@
 # MCP Server
 
-The buyer agent exposes a FastMCP SSE server that allows AI assistants --- Claude Desktop, ChatGPT, Cursor, Windsurf, and others --- to call buyer operations as structured tools. This is distinct from the buyer's outbound MCP client, which calls seller agents.
+The buyer agent exposes a FastMCP server that allows AI assistants --- Claude Desktop, ChatGPT, Cursor, Windsurf, and others --- to call buyer operations as structured tools. This is distinct from the buyer's outbound MCP client, which calls seller agents.
 
 !!! info "Two MCP roles"
     The buyer agent is both an **MCP client** (calling sellers via `IABMCPClient`) and an **MCP server** (serving AI assistants via `FastMCP`). These are independent: the client speaks to seller endpoints; the server speaks to AI assistants connected by users.
@@ -8,13 +8,13 @@ The buyer agent exposes a FastMCP SSE server that allows AI assistants --- Claud
     | Direction | Component | Purpose |
     |-----------|-----------|---------|
     | Outbound | `IABMCPClient` | Buyer calls seller MCP servers to browse inventory and book deals |
-    | Inbound | FastMCP SSE server | AI assistants call the buyer's MCP server to operate the buyer agent |
+    | Inbound | FastMCP server | AI assistants call the buyer's MCP server to operate the buyer agent |
 
 ---
 
 ## Mounting
 
-The MCP server is a [FastMCP](https://github.com/jlowin/fastmcp) SSE application mounted on the main FastAPI process:
+The MCP server mounts two transports on the main FastAPI process:
 
 ```
 FastAPI (port 8001)
@@ -22,21 +22,23 @@ FastAPI (port 8001)
   GET  /bookings/{job_id}
   GET  /health
   ...
-  MOUNT /mcp/sse  <-- FastMCP SSE app
+  MOUNT /mcp        <-- FastMCP Streamable HTTP app (canonical, MCP standard 2025-06-18)
+  MOUNT /mcp-sse    <-- FastMCP SSE app (legacy fallback for older MCP clients)
 ```
 
 The mount is a single call in `interfaces/api/main.py`:
 
 ```python
 from ad_buyer.interfaces.mcp_server import mount_mcp
-mount_mcp(app)  # Creates /mcp/sse
+mount_mcp(app)  # Creates /mcp (Streamable HTTP) and /mcp-sse (legacy SSE)
 ```
 
-`mount_mcp` calls `mcp.sse_app()` and mounts the resulting ASGI application under `/mcp/sse`. Due to Starlette sub-app routing, the FastMCP SSE app exposes its own `/sse` path internally, making the canonical client URL `http://<host>:8001/mcp/sse/sse`. Connecting to bare `/mcp/sse` returns a 307 redirect that most MCP clients cannot follow.
+`mount_mcp` calls `mcp.streamable_http_app()` (canonical) and `mcp.sse_app()` (legacy fallback).
+The canonical client URL is `http://<host>:8001/mcp`. For legacy SSE clients, use `http://<host>:8001/mcp-sse/sse`.
 
 ### Auth middleware note
 
-The FastAPI `api_key_auth_middleware` applies to all HTTP paths. The MCP SSE path (`/mcp/sse`) is not in the public path exemption list (`/health`, `/docs`, `/openapi.json`, `/redoc`), so it passes through the key check. When `settings.api_key` is non-empty, MCP clients must send `X-API-Key: <key>` on the initial SSE connection. When `settings.api_key` is empty (default for local development), the middleware skips authentication entirely.
+The FastAPI `api_key_auth_middleware` applies to all HTTP paths. Neither `/mcp` nor `/mcp-sse` is in the public path exemption list (`/health`, `/docs`, `/openapi.json`, `/redoc`), so both pass through the key check. When `settings.api_key` is non-empty, MCP clients must send `X-API-Key: <key>` on the initial connection. When `settings.api_key` is empty (default for local development), the middleware skips authentication entirely.
 
 ---
 
@@ -115,7 +117,8 @@ graph TB
 
     subgraph BuyerAgent["Ad Buyer Agent (port 8001)"]
         FastAPI["FastAPI"]
-        SSE["/mcp/sse/sse<br/>(FastMCP SSE)"]
+        StreamableHTTP["/mcp<br/>(FastMCP Streamable HTTP — canonical)"]
+        SSE["/mcp-sse/sse<br/>(FastMCP SSE — legacy fallback)"]
         Tools["MCP Tool Functions<br/>(12 categories, 40+ tools)"]
         Stores["Store Accessors<br/>DealStore / CampaignStore / OrderStore"]
         DB[(SQLite)]
@@ -123,7 +126,9 @@ graph TB
 
     SellerMCP["Seller MCP Server<br/>(outbound, separate path)"]
 
-    AI -->|"MCP / SSE"| SSE
+    AI -->|"Streamable HTTP (current)"| StreamableHTTP
+    AI -.->|"SSE (legacy clients)"| SSE
+    StreamableHTTP --> FastAPI
     SSE --> FastAPI
     FastAPI -->|"route to tools"| Tools
     Tools --> Stores
