@@ -23,7 +23,7 @@ Works on both **Claude Desktop** and **Claude on the web** (claude.ai):
 1. Open Claude Desktop or go to [claude.ai](https://claude.ai)
 2. Go to **Settings > Integrations**
 3. Click **"+ Add Custom Integration"**
-4. Enter your buyer agent's MCP URL: `https://your-buyer.example.com/mcp/sse/sse`
+4. Enter your buyer agent's MCP URL: `https://your-buyer.example.com/mcp`
 5. If prompted for authentication, enter your operator API key
 6. Click **Save**
 
@@ -41,11 +41,13 @@ For buyer agents running on `localhost`:
 {
   "mcpServers": {
     "buyer-agent": {
-      "url": "http://localhost:8001/mcp/sse/sse"
+      "url": "http://localhost:8001/mcp"
     }
   }
 }
 ```
+
+> **Legacy SSE clients**: If you are using an older MCP client that requires SSE transport, use `http://localhost:8001/mcp-sse/sse` instead. Streamable HTTP (`/mcp`) is the canonical endpoint for all current MCP clients.
 
 4. Save and restart Claude Desktop
 
@@ -173,7 +175,7 @@ The same MCP endpoint works with other AI platforms:
 3. Fully quit and relaunch Claude Desktop — it only reads the config at startup
 4. Check Claude Desktop logs for connection errors (macOS: `~/Library/Logs/Claude/`)
 
-### Connection refused on `http://localhost:8001/mcp/sse/sse`
+### Connection refused on `http://localhost:8001/mcp`
 
 The buyer server is not running or crashed. Start it with:
 

@@ -48,7 +48,7 @@ class TestMCPServerInitialization:
         assert len(mcp.instructions) > 0
 
 
-class TestSSEMounting:
+class TestMCPMounting:
     """Test that the MCP server can be mounted in the FastAPI app."""
 
     def test_mount_mcp_function_exists(self):
@@ -57,7 +57,7 @@ class TestSSEMounting:
         assert callable(mount_mcp)
 
     def test_mount_mcp_adds_route(self):
-        """mount_mcp should add the /mcp/sse route to the FastAPI app."""
+        """mount_mcp should add both /mcp (Streamable HTTP) and /mcp-sse (legacy SSE) routes."""
         from fastapi import FastAPI
 
         from ad_buyer.interfaces.mcp_server import mount_mcp
@@ -65,19 +65,23 @@ class TestSSEMounting:
         test_app = FastAPI()
         mount_mcp(test_app)
 
-        # Check that a route at /mcp/sse is mounted
+        # Check that routes for both transports are mounted
         route_paths = []
         for route in test_app.routes:
             if hasattr(route, "path"):
                 route_paths.append(route.path)
 
-        # The mount should be at /mcp/sse
-        assert any("/mcp/sse" in str(p) for p in route_paths), (
-            f"Expected /mcp/sse in routes, got: {route_paths}"
+        # Streamable HTTP transport (current MCP standard)
+        assert any("/mcp" == str(p) or str(p).startswith("/mcp") for p in route_paths), (
+            f"Expected /mcp (Streamable HTTP) in routes, got: {route_paths}"
+        )
+        # Legacy SSE transport (backwards compat for older clients)
+        assert any("/mcp-sse" in str(p) for p in route_paths), (
+            f"Expected /mcp-sse (legacy SSE) in routes, got: {route_paths}"
         )
 
     def test_buyer_api_app_has_mcp_mounted(self):
-        """The buyer API app should have MCP mounted after import."""
+        """The buyer API app should have both MCP transports mounted after import."""
         from ad_buyer.interfaces.api.main import app
 
         route_paths = []
@@ -85,8 +89,13 @@ class TestSSEMounting:
             if hasattr(route, "path"):
                 route_paths.append(route.path)
 
-        assert any("/mcp/sse" in str(p) for p in route_paths), (
-            f"Expected /mcp/sse in buyer API app routes, got: {route_paths}"
+        # Streamable HTTP transport (canonical)
+        assert any("/mcp" == str(p) or (str(p).startswith("/mcp") and not str(p).startswith("/mcp-sse")) for p in route_paths), (
+            f"Expected /mcp (Streamable HTTP) in buyer API app routes, got: {route_paths}"
+        )
+        # Legacy SSE transport
+        assert any("/mcp-sse" in str(p) for p in route_paths), (
+            f"Expected /mcp-sse (legacy SSE) in buyer API app routes, got: {route_paths}"
         )
 
 
