@@ -649,11 +649,13 @@ Pacing alert levels:
 
 The buyer agent exposes its own MCP server for external clients (Claude Desktop, Cursor, Windsurf, custom agents). The MCP server is mounted automatically on the FastAPI app at startup and exposes buyer operations as structured tools.
 
-MCP endpoint:
+MCP endpoint (Streamable HTTP, canonical):
 
 ```
-http://localhost:8001/mcp/sse/sse
+http://localhost:8001/mcp
 ```
+
+Legacy SSE fallback (for older MCP clients): `http://localhost:8001/mcp-sse/sse`
 
 Available tool categories:
 
@@ -673,7 +675,7 @@ Add the buyer agent to your Claude Desktop MCP configuration (`~/Library/Applica
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8001/mcp/sse/sse"
+        "http://localhost:8001/mcp"
       ]
     }
   }
@@ -684,13 +686,13 @@ Restart Claude Desktop after editing the configuration. The buyer agent tools wi
 
 ### Connecting Other MCP Clients
 
-Any client supporting Streamable HTTP (SSE) transport can connect:
+Any client supporting Streamable HTTP transport can connect:
 
 ```python
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-async with streamablehttp_client("http://localhost:8001/mcp/sse/sse") as (read, write, _):
+async with streamablehttp_client("http://localhost:8001/mcp") as (read, write, _):
     async with ClientSession(read, write) as session:
         await session.initialize()
         tools = await session.list_tools()
@@ -705,7 +707,7 @@ The buyer agent acts as an **MCP client** to seller agents (in addition to expos
 SELLER_ENDPOINTS=http://seller1.example.com:8000,http://seller2.example.com:8000
 ```
 
-The buyer's `UnifiedClient` connects to the seller's MCP SSE endpoint at `{base_url}/mcp/sse`. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.
+The buyer's `UnifiedClient` connects to the seller's MCP SSE endpoint at `{base_url}/mcp-sse/sse`. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.
 
 **Test seller MCP connectivity manually:**
 
@@ -971,7 +973,7 @@ SELLER_ENDPOINTS=http://host.docker.internal:8000
 Test the seller's MCP endpoint directly:
 
 ```bash
-curl -N http://seller.example.com:8000/mcp/sse  # Should stream SSE events
+curl -N http://seller.example.com:8000/mcp-sse/sse  # Should stream SSE events
 ```
 
 ---
@@ -1019,7 +1021,7 @@ If not installed, install it: `pip install mcp`
 
 ```bash
 # The SSE endpoint should keep the connection open
-curl -N -H "Accept: text/event-stream" http://seller.example.com:8000/mcp/sse
+curl -N -H "Accept: text/event-stream" http://seller.example.com:8000/mcp-sse/sse
 ```
 
 **Check 3 — Firewall / security groups:**
