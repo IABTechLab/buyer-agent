@@ -7,6 +7,7 @@ import json
 import logging
 import sqlite3
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Optional
 
@@ -14,6 +15,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import sys
 
@@ -54,16 +56,37 @@ app = FastAPI(
     ],
 )
 
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,
+    expose_headers=["*"],
 )
 
-# Mount MCP SSE server
-from ..mcp_server import mount_mcp
+# Mount MCP server (Streamable HTTP at /mcp)
+# Starlette doesn't call mounted sub-app lifespans, so we must run the
+# session manager ourselves to keep its task group alive.
+from ..mcp_server import mcp as _mcp_server, mount_mcp
 mount_mcp(app)
+
+
+@asynccontextmanager
+async def lifespan(application):
+    store = _get_order_store()
+    if store is not None:
+        application.include_router(_create_order_router(store))
+    else:
+        logger.warning("OrderStore unavailable at startup; order endpoints not mounted")
+
+    async with _mcp_server.session_manager.run():
+        yield
+
+
+app.router.lifespan_context = lifespan
 
 # Mount order status/audit router (buyer-nz9)
 from .order_endpoints import create_order_router
@@ -184,16 +207,6 @@ def _get_order_store() -> Optional[OrderStore]:
 
 # Mount buyer order status/audit endpoints
 from .order_endpoints import create_order_router as _create_order_router
-
-
-@app.on_event("startup")
-async def _mount_order_router() -> None:
-    """Mount order router once the OrderStore is available at startup."""
-    store = _get_order_store()
-    if store is not None:
-        app.include_router(_create_order_router(store))
-    else:
-        logger.warning("OrderStore unavailable at startup; order endpoints not mounted")
 
 
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
