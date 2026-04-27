@@ -2884,10 +2884,13 @@ async def help_prompt() -> list[Message]:
 def mount_mcp(app: FastAPI) -> None:
     """Mount the MCP server onto a FastAPI application.
 
-    Creates a Streamable HTTP endpoint at /mcp (MCP standard 2025-06-18).
+    Mounts both transports:
+    - Streamable HTTP at /mcp (current MCP standard, protocol 2025-06-18)
+    - Legacy SSE at /mcp-sse (deprecated, kept for backwards compat with older clients)
 
     Args:
         app: The FastAPI application to mount onto.
     """
     app.mount("/mcp", mcp.streamable_http_app())
-    logger.info("MCP server mounted: Streamable HTTP at /mcp")
+    app.mount("/mcp-sse", mcp.sse_app())
+    logger.info("MCP server mounted: Streamable HTTP at /mcp, legacy SSE at /mcp-sse/sse")
