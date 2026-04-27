@@ -1,0 +1,2287 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="API &amp; Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent" name="description"/>
+<link href="https://iabtechlab.github.io/buyer-agent/architecture/models/" rel="canonical"/>
+<link href="../deal-store/" rel="prev"/>
+<link href="../tools/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Models - IAB Tech Lab — Buyer Agent</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="indigo" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#data-models">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+<aside class="md-banner">
+<div class="md-banner__inner md-grid md-typeset">
+<a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here →
+  </a>
+</div>
+</aside>
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Models
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting-started/quickstart/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/overview/">
+          
+  
+  
+  API Reference
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../state-machines/order-lifecycle/">
+          
+  
+  
+  State Machines
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../event-bus/overview/">
+          
+  
+  
+  Event Bus
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../guides/overview/">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../integration/seller-agent/">
+          
+  
+  
+  Integration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../claude-desktop-setup/">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../ai-assistant/mcp-tools/">
+          
+  
+  
+  MCP Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="https://iabtechlab.github.io/seller-agent/">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/quickstart/">
+<span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/protocols/">
+<span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/mcp-client/">
+<span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/a2a-client/">
+<span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/authentication/">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/change-requests/">
+<span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/deals/">
+<span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/bookings/">
+<span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/seller-discovery/">
+<span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/products/">
+<span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../agent-hierarchy/">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../booking-flow/">
+<span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../buyer-deal-flow/">
+<span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-store/">
+<span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#model-map">
+<span class="md-ellipsis">
+      
+        Model Map
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-models">
+<span class="md-ellipsis">
+      
+        API Models
+      
+    </span>
+</a>
+<nav aria-label="API Models" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#campaignbrief">
+<span class="md-ellipsis">
+      
+        CampaignBrief
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingrequest">
+<span class="md-ellipsis">
+      
+        BookingRequest
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingresponse">
+<span class="md-ellipsis">
+      
+        BookingResponse
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingstatus">
+<span class="md-ellipsis">
+      
+        BookingStatus
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#approvalrequest">
+<span class="md-ellipsis">
+      
+        ApprovalRequest
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#productsearchrequest">
+<span class="md-ellipsis">
+      
+        ProductSearchRequest
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#flow-state-models">
+<span class="md-ellipsis">
+      
+        Flow State Models
+      
+    </span>
+</a>
+<nav aria-label="Flow State Models" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingstate">
+<span class="md-ellipsis">
+      
+        BookingState
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#executionstatus-enum">
+<span class="md-ellipsis">
+      
+        ExecutionStatus (enum)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channelallocation">
+<span class="md-ellipsis">
+      
+        ChannelAllocation
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#productrecommendation">
+<span class="md-ellipsis">
+      
+        ProductRecommendation
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookedline">
+<span class="md-ellipsis">
+      
+        BookedLine
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channelbrief">
+<span class="md-ellipsis">
+      
+        ChannelBrief
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#opendirect-models">
+<span class="md-ellipsis">
+      
+        OpenDirect Models
+      
+    </span>
+</a>
+<nav aria-label="OpenDirect Models" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#organization">
+<span class="md-ellipsis">
+      
+        Organization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#account">
+<span class="md-ellipsis">
+      
+        Account
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#product">
+<span class="md-ellipsis">
+      
+        Product
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#order">
+<span class="md-ellipsis">
+      
+        Order
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#line">
+<span class="md-ellipsis">
+      
+        Line
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#creative">
+<span class="md-ellipsis">
+      
+        Creative
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#assignment">
+<span class="md-ellipsis">
+      
+        Assignment
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#availsrequest-availsresponse">
+<span class="md-ellipsis">
+      
+        AvailsRequest / AvailsResponse
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#linestats">
+<span class="md-ellipsis">
+      
+        LineStats
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#enums">
+<span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#negotiation-models">
+<span class="md-ellipsis">
+      
+        Negotiation Models
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#model-relationships">
+<span class="md-ellipsis">
+      
+        Model Relationships
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../mcp-server/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/order-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/change-request-flow/">
+<span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../event-bus/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-booking/">
+<span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/negotiation/">
+<span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/identity/">
+<span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/linear-tv/">
+<span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/configuration/">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deployment-ops-guide/">
+<span class="md-ellipsis">
+    
+  
+    Deployment &amp; Operations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller-orchestration/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/campaign-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/budget-pacing/">
+<span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/creative-management/">
+<span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/opendirect/">
+<span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../claude-desktop-setup/">
+<span class="md-ellipsis">
+    
+  
+    Claude (Desktop &amp; Web)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../multi-client-setup/">
+<span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex &amp; AI IDEs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/developer-setup/">
+<span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/mcp-tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/slash-commands/">
+<span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/setup-wizard/">
+<span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="https://iabtechlab.github.io/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#model-map">
+<span class="md-ellipsis">
+      
+        Model Map
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#api-models">
+<span class="md-ellipsis">
+      
+        API Models
+      
+    </span>
+</a>
+<nav aria-label="API Models" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#campaignbrief">
+<span class="md-ellipsis">
+      
+        CampaignBrief
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingrequest">
+<span class="md-ellipsis">
+      
+        BookingRequest
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingresponse">
+<span class="md-ellipsis">
+      
+        BookingResponse
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingstatus">
+<span class="md-ellipsis">
+      
+        BookingStatus
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#approvalrequest">
+<span class="md-ellipsis">
+      
+        ApprovalRequest
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#productsearchrequest">
+<span class="md-ellipsis">
+      
+        ProductSearchRequest
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#flow-state-models">
+<span class="md-ellipsis">
+      
+        Flow State Models
+      
+    </span>
+</a>
+<nav aria-label="Flow State Models" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookingstate">
+<span class="md-ellipsis">
+      
+        BookingState
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#executionstatus-enum">
+<span class="md-ellipsis">
+      
+        ExecutionStatus (enum)
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channelallocation">
+<span class="md-ellipsis">
+      
+        ChannelAllocation
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#productrecommendation">
+<span class="md-ellipsis">
+      
+        ProductRecommendation
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#bookedline">
+<span class="md-ellipsis">
+      
+        BookedLine
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#channelbrief">
+<span class="md-ellipsis">
+      
+        ChannelBrief
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#opendirect-models">
+<span class="md-ellipsis">
+      
+        OpenDirect Models
+      
+    </span>
+</a>
+<nav aria-label="OpenDirect Models" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#organization">
+<span class="md-ellipsis">
+      
+        Organization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#account">
+<span class="md-ellipsis">
+      
+        Account
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#product">
+<span class="md-ellipsis">
+      
+        Product
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#order">
+<span class="md-ellipsis">
+      
+        Order
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#line">
+<span class="md-ellipsis">
+      
+        Line
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#creative">
+<span class="md-ellipsis">
+      
+        Creative
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#assignment">
+<span class="md-ellipsis">
+      
+        Assignment
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#availsrequest-availsresponse">
+<span class="md-ellipsis">
+      
+        AvailsRequest / AvailsResponse
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#linestats">
+<span class="md-ellipsis">
+      
+        LineStats
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#enums">
+<span class="md-ellipsis">
+      
+        Enums
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#negotiation-models">
+<span class="md-ellipsis">
+      
+        Negotiation Models
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#model-relationships">
+<span class="md-ellipsis">
+      
+        Model Relationships
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="data-models">Data Models<a class="headerlink" href="#data-models" title="Permanent link">¶</a></h1>
+<p>All models are Pydantic v2 classes. The buyer agent uses two model families: API request/response models defined in <code>interfaces/api/main.py</code>, and domain models defined in <code>models/flow_state.py</code> and <code>models/opendirect.py</code>.</p>
+<p>The two families serve different audiences. <strong>API models</strong> define the contract between external callers and the buyer's FastAPI endpoints --- you encounter these when submitting a campaign brief or polling for booking status. <strong>Domain models</strong> represent the internal state of a booking flow and the OpenDirect objects exchanged with seller agents --- you encounter these when extending the flow logic, writing custom strategies, or debugging a booking in progress. If you are integrating with the buyer as a client, start with the API Models section. If you are developing inside the buyer codebase, start with Flow State Models.</p>
+<h3 id="model-map">Model Map<a class="headerlink" href="#model-map" title="Permanent link">¶</a></h3>
+<p>The diagram below shows when each model family appears during a typical booking.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>External caller                     Buyer internals                     Seller agent
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>─────────────                       ───────────────                     ────────────
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>BookingRequest ──POST /bookings──►  BookingState (created)
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>                                    ChannelAllocation (budget split)
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>                                    ProductRecommendation (research)
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a>BookingStatus  ◄─GET /bookings────
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a>ApprovalRequest─POST .../approve─►
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>                                    BookedLine (execution)  ──────────► Order, Line, Product
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a>BookingStatus  ◄─GET /bookings────  (completed)
+</code></pre></div>
+<h2 id="api-models">API Models<a class="headerlink" href="#api-models" title="Permanent link">¶</a></h2>
+<p>Defined in <code>interfaces/api/main.py</code>:</p>
+<h3 id="campaignbrief">CampaignBrief<a class="headerlink" href="#campaignbrief" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>1-100 characters</td>
+</tr>
+<tr>
+<td><code>objectives</code></td>
+<td><code>list[str]</code></td>
+<td>yes</td>
+<td>At least one objective</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td><code>float</code></td>
+<td>yes</td>
+<td>Must be &gt; 0</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Format: YYYY-MM-DD</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Format: YYYY-MM-DD</td>
+</tr>
+<tr>
+<td><code>target_audience</code></td>
+<td><code>dict[str, Any]</code></td>
+<td>yes</td>
+<td>Audience specification</td>
+</tr>
+<tr>
+<td><code>kpis</code></td>
+<td><code>dict[str, Any]</code></td>
+<td>no</td>
+<td>Key performance indicators</td>
+</tr>
+<tr>
+<td><code>channels</code></td>
+<td><code>list[str] \| None</code></td>
+<td>no</td>
+<td>Preferred channels</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bookingrequest">BookingRequest<a class="headerlink" href="#bookingrequest" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>brief</code></td>
+<td><code>CampaignBrief</code></td>
+<td>--</td>
+<td>Required</td>
+</tr>
+<tr>
+<td><code>auto_approve</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td>Skip approval step</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bookingresponse">BookingResponse<a class="headerlink" href="#bookingresponse" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>job_id</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td><code>str</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="bookingstatus">BookingStatus<a class="headerlink" href="#bookingstatus" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>job_id</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td><code>progress</code></td>
+<td><code>float</code></td>
+</tr>
+<tr>
+<td><code>budget_allocations</code></td>
+<td><code>dict \| None</code></td>
+</tr>
+<tr>
+<td><code>recommendations</code></td>
+<td><code>list[dict] \| None</code></td>
+</tr>
+<tr>
+<td><code>booked_lines</code></td>
+<td><code>list[dict] \| None</code></td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td><code>list[str] \| None</code></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td><code>str</code></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td><code>str</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="approvalrequest">ApprovalRequest<a class="headerlink" href="#approvalrequest" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>approved_product_ids</code></td>
+<td><code>list[str]</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="productsearchrequest">ProductSearchRequest<a class="headerlink" href="#productsearchrequest" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>channel</code></td>
+<td><code>str \| None</code></td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>str \| None</code></td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td><code>min_price</code></td>
+<td><code>float \| None</code></td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td><code>max_price</code></td>
+<td><code>float \| None</code></td>
+<td><code>null</code></td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>int</code></td>
+<td><code>10</code> (range 1-50)</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="flow-state-models">Flow State Models<a class="headerlink" href="#flow-state-models" title="Permanent link">¶</a></h2>
+<p>Defined in <code>models/flow_state.py</code>:</p>
+<h3 id="bookingstate">BookingState<a class="headerlink" href="#bookingstate" title="Permanent link">¶</a></h3>
+<p>The central state object carried through the entire <code>DealBookingFlow</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>campaign_brief</code></td>
+<td><code>dict[str, Any]</code></td>
+<td>Raw campaign brief input</td>
+</tr>
+<tr>
+<td><code>audience_plan</code></td>
+<td><code>dict \| None</code></td>
+<td>Audience plan from planning step</td>
+</tr>
+<tr>
+<td><code>audience_coverage_estimates</code></td>
+<td><code>dict[str, float]</code></td>
+<td>Coverage estimates per channel (0-100%)</td>
+</tr>
+<tr>
+<td><code>audience_gaps</code></td>
+<td><code>list[str]</code></td>
+<td>Audience requirements that cannot be fulfilled</td>
+</tr>
+<tr>
+<td><code>budget_allocations</code></td>
+<td><code>dict[str, ChannelAllocation]</code></td>
+<td>Channel-level budget splits</td>
+</tr>
+<tr>
+<td><code>channel_recommendations</code></td>
+<td><code>dict[str, list[ProductRecommendation]]</code></td>
+<td>Recommendations grouped by channel</td>
+</tr>
+<tr>
+<td><code>pending_approvals</code></td>
+<td><code>list[ProductRecommendation]</code></td>
+<td>Flattened recommendations awaiting approval</td>
+</tr>
+<tr>
+<td><code>booked_lines</code></td>
+<td><code>list[BookedLine]</code></td>
+<td>Successfully booked line items</td>
+</tr>
+<tr>
+<td><code>execution_status</code></td>
+<td><code>ExecutionStatus</code></td>
+<td>Current flow status</td>
+</tr>
+<tr>
+<td><code>errors</code></td>
+<td><code>list[str]</code></td>
+<td>Error messages</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td><code>datetime</code></td>
+<td>Flow creation time</td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td><code>datetime</code></td>
+<td>Last update time</td>
+</tr>
+</tbody>
+</table>
+<h3 id="executionstatus-enum">ExecutionStatus (enum)<a class="headerlink" href="#executionstatus-enum" title="Permanent link">¶</a></h3>
+<p><code>initialized</code> | <code>brief_received</code> | <code>validation_failed</code> | <code>budget_allocated</code> | <code>researching</code> | <code>awaiting_approval</code> | <code>executing_bookings</code> | <code>completed</code> | <code>failed</code></p>
+<h3 id="channelallocation">ChannelAllocation<a class="headerlink" href="#channelallocation" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>Channel name</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td><code>float</code></td>
+<td>Allocated budget</td>
+</tr>
+<tr>
+<td><code>percentage</code></td>
+<td><code>float</code></td>
+<td>Percentage of total (0-100)</td>
+</tr>
+<tr>
+<td><code>rationale</code></td>
+<td><code>str</code></td>
+<td>Reason for allocation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="productrecommendation">ProductRecommendation<a class="headerlink" href="#productrecommendation" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product_id</code></td>
+<td><code>str</code></td>
+<td>Seller product ID</td>
+</tr>
+<tr>
+<td><code>product_name</code></td>
+<td><code>str</code></td>
+<td>Product display name</td>
+</tr>
+<tr>
+<td><code>publisher</code></td>
+<td><code>str</code></td>
+<td>Publisher name</td>
+</tr>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>Channel (branding, ctv, etc.)</td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>str \| None</code></td>
+<td>Ad format</td>
+</tr>
+<tr>
+<td><code>impressions</code></td>
+<td><code>int</code></td>
+<td>Target impressions</td>
+</tr>
+<tr>
+<td><code>cpm</code></td>
+<td><code>float</code></td>
+<td>Cost per mille</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td><code>float</code></td>
+<td>Total estimated cost</td>
+</tr>
+<tr>
+<td><code>targeting</code></td>
+<td><code>dict \| None</code></td>
+<td>Targeting parameters</td>
+</tr>
+<tr>
+<td><code>priority</code></td>
+<td><code>int</code></td>
+<td>Recommendation priority</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>str</code></td>
+<td><code>pending</code>, <code>pending_approval</code>, <code>approved</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>rationale</code></td>
+<td><code>str \| None</code></td>
+<td>Why this product was recommended</td>
+</tr>
+</tbody>
+</table>
+<h3 id="bookedline">BookedLine<a class="headerlink" href="#bookedline" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>line_id</code></td>
+<td><code>str</code></td>
+<td>Line item ID</td>
+</tr>
+<tr>
+<td><code>order_id</code></td>
+<td><code>str</code></td>
+<td>Parent order ID</td>
+</tr>
+<tr>
+<td><code>product_id</code></td>
+<td><code>str</code></td>
+<td>Seller product ID</td>
+</tr>
+<tr>
+<td><code>product_name</code></td>
+<td><code>str</code></td>
+<td>Product name</td>
+</tr>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>Channel</td>
+</tr>
+<tr>
+<td><code>impressions</code></td>
+<td><code>int</code></td>
+<td>Booked impressions</td>
+</tr>
+<tr>
+<td><code>cost</code></td>
+<td><code>float</code></td>
+<td>Booked cost</td>
+</tr>
+<tr>
+<td><code>booking_status</code></td>
+<td><code>str</code></td>
+<td>Booking status</td>
+</tr>
+<tr>
+<td><code>booked_at</code></td>
+<td><code>datetime</code></td>
+<td>Booking timestamp</td>
+</tr>
+</tbody>
+</table>
+<h3 id="channelbrief">ChannelBrief<a class="headerlink" href="#channelbrief" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>Channel name</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td><code>float</code></td>
+<td>Channel budget</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>str</code></td>
+<td>Start date</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>str</code></td>
+<td>End date</td>
+</tr>
+<tr>
+<td><code>target_audience</code></td>
+<td><code>dict</code></td>
+<td>Audience spec</td>
+</tr>
+<tr>
+<td><code>objectives</code></td>
+<td><code>list[str]</code></td>
+<td>Campaign objectives</td>
+</tr>
+<tr>
+<td><code>kpis</code></td>
+<td><code>dict</code></td>
+<td>KPIs</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="opendirect-models">OpenDirect Models<a class="headerlink" href="#opendirect-models" title="Permanent link">¶</a></h2>
+<p>Defined in <code>models/opendirect.py</code>, these represent IAB <a href="https://iabtechlab.com/standards/opendirect/">OpenDirect</a> 2.1 resources used by the <code>OpenDirectClient</code>.</p>
+<h3 id="organization">Organization<a class="headerlink" href="#organization" title="Permanent link">¶</a></h3>
+<p>Represents advertisers, agencies, and publishers. Fields: <code>id</code>, <code>name</code>, <code>type</code>, <code>address</code>, <code>contacts</code>, <code>ext</code>.</p>
+<h3 id="account">Account<a class="headerlink" href="#account" title="Permanent link">¶</a></h3>
+<p>Buyer-advertiser relationship. Fields: <code>id</code>, <code>advertiser_id</code>, <code>buyer_id</code>, <code>name</code>, <code>ext</code>.</p>
+<h3 id="product">Product<a class="headerlink" href="#product" title="Permanent link">¶</a></h3>
+<p>Publisher inventory item. Key fields: <code>id</code>, <code>publisher_id</code>, <code>name</code>, <code>description</code>, <code>currency</code>, <code>base_price</code>, <code>rate_type</code>, <code>delivery_type</code>, <code>domain</code>, <code>ad_unit</code>, <code>targeting</code>, <code>available_impressions</code>.</p>
+<h3 id="order">Order<a class="headerlink" href="#order" title="Permanent link">¶</a></h3>
+<p>Campaign container (insertion order). Key fields: <code>id</code>, <code>name</code>, <code>account_id</code>, <code>publisher_id</code>, <code>currency</code>, <code>budget</code>, <code>start_date</code>, <code>end_date</code>, <code>order_status</code>.</p>
+<h3 id="line">Line<a class="headerlink" href="#line" title="Permanent link">¶</a></h3>
+<p>Individual product booking. Key fields: <code>id</code>, <code>order_id</code>, <code>product_id</code>, <code>name</code>, <code>start_date</code>, <code>end_date</code>, <code>rate_type</code>, <code>rate</code>, <code>quantity</code>, <code>cost</code>, <code>booking_status</code>, <code>targeting</code>.</p>
+<h3 id="creative">Creative<a class="headerlink" href="#creative" title="Permanent link">¶</a></h3>
+<p>Ad creative asset. Fields: <code>id</code>, <code>account_id</code>, <code>name</code>, <code>language</code>, <code>click_url</code>, <code>creative_asset</code>, <code>creative_approvals</code>.</p>
+<h3 id="assignment">Assignment<a class="headerlink" href="#assignment" title="Permanent link">¶</a></h3>
+<p>Creative-to-line binding. Fields: <code>id</code>, <code>creative_id</code>, <code>line_id</code>, <code>status</code>.</p>
+<h3 id="availsrequest-availsresponse">AvailsRequest / AvailsResponse<a class="headerlink" href="#availsrequest-availsresponse" title="Permanent link">¶</a></h3>
+<p>Used for availability and pricing checks. Request fields: <code>product_id</code>, <code>start_date</code>, <code>end_date</code>, <code>requested_impressions</code>, <code>budget</code>, <code>targeting</code>. Response fields: <code>product_id</code>, <code>available_impressions</code>, <code>guaranteed_impressions</code>, <code>estimated_cpm</code>, <code>total_cost</code>, <code>delivery_confidence</code>, <code>available_targeting</code>.</p>
+<h3 id="linestats">LineStats<a class="headerlink" href="#linestats" title="Permanent link">¶</a></h3>
+<p>Performance metrics for a line item. Fields: <code>line_id</code>, <code>impressions_delivered</code>, <code>target_impressions</code>, <code>delivery_rate</code>, <code>pacing_status</code>, <code>amount_spent</code>, <code>budget</code>, <code>budget_utilization</code>, <code>effective_cpm</code>, <code>vcr</code>, <code>viewability</code>, <code>ctr</code>, <code>last_updated</code>.</p>
+<h3 id="enums">Enums<a class="headerlink" href="#enums" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Enum</th>
+<th>Values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RateType</code></td>
+<td><code>CPM</code>, <code>CPMV</code>, <code>CPC</code>, <code>CPD</code>, <code>FlatRate</code></td>
+</tr>
+<tr>
+<td><code>DeliveryType</code></td>
+<td><code>Exclusive</code>, <code>Guaranteed</code>, <code>PMP</code></td>
+</tr>
+<tr>
+<td><code>OrderStatus</code></td>
+<td><code>PENDING</code>, <code>APPROVED</code>, <code>REJECTED</code></td>
+</tr>
+<tr>
+<td><code>LineBookingStatus</code></td>
+<td><code>Draft</code>, <code>PendingReservation</code>, <code>Reserved</code>, <code>PendingBooking</code>, <code>Booked</code>, <code>InFlight</code>, <code>Finished</code>, <code>Stopped</code>, <code>Cancelled</code>, <code>Expired</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="negotiation-models">Negotiation Models<a class="headerlink" href="#negotiation-models" title="Permanent link">¶</a></h2>
+<p>The negotiation module defines its own set of models for managing multi-turn price negotiations with seller agents. These include negotiation state, offer history, and strategy configuration. See the <a href="../../guides/negotiation/">Negotiation Guide</a> for the full model reference and usage examples.</p>
+<hr/>
+<h2 id="model-relationships">Model Relationships<a class="headerlink" href="#model-relationships" title="Permanent link">¶</a></h2>
+<pre class="mermaid"><code>erDiagram
+    CampaignBrief ||--|| BookingRequest : "submitted in"
+    BookingRequest ||--|| BookingState : "initializes"
+    BookingState ||--o{ ChannelAllocation : "budget_allocations"
+    BookingState ||--o{ ProductRecommendation : "pending_approvals"
+    BookingState ||--o{ BookedLine : "booked_lines"
+    Organization ||--o{ Account : "advertiser/buyer"
+    Account ||--o{ Order : "contains"
+    Order ||--o{ Line : "contains"
+    Product ||--o{ Line : "booked as"
+    Line ||--o{ Assignment : "has"
+    Creative ||--o{ Assignment : "assigned via"
+</code></pre>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>

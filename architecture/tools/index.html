@@ -1,0 +1,2642 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="API &amp; Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent" name="description"/>
+<link href="https://iabtechlab.github.io/buyer-agent/architecture/tools/" rel="canonical"/>
+<link href="../models/" rel="prev"/>
+<link href="../mcp-server/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Tools Reference - IAB Tech Lab — Buyer Agent</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="indigo" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#crewai-tools-reference">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+<aside class="md-banner">
+<div class="md-banner__inner md-grid md-typeset">
+<a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here →
+  </a>
+</div>
+</aside>
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Tools Reference
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting-started/quickstart/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../api/overview/">
+          
+  
+  
+  API Reference
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../state-machines/order-lifecycle/">
+          
+  
+  
+  State Machines
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../event-bus/overview/">
+          
+  
+  
+  Event Bus
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../guides/overview/">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../integration/seller-agent/">
+          
+  
+  
+  Integration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../claude-desktop-setup/">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../ai-assistant/mcp-tools/">
+          
+  
+  
+  MCP Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="https://iabtechlab.github.io/seller-agent/">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/quickstart/">
+<span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/protocols/">
+<span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/mcp-client/">
+<span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/a2a-client/">
+<span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/authentication/">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/change-requests/">
+<span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/deals/">
+<span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/bookings/">
+<span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/seller-discovery/">
+<span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/products/">
+<span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../agent-hierarchy/">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../booking-flow/">
+<span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../buyer-deal-flow/">
+<span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-store/">
+<span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../models/">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#typical-tool-flow">
+<span class="md-ellipsis">
+      
+        Typical Tool Flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tool-categories">
+<span class="md-ellipsis">
+      
+        Tool Categories
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audience-tools">
+<span class="md-ellipsis">
+      
+        Audience Tools
+      
+    </span>
+</a>
+<nav aria-label="Audience Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audiencediscoverytool">
+<span class="md-ellipsis">
+      
+        AudienceDiscoveryTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audiencematchingtool">
+<span class="md-ellipsis">
+      
+        AudienceMatchingTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#coverageestimationtool">
+<span class="md-ellipsis">
+      
+        CoverageEstimationTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#buyer-deal-tools">
+<span class="md-ellipsis">
+      
+        Buyer Deal Tools
+      
+    </span>
+</a>
+<nav aria-label="Buyer Deal Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#discoverinventorytool">
+<span class="md-ellipsis">
+      
+        DiscoverInventoryTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#getpricingtool">
+<span class="md-ellipsis">
+      
+        GetPricingTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#requestdealtool">
+<span class="md-ellipsis">
+      
+        RequestDealTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#execution-tools">
+<span class="md-ellipsis">
+      
+        Execution Tools
+      
+    </span>
+</a>
+<nav aria-label="Execution Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#createordertool">
+<span class="md-ellipsis">
+      
+        CreateOrderTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#createlinetool">
+<span class="md-ellipsis">
+      
+        CreateLineTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reservelinetool">
+<span class="md-ellipsis">
+      
+        ReserveLineTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#booklinetool">
+<span class="md-ellipsis">
+      
+        BookLineTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#booking-lifecycle">
+<span class="md-ellipsis">
+      
+        Booking Lifecycle
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#research-tools">
+<span class="md-ellipsis">
+      
+        Research Tools
+      
+    </span>
+</a>
+<nav aria-label="Research Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#productsearchtool">
+<span class="md-ellipsis">
+      
+        ProductSearchTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#availschecktool">
+<span class="md-ellipsis">
+      
+        AvailsCheckTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reporting-tools">
+<span class="md-ellipsis">
+      
+        Reporting Tools
+      
+    </span>
+</a>
+<nav aria-label="Reporting Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#getstatstool">
+<span class="md-ellipsis">
+      
+        GetStatsTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tool-initialization-patterns">
+<span class="md-ellipsis">
+      
+        Tool Initialization Patterns
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../mcp-server/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/order-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/change-request-flow/">
+<span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../event-bus/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-booking/">
+<span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/negotiation/">
+<span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/identity/">
+<span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/linear-tv/">
+<span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/configuration/">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deployment-ops-guide/">
+<span class="md-ellipsis">
+    
+  
+    Deployment &amp; Operations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller-orchestration/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/campaign-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/budget-pacing/">
+<span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/creative-management/">
+<span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/opendirect/">
+<span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../claude-desktop-setup/">
+<span class="md-ellipsis">
+    
+  
+    Claude (Desktop &amp; Web)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../multi-client-setup/">
+<span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex &amp; AI IDEs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/developer-setup/">
+<span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/mcp-tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/slash-commands/">
+<span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/setup-wizard/">
+<span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="https://iabtechlab.github.io/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#typical-tool-flow">
+<span class="md-ellipsis">
+      
+        Typical Tool Flow
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tool-categories">
+<span class="md-ellipsis">
+      
+        Tool Categories
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audience-tools">
+<span class="md-ellipsis">
+      
+        Audience Tools
+      
+    </span>
+</a>
+<nav aria-label="Audience Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audiencediscoverytool">
+<span class="md-ellipsis">
+      
+        AudienceDiscoveryTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#audiencematchingtool">
+<span class="md-ellipsis">
+      
+        AudienceMatchingTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#coverageestimationtool">
+<span class="md-ellipsis">
+      
+        CoverageEstimationTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#buyer-deal-tools">
+<span class="md-ellipsis">
+      
+        Buyer Deal Tools
+      
+    </span>
+</a>
+<nav aria-label="Buyer Deal Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#discoverinventorytool">
+<span class="md-ellipsis">
+      
+        DiscoverInventoryTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#getpricingtool">
+<span class="md-ellipsis">
+      
+        GetPricingTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#requestdealtool">
+<span class="md-ellipsis">
+      
+        RequestDealTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#execution-tools">
+<span class="md-ellipsis">
+      
+        Execution Tools
+      
+    </span>
+</a>
+<nav aria-label="Execution Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#createordertool">
+<span class="md-ellipsis">
+      
+        CreateOrderTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#createlinetool">
+<span class="md-ellipsis">
+      
+        CreateLineTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reservelinetool">
+<span class="md-ellipsis">
+      
+        ReserveLineTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#booklinetool">
+<span class="md-ellipsis">
+      
+        BookLineTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#booking-lifecycle">
+<span class="md-ellipsis">
+      
+        Booking Lifecycle
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#research-tools">
+<span class="md-ellipsis">
+      
+        Research Tools
+      
+    </span>
+</a>
+<nav aria-label="Research Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#productsearchtool">
+<span class="md-ellipsis">
+      
+        ProductSearchTool
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#availschecktool">
+<span class="md-ellipsis">
+      
+        AvailsCheckTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#reporting-tools">
+<span class="md-ellipsis">
+      
+        Reporting Tools
+      
+    </span>
+</a>
+<nav aria-label="Reporting Tools" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#getstatstool">
+<span class="md-ellipsis">
+      
+        GetStatsTool
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#tool-initialization-patterns">
+<span class="md-ellipsis">
+      
+        Tool Initialization Patterns
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="crewai-tools-reference">CrewAI Tools Reference<a class="headerlink" href="#crewai-tools-reference" title="Permanent link">¶</a></h1>
+<p>The buyer agent provides 13 tools that agents use to interact with sellers, plan audiences, execute bookings, and retrieve performance data. All tools extend CrewAI's <code>BaseTool</code> and expose both synchronous (<code>_run</code>) and asynchronous (<code>_arun</code>) interfaces.</p>
+<p>Tools are how AI agents take action in the real world. While agents reason about strategy and make decisions, tools are the concrete operations they invoke --- searching a seller's product catalog, checking inventory availability, or confirming a booking. Each tool wraps a single, well-defined API call so that agents do not need to construct raw HTTP requests. Tools fall into four categories: <strong>Audience</strong> (understanding who to target), <strong>Research</strong> (finding what to buy), <strong>Buyer Deals</strong> (obtaining Deal IDs for programmatic activation), and <strong>Execution</strong> (placing and confirming orders).</p>
+<h3 id="typical-tool-flow">Typical Tool Flow<a class="headerlink" href="#typical-tool-flow" title="Permanent link">¶</a></h3>
+<p>In a standard booking, tools are used in this order:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>1. AudienceDiscovery / AudienceMatching / CoverageEstimation  (plan audience)
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>2. ProductSearch / AvailsCheck                                  (find inventory)
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a>3. DiscoverInventory / GetPricing / RequestDeal                 (buyer deal path, if applicable)
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>4. CreateOrder → CreateLine → ReserveLine → BookLine            (execute booking)
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a>5. GetStats                                                     (monitor delivery, coming soon)
+</code></pre></div>
+<h2 id="tool-categories">Tool Categories<a class="headerlink" href="#tool-categories" title="Permanent link">¶</a></h2>
+<pre class="mermaid"><code>graph LR
+    subgraph Audience["Audience Tools"]
+        AD[AudienceDiscoveryTool]
+        AM[AudienceMatchingTool]
+        CE[CoverageEstimationTool]
+    end
+
+    subgraph DSP["Buyer Deal Tools"]
+        DI[DiscoverInventoryTool]
+        GP[GetPricingTool]
+        RD[RequestDealTool]
+    end
+
+    subgraph Execution["Execution Tools"]
+        CO[CreateOrderTool]
+        CL[CreateLineTool]
+        RL[ReserveLineTool]
+        BL[BookLineTool]
+    end
+
+    subgraph Research["Research Tools"]
+        PS[ProductSearchTool]
+        AC[AvailsCheckTool]
+    end
+
+    subgraph Reporting["Reporting Tools (Coming Soon)"]
+        GS[GetStatsTool]
+    end
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Tools</th>
+<th>Used By</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Audience</strong></td>
+<td>AudienceDiscovery, AudienceMatching, CoverageEstimation</td>
+<td>Audience Planner, Research Agent</td>
+</tr>
+<tr>
+<td><strong>Buyer Deals</strong></td>
+<td>DiscoverInventory, GetPricing, RequestDeal</td>
+<td>Buyer Deal Specialist</td>
+</tr>
+<tr>
+<td><strong>Execution</strong></td>
+<td>CreateOrder, CreateLine, ReserveLine, BookLine</td>
+<td>Execution Agent</td>
+</tr>
+<tr>
+<td><strong>Research</strong></td>
+<td>ProductSearch, AvailsCheck</td>
+<td>Research Agent</td>
+</tr>
+<tr>
+<td><strong>Reporting</strong></td>
+<td>GetStats</td>
+<td>Reporting Agent (Coming Soon)</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="audience-tools">Audience Tools<a class="headerlink" href="#audience-tools" title="Permanent link">¶</a></h2>
+<p>Audience tools use the IAB Tech Lab <a href="https://iabtechlab.com/ucp">User Context Protocol (UCP)</a> to discover, match, and estimate audience coverage across seller inventory.</p>
+<p><strong>Package:</strong> <code>src/ad_buyer/tools/audience/</code></p>
+<h3 id="audiencediscoverytool">AudienceDiscoveryTool<a class="headerlink" href="#audiencediscoverytool" title="Permanent link">¶</a></h3>
+<p>Discovers available audience signals from a seller endpoint via UCP.</p>
+<p><strong>CrewAI name:</strong> <code>discover_audience_capabilities</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>seller_endpoint</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Seller's capability discovery endpoint URL</td>
+</tr>
+<tr>
+<td><code>signal_types</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Filter by signal type: <code>identity</code>, <code>contextual</code>, <code>reinforcement</code></td>
+</tr>
+<tr>
+<td><code>min_coverage</code></td>
+<td><code>float</code></td>
+<td>no</td>
+<td>Minimum coverage percentage (0--100)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Capabilities grouped by signal type, each with coverage percentage, available segments, and UCP compatibility status.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.audience</span><span class="w"> </span><span class="kn">import</span> <span class="n">AudienceDiscoveryTool</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="n">tool</span> <span class="o">=</span> <span class="n">AudienceDiscoveryTool</span><span class="p">()</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">tool</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a>    <span class="n">seller_endpoint</span><span class="o">=</span><span class="s2">"http://seller.example.com:8000/ucp/capabilities"</span><span class="p">,</span>
+<a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a>    <span class="n">signal_types</span><span class="o">=</span><span class="p">[</span><span class="s2">"contextual"</span><span class="p">,</span> <span class="s2">"identity"</span><span class="p">],</span>
+<a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a>    <span class="n">min_coverage</span><span class="o">=</span><span class="mf">50.0</span><span class="p">,</span>
+<a href="#__codelineno-1-8" id="__codelineno-1-8" name="__codelineno-1-8"></a><span class="p">)</span>
+</code></pre></div>
+<details class="note">
+<summary>Signal types explained</summary>
+<ul>
+<li><strong>Identity</strong>: Hashed user IDs, device graphs, demographic models</li>
+<li><strong>Contextual</strong>: Page content categories, keywords, IAB taxonomy</li>
+<li><strong>Reinforcement</strong>: Purchase intent, past converters, feedback loops</li>
+</ul>
+</details>
+<hr/>
+<h3 id="audiencematchingtool">AudienceMatchingTool<a class="headerlink" href="#audiencematchingtool" title="Permanent link">¶</a></h3>
+<p>Computes a UCP similarity score between the campaign's target audience and a seller's inventory audience characteristics.</p>
+<p><strong>CrewAI name:</strong> <code>match_audience_to_inventory</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>seller_endpoint</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Seller's UCP exchange endpoint URL</td>
+</tr>
+<tr>
+<td><code>demographics</code></td>
+<td><code>dict</code></td>
+<td>no</td>
+<td>Age, gender, income targeting</td>
+</tr>
+<tr>
+<td><code>interests</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Interest-based categories</td>
+</tr>
+<tr>
+<td><code>behaviors</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Behavioral targeting segments</td>
+</tr>
+<tr>
+<td><code>geography</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Country code for geo targeting</td>
+</tr>
+<tr>
+<td><code>exclusions</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Segments to exclude</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Match quality (STRONG/MODERATE/WEAK/POOR), UCP similarity score (0--1), matched capabilities, gaps, and suggested alternatives.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.audience</span><span class="w"> </span><span class="kn">import</span> <span class="n">AudienceMatchingTool</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a><span class="n">tool</span> <span class="o">=</span> <span class="n">AudienceMatchingTool</span><span class="p">()</span>
+<a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">tool</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span>
+<a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a>    <span class="n">seller_endpoint</span><span class="o">=</span><span class="s2">"http://seller.example.com:8000/ucp/exchange"</span><span class="p">,</span>
+<a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a>    <span class="n">demographics</span><span class="o">=</span><span class="p">{</span><span class="s2">"age"</span><span class="p">:</span> <span class="s2">"25-54"</span><span class="p">,</span> <span class="s2">"gender"</span><span class="p">:</span> <span class="s2">"all"</span><span class="p">},</span>
+<a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a>    <span class="n">interests</span><span class="o">=</span><span class="p">[</span><span class="s2">"sports"</span><span class="p">,</span> <span class="s2">"news"</span><span class="p">],</span>
+<a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a>    <span class="n">geography</span><span class="o">=</span><span class="s2">"US"</span><span class="p">,</span>
+<a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a><span class="p">)</span>
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Score thresholds</p>
+<ul>
+<li><strong>&gt;= 0.7</strong>: Strong match --- proceed with targeting</li>
+<li><strong>0.5 --- 0.7</strong>: Moderate --- proceed with caution, may limit reach</li>
+<li><strong>&lt; 0.5</strong>: Weak --- consider broadening targeting or reviewing alternatives</li>
+</ul>
+</div>
+<hr/>
+<h3 id="coverageestimationtool">CoverageEstimationTool<a class="headerlink" href="#coverageestimationtool" title="Permanent link">¶</a></h3>
+<p>Estimates audience reach for a targeting specification across channels.</p>
+<p><strong>CrewAI name:</strong> <code>estimate_audience_coverage</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>targeting</code></td>
+<td><code>dict</code></td>
+<td>yes</td>
+<td>Targeting spec with demographics, interests, behaviors, etc.</td>
+</tr>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Specific channel: <code>display</code>, <code>video</code>, <code>ctv</code>, <code>mobile_app</code></td>
+</tr>
+<tr>
+<td><code>total_impressions</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Total available impressions to estimate against (default: 10M)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Per-channel coverage estimates with impression counts, coverage percentages, confidence levels, and limiting factors.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.audience</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoverageEstimationTool</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a><span class="n">tool</span> <span class="o">=</span> <span class="n">CoverageEstimationTool</span><span class="p">()</span>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">tool</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span>
+<a href="#__codelineno-3-5" id="__codelineno-3-5" name="__codelineno-3-5"></a>    <span class="n">targeting</span><span class="o">=</span><span class="p">{</span>
+<a href="#__codelineno-3-6" id="__codelineno-3-6" name="__codelineno-3-6"></a>        <span class="s2">"demographics"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"age"</span><span class="p">:</span> <span class="s2">"25-54"</span><span class="p">},</span>
+<a href="#__codelineno-3-7" id="__codelineno-3-7" name="__codelineno-3-7"></a>        <span class="s2">"interests"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"sports"</span><span class="p">],</span>
+<a href="#__codelineno-3-8" id="__codelineno-3-8" name="__codelineno-3-8"></a>        <span class="s2">"geography"</span><span class="p">:</span> <span class="s2">"US"</span><span class="p">,</span>
+<a href="#__codelineno-3-9" id="__codelineno-3-9" name="__codelineno-3-9"></a>    <span class="p">},</span>
+<a href="#__codelineno-3-10" id="__codelineno-3-10" name="__codelineno-3-10"></a>    <span class="n">channel</span><span class="o">=</span><span class="s2">"ctv"</span><span class="p">,</span>
+<a href="#__codelineno-3-11" id="__codelineno-3-11" name="__codelineno-3-11"></a>    <span class="n">total_impressions</span><span class="o">=</span><span class="mi">5_000_000</span><span class="p">,</span>
+<a href="#__codelineno-3-12" id="__codelineno-3-12" name="__codelineno-3-12"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Coverage factors by targeting type:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Targeting Type</th>
+<th>Base Coverage</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Geography</td>
+<td>95%</td>
+<td>Nearly all inventory has geo data</td>
+</tr>
+<tr>
+<td>Device</td>
+<td>98%</td>
+<td>Device data is standard</td>
+</tr>
+<tr>
+<td>Interests (contextual)</td>
+<td>90%</td>
+<td>Most inventory supports contextual signals</td>
+</tr>
+<tr>
+<td>Demographics</td>
+<td>75%</td>
+<td>Modeled demographic data</td>
+</tr>
+<tr>
+<td>Behaviors</td>
+<td>40%</td>
+<td>Limited behavioral data availability</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Channel modifiers:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Channel</th>
+<th>Modifier</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Display</td>
+<td>1.0x</td>
+<td>Largest inventory pool</td>
+</tr>
+<tr>
+<td>Video</td>
+<td>0.85x</td>
+<td>Less video inventory available</td>
+</tr>
+<tr>
+<td>Mobile App</td>
+<td>0.70x</td>
+<td>App inventory varies</td>
+</tr>
+<tr>
+<td>CTV</td>
+<td>0.60x</td>
+<td>Most limited but growing</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="buyer-deal-tools">Buyer Deal Tools<a class="headerlink" href="#buyer-deal-tools" title="Permanent link">¶</a></h2>
+<p>Buyer deal tools enable programmatic deal workflows where Deal IDs are obtained from sellers and activated in traditional DSP platforms. All three tools require a <code>UnifiedClient</code> and <code>BuyerContext</code> at initialization.</p>
+<p><strong>Package:</strong> <code>src/ad_buyer/tools/buyer_deals/</code></p>
+<h3 id="discoverinventorytool">DiscoverInventoryTool<a class="headerlink" href="#discoverinventorytool" title="Permanent link">¶</a></h3>
+<p>Queries sellers for available inventory with identity-based access and tiered pricing.</p>
+<p><strong>CrewAI name:</strong> <code>discover_inventory</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>query</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Natural language query (e.g., "CTV inventory under $25 CPM")</td>
+</tr>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Channel filter: <code>ctv</code>, <code>display</code>, <code>video</code>, <code>mobile</code></td>
+</tr>
+<tr>
+<td><code>max_cpm</code></td>
+<td><code>float</code></td>
+<td>no</td>
+<td>Maximum CPM price</td>
+</tr>
+<tr>
+<td><code>min_impressions</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Minimum available impressions</td>
+</tr>
+<tr>
+<td><code>targeting</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Required targeting capabilities</td>
+</tr>
+<tr>
+<td><code>publisher</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Specific publisher to search</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> List of products with tiered pricing based on buyer identity, availability, and targeting capabilities.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.buyer_deals</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscoverInventoryTool</span>
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.clients.unified_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnifiedClient</span>
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.models.buyer_identity</span><span class="w"> </span><span class="kn">import</span> <span class="n">BuyerContext</span><span class="p">,</span> <span class="n">BuyerIdentity</span>
+<a href="#__codelineno-4-4" id="__codelineno-4-4" name="__codelineno-4-4"></a>
+<a href="#__codelineno-4-5" id="__codelineno-4-5" name="__codelineno-4-5"></a><span class="n">client</span> <span class="o">=</span> <span class="n">UnifiedClient</span><span class="p">(</span><span class="n">base_url</span><span class="o">=</span><span class="s2">"http://seller.example.com:8000"</span><span class="p">)</span>
+<a href="#__codelineno-4-6" id="__codelineno-4-6" name="__codelineno-4-6"></a><span class="n">buyer_context</span> <span class="o">=</span> <span class="n">BuyerContext</span><span class="p">(</span>
+<a href="#__codelineno-4-7" id="__codelineno-4-7" name="__codelineno-4-7"></a>    <span class="n">identity</span><span class="o">=</span><span class="n">BuyerIdentity</span><span class="p">(</span><span class="n">seat_id</span><span class="o">=</span><span class="s2">"ttd-123"</span><span class="p">,</span> <span class="n">agency_id</span><span class="o">=</span><span class="s2">"omnicom-456"</span><span class="p">),</span>
+<a href="#__codelineno-4-8" id="__codelineno-4-8" name="__codelineno-4-8"></a>    <span class="n">is_authenticated</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a href="#__codelineno-4-9" id="__codelineno-4-9" name="__codelineno-4-9"></a><span class="p">)</span>
+<a href="#__codelineno-4-10" id="__codelineno-4-10" name="__codelineno-4-10"></a>
+<a href="#__codelineno-4-11" id="__codelineno-4-11" name="__codelineno-4-11"></a><span class="n">tool</span> <span class="o">=</span> <span class="n">DiscoverInventoryTool</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span> <span class="n">buyer_context</span><span class="o">=</span><span class="n">buyer_context</span><span class="p">)</span>
+<a href="#__codelineno-4-12" id="__codelineno-4-12" name="__codelineno-4-12"></a><span class="n">result</span> <span class="o">=</span> <span class="n">tool</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span><span class="n">query</span><span class="o">=</span><span class="s2">"premium CTV sports inventory"</span><span class="p">,</span> <span class="n">max_cpm</span><span class="o">=</span><span class="mf">30.0</span><span class="p">)</span>
+</code></pre></div>
+<div class="admonition info">
+<p class="admonition-title">Access tiers</p>
+<p>The buyer's identity determines which inventory and pricing they see:</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Discount</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Public</td>
+<td>0%</td>
+<td>Price ranges, standard catalog</td>
+</tr>
+<tr>
+<td>Seat</td>
+<td>5%</td>
+<td>Fixed prices</td>
+</tr>
+<tr>
+<td>Agency</td>
+<td>10%</td>
+<td>Premium inventory, negotiation</td>
+</tr>
+<tr>
+<td>Advertiser</td>
+<td>15%</td>
+<td>Volume discounts, full negotiation</td>
+</tr>
+</tbody>
+</table>
+</div>
+<hr/>
+<h3 id="getpricingtool">GetPricingTool<a class="headerlink" href="#getpricingtool" title="Permanent link">¶</a></h3>
+<p>Retrieves tier-specific pricing for a product, including volume discounts and deal type options.</p>
+<p><strong>CrewAI name:</strong> <code>get_pricing</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Product ID to price</td>
+</tr>
+<tr>
+<td><code>volume</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Requested impressions (may unlock volume discounts)</td>
+</tr>
+<tr>
+<td><code>deal_type</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>PG</code>, <code>PD</code>, or <code>PA</code></td>
+</tr>
+<tr>
+<td><code>flight_start</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Start date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>flight_end</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>End date (YYYY-MM-DD)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Full pricing breakdown with base CPM, tier discount, volume discount, final CPM, cost projection, and available deal types.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.buyer_deals</span><span class="w"> </span><span class="kn">import</span> <span class="n">GetPricingTool</span>
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a>
+<a href="#__codelineno-5-3" id="__codelineno-5-3" name="__codelineno-5-3"></a><span class="n">tool</span> <span class="o">=</span> <span class="n">GetPricingTool</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span> <span class="n">buyer_context</span><span class="o">=</span><span class="n">buyer_context</span><span class="p">)</span>
+<a href="#__codelineno-5-4" id="__codelineno-5-4" name="__codelineno-5-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">tool</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span>
+<a href="#__codelineno-5-5" id="__codelineno-5-5" name="__codelineno-5-5"></a>    <span class="n">product_id</span><span class="o">=</span><span class="s2">"prod-ctv-sports-001"</span><span class="p">,</span>
+<a href="#__codelineno-5-6" id="__codelineno-5-6" name="__codelineno-5-6"></a>    <span class="n">volume</span><span class="o">=</span><span class="mi">10_000_000</span><span class="p">,</span>
+<a href="#__codelineno-5-7" id="__codelineno-5-7" name="__codelineno-5-7"></a>    <span class="n">deal_type</span><span class="o">=</span><span class="s2">"PD"</span><span class="p">,</span>
+<a href="#__codelineno-5-8" id="__codelineno-5-8" name="__codelineno-5-8"></a>    <span class="n">flight_start</span><span class="o">=</span><span class="s2">"2026-07-01"</span><span class="p">,</span>
+<a href="#__codelineno-5-9" id="__codelineno-5-9" name="__codelineno-5-9"></a>    <span class="n">flight_end</span><span class="o">=</span><span class="s2">"2026-09-30"</span><span class="p">,</span>
+<a href="#__codelineno-5-10" id="__codelineno-5-10" name="__codelineno-5-10"></a><span class="p">)</span>
+</code></pre></div>
+<p><strong>Volume discounts</strong> (agency/advertiser tiers only):</p>
+<table>
+<thead>
+<tr>
+<th>Volume</th>
+<th>Discount</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>5M+ impressions</td>
+<td>5%</td>
+</tr>
+<tr>
+<td>10M+ impressions</td>
+<td>10%</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h3 id="requestdealtool">RequestDealTool<a class="headerlink" href="#requestdealtool" title="Permanent link">¶</a></h3>
+<p>Requests a Deal ID from a seller for programmatic activation in a DSP platform.</p>
+<p><strong>CrewAI name:</strong> <code>request_deal</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Product ID to create deal for</td>
+</tr>
+<tr>
+<td><code>deal_type</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>PG</code>, <code>PD</code> (default), or <code>PA</code></td>
+</tr>
+<tr>
+<td><code>impressions</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Volume (required for PG deals)</td>
+</tr>
+<tr>
+<td><code>flight_start</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Start date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>flight_end</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>End date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>target_cpm</code></td>
+<td><code>float</code></td>
+<td>no</td>
+<td>Target price for negotiation (agency/advertiser only)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Deal ID, pricing details, and platform-specific activation instructions for The Trade Desk, DV360, Amazon DSP, Xandr, and Yahoo DSP.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.buyer_deals</span><span class="w"> </span><span class="kn">import</span> <span class="n">RequestDealTool</span>
+<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>
+<a href="#__codelineno-6-3" id="__codelineno-6-3" name="__codelineno-6-3"></a><span class="n">tool</span> <span class="o">=</span> <span class="n">RequestDealTool</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">,</span> <span class="n">buyer_context</span><span class="o">=</span><span class="n">buyer_context</span><span class="p">)</span>
+<a href="#__codelineno-6-4" id="__codelineno-6-4" name="__codelineno-6-4"></a><span class="n">result</span> <span class="o">=</span> <span class="n">tool</span><span class="o">.</span><span class="n">_run</span><span class="p">(</span>
+<a href="#__codelineno-6-5" id="__codelineno-6-5" name="__codelineno-6-5"></a>    <span class="n">product_id</span><span class="o">=</span><span class="s2">"prod-ctv-sports-001"</span><span class="p">,</span>
+<a href="#__codelineno-6-6" id="__codelineno-6-6" name="__codelineno-6-6"></a>    <span class="n">deal_type</span><span class="o">=</span><span class="s2">"PD"</span><span class="p">,</span>
+<a href="#__codelineno-6-7" id="__codelineno-6-7" name="__codelineno-6-7"></a>    <span class="n">impressions</span><span class="o">=</span><span class="mi">500_000</span><span class="p">,</span>
+<a href="#__codelineno-6-8" id="__codelineno-6-8" name="__codelineno-6-8"></a>    <span class="n">flight_start</span><span class="o">=</span><span class="s2">"2026-07-01"</span><span class="p">,</span>
+<a href="#__codelineno-6-9" id="__codelineno-6-9" name="__codelineno-6-9"></a>    <span class="n">flight_end</span><span class="o">=</span><span class="s2">"2026-09-30"</span><span class="p">,</span>
+<a href="#__codelineno-6-10" id="__codelineno-6-10" name="__codelineno-6-10"></a>    <span class="n">target_cpm</span><span class="o">=</span><span class="mf">22.0</span><span class="p">,</span>
+<a href="#__codelineno-6-11" id="__codelineno-6-11" name="__codelineno-6-11"></a><span class="p">)</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">PG requirements</p>
+<p>Programmatic Guaranteed (PG) deals require an <code>impressions</code> value. The tool will return an error if you request PG without specifying volume.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Negotiation requirements</p>
+<p>Setting <code>target_cpm</code> requires Agency or Advertiser tier access <strong>and</strong> the product must have <code>negotiation_enabled=True</code>. If either condition is not met, the tool will reject the negotiation attempt.</p>
+</div>
+<hr/>
+<h2 id="execution-tools">Execution Tools<a class="headerlink" href="#execution-tools" title="Permanent link">¶</a></h2>
+<p>Execution tools manage the <a href="https://iabtechlab.com/standards/opendirect/">OpenDirect</a> booking lifecycle: creating orders, adding line items, reserving inventory, and confirming bookings. All require an <code>OpenDirectClient</code> at initialization.</p>
+<p><strong>Package:</strong> <code>src/ad_buyer/tools/execution/</code></p>
+<h3 id="createordertool">CreateOrderTool<a class="headerlink" href="#createordertool" title="Permanent link">¶</a></h3>
+<p>Creates a new advertising order (IO) in OpenDirect.</p>
+<p><strong>CrewAI name:</strong> <code>create_advertising_order</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Account ID</td>
+</tr>
+<tr>
+<td><code>order_name</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Name/title for the order</td>
+</tr>
+<tr>
+<td><code>brand_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Advertiser brand identifier</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Order start date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Order end date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td><code>float</code></td>
+<td>yes</td>
+<td>Total budget in USD</td>
+</tr>
+<tr>
+<td><code>currency</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>ISO 4217 currency code (default: <code>USD</code>)</td>
+</tr>
+<tr>
+<td><code>publisher_id</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td>Target publisher ID</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Order ID and status confirmation.</p>
+<hr/>
+<h3 id="createlinetool">CreateLineTool<a class="headerlink" href="#createlinetool" title="Permanent link">¶</a></h3>
+<p>Creates a line item within an order, defining the actual media purchase.</p>
+<p><strong>CrewAI name:</strong> <code>create_line_item</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Account ID</td>
+</tr>
+<tr>
+<td><code>order_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Order to add line to</td>
+</tr>
+<tr>
+<td><code>product_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Product ID to book</td>
+</tr>
+<tr>
+<td><code>line_name</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Name for the line item</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Start date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>End date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>rate_type</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>CPM</code>, <code>CPMV</code>, <code>CPC</code>, <code>CPD</code>, <code>FlatRate</code> (default: <code>CPM</code>)</td>
+</tr>
+<tr>
+<td><code>rate</code></td>
+<td><code>float</code></td>
+<td>yes</td>
+<td>Rate/price for the line</td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td><code>int</code></td>
+<td>yes</td>
+<td>Target impressions or units</td>
+</tr>
+<tr>
+<td><code>targeting</code></td>
+<td><code>dict</code></td>
+<td>no</td>
+<td>Targeting parameters (geo, demographic, etc.)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Line ID, status, and estimated cost.</p>
+<hr/>
+<h3 id="reservelinetool">ReserveLineTool<a class="headerlink" href="#reservelinetool" title="Permanent link">¶</a></h3>
+<p>Reserves inventory for a line item, transitioning it from Draft to Reserved status.</p>
+<p><strong>CrewAI name:</strong> <code>reserve_line_item</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Account ID</td>
+</tr>
+<tr>
+<td><code>order_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Order ID</td>
+</tr>
+<tr>
+<td><code>line_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Line ID to reserve</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Updated line status confirmation. The inventory is temporarily held without final commitment.</p>
+<hr/>
+<h3 id="booklinetool">BookLineTool<a class="headerlink" href="#booklinetool" title="Permanent link">¶</a></h3>
+<p>Confirms booking for a line item, transitioning from Reserved to Booked.</p>
+<p><strong>CrewAI name:</strong> <code>book_line_item</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Account ID</td>
+</tr>
+<tr>
+<td><code>order_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Order ID</td>
+</tr>
+<tr>
+<td><code>line_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Line ID to book</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Booking confirmation with guaranteed impressions and total cost.</p>
+<hr/>
+<h3 id="booking-lifecycle">Booking Lifecycle<a class="headerlink" href="#booking-lifecycle" title="Permanent link">¶</a></h3>
+<p>The four execution tools move line items through the OpenDirect booking states:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a>CreateOrder → CreateLine → ReserveLine → BookLine
+<a href="#__codelineno-7-2" id="__codelineno-7-2" name="__codelineno-7-2"></a>                  ↓             ↓            ↓
+<a href="#__codelineno-7-3" id="__codelineno-7-3" name="__codelineno-7-3"></a>                Draft    →  Reserved   →  Booked  →  InFlight  →  Finished
+</code></pre></div>
+<hr/>
+<h2 id="research-tools">Research Tools<a class="headerlink" href="#research-tools" title="Permanent link">¶</a></h2>
+<p>Research tools discover and evaluate advertising inventory via OpenDirect APIs. Both require an <code>OpenDirectClient</code> at initialization.</p>
+<p><strong>Package:</strong> <code>src/ad_buyer/tools/research/</code></p>
+<h3 id="productsearchtool">ProductSearchTool<a class="headerlink" href="#productsearchtool" title="Permanent link">¶</a></h3>
+<p>Searches for advertising products across publishers.</p>
+<p><strong>CrewAI name:</strong> <code>search_advertising_products</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>channel</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>display</code>, <code>video</code>, <code>mobile</code>, <code>ctv</code>, <code>native</code></td>
+</tr>
+<tr>
+<td><code>format</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>banner</code>, <code>video</code>, <code>interstitial</code>, <code>rewarded</code></td>
+</tr>
+<tr>
+<td><code>min_price</code></td>
+<td><code>float</code></td>
+<td>no</td>
+<td>Minimum CPM in USD</td>
+</tr>
+<tr>
+<td><code>max_price</code></td>
+<td><code>float</code></td>
+<td>no</td>
+<td>Maximum CPM in USD</td>
+</tr>
+<tr>
+<td><code>publisher_ids</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Specific publishers to search</td>
+</tr>
+<tr>
+<td><code>targeting_capabilities</code></td>
+<td><code>list[str]</code></td>
+<td>no</td>
+<td>Required targeting: <code>geo</code>, <code>demographic</code>, <code>behavioral</code>, <code>contextual</code></td>
+</tr>
+<tr>
+<td><code>delivery_type</code></td>
+<td><code>str</code></td>
+<td>no</td>
+<td><code>Exclusive</code>, <code>Guaranteed</code>, <code>PMP</code></td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Max results (default: 10, max: 50)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Formatted list of matching products with pricing, reach estimates, and targeting capabilities.</p>
+<hr/>
+<h3 id="availschecktool">AvailsCheckTool<a class="headerlink" href="#availschecktool" title="Permanent link">¶</a></h3>
+<p>Checks real-time availability and pricing for a specific product during a flight window.</p>
+<p><strong>CrewAI name:</strong> <code>check_inventory_availability</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>product_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Product ID to check</td>
+</tr>
+<tr>
+<td><code>start_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Campaign start date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>end_date</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Campaign end date (YYYY-MM-DD)</td>
+</tr>
+<tr>
+<td><code>impressions</code></td>
+<td><code>int</code></td>
+<td>no</td>
+<td>Desired impression volume</td>
+</tr>
+<tr>
+<td><code>budget</code></td>
+<td><code>float</code></td>
+<td>no</td>
+<td>Total budget in USD</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Available impressions, guaranteed delivery, delivery confidence, estimated CPM, and total cost.</p>
+<hr/>
+<h2 id="reporting-tools">Reporting Tools<a class="headerlink" href="#reporting-tools" title="Permanent link">¶</a></h2>
+<div class="admonition info">
+<p class="admonition-title">Coming Soon</p>
+<p>The Reporting Agent and its tools (buyer-brn) are planned for a future phase. This section describes the planned reporting functionality.</p>
+</div>
+<p><strong>Package:</strong> <code>src/ad_buyer/tools/reporting/</code></p>
+<h3 id="getstatstool">GetStatsTool<a class="headerlink" href="#getstatstool" title="Permanent link">¶</a></h3>
+<p>Retrieves performance statistics for a line item.</p>
+<p><strong>CrewAI name:</strong> <code>get_line_statistics</code></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Account ID</td>
+</tr>
+<tr>
+<td><code>order_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Order ID</td>
+</tr>
+<tr>
+<td><code>line_id</code></td>
+<td><code>str</code></td>
+<td>yes</td>
+<td>Line ID to get stats for</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Returns:</strong> Delivery metrics (impressions, pacing, delivery rate), spend data (amount spent, budget utilization), and performance indicators (effective CPM, VCR, viewability, CTR).</p>
+<hr/>
+<h2 id="tool-initialization-patterns">Tool Initialization Patterns<a class="headerlink" href="#tool-initialization-patterns" title="Permanent link">¶</a></h2>
+<p>Tools are typically initialized within crew factory functions, not directly by application code. Here is how each crew creates its tool sets:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="c1"># Research tools -- require OpenDirectClient</span>
+<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.research</span><span class="w"> </span><span class="kn">import</span> <span class="n">ProductSearchTool</span><span class="p">,</span> <span class="n">AvailsCheckTool</span>
+<a href="#__codelineno-8-3" id="__codelineno-8-3" name="__codelineno-8-3"></a>
+<a href="#__codelineno-8-4" id="__codelineno-8-4" name="__codelineno-8-4"></a><span class="n">research_tools</span> <span class="o">=</span> <span class="p">[</span>
+<a href="#__codelineno-8-5" id="__codelineno-8-5" name="__codelineno-8-5"></a>    <span class="n">ProductSearchTool</span><span class="p">(</span><span class="n">client</span><span class="p">),</span>
+<a href="#__codelineno-8-6" id="__codelineno-8-6" name="__codelineno-8-6"></a>    <span class="n">AvailsCheckTool</span><span class="p">(</span><span class="n">client</span><span class="p">),</span>
+<a href="#__codelineno-8-7" id="__codelineno-8-7" name="__codelineno-8-7"></a><span class="p">]</span>
+<a href="#__codelineno-8-8" id="__codelineno-8-8" name="__codelineno-8-8"></a>
+<a href="#__codelineno-8-9" id="__codelineno-8-9" name="__codelineno-8-9"></a><span class="c1"># Execution tools -- require OpenDirectClient</span>
+<a href="#__codelineno-8-10" id="__codelineno-8-10" name="__codelineno-8-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.execution</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a href="#__codelineno-8-11" id="__codelineno-8-11" name="__codelineno-8-11"></a>    <span class="n">CreateOrderTool</span><span class="p">,</span> <span class="n">CreateLineTool</span><span class="p">,</span> <span class="n">ReserveLineTool</span><span class="p">,</span> <span class="n">BookLineTool</span><span class="p">,</span>
+<a href="#__codelineno-8-12" id="__codelineno-8-12" name="__codelineno-8-12"></a><span class="p">)</span>
+<a href="#__codelineno-8-13" id="__codelineno-8-13" name="__codelineno-8-13"></a>
+<a href="#__codelineno-8-14" id="__codelineno-8-14" name="__codelineno-8-14"></a><span class="n">execution_tools</span> <span class="o">=</span> <span class="p">[</span>
+<a href="#__codelineno-8-15" id="__codelineno-8-15" name="__codelineno-8-15"></a>    <span class="n">CreateOrderTool</span><span class="p">(</span><span class="n">client</span><span class="p">),</span>
+<a href="#__codelineno-8-16" id="__codelineno-8-16" name="__codelineno-8-16"></a>    <span class="n">CreateLineTool</span><span class="p">(</span><span class="n">client</span><span class="p">),</span>
+<a href="#__codelineno-8-17" id="__codelineno-8-17" name="__codelineno-8-17"></a>    <span class="n">ReserveLineTool</span><span class="p">(</span><span class="n">client</span><span class="p">),</span>
+<a href="#__codelineno-8-18" id="__codelineno-8-18" name="__codelineno-8-18"></a>    <span class="n">BookLineTool</span><span class="p">(</span><span class="n">client</span><span class="p">),</span>
+<a href="#__codelineno-8-19" id="__codelineno-8-19" name="__codelineno-8-19"></a><span class="p">]</span>
+<a href="#__codelineno-8-20" id="__codelineno-8-20" name="__codelineno-8-20"></a>
+<a href="#__codelineno-8-21" id="__codelineno-8-21" name="__codelineno-8-21"></a><span class="c1"># Audience tools -- no client required</span>
+<a href="#__codelineno-8-22" id="__codelineno-8-22" name="__codelineno-8-22"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.audience</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a href="#__codelineno-8-23" id="__codelineno-8-23" name="__codelineno-8-23"></a>    <span class="n">AudienceDiscoveryTool</span><span class="p">,</span> <span class="n">AudienceMatchingTool</span><span class="p">,</span> <span class="n">CoverageEstimationTool</span><span class="p">,</span>
+<a href="#__codelineno-8-24" id="__codelineno-8-24" name="__codelineno-8-24"></a><span class="p">)</span>
+<a href="#__codelineno-8-25" id="__codelineno-8-25" name="__codelineno-8-25"></a>
+<a href="#__codelineno-8-26" id="__codelineno-8-26" name="__codelineno-8-26"></a><span class="n">audience_tools</span> <span class="o">=</span> <span class="p">[</span>
+<a href="#__codelineno-8-27" id="__codelineno-8-27" name="__codelineno-8-27"></a>    <span class="n">AudienceDiscoveryTool</span><span class="p">(),</span>
+<a href="#__codelineno-8-28" id="__codelineno-8-28" name="__codelineno-8-28"></a>    <span class="n">AudienceMatchingTool</span><span class="p">(),</span>
+<a href="#__codelineno-8-29" id="__codelineno-8-29" name="__codelineno-8-29"></a>    <span class="n">CoverageEstimationTool</span><span class="p">(),</span>
+<a href="#__codelineno-8-30" id="__codelineno-8-30" name="__codelineno-8-30"></a><span class="p">]</span>
+<a href="#__codelineno-8-31" id="__codelineno-8-31" name="__codelineno-8-31"></a>
+<a href="#__codelineno-8-32" id="__codelineno-8-32" name="__codelineno-8-32"></a><span class="c1"># Buyer deal tools -- require UnifiedClient + BuyerContext</span>
+<a href="#__codelineno-8-33" id="__codelineno-8-33" name="__codelineno-8-33"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.tools.buyer_deals</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<a href="#__codelineno-8-34" id="__codelineno-8-34" name="__codelineno-8-34"></a>    <span class="n">DiscoverInventoryTool</span><span class="p">,</span> <span class="n">GetPricingTool</span><span class="p">,</span> <span class="n">RequestDealTool</span><span class="p">,</span>
+<a href="#__codelineno-8-35" id="__codelineno-8-35" name="__codelineno-8-35"></a><span class="p">)</span>
+<a href="#__codelineno-8-36" id="__codelineno-8-36" name="__codelineno-8-36"></a>
+<a href="#__codelineno-8-37" id="__codelineno-8-37" name="__codelineno-8-37"></a><span class="n">buyer_deal_tools</span> <span class="o">=</span> <span class="p">[</span>
+<a href="#__codelineno-8-38" id="__codelineno-8-38" name="__codelineno-8-38"></a>    <span class="n">DiscoverInventoryTool</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">unified_client</span><span class="p">,</span> <span class="n">buyer_context</span><span class="o">=</span><span class="n">buyer_ctx</span><span class="p">),</span>
+<a href="#__codelineno-8-39" id="__codelineno-8-39" name="__codelineno-8-39"></a>    <span class="n">GetPricingTool</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">unified_client</span><span class="p">,</span> <span class="n">buyer_context</span><span class="o">=</span><span class="n">buyer_ctx</span><span class="p">),</span>
+<a href="#__codelineno-8-40" id="__codelineno-8-40" name="__codelineno-8-40"></a>    <span class="n">RequestDealTool</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">unified_client</span><span class="p">,</span> <span class="n">buyer_context</span><span class="o">=</span><span class="n">buyer_ctx</span><span class="p">),</span>
+<a href="#__codelineno-8-41" id="__codelineno-8-41" name="__codelineno-8-41"></a><span class="p">]</span>
+</code></pre></div>
+<hr/>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="../agent-hierarchy/">Agent Hierarchy</a> --- Which agents use which tools</li>
+<li><a href="../buyer-deal-flow/">Buyer Deal Flow</a> --- How buyer deal tools work together in a flow</li>
+<li><a href="../booking-flow/">Booking Flow</a> --- How execution tools drive the booking lifecycle</li>
+<li><a href="../../guides/configuration/">Configuration</a> --- Tool-related settings</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>

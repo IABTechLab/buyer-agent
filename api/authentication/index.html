@@ -1,0 +1,2182 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="API &amp; Architecture Reference for the IAB OpenDirect 2.1 Buyer Agent" name="description"/>
+<link href="https://iabtechlab.github.io/buyer-agent/api/authentication/" rel="canonical"/>
+<link href="../a2a-client/" rel="prev"/>
+<link href="../change-requests/" rel="next"/>
+<link href="../../assets/images/favicon.png" rel="icon"/>
+<meta content="mkdocs-1.6.1, mkdocs-material-9.7.6" name="generator"/>
+<title>Authentication - IAB Tech Lab — Buyer Agent</title>
+<link href="../../assets/stylesheets/main.484c7ddc.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.ab4e12ef.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+</head>
+<body data-md-color-accent="amber" data-md-color-primary="indigo" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#authentication">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+<aside class="md-banner">
+<div class="md-banner__inner md-grid md-typeset">
+<a href="https://iabtechlab.github.io/seller-agent/" style="color: white;">
+    This is the <strong>Buyer Agent</strong> documentation.
+    Looking for the <strong>Seller Agent</strong>? Click here →
+  </a>
+</div>
+</aside>
+</div>
+<header class="md-header" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-header__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            IAB Tech Lab — Buyer Agent
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Authentication
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="amber" data-md-color-media="" data-md-color-primary="indigo" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="" tabindex="0">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<nav aria-label="Tabs" class="md-tabs" data-md-component="tabs">
+<div class="md-grid">
+<ul class="md-tabs__list">
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../..">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../getting-started/quickstart/">
+          
+  
+  
+  Getting Started
+
+        </a>
+</li>
+<li class="md-tabs__item md-tabs__item--active">
+<a class="md-tabs__link" href="../overview/">
+          
+  
+  
+  API Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../architecture/overview/">
+          
+  
+  
+  Architecture
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../state-machines/order-lifecycle/">
+          
+  
+  
+  State Machines
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../event-bus/overview/">
+          
+  
+  
+  Event Bus
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../guides/overview/">
+          
+  
+  
+  Buyer Guide
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../integration/seller-agent/">
+          
+  
+  
+  Integration
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../claude-desktop-setup/">
+          
+  
+  
+  AI Assistant Setup
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="../../ai-assistant/mcp-tools/">
+          
+  
+  
+  MCP Reference
+
+        </a>
+</li>
+<li class="md-tabs__item">
+<a class="md-tabs__link" href="https://iabtechlab.github.io/seller-agent/">
+        
+  
+  
+    
+  
+  Seller Agent Docs →
+
+      </a>
+</li>
+</ul>
+</div>
+</nav>
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary md-nav--lifted" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="IAB Tech Lab — Buyer Agent" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="IAB Tech Lab — Buyer Agent">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+</a>
+    IAB Tech Lab — Buyer Agent
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/IABTechLab/buyer-agent" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+</div>
+<div class="md-source__repository">
+    IABTechLab/buyer-agent
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/quickstart/">
+<span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+<span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../protocols/">
+<span class="md-ellipsis">
+    
+  
+    Protocol Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../mcp-client/">
+<span class="md-ellipsis">
+    
+  
+    MCP Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../a2a-client/">
+<span class="md-ellipsis">
+    
+  
+    A2A Client
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    
+  
+    Authentication
+  
+
+    
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inbound-authentication">
+<span class="md-ellipsis">
+      
+        Inbound Authentication
+      
+    </span>
+</a>
+<nav aria-label="Inbound Authentication" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#x-api-key-header">
+<span class="md-ellipsis">
+      
+        X-Api-Key Header
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#development-mode">
+<span class="md-ellipsis">
+      
+        Development Mode
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#public-paths">
+<span class="md-ellipsis">
+      
+        Public Paths
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configuration">
+<span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#outbound-authentication">
+<span class="md-ellipsis">
+      
+        Outbound Authentication
+      
+    </span>
+</a>
+<nav aria-label="Outbound Authentication" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#how-sellers-authenticate-buyers">
+<span class="md-ellipsis">
+      
+        How Sellers Authenticate Buyers
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#seller-access-tiers">
+<span class="md-ellipsis">
+      
+        Seller Access Tiers
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#apikeystore">
+<span class="md-ellipsis">
+      
+        ApiKeyStore
+      
+    </span>
+</a>
+<nav aria-label="ApiKeyStore" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#initialization">
+<span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#store-a-key">
+<span class="md-ellipsis">
+      
+        Store a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retrieve-a-key">
+<span class="md-ellipsis">
+      
+        Retrieve a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#remove-a-key">
+<span class="md-ellipsis">
+      
+        Remove a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rotate-a-key">
+<span class="md-ellipsis">
+      
+        Rotate a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#list-all-sellers">
+<span class="md-ellipsis">
+      
+        List All Sellers
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#full-apikeystore-api">
+<span class="md-ellipsis">
+      
+        Full ApiKeyStore API
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#authmiddleware">
+<span class="md-ellipsis">
+      
+        AuthMiddleware
+      
+    </span>
+</a>
+<nav aria-label="AuthMiddleware" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#initialization_1">
+<span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#adding-auth-to-requests">
+<span class="md-ellipsis">
+      
+        Adding Auth to Requests
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#handling-401-responses">
+<span class="md-ellipsis">
+      
+        Handling 401 Responses
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#multi-seller-credential-management">
+<span class="md-ellipsis">
+      
+        Multi-Seller Credential Management
+      
+    </span>
+</a>
+<nav aria-label="Multi-Seller Credential Management" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#url-normalization">
+<span class="md-ellipsis">
+      
+        URL Normalization
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#key-acquisition-workflow">
+<span class="md-ellipsis">
+      
+        Key Acquisition Workflow
+      
+    </span>
+</a>
+<nav aria-label="Key Acquisition Workflow" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-1-request-a-key-from-the-seller">
+<span class="md-ellipsis">
+      
+        Step 1: Request a Key from the Seller
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-2-store-the-key">
+<span class="md-ellipsis">
+      
+        Step 2: Store the Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-3-verify-access">
+<span class="md-ellipsis">
+      
+        Step 3: Verify Access
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#key-rotation">
+<span class="md-ellipsis">
+      
+        Key Rotation
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#dealsclient-authentication">
+<span class="md-ellipsis">
+      
+        DealsClient Authentication
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../change-requests/">
+<span class="md-ellipsis">
+    
+  
+    Change Requests
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../deals/">
+<span class="md-ellipsis">
+    
+  
+    Deals
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../bookings/">
+<span class="md-ellipsis">
+    
+  
+    Bookings
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../seller-discovery/">
+<span class="md-ellipsis">
+    
+  
+    Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../products/">
+<span class="md-ellipsis">
+    
+  
+    Products
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/agent-hierarchy/">
+<span class="md-ellipsis">
+    
+  
+    Agent Hierarchy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/booking-flow/">
+<span class="md-ellipsis">
+    
+  
+    Booking Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/buyer-deal-flow/">
+<span class="md-ellipsis">
+    
+  
+    Buyer Deal Flow
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/deal-store/">
+<span class="md-ellipsis">
+    
+  
+    Deal Store
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/models/">
+<span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/mcp-server/">
+<span class="md-ellipsis">
+    
+  
+    MCP Server
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../architecture/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connectors
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    State Machines
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    State Machines
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/order-lifecycle/">
+<span class="md-ellipsis">
+    
+  
+    Order Lifecycle
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../state-machines/change-request-flow/">
+<span class="md-ellipsis">
+    
+  
+    Change Request Flow
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_6" type="checkbox"/>
+<label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Event Bus
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_6_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_6">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Event Bus
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../event-bus/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_7" type="checkbox"/>
+<label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Buyer Guide
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_7_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_7">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Buyer Guide
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/overview/">
+<span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-booking/">
+<span class="md-ellipsis">
+    
+  
+    Deal Booking
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/negotiation/">
+<span class="md-ellipsis">
+    
+  
+    Negotiation
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/identity/">
+<span class="md-ellipsis">
+    
+  
+    Identity Strategy
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/media-kit/">
+<span class="md-ellipsis">
+    
+  
+    Media Kit Browsing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/sessions/">
+<span class="md-ellipsis">
+    
+  
+    Sessions
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Discovery
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/linear-tv/">
+<span class="md-ellipsis">
+    
+  
+    Linear TV Buying
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/configuration/">
+<span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deployment-ops-guide/">
+<span class="md-ellipsis">
+    
+  
+    Deployment &amp; Operations
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/multi-seller-orchestration/">
+<span class="md-ellipsis">
+    
+  
+    Multi-Seller Orchestration
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/campaign-pipeline/">
+<span class="md-ellipsis">
+    
+  
+    Campaign Pipeline
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/budget-pacing/">
+<span class="md-ellipsis">
+    
+  
+    Budget Pacing
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/creative-management/">
+<span class="md-ellipsis">
+    
+  
+    Creative Management
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/deal-library/">
+<span class="md-ellipsis">
+    
+  
+    Deal Library
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../guides/ssp-connectors/">
+<span class="md-ellipsis">
+    
+  
+    SSP Connector Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_8" type="checkbox"/>
+<label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_8_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_8">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    Integration
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Guide
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../integration/opendirect/">
+<span class="md-ellipsis">
+    
+  
+    OpenDirect Protocol
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_9" type="checkbox"/>
+<label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    AI Assistant Setup
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_9_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_9">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    AI Assistant Setup
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../claude-desktop-setup/">
+<span class="md-ellipsis">
+    
+  
+    Claude (Desktop &amp; Web)
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../multi-client-setup/">
+<span class="md-ellipsis">
+    
+  
+    ChatGPT, Codex &amp; AI IDEs
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/developer-setup/">
+<span class="md-ellipsis">
+    
+  
+    Developer Setup
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_10" type="checkbox"/>
+<label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+    MCP Reference
+  
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_10_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_10">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+    MCP Reference
+  
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/mcp-tools/">
+<span class="md-ellipsis">
+    
+  
+    Tools Reference
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/slash-commands/">
+<span class="md-ellipsis">
+    
+  
+    Slash Commands
+  
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../ai-assistant/setup-wizard/">
+<span class="md-ellipsis">
+    
+  
+    Setup Wizard
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="https://iabtechlab.github.io/seller-agent/">
+<span class="md-ellipsis">
+    
+  
+    Seller Agent Docs →
+  
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#inbound-authentication">
+<span class="md-ellipsis">
+      
+        Inbound Authentication
+      
+    </span>
+</a>
+<nav aria-label="Inbound Authentication" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#x-api-key-header">
+<span class="md-ellipsis">
+      
+        X-Api-Key Header
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#development-mode">
+<span class="md-ellipsis">
+      
+        Development Mode
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#public-paths">
+<span class="md-ellipsis">
+      
+        Public Paths
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#configuration">
+<span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#outbound-authentication">
+<span class="md-ellipsis">
+      
+        Outbound Authentication
+      
+    </span>
+</a>
+<nav aria-label="Outbound Authentication" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#how-sellers-authenticate-buyers">
+<span class="md-ellipsis">
+      
+        How Sellers Authenticate Buyers
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#seller-access-tiers">
+<span class="md-ellipsis">
+      
+        Seller Access Tiers
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#apikeystore">
+<span class="md-ellipsis">
+      
+        ApiKeyStore
+      
+    </span>
+</a>
+<nav aria-label="ApiKeyStore" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#initialization">
+<span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#store-a-key">
+<span class="md-ellipsis">
+      
+        Store a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#retrieve-a-key">
+<span class="md-ellipsis">
+      
+        Retrieve a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#remove-a-key">
+<span class="md-ellipsis">
+      
+        Remove a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#rotate-a-key">
+<span class="md-ellipsis">
+      
+        Rotate a Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#list-all-sellers">
+<span class="md-ellipsis">
+      
+        List All Sellers
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#full-apikeystore-api">
+<span class="md-ellipsis">
+      
+        Full ApiKeyStore API
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#authmiddleware">
+<span class="md-ellipsis">
+      
+        AuthMiddleware
+      
+    </span>
+</a>
+<nav aria-label="AuthMiddleware" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#initialization_1">
+<span class="md-ellipsis">
+      
+        Initialization
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#adding-auth-to-requests">
+<span class="md-ellipsis">
+      
+        Adding Auth to Requests
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#handling-401-responses">
+<span class="md-ellipsis">
+      
+        Handling 401 Responses
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#multi-seller-credential-management">
+<span class="md-ellipsis">
+      
+        Multi-Seller Credential Management
+      
+    </span>
+</a>
+<nav aria-label="Multi-Seller Credential Management" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#url-normalization">
+<span class="md-ellipsis">
+      
+        URL Normalization
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#key-acquisition-workflow">
+<span class="md-ellipsis">
+      
+        Key Acquisition Workflow
+      
+    </span>
+</a>
+<nav aria-label="Key Acquisition Workflow" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-1-request-a-key-from-the-seller">
+<span class="md-ellipsis">
+      
+        Step 1: Request a Key from the Seller
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-2-store-the-key">
+<span class="md-ellipsis">
+      
+        Step 2: Store the Key
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#step-3-verify-access">
+<span class="md-ellipsis">
+      
+        Step 3: Verify Access
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#key-rotation">
+<span class="md-ellipsis">
+      
+        Key Rotation
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#dealsclient-authentication">
+<span class="md-ellipsis">
+      
+        DealsClient Authentication
+      
+    </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#related">
+<span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">¶</a></h1>
+<p>The buyer agent has two distinct authentication concerns:</p>
+<ol>
+<li><strong>Inbound authentication</strong> --- protecting the buyer's own API from unauthorized callers.</li>
+<li><strong>Outbound authentication</strong> --- attaching the correct credentials when the buyer calls seller endpoints.</li>
+</ol>
+<p>This page covers both, including the <code>ApiKeyStore</code> for managing per-seller credentials and the <code>AuthMiddleware</code> that injects keys into outgoing requests.</p>
+<div class="admonition info">
+<p class="admonition-title">Seller-side reference</p>
+<p>For full details on how the seller validates keys, issues access tiers, and manages trust levels, see the <a href="https://iabtechlab.github.io/seller-agent/api/authentication/">Seller Authentication docs</a>.</p>
+</div>
+<hr/>
+<h2 id="inbound-authentication">Inbound Authentication<a class="headerlink" href="#inbound-authentication" title="Permanent link">¶</a></h2>
+<h3 id="x-api-key-header">X-Api-Key Header<a class="headerlink" href="#x-api-key-header" title="Permanent link">¶</a></h3>
+<p>Protected endpoints on the buyer agent require the <code>X-Api-Key</code> header:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Api-Key: your-secret-key"</span><span class="w"> </span>http://localhost:8001/bookings
+</code></pre></div>
+<p>The middleware compares the provided key against the <code>api_key</code> setting. If the key is missing or does not match, the server returns <code>401</code>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="p">{</span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Invalid or missing API key"</span><span class="p">}</span>
+</code></pre></div>
+<h3 id="development-mode">Development Mode<a class="headerlink" href="#development-mode" title="Permanent link">¶</a></h3>
+<p>When <code>api_key</code> is empty (the default), authentication is <strong>disabled entirely</strong>. All requests are allowed without a key. This is the intended mode for local development.</p>
+<p>To enable auth, set the <code>API_KEY</code> environment variable or add it to your <code>.env</code> file:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>API_KEY=my-secret-buyer-key
+</code></pre></div>
+<h3 id="public-paths">Public Paths<a class="headerlink" href="#public-paths" title="Permanent link">¶</a></h3>
+<p>The following paths always skip authentication, even when an API key is configured:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/health</code></td>
+<td>Health check</td>
+</tr>
+<tr>
+<td><code>/docs</code></td>
+<td>Swagger UI</td>
+</tr>
+<tr>
+<td><code>/openapi.json</code></td>
+<td>OpenAPI schema</td>
+</tr>
+<tr>
+<td><code>/redoc</code></td>
+<td>ReDoc documentation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">¶</a></h3>
+<p>The API key is loaded through <code>pydantic-settings</code> in <code>ad_buyer.config.settings.Settings</code>:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Settings</span><span class="p">(</span><span class="n">BaseSettings</span><span class="p">):</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>    <span class="c1"># Inbound API key for authenticating requests to this service.</span>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>    <span class="c1"># When empty/not set, authentication is disabled (development mode).</span>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a>    <span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
+</code></pre></div>
+<p>Set it via any method that <code>pydantic-settings</code> supports: environment variable, <code>.env</code> file, or constructor argument.</p>
+<hr/>
+<h2 id="outbound-authentication">Outbound Authentication<a class="headerlink" href="#outbound-authentication" title="Permanent link">¶</a></h2>
+<p>When the buyer calls seller endpoints (quotes, deals, media kits, etc.), it needs to present valid credentials. The seller uses these credentials to determine the buyer's <a href="https://iabtechlab.github.io/seller-agent/api/authentication/">access tier</a> and unlock tiered pricing, negotiation capabilities, and richer data in responses.</p>
+<h3 id="how-sellers-authenticate-buyers">How Sellers Authenticate Buyers<a class="headerlink" href="#how-sellers-authenticate-buyers" title="Permanent link">¶</a></h3>
+<p>Sellers accept credentials in two formats on every endpoint:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a>Authorization: Bearer &lt;api_key&gt;
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a>X-Api-Key: &lt;api_key&gt;
+</code></pre></div>
+<p>Unauthenticated requests receive <code>public</code>-tier access only --- price ranges instead of exact prices, no negotiation, and limited data.</p>
+<h3 id="seller-access-tiers">Seller Access Tiers<a class="headerlink" href="#seller-access-tiers" title="Permanent link">¶</a></h3>
+<p>The tier the buyer receives depends on the identity fields associated with its API key:</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Identity Required</th>
+<th>Pricing Visibility</th>
+<th>Negotiation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>public</code></td>
+<td>None (anonymous)</td>
+<td>Price ranges only</td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>seat</code></td>
+<td>DSP seat ID</td>
+<td>Exact prices, no discounts</td>
+<td>Limited</td>
+</tr>
+<tr>
+<td><code>agency</code></td>
+<td>Agency ID</td>
+<td>Tier discounts applied</td>
+<td>Standard</td>
+</tr>
+<tr>
+<td><code>advertiser</code></td>
+<td>Full advertiser identity</td>
+<td>Full discounts + volume pricing</td>
+<td>Premium</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition tip">
+<p class="admonition-title">Maximize your access</p>
+<p>When creating an API key on the seller, include <code>seat_id</code>, <code>agency_id</code>, and <code>advertiser_id</code> to receive the highest tier. Keys with only a <code>seat_id</code> will be limited to seat-tier pricing.</p>
+</div>
+<hr/>
+<h2 id="apikeystore">ApiKeyStore<a class="headerlink" href="#apikeystore" title="Permanent link">¶</a></h2>
+<p>The <code>ApiKeyStore</code> provides file-backed credential storage for seller API keys. It stores one key per seller URL in a JSON file at <code>~/.ad_buyer/seller_keys.json</code>. Values are base64-encoded on disk to prevent accidental exposure in casual file reads.</p>
+<div class="admonition warning">
+<p class="admonition-title">Not encryption</p>
+<p>Base64 encoding is an obfuscation layer, not encryption. For production deployments, back the store with a secrets manager or encrypted file system.</p>
+</div>
+<h3 id="initialization">Initialization<a class="headerlink" href="#initialization" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-6-1" id="__codelineno-6-1" name="__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.auth.key_store</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiKeyStore</span>
+<a href="#__codelineno-6-2" id="__codelineno-6-2" name="__codelineno-6-2"></a>
+<a href="#__codelineno-6-3" id="__codelineno-6-3" name="__codelineno-6-3"></a><span class="c1"># Default location: ~/.ad_buyer/seller_keys.json</span>
+<a href="#__codelineno-6-4" id="__codelineno-6-4" name="__codelineno-6-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ApiKeyStore</span><span class="p">()</span>
+<a href="#__codelineno-6-5" id="__codelineno-6-5" name="__codelineno-6-5"></a>
+<a href="#__codelineno-6-6" id="__codelineno-6-6" name="__codelineno-6-6"></a><span class="c1"># Custom location</span>
+<a href="#__codelineno-6-7" id="__codelineno-6-7" name="__codelineno-6-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<a href="#__codelineno-6-8" id="__codelineno-6-8" name="__codelineno-6-8"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ApiKeyStore</span><span class="p">(</span><span class="n">store_path</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="s2">"/etc/ad_buyer/keys.json"</span><span class="p">))</span>
+</code></pre></div>
+<p>The store loads existing keys from disk on initialization. If the file does not exist, the store starts empty.</p>
+<h3 id="store-a-key">Store a Key<a class="headerlink" href="#store-a-key" title="Permanent link">¶</a></h3>
+<p>Add or replace the API key for a seller URL:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-7-1" id="__codelineno-7-1" name="__codelineno-7-1"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-abc123secret"</span><span class="p">)</span>
+</code></pre></div>
+<p>The key is persisted to disk immediately. Trailing slashes on the URL are stripped for consistent lookup.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-8-1" id="__codelineno-8-1" name="__codelineno-8-1"></a><span class="c1"># Verify the key was stored (file contents are base64-encoded)</span>
+<a href="#__codelineno-8-2" id="__codelineno-8-2" name="__codelineno-8-2"></a>cat<span class="w"> </span>~/.ad_buyer/seller_keys.json
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-9-1" id="__codelineno-9-1" name="__codelineno-9-1"></a><span class="p">{</span>
+<a href="#__codelineno-9-2" id="__codelineno-9-2" name="__codelineno-9-2"></a><span class="w">  </span><span class="nt">"http://seller.example.com:8001"</span><span class="p">:</span><span class="w"> </span><span class="s2">"c2stYWJjMTIzc2VjcmV0"</span>
+<a href="#__codelineno-9-3" id="__codelineno-9-3" name="__codelineno-9-3"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="retrieve-a-key">Retrieve a Key<a class="headerlink" href="#retrieve-a-key" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-10-1" id="__codelineno-10-1" name="__codelineno-10-1"></a><span class="n">key</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">get_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">)</span>
+<a href="#__codelineno-10-2" id="__codelineno-10-2" name="__codelineno-10-2"></a><span class="k">if</span> <span class="n">key</span><span class="p">:</span>
+<a href="#__codelineno-10-3" id="__codelineno-10-3" name="__codelineno-10-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Key: </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># "sk-abc123secret"</span>
+<a href="#__codelineno-10-4" id="__codelineno-10-4" name="__codelineno-10-4"></a><span class="k">else</span><span class="p">:</span>
+<a href="#__codelineno-10-5" id="__codelineno-10-5" name="__codelineno-10-5"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">"No key stored for this seller"</span><span class="p">)</span>
+</code></pre></div>
+<p>Returns <code>None</code> if no key is stored for the given URL.</p>
+<h3 id="remove-a-key">Remove a Key<a class="headerlink" href="#remove-a-key" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-11-1" id="__codelineno-11-1" name="__codelineno-11-1"></a><span class="n">removed</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">remove_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">)</span>
+<a href="#__codelineno-11-2" id="__codelineno-11-2" name="__codelineno-11-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">removed</span><span class="p">)</span>  <span class="c1"># True if the key existed, False otherwise</span>
+</code></pre></div>
+<p>The file is updated on disk immediately after removal.</p>
+<h3 id="rotate-a-key">Rotate a Key<a class="headerlink" href="#rotate-a-key" title="Permanent link">¶</a></h3>
+<p>Replace an existing key with a new one. This is functionally identical to <code>add_key</code> but communicates intent:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-12-1" id="__codelineno-12-1" name="__codelineno-12-1"></a><span class="n">store</span><span class="o">.</span><span class="n">rotate_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-new-key-456"</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="list-all-sellers">List All Sellers<a class="headerlink" href="#list-all-sellers" title="Permanent link">¶</a></h3>
+<p>Return all seller URLs that have a stored key:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-13-1" id="__codelineno-13-1" name="__codelineno-13-1"></a><span class="n">sellers</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">list_sellers</span><span class="p">()</span>
+<a href="#__codelineno-13-2" id="__codelineno-13-2" name="__codelineno-13-2"></a><span class="k">for</span> <span class="n">url</span> <span class="ow">in</span> <span class="n">sellers</span><span class="p">:</span>
+<a href="#__codelineno-13-3" id="__codelineno-13-3" name="__codelineno-13-3"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+<a href="#__codelineno-13-4" id="__codelineno-13-4" name="__codelineno-13-4"></a><span class="c1"># http://seller-a.example.com:8001</span>
+<a href="#__codelineno-13-5" id="__codelineno-13-5" name="__codelineno-13-5"></a><span class="c1"># http://seller-b.example.com:8001</span>
+</code></pre></div>
+<h3 id="full-apikeystore-api">Full ApiKeyStore API<a class="headerlink" href="#full-apikeystore-api" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Signature</th>
+<th>Returns</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>add_key</code></td>
+<td><code>(seller_url: str, api_key: str)</code></td>
+<td><code>None</code></td>
+<td>Store or replace a key</td>
+</tr>
+<tr>
+<td><code>get_key</code></td>
+<td><code>(seller_url: str)</code></td>
+<td><code>str \| None</code></td>
+<td>Retrieve a key</td>
+</tr>
+<tr>
+<td><code>remove_key</code></td>
+<td><code>(seller_url: str)</code></td>
+<td><code>bool</code></td>
+<td>Remove a key; <code>True</code> if it existed</td>
+</tr>
+<tr>
+<td><code>rotate_key</code></td>
+<td><code>(seller_url: str, new_key: str)</code></td>
+<td><code>None</code></td>
+<td>Replace with a new key</td>
+</tr>
+<tr>
+<td><code>list_sellers</code></td>
+<td><code>()</code></td>
+<td><code>list[str]</code></td>
+<td>All seller URLs with stored keys</td>
+</tr>
+</tbody>
+</table>
+<hr/>
+<h2 id="authmiddleware">AuthMiddleware<a class="headerlink" href="#authmiddleware" title="Permanent link">¶</a></h2>
+<p>The <code>AuthMiddleware</code> sits between the buyer's HTTP clients and the network. It automatically attaches stored API keys to outgoing requests and inspects responses for <code>401</code> status codes that indicate expired or revoked credentials.</p>
+<h3 id="initialization_1">Initialization<a class="headerlink" href="#initialization_1" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-14-1" id="__codelineno-14-1" name="__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.auth.key_store</span><span class="w"> </span><span class="kn">import</span> <span class="n">ApiKeyStore</span>
+<a href="#__codelineno-14-2" id="__codelineno-14-2" name="__codelineno-14-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.auth.middleware</span><span class="w"> </span><span class="kn">import</span> <span class="n">AuthMiddleware</span>
+<a href="#__codelineno-14-3" id="__codelineno-14-3" name="__codelineno-14-3"></a>
+<a href="#__codelineno-14-4" id="__codelineno-14-4" name="__codelineno-14-4"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ApiKeyStore</span><span class="p">()</span>
+<a href="#__codelineno-14-5" id="__codelineno-14-5" name="__codelineno-14-5"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-abc123secret"</span><span class="p">)</span>
+<a href="#__codelineno-14-6" id="__codelineno-14-6" name="__codelineno-14-6"></a>
+<a href="#__codelineno-14-7" id="__codelineno-14-7" name="__codelineno-14-7"></a><span class="c1"># Send keys as X-Api-Key header (default)</span>
+<a href="#__codelineno-14-8" id="__codelineno-14-8" name="__codelineno-14-8"></a><span class="n">middleware</span> <span class="o">=</span> <span class="n">AuthMiddleware</span><span class="p">(</span><span class="n">key_store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span> <span class="n">header_type</span><span class="o">=</span><span class="s2">"api_key"</span><span class="p">)</span>
+<a href="#__codelineno-14-9" id="__codelineno-14-9" name="__codelineno-14-9"></a>
+<a href="#__codelineno-14-10" id="__codelineno-14-10" name="__codelineno-14-10"></a><span class="c1"># Or send keys as Bearer tokens</span>
+<a href="#__codelineno-14-11" id="__codelineno-14-11" name="__codelineno-14-11"></a><span class="n">middleware</span> <span class="o">=</span> <span class="n">AuthMiddleware</span><span class="p">(</span><span class="n">key_store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span> <span class="n">header_type</span><span class="o">=</span><span class="s2">"bearer"</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>key_store</code></td>
+<td><code>ApiKeyStore</code></td>
+<td><em>required</em></td>
+<td>The key store holding per-seller credentials</td>
+</tr>
+<tr>
+<td><code>header_type</code></td>
+<td><code>"api_key" \| "bearer"</code></td>
+<td><code>"api_key"</code></td>
+<td>How to send the key in the HTTP header</td>
+</tr>
+</tbody>
+</table>
+<h3 id="adding-auth-to-requests">Adding Auth to Requests<a class="headerlink" href="#adding-auth-to-requests" title="Permanent link">¶</a></h3>
+<p>The <code>add_auth</code> method takes an <code>httpx.Request</code> and returns a new request with the appropriate auth header attached. If no key is stored for the request's seller URL, the request is returned unchanged.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-15-1" id="__codelineno-15-1" name="__codelineno-15-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
+<a href="#__codelineno-15-2" id="__codelineno-15-2" name="__codelineno-15-2"></a>
+<a href="#__codelineno-15-3" id="__codelineno-15-3" name="__codelineno-15-3"></a><span class="n">request</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"http://seller.example.com:8001/api/v1/products"</span><span class="p">)</span>
+<a href="#__codelineno-15-4" id="__codelineno-15-4" name="__codelineno-15-4"></a><span class="n">authenticated_request</span> <span class="o">=</span> <span class="n">middleware</span><span class="o">.</span><span class="n">add_auth</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+<a href="#__codelineno-15-5" id="__codelineno-15-5" name="__codelineno-15-5"></a>
+<a href="#__codelineno-15-6" id="__codelineno-15-6" name="__codelineno-15-6"></a><span class="c1"># The returned request now includes:</span>
+<a href="#__codelineno-15-7" id="__codelineno-15-7" name="__codelineno-15-7"></a><span class="c1">#   X-Api-Key: sk-abc123secret       (if header_type="api_key")</span>
+<a href="#__codelineno-15-8" id="__codelineno-15-8" name="__codelineno-15-8"></a><span class="c1">#   Authorization: Bearer sk-abc123   (if header_type="bearer")</span>
+</code></pre></div>
+<p>The middleware extracts the base URL (<code>scheme://host:port</code>) from the request URL and looks up the key in the store. This means all paths on the same seller host share a single key.</p>
+<h3 id="handling-401-responses">Handling 401 Responses<a class="headerlink" href="#handling-401-responses" title="Permanent link">¶</a></h3>
+<p>The <code>handle_response</code> method inspects HTTP responses and returns an <code>AuthResponse</code> indicating whether re-authentication is needed:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-16-1" id="__codelineno-16-1" name="__codelineno-16-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.auth.middleware</span><span class="w"> </span><span class="kn">import</span> <span class="n">AuthResponse</span>
+<a href="#__codelineno-16-2" id="__codelineno-16-2" name="__codelineno-16-2"></a>
+<a href="#__codelineno-16-3" id="__codelineno-16-3" name="__codelineno-16-3"></a><span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">http_client</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">authenticated_request</span><span class="p">)</span>
+<a href="#__codelineno-16-4" id="__codelineno-16-4" name="__codelineno-16-4"></a><span class="n">auth_result</span><span class="p">:</span> <span class="n">AuthResponse</span> <span class="o">=</span> <span class="n">middleware</span><span class="o">.</span><span class="n">handle_response</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+<a href="#__codelineno-16-5" id="__codelineno-16-5" name="__codelineno-16-5"></a>
+<a href="#__codelineno-16-6" id="__codelineno-16-6" name="__codelineno-16-6"></a><span class="k">if</span> <span class="n">auth_result</span><span class="o">.</span><span class="n">needs_reauth</span><span class="p">:</span>
+<a href="#__codelineno-16-7" id="__codelineno-16-7" name="__codelineno-16-7"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Key expired for </span><span class="si">{</span><span class="n">auth_result</span><span class="o">.</span><span class="n">seller_url</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<a href="#__codelineno-16-8" id="__codelineno-16-8" name="__codelineno-16-8"></a>    <span class="c1"># Acquire a new key from the seller and update the store</span>
+<a href="#__codelineno-16-9" id="__codelineno-16-9" name="__codelineno-16-9"></a>    <span class="n">new_key</span> <span class="o">=</span> <span class="k">await</span> <span class="n">acquire_new_key</span><span class="p">(</span><span class="n">auth_result</span><span class="o">.</span><span class="n">seller_url</span><span class="p">)</span>
+<a href="#__codelineno-16-10" id="__codelineno-16-10" name="__codelineno-16-10"></a>    <span class="n">store</span><span class="o">.</span><span class="n">rotate_key</span><span class="p">(</span><span class="n">auth_result</span><span class="o">.</span><span class="n">seller_url</span><span class="p">,</span> <span class="n">new_key</span><span class="p">)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>needs_reauth</code></td>
+<td><code>bool</code></td>
+<td><code>True</code> if the response was HTTP 401</td>
+</tr>
+<tr>
+<td><code>seller_url</code></td>
+<td><code>str</code></td>
+<td>Base URL of the seller that returned the error</td>
+</tr>
+<tr>
+<td><code>status_code</code></td>
+<td><code>int</code></td>
+<td>HTTP status code from the response</td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">403 is not re-auth</p>
+<p>Only HTTP 401 (authentication failure) triggers <code>needs_reauth</code>. HTTP 403 (authorization / insufficient permissions) is intentionally excluded --- it means the key is valid but the buyer lacks access to the requested resource.</p>
+</div>
+<hr/>
+<h2 id="multi-seller-credential-management">Multi-Seller Credential Management<a class="headerlink" href="#multi-seller-credential-management" title="Permanent link">¶</a></h2>
+<p>The <code>ApiKeyStore</code> is designed for buyers that work with multiple sellers simultaneously. Each seller URL maps to its own API key, and the <code>AuthMiddleware</code> automatically selects the correct key based on the request URL.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-17-1" id="__codelineno-17-1" name="__codelineno-17-1"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ApiKeyStore</span><span class="p">()</span>
+<a href="#__codelineno-17-2" id="__codelineno-17-2" name="__codelineno-17-2"></a>
+<a href="#__codelineno-17-3" id="__codelineno-17-3" name="__codelineno-17-3"></a><span class="c1"># Register keys for multiple sellers</span>
+<a href="#__codelineno-17-4" id="__codelineno-17-4" name="__codelineno-17-4"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller-sports.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-sports-key"</span><span class="p">)</span>
+<a href="#__codelineno-17-5" id="__codelineno-17-5" name="__codelineno-17-5"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller-news.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-news-key"</span><span class="p">)</span>
+<a href="#__codelineno-17-6" id="__codelineno-17-6" name="__codelineno-17-6"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller-entertainment.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-ent-key"</span><span class="p">)</span>
+<a href="#__codelineno-17-7" id="__codelineno-17-7" name="__codelineno-17-7"></a>
+<a href="#__codelineno-17-8" id="__codelineno-17-8" name="__codelineno-17-8"></a><span class="n">middleware</span> <span class="o">=</span> <span class="n">AuthMiddleware</span><span class="p">(</span><span class="n">key_store</span><span class="o">=</span><span class="n">store</span><span class="p">)</span>
+<a href="#__codelineno-17-9" id="__codelineno-17-9" name="__codelineno-17-9"></a>
+<a href="#__codelineno-17-10" id="__codelineno-17-10" name="__codelineno-17-10"></a><span class="c1"># Each request automatically gets the right key</span>
+<a href="#__codelineno-17-11" id="__codelineno-17-11" name="__codelineno-17-11"></a><span class="n">sports_req</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"http://seller-sports.example.com:8001/api/v1/products"</span><span class="p">)</span>
+<a href="#__codelineno-17-12" id="__codelineno-17-12" name="__codelineno-17-12"></a><span class="n">news_req</span> <span class="o">=</span> <span class="n">httpx</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="s2">"GET"</span><span class="p">,</span> <span class="s2">"http://seller-news.example.com:8001/api/v1/products"</span><span class="p">)</span>
+<a href="#__codelineno-17-13" id="__codelineno-17-13" name="__codelineno-17-13"></a>
+<a href="#__codelineno-17-14" id="__codelineno-17-14" name="__codelineno-17-14"></a><span class="n">sports_auth</span> <span class="o">=</span> <span class="n">middleware</span><span class="o">.</span><span class="n">add_auth</span><span class="p">(</span><span class="n">sports_req</span><span class="p">)</span>   <span class="c1"># X-Api-Key: sk-sports-key</span>
+<a href="#__codelineno-17-15" id="__codelineno-17-15" name="__codelineno-17-15"></a><span class="n">news_auth</span> <span class="o">=</span> <span class="n">middleware</span><span class="o">.</span><span class="n">add_auth</span><span class="p">(</span><span class="n">news_req</span><span class="p">)</span>       <span class="c1"># X-Api-Key: sk-news-key</span>
+</code></pre></div>
+<h3 id="url-normalization">URL Normalization<a class="headerlink" href="#url-normalization" title="Permanent link">¶</a></h3>
+<p>The store strips trailing slashes to ensure consistent key lookup. These all resolve to the same key:</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-18-1" id="__codelineno-18-1" name="__codelineno-18-1"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001/"</span><span class="p">,</span> <span class="s2">"sk-key"</span><span class="p">)</span>
+<a href="#__codelineno-18-2" id="__codelineno-18-2" name="__codelineno-18-2"></a><span class="n">store</span><span class="o">.</span><span class="n">get_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">)</span>   <span class="c1"># "sk-key"</span>
+<a href="#__codelineno-18-3" id="__codelineno-18-3" name="__codelineno-18-3"></a><span class="n">store</span><span class="o">.</span><span class="n">get_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001/"</span><span class="p">)</span>  <span class="c1"># "sk-key"</span>
+</code></pre></div>
+<hr/>
+<h2 id="key-acquisition-workflow">Key Acquisition Workflow<a class="headerlink" href="#key-acquisition-workflow" title="Permanent link">¶</a></h2>
+<p>Before the buyer can authenticate to a seller, it needs to obtain an API key. The seller's <code>/auth/api-keys</code> endpoint issues keys with identity fields that determine the buyer's access tier.</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant Buyer as Buyer Agent
+    participant Store as ApiKeyStore
+    participant Seller as Seller Agent
+
+    Note over Buyer: Step 1: Create key on seller
+    Buyer-&gt;&gt;Seller: POST /auth/api-keys (identity fields)
+    Seller--&gt;&gt;Buyer: { api_key: "sk-...", key_id: "..." }
+
+    Note over Buyer: Step 2: Store the key locally
+    Buyer-&gt;&gt;Store: add_key(seller_url, api_key)
+    Store--&gt;&gt;Buyer: Persisted to ~/.ad_buyer/seller_keys.json
+
+    Note over Buyer: Step 3: Use key in subsequent requests
+    Buyer-&gt;&gt;Seller: GET /api/v1/products (X-Api-Key: sk-...)
+    Seller--&gt;&gt;Buyer: Full product catalog (tier-appropriate data)
+</code></pre>
+<h3 id="step-1-request-a-key-from-the-seller">Step 1: Request a Key from the Seller<a class="headerlink" href="#step-1-request-a-key-from-the-seller" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-19-1" id="__codelineno-19-1" name="__codelineno-19-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>http://seller.example.com:8001/auth/api-keys<span class="w"> </span><span class="se">\</span>
+<a href="#__codelineno-19-2" id="__codelineno-19-2" name="__codelineno-19-2"></a><span class="w">  </span>-H<span class="w"> </span><span class="s2">"Content-Type: application/json"</span><span class="w"> </span><span class="se">\</span>
+<a href="#__codelineno-19-3" id="__codelineno-19-3" name="__codelineno-19-3"></a><span class="w">  </span>-d<span class="w"> </span><span class="s1">'{</span>
+<a href="#__codelineno-19-4" id="__codelineno-19-4" name="__codelineno-19-4"></a><span class="s1">    "seat_id": "seat-acme-001",</span>
+<a href="#__codelineno-19-5" id="__codelineno-19-5" name="__codelineno-19-5"></a><span class="s1">    "seat_name": "Acme DSP",</span>
+<a href="#__codelineno-19-6" id="__codelineno-19-6" name="__codelineno-19-6"></a><span class="s1">    "agency_id": "agency-mega",</span>
+<a href="#__codelineno-19-7" id="__codelineno-19-7" name="__codelineno-19-7"></a><span class="s1">    "agency_name": "Mega Agency",</span>
+<a href="#__codelineno-19-8" id="__codelineno-19-8" name="__codelineno-19-8"></a><span class="s1">    "advertiser_id": "adv-widget-co",</span>
+<a href="#__codelineno-19-9" id="__codelineno-19-9" name="__codelineno-19-9"></a><span class="s1">    "advertiser_name": "Widget Co",</span>
+<a href="#__codelineno-19-10" id="__codelineno-19-10" name="__codelineno-19-10"></a><span class="s1">    "label": "Widget Co production key",</span>
+<a href="#__codelineno-19-11" id="__codelineno-19-11" name="__codelineno-19-11"></a><span class="s1">    "expires_in_days": 365</span>
+<a href="#__codelineno-19-12" id="__codelineno-19-12" name="__codelineno-19-12"></a><span class="s1">  }'</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Save the key immediately</p>
+<p>The seller returns the full API key <strong>only once</strong> in the creation response. It cannot be retrieved later. Store it immediately using <code>ApiKeyStore.add_key()</code>.</p>
+</div>
+<h3 id="step-2-store-the-key">Step 2: Store the Key<a class="headerlink" href="#step-2-store-the-key" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-20-1" id="__codelineno-20-1" name="__codelineno-20-1"></a><span class="n">store</span> <span class="o">=</span> <span class="n">ApiKeyStore</span><span class="p">()</span>
+<a href="#__codelineno-20-2" id="__codelineno-20-2" name="__codelineno-20-2"></a><span class="n">store</span><span class="o">.</span><span class="n">add_key</span><span class="p">(</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">,</span> <span class="s2">"sk-returned-key-from-seller"</span><span class="p">)</span>
+</code></pre></div>
+<h3 id="step-3-verify-access">Step 3: Verify Access<a class="headerlink" href="#step-3-verify-access" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-21-1" id="__codelineno-21-1" name="__codelineno-21-1"></a><span class="c1"># Test that the key works and check your tier</span>
+<a href="#__codelineno-21-2" id="__codelineno-21-2" name="__codelineno-21-2"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"X-Api-Key: sk-returned-key-from-seller"</span><span class="w"> </span><span class="se">\</span>
+<a href="#__codelineno-21-3" id="__codelineno-21-3" name="__codelineno-21-3"></a><span class="w">  </span>http://seller.example.com:8001/api/v1/products
+</code></pre></div>
+<p>A successful response with exact pricing (not just ranges) confirms the key is working and the buyer has been assigned an appropriate tier.</p>
+<h3 id="key-rotation">Key Rotation<a class="headerlink" href="#key-rotation" title="Permanent link">¶</a></h3>
+<p>When a key expires or is compromised:</p>
+<ol>
+<li>Create a new key on the seller (<code>POST /auth/api-keys</code>)</li>
+<li>Rotate the local key: <code>store.rotate_key(seller_url, new_key)</code></li>
+<li>Optionally revoke the old key on the seller (<code>DELETE /auth/api-keys/{key_id}</code>)</li>
+</ol>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-22-1" id="__codelineno-22-1" name="__codelineno-22-1"></a><span class="c1"># Rotate after receiving a 401</span>
+<a href="#__codelineno-22-2" id="__codelineno-22-2" name="__codelineno-22-2"></a><span class="n">auth_result</span> <span class="o">=</span> <span class="n">middleware</span><span class="o">.</span><span class="n">handle_response</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+<a href="#__codelineno-22-3" id="__codelineno-22-3" name="__codelineno-22-3"></a><span class="k">if</span> <span class="n">auth_result</span><span class="o">.</span><span class="n">needs_reauth</span><span class="p">:</span>
+<a href="#__codelineno-22-4" id="__codelineno-22-4" name="__codelineno-22-4"></a>    <span class="c1"># 1. Get a new key from the seller</span>
+<a href="#__codelineno-22-5" id="__codelineno-22-5" name="__codelineno-22-5"></a>    <span class="n">new_key</span> <span class="o">=</span> <span class="k">await</span> <span class="n">create_seller_api_key</span><span class="p">(</span><span class="n">auth_result</span><span class="o">.</span><span class="n">seller_url</span><span class="p">)</span>
+<a href="#__codelineno-22-6" id="__codelineno-22-6" name="__codelineno-22-6"></a>
+<a href="#__codelineno-22-7" id="__codelineno-22-7" name="__codelineno-22-7"></a>    <span class="c1"># 2. Update the local store</span>
+<a href="#__codelineno-22-8" id="__codelineno-22-8" name="__codelineno-22-8"></a>    <span class="n">store</span><span class="o">.</span><span class="n">rotate_key</span><span class="p">(</span><span class="n">auth_result</span><span class="o">.</span><span class="n">seller_url</span><span class="p">,</span> <span class="n">new_key</span><span class="p">)</span>
+<a href="#__codelineno-22-9" id="__codelineno-22-9" name="__codelineno-22-9"></a>
+<a href="#__codelineno-22-10" id="__codelineno-22-10" name="__codelineno-22-10"></a>    <span class="c1"># 3. Retry the failed request (middleware will use the new key)</span>
+<a href="#__codelineno-22-11" id="__codelineno-22-11" name="__codelineno-22-11"></a>    <span class="n">retry_request</span> <span class="o">=</span> <span class="n">middleware</span><span class="o">.</span><span class="n">add_auth</span><span class="p">(</span><span class="n">original_request</span><span class="p">)</span>
+<a href="#__codelineno-22-12" id="__codelineno-22-12" name="__codelineno-22-12"></a>    <span class="n">response</span> <span class="o">=</span> <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">retry_request</span><span class="p">)</span>
+</code></pre></div>
+<hr/>
+<h2 id="dealsclient-authentication">DealsClient Authentication<a class="headerlink" href="#dealsclient-authentication" title="Permanent link">¶</a></h2>
+<p>The <code>DealsClient</code> accepts credentials directly in its constructor and attaches them to every request. This is the simplest path for buyers that interact with a single seller per client instance.</p>
+<div class="highlight"><pre><span></span><code><a href="#__codelineno-23-1" id="__codelineno-23-1" name="__codelineno-23-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ad_buyer.clients.deals_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">DealsClient</span>
+<a href="#__codelineno-23-2" id="__codelineno-23-2" name="__codelineno-23-2"></a>
+<a href="#__codelineno-23-3" id="__codelineno-23-3" name="__codelineno-23-3"></a><span class="c1"># API key authentication (sent as X-Api-Key header)</span>
+<a href="#__codelineno-23-4" id="__codelineno-23-4" name="__codelineno-23-4"></a><span class="n">client</span> <span class="o">=</span> <span class="n">DealsClient</span><span class="p">(</span>
+<a href="#__codelineno-23-5" id="__codelineno-23-5" name="__codelineno-23-5"></a>    <span class="n">seller_url</span><span class="o">=</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">,</span>
+<a href="#__codelineno-23-6" id="__codelineno-23-6" name="__codelineno-23-6"></a>    <span class="n">api_key</span><span class="o">=</span><span class="s2">"sk-abc123secret"</span><span class="p">,</span>
+<a href="#__codelineno-23-7" id="__codelineno-23-7" name="__codelineno-23-7"></a><span class="p">)</span>
+<a href="#__codelineno-23-8" id="__codelineno-23-8" name="__codelineno-23-8"></a>
+<a href="#__codelineno-23-9" id="__codelineno-23-9" name="__codelineno-23-9"></a><span class="c1"># Bearer token authentication (sent as Authorization: Bearer header)</span>
+<a href="#__codelineno-23-10" id="__codelineno-23-10" name="__codelineno-23-10"></a><span class="n">client</span> <span class="o">=</span> <span class="n">DealsClient</span><span class="p">(</span>
+<a href="#__codelineno-23-11" id="__codelineno-23-11" name="__codelineno-23-11"></a>    <span class="n">seller_url</span><span class="o">=</span><span class="s2">"http://seller.example.com:8001"</span><span class="p">,</span>
+<a href="#__codelineno-23-12" id="__codelineno-23-12" name="__codelineno-23-12"></a>    <span class="n">bearer_token</span><span class="o">=</span><span class="s2">"eyJhbGciOiJIUzI1NiIs..."</span><span class="p">,</span>
+<a href="#__codelineno-23-13" id="__codelineno-23-13" name="__codelineno-23-13"></a><span class="p">)</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">One auth method per client</p>
+<p>Provide either <code>api_key</code> <strong>or</strong> <code>bearer_token</code>, not both. If both are set, <code>api_key</code> takes precedence and is sent as the <code>X-Api-Key</code> header.</p>
+</div>
+<p>For multi-seller scenarios, use <code>ApiKeyStore</code> + <code>AuthMiddleware</code> to manage credentials centrally, or create one <code>DealsClient</code> per seller with its own key.</p>
+<hr/>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="https://iabtechlab.github.io/seller-agent/api/authentication/">Seller Authentication</a> --- Seller-side key management, access tiers, and trust levels</li>
+<li><a href="../deals/">Deals API</a> --- Deal client that uses these auth mechanisms</li>
+<li><a href="../seller-discovery/">Seller Discovery</a> --- Discovering sellers to authenticate with</li>
+<li><a href="../../guides/identity/">Identity Strategy</a> --- How buyer identity maps to seller tiers</li>
+</ul>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" rel="noopener" target="_blank">
+      Material for MkDocs
+    </a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.highlight", "content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+<script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+<script type="module">import mermaid from "https://unpkg.com/mermaid@10.4.0/dist/mermaid.esm.min.mjs";
+window.mermaidConfig = {default: {
+    startOnLoad: false
+}};</script></body>
+</html>
