@@ -38,11 +38,12 @@ class OpenDirectClient:
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            headers=self._build_headers(api_key, oauth_token),
-            timeout=timeout,
-        )
+        self._headers = self._build_headers(api_key, oauth_token)
+        self._timeout = timeout
+        # Note: httpx.AsyncClient is NOT stored here. Each async method creates
+        # its own client via _make_client() so it binds to the current event
+        # loop. Reusing one client across threads (CrewAI crews run kickoff in
+        # worker threads with their own loops) caused "Event loop is closed".
 
     def _build_headers(self, api_key: str | None, oauth_token: str | None) -> dict[str, str]:
         """Build request headers."""
@@ -53,52 +54,44 @@ class OpenDirectClient:
             headers["X-API-Key"] = api_key
         return headers
 
+    def _make_client(self) -> httpx.AsyncClient:
+        """Create a fresh AsyncClient bound to the current event loop.
+
+        Called per-request so each worker thread (CrewAI crew) gets a client
+        tied to its own loop rather than reusing one from the main FastAPI loop.
+        """
+        return httpx.AsyncClient(
+            base_url=self.base_url,
+            headers=self._headers,
+            timeout=self._timeout,
+        )
+
     # -------------------------------------------------------------------------
     # Products
     # -------------------------------------------------------------------------
 
     async def list_products(self, skip: int = 0, top: int = 50, **filters: Any) -> list[Product]:
-        """List available products with pagination.
-
-        Args:
-            skip: Number of items to skip
-            top: Maximum number of items to return
-            **filters: Additional filter parameters
-
-        Returns:
-            List of Product objects
-        """
+        """List available products with pagination."""
         params = {"$skip": skip, "$top": top, **filters}
-        response = await self._client.get("/products", params=params)
-        response.raise_for_status()
+        async with self._make_client() as client:
+            response = await client.get("/products", params=params)
+            response.raise_for_status()
         data = response.json()
         products = data.get("products", data) if isinstance(data, dict) else data
         return [Product.model_validate(p) for p in products]
 
     async def get_product(self, product_id: str) -> Product:
-        """Get a single product by ID.
-
-        Args:
-            product_id: The product ID
-
-        Returns:
-            Product object
-        """
-        response = await self._client.get(f"/products/{product_id}")
-        response.raise_for_status()
+        """Get a single product by ID."""
+        async with self._make_client() as client:
+            response = await client.get(f"/products/{product_id}")
+            response.raise_for_status()
         return Product.model_validate(response.json())
 
     async def search_products(self, filters: dict[str, Any]) -> list[Product]:
-        """Search products with filters.
-
-        Args:
-            filters: Search filter parameters (channel, format, pricing, etc.)
-
-        Returns:
-            List of matching Product objects
-        """
-        response = await self._client.post("/products/search", json=filters)
-        response.raise_for_status()
+        """Search products with filters."""
+        async with self._make_client() as client:
+            response = await client.post("/products/search", json=filters)
+            response.raise_for_status()
         data = response.json()
         products = data.get("products", data) if isinstance(data, dict) else data
         return [Product.model_validate(p) for p in products]
@@ -112,10 +105,11 @@ class OpenDirectClient:
         Returns:
             AvailsResponse with availability and pricing info
         """
-        response = await self._client.post(
-            "/products/avails", json=request.model_dump(by_alias=True, exclude_none=True)
-        )
-        response.raise_for_status()
+        async with self._make_client() as client:
+            response = await client.post(
+                "/products/avails", json=request.model_dump(by_alias=True, exclude_none=True)
+            )
+            response.raise_for_status()
         return AvailsResponse.model_validate(response.json())
 
     # -------------------------------------------------------------------------

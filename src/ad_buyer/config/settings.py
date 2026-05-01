@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     redis_url: str | None = None
 
     # CrewAI Settings
-    crew_memory_enabled: bool = True
+    crew_memory_enabled: bool = False
     crew_verbose: bool = True
     crew_max_iterations: int = 15
 

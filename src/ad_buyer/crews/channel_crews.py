@@ -333,23 +333,36 @@ Provide ranked recommendations with rationale.
     }
 ]""",
     recommendation_task_description="""
-Review the research findings and select the best inventory for this
-branding campaign. Consider:
+Review the research findings and select the best inventory for this branding campaign.
 
+STRICT RULES:
+- Only recommend products that were ACTUALLY FOUND and returned by the search tools.
+- Use the EXACT product_id values from the research results. Do NOT invent, modify, or
+  suffix product IDs (e.g. do not create "prod-003-split" from "prod-003").
+- Each item in your recommendations list must be a single bookable product from the catalog.
+- If no suitable products were found, return an empty recommendations list.
+
+Evaluate each found product on:
 1. Alignment with campaign objectives
-2. Budget efficiency
-3. Reach and frequency
-4. Quality metrics
+2. Budget efficiency (impressions per dollar)
+3. Reach and quality metrics
 
-Finalize your recommendations for approval.
+Output ONLY the JSON below — no extra text, no markdown outside the JSON block:
 """,
-    recommendation_task_output="""Final recommendations with booking priority:
-{
-    "recommendations": [...],
-    "total_impressions": X,
-    "total_cost": Y,
-    "summary": "..."
-}""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher from search results>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -377,9 +390,29 @@ Provide ranked recommendations with rationale.
     research_task_output="""List of recommended products with fraud scores and MMP support.""",
     recommendation_task_description="""
 Review the research findings and select the best mobile inventory.
-Prioritize quality over scale - low fraud and proper attribution are critical.
+Prioritize quality over scale — low fraud and proper attribution are critical.
+
+STRICT RULES:
+- Only recommend products ACTUALLY FOUND by the search tools.
+- Use EXACT product_id values from the research results. Do NOT invent new IDs.
+- If no suitable products were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
 """,
-    recommendation_task_output="""Final recommendations with booking priority.""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -408,8 +441,28 @@ Provide ranked recommendations with rationale.
     recommendation_task_description="""
 Review the research findings and select the best CTV inventory.
 Balance reach with frequency management across devices.
+
+STRICT RULES:
+- Only recommend products ACTUALLY FOUND by the search tools.
+- Use EXACT product_id values from the research results. Do NOT invent new IDs.
+- If no suitable products were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
 """,
-    recommendation_task_output="""Final recommendations with booking priority.""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -439,8 +492,28 @@ Provide ranked recommendations with rationale.
     recommendation_task_description="""
 Review the research findings and select the best performance inventory.
 Optimize for ROAS and conversion efficiency.
+
+STRICT RULES:
+- Only recommend products ACTUALLY FOUND by the search tools.
+- Use EXACT product_id values from the research results. Do NOT invent new IDs.
+- If no suitable products were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
 """,
-    recommendation_task_output="""Final recommendations with booking priority.""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 

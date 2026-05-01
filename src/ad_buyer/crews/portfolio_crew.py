@@ -70,33 +70,37 @@ Not all channels may be needed - allocate $0 to channels that don't fit the obje
         agent=portfolio_manager,
     )
 
-    # Define channel coordination task
-    channel_coordination_task = Task(
-        description="""
-Based on the budget allocation, provide high-level guidance for each
-active channel specialist:
-
-For each channel with budget > $0:
-1. Key objectives for that channel
-2. Targeting priorities
-3. Quality requirements (viewability, brand safety, etc.)
-4. Any specific constraints or preferences
-
-This guidance will be used by channel specialists to research and
-recommend specific inventory.
-""",
-        expected_output="""Channel guidance for each active channel:
-{
-    "channel_name": {
-        "objectives": ["..."],
-        "targeting_priorities": ["..."],
-        "quality_requirements": {...},
-        "constraints": ["..."]
-    }
-}""",
-        agent=portfolio_manager,
-        context=[budget_allocation_task],
-    )
+    # Legacy: channel_coordination_task was the final task, so kickoff() returned
+    # guidance JSON (no "budget" field). _parse_allocations() found nothing and
+    # budget_allocations stayed empty, skipping all channel research crews.
+    # Commented out so budget_allocation_task is the sole output of kickoff().
+    #
+    # channel_coordination_task = Task(
+    #     description="""
+    # Based on the budget allocation, provide high-level guidance for each
+    # active channel specialist:
+    #
+    # For each channel with budget > $0:
+    # 1. Key objectives for that channel
+    # 2. Targeting priorities
+    # 3. Quality requirements (viewability, brand safety, etc.)
+    # 4. Any specific constraints or preferences
+    #
+    # This guidance will be used by channel specialists to research and
+    # recommend specific inventory.
+    # """,
+    #     expected_output="""Channel guidance for each active channel:
+    # {
+    #     "channel_name": {
+    #         "objectives": ["..."],
+    #         "targeting_priorities": ["..."],
+    #         "quality_requirements": {...},
+    #         "constraints": ["..."]
+    #     }
+    # }""",
+    #     agent=portfolio_manager,
+    #     context=[budget_allocation_task],
+    # )
 
     return Crew(
         agents=[
@@ -105,7 +109,7 @@ recommend specific inventory.
             ctv_agent,
             performance_agent,
         ],
-        tasks=[budget_allocation_task, channel_coordination_task],
+        tasks=[budget_allocation_task],
         process=Process.hierarchical,
         manager_agent=portfolio_manager,
         memory=settings.crew_memory_enabled,

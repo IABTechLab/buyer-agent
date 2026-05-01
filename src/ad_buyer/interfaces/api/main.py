@@ -234,7 +234,7 @@ def _persist_job(job_id: str, job: dict[str, Any]) -> None:
             booked_lines=json.dumps(job.get("booked_lines", [])),
             errors=json.dumps(job.get("errors", [])),
         )
-    except (sqlite3.Error, OSError, ValueError, AttributeError):
+    except (sqlite3.Error, OSError, ValueError, AttributeError, TypeError):
         logger.exception("Failed to persist job %s", job_id)
 
 
@@ -410,9 +410,10 @@ async def approve_recommendations(
     # Execute approvals
     result = flow.approve_recommendations(request.approved_product_ids)
 
-    # Update job
+    # Update job — refresh recommendations with live statuses from flow state
     job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
+    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
@@ -450,7 +451,8 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
     result = flow.approve_all()
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
+    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
@@ -492,13 +494,19 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
     client = _create_client()
     tool = ProductSearchTool(client)
 
-    result = tool._run(
-        channel=request.channel,
-        format=request.format,
-        min_price=request.min_price,
-        max_price=request.max_price,
-        limit=request.limit,
-    )
+    try:
+        result = tool._run(
+            channel=request.channel,
+            format=request.format,
+            min_price=request.min_price,
+            max_price=request.max_price,
+            limit=request.limit,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Product search failed: seller unreachable or returned an error — {e}",
+        )
 
     return {"results": result}
 
@@ -571,6 +579,13 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["progress"] = 0.2
         result = flow.kickoff()
 
+        # If consolidate_recommendations didn't fire (CrewAI or_() limitation), collect manually.
+        if not flow.state.pending_approvals:
+            for recs in flow.state.channel_recommendations.values():
+                for rec in recs:
+                    rec.status = "pending_approval"
+                    flow.state.pending_approvals.append(rec)
+
         job["progress"] = 0.8
         job["budget_allocations"] = {
             k: v.model_dump() for k, v in flow.state.budget_allocations.items()
@@ -581,7 +596,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
 
         if request.auto_approve:
             flow.approve_all()
-            job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+            job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
             job["status"] = "completed"
         else:
             job["status"] = "awaiting_approval"

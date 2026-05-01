@@ -313,11 +313,12 @@ class DealBookingFlow(Flow[BookingState]):
             # Try to extract JSON from the result
             allocations = self._parse_allocations(result_str)
 
-            # Store allocations
+            # Store allocations (normalize channel keys to lowercase)
             for channel, alloc_data in allocations.items():
                 if alloc_data.get("budget", 0) > 0:
-                    self.state.budget_allocations[channel] = ChannelAllocation(
-                        channel=channel,
+                    ch = channel.lower()
+                    self.state.budget_allocations[ch] = ChannelAllocation(
+                        channel=ch,
                         budget=alloc_data["budget"],
                         percentage=alloc_data.get("percentage", 0),
                         rationale=alloc_data.get("rationale", ""),
@@ -403,7 +404,14 @@ class DealBookingFlow(Flow[BookingState]):
             )
             result = crew.kickoff()
 
-            recommendations = self._parse_recommendations(str(result), "branding")
+            result_str = str(result)
+            recommendations = self._parse_recommendations(result_str, "branding")
+            if not recommendations:
+                for task in (crew.tasks or []):
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "branding")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["branding"] = recommendations
             self.state.updated_at = datetime.now(timezone.utc)
 
@@ -433,6 +441,12 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "ctv")
+            if not recommendations:
+                for task in (crew.tasks or []):
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "ctv")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["ctv"] = recommendations
             self.state.updated_at = datetime.now(timezone.utc)
 
@@ -462,6 +476,12 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
+            if not recommendations:
+                for task in (crew.tasks or []):
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "mobile_app")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["mobile_app"] = recommendations
             self.state.updated_at = datetime.now(timezone.utc)
 
@@ -491,6 +511,12 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "performance")
+            if not recommendations:
+                for task in (crew.tasks or []):
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "performance")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["performance"] = recommendations
             self.state.updated_at = datetime.now(timezone.utc)
 
@@ -512,34 +538,93 @@ class DealBookingFlow(Flow[BookingState]):
             kpis=self.state.campaign_brief.get("kpis", {}),
         ).model_dump(by_alias=True)
 
-    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
-        """Parse recommendations from crew result."""
-        recommendations = []
+    @staticmethod
+    def _extract_items_from_str(result_str: str) -> list[dict]:
+        """Extract a product list from the crew result string.
 
+        Tries three strategies in order:
+        1. Strip markdown fences, parse as JSON object/array directly.
+        2. If the parsed object has a 'recommendations' key, use that list.
+        3. Bracket-scan: find every outermost '[...]' span and try each.
+        """
+        product_keys = {"product_id", "product_name", "cpm", "cost", "impressions"}
+
+        def _is_product_list(lst: list) -> bool:
+            return (
+                isinstance(lst, list)
+                and bool(lst)
+                and any(isinstance(it, dict) and product_keys & it.keys() for it in lst)
+            )
+
+        # Strategy 1 & 2 — try direct JSON parse (strip ``` fences first)
+        clean = result_str.strip()
+        if clean.startswith("```"):
+            lines = clean.splitlines()
+            # Remove first line (```json or ```) and last line (```)
+            inner = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+            clean = "\n".join(inner)
         try:
-            # Try to find JSON array in result
-            start_idx = result_str.find("[")
-            end_idx = result_str.rfind("]") + 1
-            if start_idx >= 0 and end_idx > start_idx:
-                json_str = result_str[start_idx:end_idx]
-                items = json.loads(json_str)
-
-                for item in items:
-                    rec = ProductRecommendation(
-                        product_id=item.get("product_id", "unknown"),
-                        product_name=item.get("product_name", "Unknown Product"),
-                        publisher=item.get("publisher", "Unknown"),
-                        channel=channel,
-                        format=item.get("format"),
-                        impressions=item.get("impressions", 0),
-                        cpm=item.get("cpm", 0),
-                        cost=item.get("cost", 0),
-                        rationale=item.get("rationale"),
-                    )
-                    recommendations.append(rec)
-        except (json.JSONDecodeError, KeyError):
-            # If parsing fails, create a placeholder recommendation
+            data = json.loads(clean)
+            if isinstance(data, list) and _is_product_list(data):
+                return [it for it in data if isinstance(it, dict)]
+            if isinstance(data, dict):
+                # Handle {"recommendations": [...]} wrapper
+                for key in ("recommendations", "products", "items"):
+                    lst = data.get(key, [])
+                    if _is_product_list(lst):
+                        return [it for it in lst if isinstance(it, dict)]
+        except (json.JSONDecodeError, TypeError):
             pass
+
+        # Strategy 3 — bracket-scan every '[...]' span
+        candidates: list[str] = []
+        i = 0
+        while i < len(result_str):
+            if result_str[i] == "[":
+                depth = 0
+                for j in range(i, len(result_str)):
+                    if result_str[j] == "[":
+                        depth += 1
+                    elif result_str[j] == "]":
+                        depth -= 1
+                        if depth == 0:
+                            candidates.append(result_str[i : j + 1])
+                            i = j + 1
+                            break
+                else:
+                    i += 1
+            else:
+                i += 1
+
+        for candidate in candidates:
+            try:
+                lst = json.loads(candidate)
+                if _is_product_list(lst):
+                    return [it for it in lst if isinstance(it, dict)]
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        return []
+
+    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
+        """Parse product recommendations from a crew result string."""
+        recommendations: list[ProductRecommendation] = []
+
+        for item in self._extract_items_from_str(result_str):
+            if not isinstance(item, dict):
+                continue
+            rec = ProductRecommendation(
+                product_id=item.get("product_id", "unknown"),
+                product_name=item.get("product_name", "Unknown Product"),
+                publisher=item.get("publisher", "Unknown"),
+                channel=channel,
+                format=item.get("format"),
+                impressions=item.get("impressions", 0),
+                cpm=item.get("cpm", 0),
+                cost=item.get("cost", 0),
+                rationale=item.get("rationale"),
+            )
+            recommendations.append(rec)
 
         return recommendations
 
@@ -629,37 +714,107 @@ class DealBookingFlow(Flow[BookingState]):
         all_ids = [rec.product_id for rec in self.state.pending_approvals]
         return self.approve_recommendations(all_ids)
 
+    def _book_via_seller_api(self, rec: Any) -> tuple[str, str, str]:
+        """Call seller: quote → deal → order. Returns (quote_id, deal_id, order_id).
+
+        Uses a synchronous httpx.Client so this can be called from the
+        non-async _execute_bookings method. Raises on HTTP errors.
+        """
+        import httpx
+
+        base_url = self._client.base_url.rstrip("/")
+        headers = {**self._client._headers}
+        brief = self.state.campaign_brief
+
+        with httpx.Client(base_url=base_url, headers=headers, timeout=30.0) as http:
+            # 1. Request a quote from the seller
+            quote_payload = {
+                "product_id": rec.product_id,
+                "deal_type": "PD",
+                "impressions": rec.impressions,
+                "flight_start": brief.get("start_date"),
+                "flight_end": brief.get("end_date"),
+                "target_cpm": rec.cpm,
+                "buyer_identity": {
+                    "advertiser_id": "buyer-agent-001",
+                    "dsp_platform": "iab-buyer-agent",
+                },
+            }
+            r = http.post("/api/v1/quotes", json=quote_payload)
+            r.raise_for_status()
+            quote_id = r.json().get("quote_id") or r.json().get("id", "")
+
+            # 2. Book the deal using the quote
+            deal_payload = {
+                "quote_id": quote_id,
+                "buyer_identity": {
+                    "advertiser_id": "buyer-agent-001",
+                    "dsp_platform": "iab-buyer-agent",
+                },
+                "notes": f"Booked via buyer agent — {rec.product_name}",
+            }
+            r = http.post("/api/v1/deals", json=deal_payload)
+            r.raise_for_status()
+            deal_id = r.json().get("deal_id") or r.json().get("id", "")
+
+            # 3. Create an order record on the seller
+            order_payload = {"deal_id": deal_id, "quote_id": quote_id}
+            r = http.post("/api/v1/orders", json=order_payload)
+            r.raise_for_status()
+            order_id = r.json().get("order_id") or r.json().get("id", "")
+
+        return quote_id, deal_id, order_id
+
     def _execute_bookings(self) -> dict[str, Any]:
-        """Execute bookings for all approved recommendations."""
+        """Execute bookings for all approved recommendations via seller API."""
         from ..models.flow_state import BookedLine
 
-        approved = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+        approved_all = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+
+        # Deduplicate: if the same product_id appears from multiple channel crews,
+        # keep the one with the highest impressions to avoid double-booking.
+        seen: dict[str, Any] = {}
+        for rec in approved_all:
+            if rec.product_id not in seen or rec.impressions > seen[rec.product_id].impressions:
+                seen[rec.product_id] = rec
+        approved = list(seen.values())
 
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
             return {"status": "success", "booked": 0, "message": "No recommendations approved"}
 
-        # In a full implementation, this would use the Execution Agent
-        # to create orders and book lines. For now, we track the approvals.
+        booking_errors: list[str] = []
+
         for rec in approved:
+            booking_status = "booked"
+            order_id = "order_pending"
+
+            try:
+                _quote_id, _deal_id, order_id = self._book_via_seller_api(rec)
+                booking_status = "booked"
+            except Exception as e:  # noqa: BLE001
+                booking_status = "booking_failed"
+                booking_errors.append(f"{rec.product_id}: {e}")
+                logger.warning("Seller booking failed for %s: %s", rec.product_id, e)
+
             booked = BookedLine(
                 line_id=f"line_{rec.product_id}",
-                order_id="order_pending",
+                order_id=order_id,
                 product_id=rec.product_id,
                 product_name=rec.product_name,
                 channel=rec.channel,
                 impressions=rec.impressions,
                 cost=rec.cost,
-                booking_status="pending_execution",
+                booking_status=booking_status,
                 booked_at=datetime.now(timezone.utc),
             )
             self.state.booked_lines.append(booked)
 
             # Persist booking record and update deal status
-            deal_id = getattr(rec, "_store_deal_id", None)
-            if deal_id:
-                self._persist_booking(deal_id, booked)
-                self._persist_deal_status(deal_id, "booked")
+            store_deal_id = getattr(rec, "_store_deal_id", None)
+            if store_deal_id:
+                self._persist_booking(store_deal_id, booked)
+                self._persist_deal_status(store_deal_id, booking_status)
 
         self.state.execution_status = ExecutionStatus.COMPLETED
         self.state.updated_at = datetime.now(timezone.utc)
@@ -678,11 +833,13 @@ class DealBookingFlow(Flow[BookingState]):
                 },
             )
 
+        actually_booked = [b for b in self.state.booked_lines if b.booking_status == "booked"]
         return {
             "status": "success",
-            "booked": len(self.state.booked_lines),
-            "total_impressions": sum(b.impressions for b in self.state.booked_lines),
-            "total_cost": sum(b.cost for b in self.state.booked_lines),
+            "booked": len(actually_booked),
+            "total_impressions": sum(b.impressions for b in actually_booked),
+            "total_cost": sum(b.cost for b in actually_booked),
+            "booking_errors": booking_errors,
         }
 
     def get_status(self) -> dict[str, Any]:
