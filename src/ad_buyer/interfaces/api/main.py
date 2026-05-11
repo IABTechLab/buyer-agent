@@ -53,6 +53,7 @@ app = FastAPI(
         {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
         {"name": "Products", "description": "Seller inventory product search"},
         {"name": "Events", "description": "Event bus query endpoints"},
+        {"name": "Reporting", "description": "Campaign delivery reporting (Meta + GAM)"},
     ],
 )
 
@@ -540,6 +541,96 @@ async def list_events(
     return {
         "events": [e.model_dump(mode="json") for e in events],
         "total": len(events),
+    }
+
+
+@app.get("/reports/{job_id}", tags=["Reporting"])
+async def get_campaign_report(
+    job_id: str,
+    date_range: str = "last_30d",
+) -> dict[str, Any]:
+    """Get delivery reports for a completed booking job.
+
+    Fetches data from:
+    - Meta Ads CLI (for social channel bookings — campaign insights)
+    - GAM REST API (for IAB/OpenDirect booked lines — TBD, requires GAM credentials)
+
+    Requires META_ACCESS_TOKEN + META_AD_ACCOUNT_ID + META_PAGE_ID in .env
+    for Meta reporting.
+    """
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = jobs[job_id]
+    booked_lines = job.get("booked_lines", [])
+    if not booked_lines:
+        return {"job_id": job_id, "message": "No booked lines to report on", "reports": []}
+
+    iam_order_ids = [
+        b["order_id"] for b in booked_lines
+        if b.get("channel") not in ("social", "meta")
+        and b.get("order_id", "").startswith("ORD-")
+    ]
+    meta_campaign_ids = [
+        b["order_id"] for b in booked_lines
+        if b.get("channel") in ("social", "meta")
+    ]
+
+    reports: list[dict[str, Any]] = []
+
+    if meta_campaign_ids and settings.meta_access_token:
+        try:
+            from ...tools.reporting.meta_reporting import MetaReportingTool
+            tool = MetaReportingTool()
+            reports.append({
+                "source": "Meta",
+                "campaign_ids": meta_campaign_ids,
+                "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
+            })
+        except Exception as e:
+            reports.append({"source": "Meta", "campaign_ids": meta_campaign_ids, "error": str(e)})
+    elif meta_campaign_ids:
+        reports.append({
+            "source": "Meta",
+            "campaign_ids": meta_campaign_ids,
+            "message": "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID",
+        })
+
+    if iam_order_ids:
+        if settings.gam_enabled and settings.gam_network_code and settings.gam_json_key_path:
+            try:
+                from ...tools.reporting.gam_reporting import GAMReportingTool
+                tool = GAMReportingTool()
+                gam_report = tool._run(
+                    order_ids=iam_order_ids,
+                    date_range=date_range.upper().replace("-", "_"),
+                )
+                reports.append({
+                    "source": "GAM",
+                    "order_ids": iam_order_ids,
+                    "report": gam_report,
+                })
+            except Exception as e:
+                reports.append({
+                    "source": "GAM",
+                    "order_ids": iam_order_ids,
+                    "error": str(e),
+                })
+        else:
+            reports.append({
+                "source": "GAM",
+                "order_ids": iam_order_ids,
+                "message": (
+                    "GAM not configured — set GAM_ENABLED=true, GAM_NETWORK_CODE, "
+                    "GAM_JSON_KEY_PATH in .env"
+                ),
+            })
+
+    return {
+        "job_id": job_id,
+        "campaign_name": job.get("brief", {}).get("name"),
+        "date_range": date_range,
+        "reports": reports,
     }
 
 

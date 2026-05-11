@@ -18,6 +18,7 @@ from ..crews.channel_crews import (
     create_ctv_crew,
     create_mobile_crew,
     create_performance_crew,
+    create_social_crew,
 )
 from ..crews.portfolio_crew import create_portfolio_crew
 from ..events.helpers import emit_event_sync
@@ -312,6 +313,29 @@ class DealBookingFlow(Flow[BookingState]):
 
             # Try to extract JSON from the result
             allocations = self._parse_allocations(result_str)
+
+            # If brief specifies explicit channels, enforce them —
+            # redistribute budget equally across requested channels only,
+            # ignoring whatever the LLM decided.
+            requested = [
+                c.lower()
+                for c in self.state.campaign_brief.get("channels", [])
+                if c.strip()
+            ]
+            if requested:
+                total_budget = self.state.campaign_brief.get("budget", 0)
+                per_channel = total_budget / len(requested)
+                pct = round(100 / len(requested), 1)
+                allocations = {
+                    ch: {
+                        "budget": per_channel,
+                        "percentage": pct,
+                        "rationale": allocations.get(ch, {}).get(
+                            "rationale", f"Requested channel: {ch}"
+                        ),
+                    }
+                    for ch in requested
+                }
 
             # Store allocations (normalize channel keys to lowercase)
             for channel, alloc_data in allocations.items():
@@ -628,7 +652,43 @@ class DealBookingFlow(Flow[BookingState]):
 
         return recommendations
 
-    @listen(or_(research_branding, research_ctv, research_mobile, research_performance))
+    @listen(allocate_budget)
+    def research_social(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+        """Social media specialist researches Meta Ads inventory."""
+        if allocation_result.get("status") != "success":
+            return {"channel": "social", "status": "skipped"}
+
+        social_alloc = self.state.budget_allocations.get("social")
+        if not social_alloc or social_alloc.budget <= 0:
+            return {"channel": "social", "status": "no_budget"}
+
+        try:
+            channel_brief = self._create_channel_brief("social", social_alloc)
+            crew = create_social_crew(
+                self._client,
+                channel_brief,
+                audience_plan=self.state.audience_plan,
+            )
+            result = crew.kickoff()
+
+            result_str = str(result)
+            recommendations = self._parse_recommendations(result_str, "social")
+            if not recommendations:
+                for task in (crew.tasks or []):
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "social")
+                        if recommendations:
+                            break
+            self.state.channel_recommendations["social"] = recommendations
+            self.state.updated_at = datetime.now(timezone.utc)
+
+            return {"channel": "social", "status": "success", "count": len(recommendations)}
+
+        except Exception as e:  # noqa: BLE001
+            self.state.errors.append(f"Social research failed: {e}")
+            return {"channel": "social", "status": "failed", "error": str(e)}
+
+    @listen(or_(research_branding, research_ctv, research_mobile, research_performance, research_social))
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
         """Consolidate all channel recommendations for approval."""
         # Check if all active channels have reported
@@ -765,6 +825,86 @@ class DealBookingFlow(Flow[BookingState]):
 
         return quote_id, deal_id, order_id
 
+    def _book_via_meta_cli(self, rec: Any) -> tuple[str, str, str]:
+        """Book a Meta Ads campaign via 4 sequential CLI commands.
+
+        Steps:
+            1. meta ads campaign create  → campaign_id  (PAUSED)
+            2. meta ads adset create     → ad_set_id    (PAUSED)
+            3. meta ads creative create  → creative_id
+            4. meta ads ad create        → ad_id        (PAUSED)
+
+        Returns:
+            (campaign_id, ad_set_id, "meta")
+        """
+        from ..clients.meta_ads_cli_client import MetaAdsCLIClient, MetaAuthError, MetaAPIError
+        from ..config.settings import settings as _settings
+
+        if not _settings.meta_access_token or not _settings.meta_ad_account_id:
+            raise ValueError("Meta not configured: set META_ACCESS_TOKEN + META_AD_ACCOUNT_ID")
+        if not _settings.meta_page_id:
+            raise ValueError("META_PAGE_ID required — set in .env (Business Manager → Pages)")
+
+        brief = self.state.campaign_brief
+        target_audience = brief.get("target_audience", {})
+        geo_locations = target_audience.get("geo_locations", ["US"])
+
+        obj_map = {
+            "brand_awareness": "OUTCOME_AWARENESS",
+            "reach":           "OUTCOME_AWARENESS",
+            "traffic":         "OUTCOME_TRAFFIC",
+            "conversions":     "OUTCOME_SALES",
+            "video_views":     "OUTCOME_ENGAGEMENT",
+            "lead_generation": "OUTCOME_LEADS",
+        }
+        objectives = brief.get("objectives", ["brand_awareness"])
+        meta_obj = obj_map.get(
+            objectives[0] if objectives else "brand_awareness", "OUTCOME_AWARENESS"
+        )
+
+        optimization_goal = "LINK_CLICKS" if rec.channel == "performance" else "REACH"
+        daily_budget_cents = max(int((rec.cost / 30) * 100), 100)
+        bid_amount_cents = max(int((rec.cpm or 5.0) * 100), 1)
+        campaign_name = f"{brief.get('name', 'Campaign')} — {rec.product_name}"
+
+        cli = MetaAdsCLIClient(
+            access_token=_settings.meta_access_token,
+            ad_account_id=_settings.meta_ad_account_id,
+            page_id=_settings.meta_page_id,
+            api_version=_settings.meta_api_version,
+        )
+
+        # 1. Create campaign
+        camp = cli.create_campaign(
+            name=campaign_name,
+            objective=meta_obj,
+            daily_budget_cents=daily_budget_cents,
+        )
+        campaign_id = camp.get("id") or camp.get("campaign_id", "")
+        if not campaign_id:
+            raise ValueError(f"Campaign creation failed — no id in response: {camp}")
+
+        # 2. Create ad set
+        adset = cli.create_adset(
+            campaign_id=campaign_id,
+            name=f"{rec.product_name} Ad Set",
+            optimization_goal=optimization_goal,
+            billing_event="IMPRESSIONS",
+            bid_amount_cents=bid_amount_cents,
+            targeting_countries=geo_locations if isinstance(geo_locations, list) else ["US"],
+        )
+        ad_set_id = adset.get("id") or adset.get("adset_id", "")
+        if not ad_set_id:
+            raise ValueError(f"Ad set creation failed — no id in response: {adset}")
+
+        # 3. Create creative (optional — requires an image asset)
+        # Skipped here: ad creative needs a real image URL or file.
+        # Campaign + ad set are created PAUSED and sufficient for booking.
+        # Add creative + ad via Meta Ads Manager or a follow-up API call
+        # once real creative assets are available for this placement.
+
+        return campaign_id, ad_set_id, "meta"
+
     def _execute_bookings(self) -> dict[str, Any]:
         """Execute bookings for all approved recommendations via seller API."""
         from ..models.flow_state import BookedLine
@@ -788,17 +928,24 @@ class DealBookingFlow(Flow[BookingState]):
         for rec in approved:
             booking_status = "booked"
             order_id = "order_pending"
+            line_id_override: str | None = None
 
             try:
-                _quote_id, _deal_id, order_id = self._book_via_seller_api(rec)
-                booking_status = "booked"
+                if rec.channel in ("social", "meta"):
+                    campaign_id, ad_set_id, _ = self._book_via_meta_cli(rec)
+                    order_id = campaign_id
+                    line_id_override = ad_set_id
+                    booking_status = "paused"
+                else:
+                    _quote_id, _deal_id, order_id = self._book_via_seller_api(rec)
+                    booking_status = "booked"
             except Exception as e:  # noqa: BLE001
                 booking_status = "booking_failed"
                 booking_errors.append(f"{rec.product_id}: {e}")
-                logger.warning("Seller booking failed for %s: %s", rec.product_id, e)
+                logger.warning("Booking failed for %s: %s", rec.product_id, e)
 
             booked = BookedLine(
-                line_id=f"line_{rec.product_id}",
+                line_id=line_id_override or f"line_{rec.product_id}",
                 order_id=order_id,
                 product_id=rec.product_id,
                 product_name=rec.product_name,

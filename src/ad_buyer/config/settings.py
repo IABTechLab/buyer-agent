@@ -92,6 +92,33 @@ class Settings(BaseSettings):
     # Override via EMBEDDING_MODE env var.
     embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
 
+    # --------------------------------------------------------------------------
+    # Google Ad Manager (GAM) — read-only reporting
+    # Same field names as seller agent for operational consistency
+    # --------------------------------------------------------------------------
+    # Feature flag — set true once service account is configured
+    gam_enabled: bool = False
+    # GAM network code (GAM UI → Admin → Global Settings → Network code)
+    gam_network_code: str = ""
+    # Path to service account JSON key file
+    gam_json_key_path: str = ""
+    # Application name sent in API requests
+    gam_application_name: str = "AAMPBuyerAgent"
+    # GAM REST API version
+    gam_api_version: str = "v202411"
+
+    # --------------------------------------------------------------------------
+    # Meta Ads CLI integration
+    # --------------------------------------------------------------------------
+    # System user access token (from Meta Business Manager → System Users)
+    meta_access_token: str = ""
+    # Ad account ID (format: act_XXXXXXXXX — assign to system user in Business Manager)
+    meta_ad_account_id: str = ""
+    # Facebook Page ID (required for ad creative creation via CLI)
+    meta_page_id: str = ""
+    # Graph API version (used for reach estimates)
+    meta_api_version: str = "v21.0"
+
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,
         "env_file_encoding": "utf-8",
