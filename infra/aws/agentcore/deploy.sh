@@ -28,7 +28,7 @@ set -euo pipefail
 REGION="${AWS_REGION:-us-west-2}"
 AGENT_NAME="${AGENT_NAME:-}"
 AWS_PROFILE="${AWS_PROFILE:-}"
-LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0}"
+LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.amazon.nova-pro-v1:0}"
 SELLER_AGENT_URL="${SELLER_AGENT_URL:-}"
 DEPLOY_MODE="http"
 DO_TEST=false
@@ -119,6 +119,27 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     pip install bedrock-agentcore-starter-toolkit==0.3.4
   fi
 
+  # ── Workaround: Hide root Dockerfile during configure/deploy ──────
+  # The agentcore toolkit copies a root-level Dockerfile into the build
+  # directory if one exists, ignoring the -e entrypoint flag. The community
+  # repo ships its own Dockerfile for local docker-compose usage, so we
+  # temporarily move it aside to let the toolkit generate the correct one
+  # from its template with our HTTP entrypoint.
+  _ROOT_DOCKERFILE="${REPO_ROOT}/Dockerfile"
+  _DOCKERFILE_HIDDEN=false
+  if [[ -f "${_ROOT_DOCKERFILE}" ]]; then
+    echo "  ⚠️  Root Dockerfile detected — hiding during deploy (toolkit would override entrypoint)"
+    mv "${_ROOT_DOCKERFILE}" "${_ROOT_DOCKERFILE}.community-bak"
+    _DOCKERFILE_HIDDEN=true
+  fi
+
+  # Also remove the stale generated Dockerfile so the toolkit regenerates it
+  _GENERATED_DOCKERFILE="${REPO_ROOT}/.bedrock_agentcore/${AGENT_NAME}/Dockerfile"
+  if [[ -f "${_GENERATED_DOCKERFILE}" ]]; then
+    echo "  🗑️  Removing stale generated Dockerfile: ${_GENERATED_DOCKERFILE}"
+    rm -f "${_GENERATED_DOCKERFILE}"
+  fi
+
   # Configure
   echo ""
   echo ">>> Configuring agent..."
@@ -141,7 +162,17 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     --env "DATABASE_URL=sqlite:///:memory:" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \
     --env "SELLER_AGENT_URL=${SELLER_AGENT_URL}" \
+    --env "AWS_REGION=${REGION}" \
+    --env "AWS_DEFAULT_REGION=${REGION}" \
+    --env "CREW_MEMORY_ENABLED=true" \
+    --env "MEMORY_LLM_MODEL=bedrock/us.amazon.nova-lite-v1:0" \
     --auto-update-on-conflict
+
+  # ── Restore root Dockerfile ─────────────────────────────────────────
+  if [[ "${_DOCKERFILE_HIDDEN}" == "true" ]]; then
+    mv "${_ROOT_DOCKERFILE}.community-bak" "${_ROOT_DOCKERFILE}"
+    echo "  ✅ Restored root Dockerfile"
+  fi
 
   echo ""
   echo "✅ Deploy complete"

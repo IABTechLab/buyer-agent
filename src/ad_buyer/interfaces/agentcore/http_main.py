@@ -46,10 +46,32 @@ _src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", 
 if os.path.isdir(_src_dir):
     sys.path.insert(0, _src_dir)
 
+# Add repo root to path for patches/ module
+_repo_root = os.path.join(_src_dir, "..")
+if os.path.isdir(os.path.join(_repo_root, "patches")):
+    sys.path.insert(0, _repo_root)
+
 # Environment defaults for AgentCore / workshop demo mode
 os.environ.setdefault("ANTHROPIC_API_KEY", "not-used-with-bedrock")
 os.environ.setdefault("STORAGE_TYPE", "sqlite")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+
+# Apply CrewAI patches BEFORE any CrewAI imports
+try:
+    from patches.crewai_bedrock_fix import apply_patches as apply_bedrock_patches
+    apply_bedrock_patches()
+except ImportError as _ie:
+    logging.getLogger(__name__).warning("crewai_bedrock_fix not found: %s (repo_root=%s)", _ie, _repo_root)
+except Exception as _exc:
+    logging.getLogger(__name__).warning("crewai_bedrock_fix patch failed: %s", _exc)
+
+try:
+    from patches.crewai_agentcore_memory import apply_patches as apply_memory_patches
+    apply_memory_patches()
+except ImportError as _ie:
+    logging.getLogger(__name__).warning("crewai_agentcore_memory not found: %s (repo_root=%s)", _ie, _repo_root)
+except Exception as _exc:
+    logging.getLogger(__name__).warning("crewai_agentcore_memory patch failed: %s", _exc)
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
@@ -327,6 +349,21 @@ async def _handle_invocation(payload: dict):
     crew mode for campaign planning.
     """
     routing_mode = _get_routing_mode(payload)
+
+    # Extract session context for memory integration
+    session_id = (
+        payload.get("session_id")
+        or payload.get("runtimeSessionId")
+        or payload.get("session_metadata", {}).get("session_id") if isinstance(payload.get("session_metadata"), dict) else None
+    )
+    actor_id = payload.get("agent_name") or "buyer-agent"
+
+    # Update memory patch with session context (idempotent if already patched)
+    try:
+        from patches.crewai_agentcore_memory import apply_patches as apply_memory_patches
+        apply_memory_patches(session_id=session_id, actor_id=actor_id)
+    except ImportError:
+        pass
 
     # UI sends payloads with agent_name/memory_id but no routing_mode.
     # Default to crew for UI calls.
