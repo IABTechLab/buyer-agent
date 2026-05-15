@@ -24,7 +24,6 @@ class ApprovalRecord(BaseModel):
     vendor_company_id: int = Field(alias="vendorCompanyId")
     company_name: str = Field(alias="companyName", default="")
     domain: str = ""
-    internal_id: str = Field(alias="internalId", default="")
     iab_buyer_agent_approval: bool = Field(alias="iabBuyerAgentApproval", default=False)
     iab_buyer_agent_approved_at: datetime | None = Field(
         alias="iabBuyerAgentApprovedAt", default=None

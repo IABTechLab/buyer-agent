@@ -11,7 +11,7 @@ Endpoint:
     GET /api/v1/integrations/iab/buyer-agent-approval?domain=a.com,b.com
 
 Auth: api-key header, scope `iab:buyerAgent`.
-Limit: up to 10 domains/internalIds per call (SGP-enforced).
+Limit: up to 10 domains per call (SGP-enforced).
 """
 
 from __future__ import annotations

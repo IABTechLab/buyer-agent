@@ -56,7 +56,6 @@ def _record(domain: str, approved: bool, approved_at: str | None = "2026-03-14T1
         "vendorCompanyId": (hash(domain) + 1) & 0xFFFF,
         "companyName": domain.split(".")[0].title() + " Inc.",
         "domain": domain,
-        "internalId": "",
         "iabBuyerAgentApproval": approved,
         "iabBuyerAgentApprovedAt": approved_at,
     }

@@ -50,7 +50,6 @@ def _approved(domain: str) -> ApprovalRecord:
             "vendorCompanyId": 10,
             "companyName": "Example Seller",
             "domain": domain,
-            "internalId": "",
             "iabBuyerAgentApproval": True,
             "iabBuyerAgentApprovedAt": "2026-03-01T00:00:00Z",
         }
@@ -64,7 +63,6 @@ def _denied(domain: str) -> ApprovalRecord:
             "vendorCompanyId": 20,
             "companyName": "Shady Seller",
             "domain": domain,
-            "internalId": "",
             "iabBuyerAgentApproval": False,
             "iabBuyerAgentApprovedAt": None,
         }
