@@ -172,13 +172,10 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
                 base_url=settings.sgp_base_url,
                 cache_ttl_seconds=settings.sgp_cache_ttl_seconds,
             )
-        if (
-            sgp_client is None
-            and settings.sgp_enforce_on_deal_request
-        ):
+        if sgp_client is None and settings.sgp_enforce:
             logger.warning(
-                "SGP_ENFORCE_ON_DEAL_REQUEST is true but SGP_API_KEY is empty; "
-                "the SafeGuard Privacy deal-request gate will be bypassed. "
+                "SGP_ENFORCE is true but SGP_API_KEY is empty; "
+                "the SafeGuard Privacy approval gate will be bypassed. "
                 "Set SGP_API_KEY to enable vendor approval enforcement."
             )
         self._sgp_client = sgp_client
@@ -188,6 +185,8 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             client=client,
             buyer_context=buyer_context,
             sgp_client=sgp_client,
+            sgp_enforce=settings.sgp_enforce,
+            sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
         )
         self._pricing_tool = GetPricingTool(
             client=client,
@@ -197,7 +196,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             client=client,
             buyer_context=buyer_context,
             sgp_client=sgp_client,
-            sgp_enforce=settings.sgp_enforce_on_deal_request,
+            sgp_enforce=settings.sgp_enforce,
             sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
         )
         # Agent-callable vendor approval tool — only useful with an SGP client.

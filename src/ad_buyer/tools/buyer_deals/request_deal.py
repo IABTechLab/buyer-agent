@@ -233,7 +233,7 @@ Returns:
             return (
                 "Deal blocked: cannot determine seller domain for SafeGuard "
                 "Privacy approval check. Add a seller_url / publisher_domain "
-                "field to the product, or disable SGP_ENFORCE_ON_DEAL_REQUEST.",
+                "field to the product, or disable SGP_ENFORCE.",
                 None,
             )
 

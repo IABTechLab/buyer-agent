@@ -300,3 +300,209 @@ def test_flow_omits_vendor_approval_tool_without_sgp(agency_context, monkeypatch
         sgp_client=None,
     )
     assert flow._vendor_approval_tool is None
+
+
+# ---------------------------------------------------------------------------
+# DiscoverInventoryTool enforcement (filters before the agent sees products)
+# ---------------------------------------------------------------------------
+
+
+def _product(product_id: str, domain: str, price: float = 20.0) -> dict:
+    return {
+        "id": product_id,
+        "name": f"Product {product_id}",
+        "publisherId": "pub-1",
+        "channel": "ctv",
+        "basePrice": price,
+        "availableImpressions": 1_000_000,
+        "seller_url": f"http://{domain}",
+    }
+
+
+@pytest.fixture
+def discovery_client() -> MagicMock:
+    """UnifiedClient mock returning a mixed list of seller domains."""
+    client = MagicMock()
+    products = [
+        _product("p1", "approved.example.com"),
+        _product("p2", "denied.example.com"),
+        _product("p3", "unknown.example.com"),
+    ]
+    client.search_products = AsyncMock(
+        return_value=MagicMock(success=True, data=products)
+    )
+    client.list_products = AsyncMock(
+        return_value=MagicMock(success=True, data=products)
+    )
+    return client
+
+
+def _strip_scheme(d: str) -> str:
+    """Tiny stand-in for SGPClient.normalize_domain for test mocks."""
+    return d.replace("http://", "").replace("https://", "").split(":")[0]
+
+
+def _discovery_sgp_mock() -> MagicMock:
+    """SGP mock with approved/denied/unknown for the three discovery_client domains."""
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=_strip_scheme)
+    sgp.check_approvals = AsyncMock(
+        return_value={
+            "approved.example.com": _approved("approved.example.com"),
+            "denied.example.com": _denied("denied.example.com"),
+            "unknown.example.com": None,
+        }
+    )
+    return sgp
+
+
+@pytest.mark.asyncio
+async def test_discovery_enforce_filters_not_approved(
+    discovery_client, agency_context
+):
+    """When enforcing, NOT APPROVED rows are dropped before formatting."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    sgp = _discovery_sgp_mock()
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="block",
+    )
+    result = await tool._arun(query="ctv inventory")
+    assert "approved.example.com" in result
+    assert "denied.example.com" not in result
+    assert "unknown.example.com" not in result
+    assert "filtered" in result.lower()
+
+
+@pytest.mark.asyncio
+async def test_discovery_enforce_warn_keeps_unknowns(
+    discovery_client, agency_context
+):
+    """warn policy keeps unknowns in the result and emits a warning line."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    sgp = _discovery_sgp_mock()
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="warn",
+    )
+    result = await tool._arun(query="ctv inventory")
+    assert "approved.example.com" in result
+    assert "denied.example.com" not in result
+    assert "unknown.example.com" in result
+    assert "SGP WARNING" in result
+
+
+@pytest.mark.asyncio
+async def test_discovery_enforce_allow_keeps_unknowns_silently(
+    discovery_client, agency_context
+):
+    """allow policy keeps unknowns and suppresses the per-row annotation."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    sgp = _discovery_sgp_mock()
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="allow",
+    )
+    result = await tool._arun(query="ctv inventory")
+    # p3 is the unknown vendor — kept silently under "allow" policy
+    assert "Product p3" in result
+    assert "SGP WARNING" not in result
+    # NOT APPROVED (p2) is still filtered regardless of unknown policy
+    assert "Product p2" not in result
+
+
+@pytest.mark.asyncio
+async def test_discovery_no_enforce_annotates_only(discovery_client, agency_context):
+    """Without enforcement, all products pass through with annotations."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    sgp = _discovery_sgp_mock()
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=False,
+    )
+    result = await tool._arun(query="ctv inventory")
+    assert "approved.example.com" in result
+    assert "denied.example.com" in result  # not filtered
+    assert "unknown.example.com" in result
+    assert "NOT APPROVED" in result
+    assert "filtered" not in result.lower()
+
+
+@pytest.mark.asyncio
+async def test_discovery_fails_closed_when_sgp_unreachable_and_enforcing(
+    discovery_client, agency_context
+):
+    """SGP transport error propagates so the flow can mark FAILED."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=lambda d: d)
+    sgp.check_approvals = AsyncMock(side_effect=SGPClientError("upstream 503"))
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+    )
+    with pytest.raises(SGPClientError, match="Inventory discovery halted"):
+        await tool._arun(query="ctv inventory")
+
+
+@pytest.mark.asyncio
+async def test_discovery_no_enforce_swallows_sgp_error(
+    discovery_client, agency_context, caplog
+):
+    """Without enforcement, transport error returns unannotated results."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=lambda d: d)
+    sgp.check_approvals = AsyncMock(side_effect=SGPClientError("upstream 503"))
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=False,
+    )
+    result = await tool._arun(query="ctv inventory")
+    assert "Product p1" in result
+    assert "Product p2" in result  # not filtered (annotate-only mode)
+    assert "Product p3" in result
+    assert "SGP Approval" not in result  # no annotations
+    assert "Total products found: 3" in result
+
+
+@pytest.mark.asyncio
+async def test_discovery_no_sgp_client_pass_through(
+    discovery_client, agency_context
+):
+    """Without an SGP client, discovery behaves as before — no annotations, no filter."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    tool = DiscoverInventoryTool(
+        client=discovery_client,
+        buyer_context=agency_context,
+        sgp_client=None,
+        sgp_enforce=True,  # no-op without a client
+    )
+    result = await tool._arun(query="ctv inventory")
+    assert "Product p1" in result
+    assert "Product p2" in result
+    assert "Product p3" in result
+    assert "SGP Approval" not in result
+    assert "Total products found: 3" in result

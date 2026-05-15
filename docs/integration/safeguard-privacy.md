@@ -30,12 +30,11 @@ The response contains one `IabBuyerAgentResource` per matched vendor:
   "status": "success",
   "code": 200,
   "data": [
-    {
+{
       "vendorId": 123,
       "vendorCompanyId": 456,
       "companyName": "Example Publisher",
       "domain": "example.com",
-      "internalId": "",
       "iabBuyerAgentApproval": true,
       "iabBuyerAgentApprovedAt": "2026-03-14T12:00:00Z"
     }
@@ -57,18 +56,18 @@ Three response states matter to the buyer agent:
 |----------|------|---------|-------------|
 | `SGP_API_KEY` | `str` | `""` | API key with the `iab:buyerAgent` scope. Empty = integration disabled. |
 | `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | Production endpoint. The staging environment is `https://api.safeguardprivacy-demo.com`. |
-| `SGP_ENFORCE_ON_DEAL_REQUEST` | `bool` | `False` | When `True`, `RequestDealTool` blocks Deal ID generation unless the seller's vendor is approved. |
-| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. |
+| `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery, the deal-request gate blocks Deal ID generation, and SGP transport errors halt the flow. |
+| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. Applies at both discovery and deal-request stages when enforcement is on. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime. Discovery→pricing→booking reuse a single SGP call within the TTL. |
 
 !!! warning "Enforcement without a key is a no-op"
-    If `SGP_ENFORCE_ON_DEAL_REQUEST=true` but `SGP_API_KEY` is empty, the gate cannot be evaluated and is silently bypassed. The buyer agent logs a warning at flow construction time so this misconfiguration is visible.
+    If `SGP_ENFORCE=true` but `SGP_API_KEY` is empty, the gate cannot be evaluated and is silently bypassed. The buyer agent logs a warning at flow construction time so this misconfiguration is visible.
 
 ## Where the gate runs
 
-The integration plugs into two existing buyer-agent tools:
+The integration plugs into two existing buyer-agent tools. Behavior at each stage is governed by the same `SGP_ENFORCE` flag — there's no separate "enforce on discovery" switch.
 
-### Inventory discovery annotations
+### Inventory discovery
 
 `DiscoverInventoryTool` accepts an optional `SGPClient`. When provided, it extracts the seller domain from each returned product (checking `seller_url`, `publisher_domain`, then `publisherId`/`publisher` if they contain a `.`), batches distinct domains into groups of 10, and annotates each product row in the formatted output:
 
@@ -80,11 +79,24 @@ The integration plugs into two existing buyer-agent tools:
    SGP Approval: ✓ APPROVED — seller.example.com
 ```
 
-Discovery **fails open** on SGP transport errors — the tool logs and continues without annotations, so a SafeGuard outage never breaks inventory browsing. The actual enforcement is always at the deal-request step.
+Behavior depends on `SGP_ENFORCE`:
+
+| `SGP_ENFORCE` | NOT APPROVED rows | Unknown vendors | Missing seller domain | SGP transport error |
+|---|---|---|---|---|
+| `false` (annotate only) | kept + annotated | kept + annotated | kept (no annotation) | logged, no annotations |
+| `true` (filter) | **filtered out** | governed by `SGP_UNKNOWN_VENDOR_POLICY` | filtered out | flow halts (fails closed) |
+
+When enforcement removes any products, a tail line is appended so the action is auditable:
+
+```
+--------------------------------------------------
+Total products found: 4
+SGP enforcement filtered 2 product(s): 1 not approved, 1 unknown to SGP
+```
 
 ### Deal-request gate
 
-`RequestDealTool` checks the seller's vendor approval after fetching product details and before generating a Deal ID. The gate runs only when an `SGPClient` is wired in and `sgp_enforce=True`:
+`RequestDealTool` checks the seller's vendor approval after fetching product details and before generating a Deal ID. The gate acts as a safety net behind discovery filtering — it runs only when an `SGPClient` is wired in and `sgp_enforce=True`:
 
 ```python
 # Injected automatically by BuyerDealFlow from settings
@@ -92,7 +104,7 @@ RequestDealTool(
     client=unified_client,
     buyer_context=ctx,
     sgp_client=sgp_client,
-    sgp_enforce=settings.sgp_enforce_on_deal_request,
+    sgp_enforce=settings.sgp_enforce,
     sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
 )
 ```
@@ -112,15 +124,15 @@ A failed gate returns a blocking message and does **not** generate a Deal ID.
 
 ## Behavior matrix
 
-With enforcement on (`SGP_ENFORCE_ON_DEAL_REQUEST=true`, `SGP_API_KEY` set):
+With enforcement on (`SGP_ENFORCE=true`, `SGP_API_KEY` set), behavior is consistent across stages:
 
 | SGP response | `block` policy | `warn` policy | `allow` policy |
 |---|---|---|---|
-| `iabBuyerAgentApproval: true` | ✅ deal proceeds + banner | same | same |
-| `iabBuyerAgentApproval: false` | ❌ blocked | ❌ blocked | ❌ blocked |
-| 404 (not onboarded in SGP) | ❌ blocked | ✅ proceeds + warning banner | ✅ proceeds silently |
-| Transport error | ❌ fails closed | ❌ fails closed | ❌ fails closed |
-| Product has no seller domain field | ❌ blocked (cannot evaluate) | ❌ | ❌ |
+| `iabBuyerAgentApproval: true` | ✅ kept + approved banner | same | same |
+| `iabBuyerAgentApproval: false` | ❌ filtered at discovery; blocked at request | ❌ | ❌ |
+| 404 (not onboarded in SGP) | ❌ filtered at discovery; blocked at request | ✅ kept + warning annotation/banner | ✅ kept silently |
+| Transport error | ❌ flow halts | ❌ flow halts | ❌ flow halts |
+| Product has no seller domain field | ❌ filtered at discovery; blocked at request | ❌ | ❌ |
 
 The `iabBuyerAgentApproval: false` row is intentionally the same across all three unknown-vendor policies — an explicit non-approval is always fatal. The policies only govern the "unknown to SGP" case.
 
@@ -151,7 +163,7 @@ The class is prefixed `SGP` so future vendor-approval integrations can coexist u
 | `Deal blocked: <domain> is not in your SafeGuard Privacy portfolio` | The vendor is not onboarded in SGP. Add and approve the vendor in SGP, or switch `SGP_UNKNOWN_VENDOR_POLICY` to `warn` for soft-fail behavior. |
 | `Deal blocked: <vendor> does not carry the IAB buyer-agent approval flag` | The vendor is onboarded but not marked approved for IAB buyer-agent purchases. Toggle the approval in SGP. |
 | `Deal blocked: SafeGuard Privacy lookup failed` | SGP was unreachable or returned a transient error. Enforcement fails closed; retry once the service is reachable. |
-| Gate seems to do nothing | Either `SGP_API_KEY` is empty or `SGP_ENFORCE_ON_DEAL_REQUEST=false`. Check startup logs for the bypass warning. |
+| Gate seems to do nothing | Either `SGP_API_KEY` is empty or `SGP_ENFORCE=false`. Check startup logs for the bypass warning. |
 
 ## Related
 
