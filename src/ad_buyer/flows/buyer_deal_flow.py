@@ -22,7 +22,9 @@ from crewai.flow.flow import Flow, listen, start
 from pydantic import BaseModel, Field
 
 from ..agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
+from ..clients.sgp_client import SGPClient
 from ..clients.unified_client import UnifiedClient
+from ..config.settings import settings
 from ..models.audience_plan import AudiencePlan
 from ..time_utils import utc_now
 from ..models.buyer_identity import (
@@ -43,6 +45,7 @@ from ..pipelines.audience_planner_step import (
 )
 from ..storage.deal_store import DealStore
 from ..tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+from ..tools.research import SGPVendorApprovalTool
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +174,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         buyer_context: BuyerContext,
         store: Optional[DealStore] = None,
         brief: Optional[CampaignBrief] = None,
+        sgp_client: SGPClient | None = None,
     ):
         """Initialize the flow with client, buyer context, and optional persistence.
 
@@ -184,6 +188,8 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
                 ``AudiencePlan`` is threaded onto seller-bound calls
                 (proposal §5.3 / bead ar-ts30 §18). When None, the flow
                 stays audience-blind for backward compatibility.
+            sgp_client: Optional IAB Diligence Platform client. When omitted,
+                one is built from settings if ``SGP_API_KEY`` is set.
         """
         super().__init__()
         self._client = client
@@ -198,10 +204,27 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         # CampaignPipeline.get_audience_planner_result on Path A).
         self._audience_planner_result: Optional[AudiencePlannerResult] = None
 
+        if sgp_client is None and settings.sgp_api_key:
+            sgp_client = SGPClient(
+                api_key=settings.sgp_api_key,
+                base_url=settings.sgp_base_url,
+                cache_ttl_seconds=settings.sgp_cache_ttl_seconds,
+            )
+        if sgp_client is None and settings.sgp_enforce:
+            logger.warning(
+                "SGP_ENFORCE is true but SGP_API_KEY is empty; "
+                "the IAB Diligence Platform approval gate will be bypassed. "
+                "Set SGP_API_KEY to enable vendor approval enforcement."
+            )
+        self._sgp_client = sgp_client
+
         # Create tools
         self._discover_tool = DiscoverInventoryTool(
             client=client,
             buyer_context=buyer_context,
+            sgp_client=sgp_client,
+            sgp_enforce=settings.sgp_enforce,
+            sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
         )
         self._pricing_tool = GetPricingTool(
             client=client,
@@ -210,6 +233,13 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         self._deal_tool = RequestDealTool(
             client=client,
             buyer_context=buyer_context,
+            sgp_client=sgp_client,
+            sgp_enforce=settings.sgp_enforce,
+            sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
+        )
+        # Agent-callable vendor approval tool — only useful with an SGP client.
+        self._vendor_approval_tool: SGPVendorApprovalTool | None = (
+            SGPVendorApprovalTool(client=sgp_client) if sgp_client is not None else None
         )
 
     # ------------------------------------------------------------------
@@ -399,10 +429,14 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         try:
             self.state.status = BuyerDealFlowStatus.EVALUATING_PRICING
 
-            # Create crew for intelligent selection
-            deal_agent = create_buyer_deal_specialist_agent(
-                tools=[self._discover_tool, self._pricing_tool],
-            )
+            # Create crew for intelligent selection. Include the vendor
+            # approval tool so the agent can check IAB buyer-agent approval
+            # status for candidate sellers during selection, not just at
+            # Deal ID generation.
+            agent_tools: list[Any] = [self._discover_tool, self._pricing_tool]
+            if self._vendor_approval_tool is not None:
+                agent_tools.append(self._vendor_approval_tool)
+            deal_agent = create_buyer_deal_specialist_agent(tools=agent_tools)
 
             selection_task = Task(
                 description=f"""Analyze the discovery results and select the best product

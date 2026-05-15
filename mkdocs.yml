@@ -104,6 +104,7 @@ nav:
   - Integration:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
+      - IAB Diligence Platform Approval: integration/iab-diligence-platform.md
   - AI Assistant Setup:
       - Claude (Desktop & Web): claude-desktop-setup.md
       - ChatGPT, Codex & AI IDEs: multi-client-setup.md

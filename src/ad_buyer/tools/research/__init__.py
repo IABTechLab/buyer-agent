@@ -5,5 +5,6 @@
 
 from .avails_check import AvailsCheckTool
 from .product_search import ProductSearchTool
+from .sgp_vendor_approval import SGPVendorApprovalTool
 
-__all__ = ["ProductSearchTool", "AvailsCheckTool"]
+__all__ = ["ProductSearchTool", "AvailsCheckTool", "SGPVendorApprovalTool"]
