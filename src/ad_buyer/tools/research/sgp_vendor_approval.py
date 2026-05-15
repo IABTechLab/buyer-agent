@@ -1,7 +1,7 @@
 # Author: SafeGuard Privacy
 # Donated to IAB Tech Lab
 
-"""CrewAI tool: check IAB buyer-agent approval via SafeGuard Privacy.
+"""CrewAI tool: check IAB buyer-agent approval via the IAB Diligence Platform.
 
 The class is intentionally prefixed ``SGP`` so that future vendor-approval
 integrations (e.g. OneTrust, an IAB Tech Lab registry) can coexist under
@@ -20,7 +20,7 @@ from ...clients.sgp_client import SGPClient, SGPClientError
 
 
 class SGPVendorApprovalInput(BaseModel):
-    """Input schema for the SafeGuard Privacy vendor approval check tool."""
+    """Input schema for the IAB Diligence Platform vendor approval check tool."""
 
     domains: list[str] = Field(
         ...,
@@ -35,7 +35,7 @@ class SGPVendorApprovalInput(BaseModel):
 class SGPVendorApprovalTool(BaseTool):
     """Check whether seller vendors carry the IAB buyer-agent approval flag.
 
-    Consults the SafeGuard Privacy `iab/buyer-agent-approval` endpoint,
+    Consults the IAB Diligence Platform `iab/buyer-agent-approval` endpoint,
     which returns the ``iabBuyerAgentApproval`` boolean per vendor on the
     buyer's SGP tenant. Vendors absent from the tenant come back as
     ``UNKNOWN``.
@@ -43,8 +43,8 @@ class SGPVendorApprovalTool(BaseTool):
 
     name: str = "check_sgp_vendor_approval"
     description: str = (
-        "Check IAB buyer-agent approval for seller domains via SafeGuard "
-        "Privacy. Returns APPROVED / NOT APPROVED / UNKNOWN per domain, "
+        "Check IAB buyer-agent approval for seller domains via the IAB "
+        "Diligence Platform. Returns APPROVED / NOT APPROVED / UNKNOWN per domain, "
         "along with the approval date when available. Use before "
         "requesting a Deal ID from a seller."
     )
@@ -62,13 +62,13 @@ class SGPVendorApprovalTool(BaseTool):
         try:
             results = await self._client.check_approvals(domains)
         except SGPClientError as exc:
-            return f"SafeGuard Privacy lookup failed: {exc}"
+            return f"IAB Diligence Platform lookup failed: {exc}"
 
         if not results:
             return "No valid domains were provided."
 
         lines = [
-            "SafeGuard Privacy — IAB Buyer-Agent Approval",
+            "IAB Diligence Platform Approval",
             "-" * 50,
         ]
         for domain in sorted(results):

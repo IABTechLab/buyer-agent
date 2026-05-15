@@ -157,7 +157,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             buyer_context: BuyerContext with identity for tiered access
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
-            sgp_client: Optional SafeGuard Privacy client. When omitted,
+            sgp_client: Optional IAB Diligence Platform client. When omitted,
                 one is built from settings if ``SGP_API_KEY`` is set.
         """
         super().__init__()
@@ -175,7 +175,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         if sgp_client is None and settings.sgp_enforce:
             logger.warning(
                 "SGP_ENFORCE is true but SGP_API_KEY is empty; "
-                "the SafeGuard Privacy approval gate will be bypassed. "
+                "the IAB Diligence Platform approval gate will be bypassed. "
                 "Set SGP_API_KEY to enable vendor approval enforcement."
             )
         self._sgp_client = sgp_client

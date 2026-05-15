@@ -110,7 +110,7 @@ Returns:
         Args:
             client: UnifiedClient for seller communication
             buyer_context: BuyerContext with identity for tiered access
-            sgp_client: Optional SafeGuard Privacy client. When provided
+            sgp_client: Optional IAB Diligence Platform client. When provided
                 and ``sgp_enforce`` is True, the seller's IAB buyer-agent
                 approval is verified before a Deal ID is generated.
             sgp_enforce: When True, block the deal request unless SGP
@@ -189,7 +189,7 @@ Returns:
             if not product:
                 return f"Product {product_id} not found."
 
-            # SafeGuard Privacy approval gate — must pass before a Deal ID is issued.
+            # IAB Diligence Platform approval gate — must pass before a Deal ID is issued.
             gate_error, approval_banner = await self._check_sgp_approval(product)
             if gate_error:
                 return gate_error
@@ -215,7 +215,7 @@ Returns:
     async def _check_sgp_approval(
         self, product: dict
     ) -> tuple[str | None, str | None]:
-        """Gate a deal request against SafeGuard Privacy approval.
+        """Gate a deal request against IAB Diligence Platform approval.
 
         Returns ``(error_message, banner)``:
           * ``error_message`` is non-None when the deal must be refused.
@@ -231,9 +231,9 @@ Returns:
         raw_domain = extract_product_domain(product)
         if not raw_domain:
             return (
-                "Deal blocked: cannot determine seller domain for SafeGuard "
-                "Privacy approval check. Add a seller_url / publisher_domain "
-                "field to the product, or disable SGP_ENFORCE.",
+                "Deal blocked: cannot determine seller domain for IAB "
+                "Diligence Platform approval check. Add a seller_url / "
+                "publisher_domain field to the product, or disable SGP_ENFORCE.",
                 None,
             )
 
@@ -243,13 +243,13 @@ Returns:
             approvals = await self._sgp_client.check_approvals([raw_domain])
         except SGPClientError as exc:
             logger.warning(
-                "SafeGuard Privacy lookup failed for %s during deal request", domain,
+                "IAB Diligence Platform lookup failed for %s during deal request", domain,
                 exc_info=True,
             )
             # Fail closed — enforcement is on, so we must not issue a Deal ID
             # when the privacy gate cannot be evaluated.
             return (
-                f"Deal blocked: SafeGuard Privacy lookup failed for {domain} "
+                f"Deal blocked: IAB Diligence Platform lookup failed for {domain} "
                 f"({exc}). Retry once the SGP service is reachable.",
                 None,
             )
@@ -262,11 +262,11 @@ Returns:
             if self._sgp_unknown_policy == "warn":
                 return None, (
                     f"SGP WARNING: {domain} is not in your SGP portfolio. "
-                    f"Onboard and approve this vendor in SafeGuard Privacy "
+                    f"Onboard and approve this vendor in IAB Diligence Platform "
                     f"to suppress this warning."
                 )
             return (
-                f"Deal blocked: {domain} is not in your SafeGuard Privacy "
+                f"Deal blocked: {domain} is not in your IAB Diligence Platform "
                 f"portfolio. Onboard and approve the vendor in SGP before "
                 f"requesting a Deal ID.",
                 None,
@@ -275,7 +275,7 @@ Returns:
         if not record.iab_buyer_agent_approval:
             return (
                 f"Deal blocked: {record.company_name or domain} does not carry "
-                f"the IAB buyer-agent approval flag in SafeGuard Privacy. "
+                f"the IAB buyer-agent approval flag in IAB Diligence Platform. "
                 f"Update the vendor's approval in SGP and retry.",
                 None,
             )

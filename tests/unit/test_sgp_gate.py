@@ -1,7 +1,7 @@
 # Author: SafeGuard Privacy
 # Donated to IAB Tech Lab
 
-"""Tests for the SafeGuard Privacy deal-request gate in RequestDealTool."""
+"""Tests for the IAB Diligence Platform deal-request gate in RequestDealTool."""
 
 from __future__ import annotations
 
@@ -172,7 +172,7 @@ async def test_unknown_vendor_blocks_by_default(mock_client, agency_context):
     )
     result = await tool._arun(product_id="prod_1", impressions=100)
     assert "Deal blocked" in result
-    assert "not in your SafeGuard Privacy" in result
+    assert "not in your IAB Diligence Platform" in result
     assert "DEAL CREATED SUCCESSFULLY" not in result
 
 
@@ -228,7 +228,7 @@ async def test_transport_error_fails_closed_when_enforcing(mock_client, agency_c
     )
     result = await tool._arun(product_id="prod_1", impressions=100)
     assert "Deal blocked" in result
-    assert "SafeGuard Privacy lookup failed" in result
+    assert "IAB Diligence Platform lookup failed" in result
     assert "DEAL CREATED SUCCESSFULLY" not in result
 
 

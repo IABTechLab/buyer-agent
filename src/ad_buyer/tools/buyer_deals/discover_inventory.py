@@ -99,7 +99,7 @@ Returns:
         Args:
             client: UnifiedClient for seller communication
             buyer_context: BuyerContext with identity for tiered access
-            sgp_client: Optional SafeGuard Privacy client. When provided,
+            sgp_client: Optional IAB Diligence Platform client. When provided,
                 each returned product is annotated with the seller's
                 IAB buyer-agent approval status.
             sgp_enforce: When True and ``sgp_client`` is provided, NOT
@@ -190,7 +190,7 @@ Returns:
             # transport errors otherwise. Halts the flow via the caller's
             # broad except clause.
             raise SGPClientError(
-                f"Inventory discovery halted: SafeGuard Privacy unreachable "
+                f"Inventory discovery halted: IAB Diligence Platform unreachable "
                 f"while SGP_ENFORCE=true ({e})."
             ) from e
         except (OSError, ValueError, RuntimeError) as e:

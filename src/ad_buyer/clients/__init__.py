@@ -32,7 +32,7 @@ __all__ = [
     # IAB Deals API v1.0 client (quote-then-book flow)
     "DealsClient",
     "DealsClientError",
-    # SafeGuard Privacy (SGP) approval gate
+    # IAB Diligence Platform (SGP) approval gate
     "SGPClient",
     "SGPClientError",
     "SGPAuthError",

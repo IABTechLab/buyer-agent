@@ -175,9 +175,9 @@ CORS_ALLOWED_ORIGINS=https://dashboard.example.com,https://app.example.com
 
 ---
 
-### SafeGuard Privacy (IAB Buyer-Agent Approval)
+### IAB Diligence Platform Approval
 
-Optional integration that gates deal requests against the buyer's [SafeGuard Privacy](https://safeguardprivacy.com) vendor portfolio. Inert when `SGP_API_KEY` is empty.
+Optional integration that gates deal requests against the buyer's [IAB Diligence Platform](https://safeguardprivacy.com/iab-diligence-platform/) vendor portfolio. Inert when `SGP_API_KEY` is empty.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -187,7 +187,7 @@ Optional integration that gates deal requests against the buyer's [SafeGuard Pri
 | `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `block` | Behavior when the vendor is not in the buyer's SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime for approval lookups. |
 
-See the [IAB Buyer-Agent Approval](../integration/safeguard-privacy.md) integration guide for endpoint contract, behavior matrix, and troubleshooting.
+See the [IAB Diligence Platform Approval](../integration/iab-diligence-platform.md) integration guide for endpoint contract, behavior matrix, and troubleshooting.
 
 ---
 

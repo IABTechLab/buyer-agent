@@ -1,9 +1,9 @@
 # Author: SafeGuard Privacy
 # Donated to IAB Tech Lab
 
-"""SafeGuard Privacy (SGP) platform client.
+"""IAB Diligence Platform (SGP) platform client.
 
-Async HTTP client for the SafeGuard Privacy integration API. Currently
+Async HTTP client for the IAB Diligence Platform integration API. Currently
 exposes a single capability: checking whether a vendor has the IAB
 buyer-agent approval flag set on the buyer's SGP tenant.
 
@@ -70,7 +70,7 @@ class SGPAuthError(SGPClientError):
 
 
 class SGPClient:
-    """Async client for SafeGuard Privacy buyer-agent approval checks.
+    """Async client for IAB Diligence Platform buyer-agent approval checks.
 
     Normalizes domains (strips scheme, www, port, lowercases), dedupes,
     chunks into groups of 10, and caches per-domain results for
@@ -188,7 +188,7 @@ class SGPClient:
             # as SGPClientError so callers catch it on a single type and
             # the deal-request gate can fail closed.
             raise SGPClientError(
-                f"SafeGuard Privacy request failed: {exc.__class__.__name__}: {exc}"
+                f"IAB Diligence Platform request failed: {exc.__class__.__name__}: {exc}"
             ) from exc
 
         if resp.status_code == 404:
@@ -197,25 +197,26 @@ class SGPClient:
 
         if resp.status_code == 401:
             raise SGPAuthError(
-                "SafeGuard Privacy rejected the api-key (missing or lacks iab:buyerAgent scope)",
+                "IAB Diligence Platform rejected the api-key "
+                "(missing or lacks iab:buyerAgent scope)",
                 status_code=401,
             )
 
         if resp.status_code == 400:
             raise SGPClientError(
-                f"SafeGuard Privacy rejected the request as malformed: {resp.text}",
+                f"IAB Diligence Platform rejected the request as malformed: {resp.text}",
                 status_code=400,
             )
 
         if resp.status_code in _RETRYABLE_STATUS_CODES or resp.status_code >= 500:
             raise SGPClientError(
-                f"SafeGuard Privacy returned {resp.status_code}: {resp.text}",
+                f"IAB Diligence Platform returned {resp.status_code}: {resp.text}",
                 status_code=resp.status_code,
             )
 
         if resp.status_code != 200:
             raise SGPClientError(
-                f"Unexpected SafeGuard Privacy response {resp.status_code}: {resp.text}",
+                f"Unexpected IAB Diligence Platform response {resp.status_code}: {resp.text}",
                 status_code=resp.status_code,
             )
 

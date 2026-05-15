@@ -1,7 +1,7 @@
 # Author: SafeGuard Privacy
 # Donated to IAB Tech Lab
 
-"""Tests for the SafeGuard Privacy (SGP) client.
+"""Tests for the IAB Diligence Platform (SGP) client.
 
 Covers domain normalization, batch chunking to 10, HTTP status handling
 (200 / 400 / 401 / 404 / 5xx), response parsing, TTL cache, and the

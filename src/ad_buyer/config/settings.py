@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     opendirect_token: str | None = None
     opendirect_api_key: str | None = None
 
-    # SafeGuard Privacy — vendor approval gate.
+    # IAB Diligence Platform — vendor approval gate.
     # The integration is inert when ``sgp_api_key`` is empty; enforcement
     # only activates once an SGP API key is supplied AND ``sgp_enforce``
     # is true. When enforcing, NOT APPROVED vendors are filtered out at
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # https://api.safeguardprivacy-demo.com
     sgp_base_url: str = "https://api.safeguardprivacy.com"
     sgp_enforce: bool = False
-    # Behavior when SafeGuard Privacy returns 404 for a seller domain (vendor
+    # Behavior when IAB Diligence Platform returns 404 for a seller domain (vendor
     # not in the buyer's SGP portfolio). One of: "block", "warn", "allow".
     sgp_unknown_vendor_policy: str = "block"
     sgp_cache_ttl_seconds: int = 900

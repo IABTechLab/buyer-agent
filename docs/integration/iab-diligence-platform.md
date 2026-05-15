@@ -1,27 +1,26 @@
-# IAB Buyer-Agent Approval (via SafeGuard Privacy)
+# IAB Diligence Platform
 
-The buyer agent can verify, before issuing a Deal ID, that the buyer has explicitly approved a seller's vendor record for IAB buyer-agent purchases. Approvals are stored in the buyer's [SafeGuard Privacy](https://safeguardprivacy.com) tenant; the buyer agent consults them through SGP's integration API.
+The buyer agent can verify, before issuing a Deal ID, that the buyer has explicitly approved a seller's vendor record for IAB buyer-agent purchases. Approvals are stored in the buyer's [IAB Diligence Platform](https://safeguardprivacy.com/iab-diligence-platform/) tenant; the buyer agent consults them through SGP's integration API.
 
 This integration is **optional and off by default**. When `SGP_API_KEY` is empty the feature is fully inert — the buyer agent behaves exactly as it did before this page existed. Once configured, it acts as a privacy rail in front of the existing deal workflow.
 
 ## Who should enable this
 
-SafeGuard Privacy customers who treat vendor onboarding and approval as a compliance prerequisite for programmatic buying. If your team already maintains a vendor inventory in SGP with IAB buyer-agent approval flags, this integration enforces that workflow inside the buyer agent itself.
+IAB Diligence Platform customers who treat vendor onboarding and approval as a compliance prerequisite for programmatic buying. If your team already maintains a vendor inventory in SGP with IAB buyer-agent approval flags, this integration enforces that workflow inside the buyer agent itself.
 
 ## Endpoint contract
 
-The client calls a single endpoint on the SafeGuard Privacy platform:
+The client calls a single endpoint on the IAB Diligence Platform (SafeGuard Privacy API):
 
 ```
 GET /api/v1/integrations/iab/buyer-agent-approval?domain=a.com,b.com
 ```
 
-| Property | Value |
-|----------|-------|
-| Auth | `api-key` header |
-| Scope | `iab:buyerAgent` |
-| Batch size | Up to 10 domains per request |
-| Tenant scope | Results are scoped to the caller's SGP `companyId` |
+| Property     | Value                                                   |
+|--------------|---------------------------------------------------------|
+| Auth         | `api-key` header                                        |
+| Domain       | `domain` query parameter - Up to 10 domains per request |
+| Tenant scope | Results are scoped to the caller's SGP tenant           |
 
 The response contains one `IabBuyerAgentResource` per matched vendor:
 
@@ -52,20 +51,20 @@ Three response states matter to the buyer agent:
 
 ## Configuration
 
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `SGP_API_KEY` | `str` | `""` | API key with the `iab:buyerAgent` scope. Empty = integration disabled. |
-| `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | Production endpoint. The staging environment is `https://api.safeguardprivacy-demo.com`. |
-| `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery, the deal-request gate blocks Deal ID generation, and SGP transport errors halt the flow. |
+| Variable | Type | Default | Description                                                                                                                                                          |
+|----------|------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `SGP_API_KEY` | `str` | `""` | API key from the SGP api. Empty = integration disabled.                                                                                                              |
+| `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | Production endpoint. The staging environment is `https://api.safeguardprivacy-demo.com`.                                                                             |
+| `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery, the deal-request gate blocks Deal ID generation, and SGP transport errors halt the flow.            |
 | `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. Applies at both discovery and deal-request stages when enforcement is on. |
-| `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime. Discovery→pricing→booking reuse a single SGP call within the TTL. |
+| `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime. Discovery→pricing→booking reuse a single SGP call within the TTL.                                                                         |
 
 !!! warning "Enforcement without a key is a no-op"
     If `SGP_ENFORCE=true` but `SGP_API_KEY` is empty, the gate cannot be evaluated and is silently bypassed. The buyer agent logs a warning at flow construction time so this misconfiguration is visible.
 
 ## Where the gate runs
 
-The integration plugs into two existing buyer-agent tools. Behavior at each stage is governed by the same `SGP_ENFORCE` flag — there's no separate "enforce on discovery" switch.
+The integration plugs into two existing buyer-agent tools. Behavior at each stage is governed by the same `SGP_ENFORCE` flag.
 
 ### Inventory discovery
 
@@ -157,13 +156,13 @@ The class is prefixed `SGP` so future vendor-approval integrations can coexist u
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
-|---------|-------------|
-| `SafeGuard Privacy rejected the api-key` (401) | The key is missing, revoked, or lacks the `iab:buyerAgent` scope. Issue a new key in SGP with that scope. |
-| `Deal blocked: <domain> is not in your SafeGuard Privacy portfolio` | The vendor is not onboarded in SGP. Add and approve the vendor in SGP, or switch `SGP_UNKNOWN_VENDOR_POLICY` to `warn` for soft-fail behavior. |
-| `Deal blocked: <vendor> does not carry the IAB buyer-agent approval flag` | The vendor is onboarded but not marked approved for IAB buyer-agent purchases. Toggle the approval in SGP. |
-| `Deal blocked: SafeGuard Privacy lookup failed` | SGP was unreachable or returned a transient error. Enforcement fails closed; retry once the service is reachable. |
-| Gate seems to do nothing | Either `SGP_API_KEY` is empty or `SGP_ENFORCE=false`. Check startup logs for the bypass warning. |
+| Symptom | Likely cause                                                                                                                                   |
+|---------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `IAB Diligence Platform rejected the api-key` (401) | The key is missing, revoked, or lacks the proper scope. Request a new key from SGP.                                                            |
+| `Deal blocked: <domain> is not in your IAB Diligence Platform portfolio` | The vendor is not onboarded in SGP. Add and approve the vendor in SGP, or switch `SGP_UNKNOWN_VENDOR_POLICY` to `warn` for soft-fail behavior. |
+| `Deal blocked: <vendor> does not carry the IAB buyer-agent approval flag` | The vendor is onboarded but not marked approved for IAB buyer-agent purchases. Toggle the approval in SGP.                                     |
+| `Deal blocked: IAB Diligence Platform lookup failed` | SGP was unreachable or returned a transient error. Enforcement fails closed; retry once the service is reachable.                              |
+| Gate seems to do nothing | Either `SGP_API_KEY` is empty or `SGP_ENFORCE=false`. Check startup logs for the bypass warning.                                               |
 
 ## Related
 
