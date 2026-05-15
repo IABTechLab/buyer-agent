@@ -7,6 +7,7 @@ import json
 import logging
 import sqlite3
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Optional
 
@@ -14,11 +15,13 @@ from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import sys
 
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
+from ...time_utils import utc_now
 from ...flows.deal_booking_flow import DealBookingFlow
 from ...models.flow_state import BookingState
 from ...storage import DealStore
@@ -53,16 +56,37 @@ app = FastAPI(
     ],
 )
 
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.get_cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=False,
+    expose_headers=["*"],
 )
 
-# Mount MCP SSE server
-from ..mcp_server import mount_mcp
+# Mount MCP server (Streamable HTTP at /mcp)
+# Starlette doesn't call mounted sub-app lifespans, so we must run the
+# session manager ourselves to keep its task group alive.
+from ..mcp_server import mcp as _mcp_server, mount_mcp
 mount_mcp(app)
+
+
+@asynccontextmanager
+async def lifespan(application):
+    store = _get_order_store()
+    if store is not None:
+        application.include_router(_create_order_router(store))
+    else:
+        logger.warning("OrderStore unavailable at startup; order endpoints not mounted")
+
+    async with _mcp_server.session_manager.run():
+        yield
+
+
+app.router.lifespan_context = lifespan
 
 # Mount order status/audit router (buyer-nz9)
 from .order_endpoints import create_order_router
@@ -183,16 +207,6 @@ def _get_order_store() -> Optional[OrderStore]:
 
 # Mount buyer order status/audit endpoints
 from .order_endpoints import create_order_router as _create_order_router
-
-
-@app.on_event("startup")
-async def _mount_order_router() -> None:
-    """Mount order router once the OrderStore is available at startup."""
-    store = _get_order_store()
-    if store is not None:
-        app.include_router(_create_order_router(store))
-    else:
-        logger.warning("OrderStore unavailable at startup; order endpoints not mounted")
 
 
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
@@ -317,7 +331,7 @@ async def create_booking(
     Use GET /bookings/{job_id} to check status.
     """
     job_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = utc_now().isoformat()
 
     jobs[job_id] = {
         "status": "pending",
@@ -399,7 +413,7 @@ async def approve_recommendations(
     # Update job
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-    job["updated_at"] = datetime.utcnow().isoformat()
+    job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
     # Dual-write to SQLite
@@ -437,7 +451,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-    job["updated_at"] = datetime.utcnow().isoformat()
+    job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
     # Dual-write to SQLite
@@ -540,12 +554,16 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
     try:
         job["status"] = "running"
         job["progress"] = 0.1
-        job["updated_at"] = datetime.utcnow().isoformat()
+        job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 
         client = _create_client()
-        flow = DealBookingFlow(client, store=_get_store())
-        flow.state = BookingState(campaign_brief=request.brief.model_dump())
+        # Pass initial state via constructor — CrewAI 1.10.1 removed flow.state setter.
+        flow = DealBookingFlow(
+            client,
+            store=_get_store(),
+            campaign_brief=request.brief.model_dump(),
+        )
 
         # Store flow reference for approval
         job["_flow"] = flow
@@ -569,13 +587,13 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
             job["status"] = "awaiting_approval"
 
         job["progress"] = 1.0 if job["status"] == "completed" else 0.9
-        job["updated_at"] = datetime.utcnow().isoformat()
+        job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 
     except Exception as e:  # noqa: BLE001 - top-level background task handler; must record any failure
         job["status"] = "failed"
         job["errors"].append(str(e))
-        job["updated_at"] = datetime.utcnow().isoformat()
+        job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 
 

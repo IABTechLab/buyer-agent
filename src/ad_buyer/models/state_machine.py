@@ -30,6 +30,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..time_utils import utc_now
+
 # ---------------------------------------------------------------------------
 # Buyer Deal Status
 # ---------------------------------------------------------------------------
@@ -155,7 +157,7 @@ class StateTransition(BaseModel):
     transition_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     from_status: str
     to_status: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     actor: str = "system"  # "system", "human:<user_id>", "agent:<agent_id>"
     reason: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)

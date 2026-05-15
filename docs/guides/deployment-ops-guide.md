@@ -9,10 +9,10 @@ This guide covers everything needed to run the buyer agent in any environment �
 1. [Local Development Setup](#local-development-setup)
 2. [Docker Deployment](#docker-deployment)
 3. [AWS Deployment](#aws-deployment)
-4. [Environment Variables & Configuration](#environment-variables--configuration)
-5. [Health Checks & Monitoring](#health-checks--monitoring)
-6. [MCP Server Setup & Connectivity](#mcp-server-setup--connectivity)
-7. [Backup & Recovery](#backup--recovery)
+4. [Environment Variables and Configuration](#environment-variables-and-configuration)
+5. [Health Checks and Monitoring](#health-checks-and-monitoring)
+6. [MCP Server Setup and Connectivity](#mcp-server-setup-and-connectivity)
+7. [Backup and Recovery](#backup-and-recovery)
 8. [Troubleshooting](#troubleshooting)
 
 ---
@@ -86,7 +86,7 @@ ENVIRONMENT=development
 LOG_LEVEL=INFO
 ```
 
-See the [Configuration Reference](#environment-variables--configuration) below for the full variable list.
+See the [Configuration Reference](#environment-variables-and-configuration) below for the full variable list.
 
 ### Run the Development Server
 
@@ -410,7 +410,7 @@ terraform apply -var="container_image_tag=v1.2.0"
 
 ---
 
-## Environment Variables & Configuration
+## Environment Variables and Configuration
 
 All settings are loaded from environment variables or a `.env` file via `pydantic-settings`. Shell environment variables take precedence over `.env` values.
 
@@ -532,7 +532,7 @@ To add additional secrets (seller API keys, service credentials):
 
 ---
 
-## Health Checks & Monitoring
+## Health Checks and Monitoring
 
 ### Health Endpoint
 
@@ -643,17 +643,19 @@ Pacing alert levels:
 
 ---
 
-## MCP Server Setup & Connectivity
+## MCP Server Setup and Connectivity
 
 ### Overview
 
 The buyer agent exposes its own MCP server for external clients (Claude Desktop, Cursor, Windsurf, custom agents). The MCP server is mounted automatically on the FastAPI app at startup and exposes buyer operations as structured tools.
 
-MCP endpoint:
+MCP endpoint (Streamable HTTP, canonical):
 
 ```
-http://localhost:8001/mcp/sse
+http://localhost:8001/mcp
 ```
+
+Legacy SSE fallback (for older MCP clients): `http://localhost:8001/mcp-sse/sse`
 
 Available tool categories:
 
@@ -673,7 +675,7 @@ Add the buyer agent to your Claude Desktop MCP configuration (`~/Library/Applica
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8001/mcp/sse"
+        "http://localhost:8001/mcp"
       ]
     }
   }
@@ -684,13 +686,13 @@ Restart Claude Desktop after editing the configuration. The buyer agent tools wi
 
 ### Connecting Other MCP Clients
 
-Any client supporting Streamable HTTP (SSE) transport can connect:
+Any client supporting Streamable HTTP transport can connect:
 
 ```python
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-async with streamablehttp_client("http://localhost:8001/mcp/sse") as (read, write, _):
+async with streamablehttp_client("http://localhost:8001/mcp") as (read, write, _):
     async with ClientSession(read, write) as session:
         await session.initialize()
         tools = await session.list_tools()
@@ -705,7 +707,7 @@ The buyer agent acts as an **MCP client** to seller agents (in addition to expos
 SELLER_ENDPOINTS=http://seller1.example.com:8000,http://seller2.example.com:8000
 ```
 
-The buyer's `UnifiedClient` connects to the seller's MCP SSE endpoint at `{base_url}/mcp/sse`. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.
+The buyer's `UnifiedClient` connects to the seller's MCP SSE endpoint at `{base_url}/mcp-sse/sse`. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.
 
 **Test seller MCP connectivity manually:**
 
@@ -733,7 +735,7 @@ If connecting to an external seller:
 
 ---
 
-## Backup & Recovery
+## Backup and Recovery
 
 ### What Needs to Be Backed Up
 
@@ -971,7 +973,7 @@ SELLER_ENDPOINTS=http://host.docker.internal:8000
 Test the seller's MCP endpoint directly:
 
 ```bash
-curl -N http://seller.example.com:8000/mcp/sse  # Should stream SSE events
+curl -N http://seller.example.com:8000/mcp-sse/sse  # Should stream SSE events
 ```
 
 ---
@@ -1019,7 +1021,7 @@ If not installed, install it: `pip install mcp`
 
 ```bash
 # The SSE endpoint should keep the connection open
-curl -N -H "Accept: text/event-stream" http://seller.example.com:8000/mcp/sse
+curl -N -H "Accept: text/event-stream" http://seller.example.com:8000/mcp-sse/sse
 ```
 
 **Check 3 — Firewall / security groups:**

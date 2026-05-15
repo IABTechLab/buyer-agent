@@ -85,6 +85,13 @@ mcp = FastMCP(
         "Use the available tools to check system status, review configuration, "
         "and manage buyer workflows."
     ),
+    # streamable_http_path="/" so that when mounted at /mcp in FastAPI the
+    # endpoint resolves to /mcp (not /mcp/mcp which is the default).
+    streamable_http_path="/",
+    # host="0.0.0.0" disables the auto DNS-rebinding protection that FastMCP
+    # applies when host is 127.0.0.1/localhost. That protection blocks requests
+    # from Cloud Run (Host header is the public *.run.app domain) with 421.
+    host="0.0.0.0",
 )
 
 
@@ -2875,13 +2882,15 @@ async def help_prompt() -> list[Message]:
 
 
 def mount_mcp(app: FastAPI) -> None:
-    """Mount the MCP SSE server onto a FastAPI application.
+    """Mount the MCP server onto a FastAPI application.
 
-    Creates an SSE endpoint at /mcp/sse that MCP clients can connect to.
+    Mounts both transports:
+    - Streamable HTTP at /mcp (current MCP standard, protocol 2025-06-18)
+    - Legacy SSE at /mcp-sse (deprecated, kept for backwards compat with older clients)
 
     Args:
         app: The FastAPI application to mount onto.
     """
-    sse_app = mcp.sse_app()
-    app.mount("/mcp/sse", sse_app)
-    logger.info("MCP SSE server mounted at /mcp/sse")
+    app.mount("/mcp", mcp.streamable_http_app())
+    app.mount("/mcp-sse", mcp.sse_app())
+    logger.info("MCP server mounted: Streamable HTTP at /mcp, legacy SSE at /mcp-sse/sse")

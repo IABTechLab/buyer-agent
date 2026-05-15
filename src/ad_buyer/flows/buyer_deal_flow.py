@@ -1,7 +1,15 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Buyer Deal Flow - workflow for obtaining Deal IDs for programmatic activation."""
+"""Buyer Deal Flow - workflow for obtaining Deal IDs for programmatic activation.
+
+Path B of the Audience Planner wiring (proposal §5.3 / bead ar-ts30 §18):
+this flow is the brief-driven counterpart to ``CampaignPipeline``. When a
+``CampaignBrief`` is supplied to the flow, the Audience Planner runs at
+``receive_request`` and the resulting ``AudiencePlan`` is threaded onto the
+seller-bound ``DealRequest`` / ``RequestDealTool`` payload so the seller can
+match each ref against package capabilities (proposal §5.1).
+"""
 
 import logging
 import sqlite3
@@ -17,6 +25,8 @@ from ..agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specia
 from ..clients.sgp_client import SGPClient
 from ..clients.unified_client import UnifiedClient
 from ..config.settings import settings
+from ..models.audience_plan import AudiencePlan
+from ..time_utils import utc_now
 from ..models.buyer_identity import (
     AccessTier,
     BuyerContext,
@@ -25,9 +35,14 @@ from ..models.buyer_identity import (
     DealResponse,
     DealType,
 )
+from ..models.campaign_brief import CampaignBrief
 from ..events.helpers import emit_event_sync
 from ..events.models import EventType
 from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
+from ..pipelines.audience_planner_step import (
+    AudiencePlannerResult,
+    run_audience_planner_step,
+)
 from ..storage.deal_store import DealStore
 from ..tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 from ..tools.research import SGPVendorApprovalTool
@@ -115,6 +130,16 @@ class BuyerDealFlowState(BaseModel):
         description="Created deal information",
     )
 
+    # Audience plan threaded through the flow. Populated either from an
+    # explicit caller-provided plan (preserves source=`explicit`) or by the
+    # Audience Planner running at receive_request when a CampaignBrief was
+    # supplied. None on legacy paths so behavior is unchanged when the
+    # caller did not opt into audience targeting (proposal §5.3 / §18).
+    audience_plan: Optional[AudiencePlan] = Field(
+        default=None,
+        description="Typed AudiencePlan threaded onto seller-bound calls",
+    )
+
     # Execution tracking
     status: BuyerDealFlowStatus = Field(
         default=BuyerDealFlowStatus.INITIALIZED,
@@ -123,8 +148,8 @@ class BuyerDealFlowState(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
     # Metadata
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
 
 class BuyerDealFlow(Flow[BuyerDealFlowState]):
@@ -148,6 +173,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         client: UnifiedClient,
         buyer_context: BuyerContext,
         store: Optional[DealStore] = None,
+        brief: Optional[CampaignBrief] = None,
         sgp_client: SGPClient | None = None,
     ):
         """Initialize the flow with client, buyer context, and optional persistence.
@@ -157,6 +183,11 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             buyer_context: BuyerContext with identity for tiered access
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
+            brief: Optional ``CampaignBrief``. When provided, the Audience
+                Planner runs at ``receive_request`` and the resulting
+                ``AudiencePlan`` is threaded onto seller-bound calls
+                (proposal §5.3 / bead ar-ts30 §18). When None, the flow
+                stays audience-blind for backward compatibility.
             sgp_client: Optional IAB Diligence Platform client. When omitted,
                 one is built from settings if ``SGP_API_KEY`` is set.
         """
@@ -165,6 +196,13 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         self._buyer_context = buyer_context
         self._store = store
         self._store_deal_id: Optional[str] = None
+        # Cached brief for audience planning. The planner runs once at
+        # receive_request; the resulting plan is held on flow state so
+        # downstream stages can reference it without re-running the loop.
+        self._brief: Optional[CampaignBrief] = brief
+        # Cached planner result for tests / observability (mirrors
+        # CampaignPipeline.get_audience_planner_result on Path A).
+        self._audience_planner_result: Optional[AudiencePlannerResult] = None
 
         if sgp_client is None and settings.sgp_api_key:
             sgp_client = SGPClient(
@@ -253,7 +291,16 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
 
     @start()
     def receive_request(self) -> dict[str, Any]:
-        """Entry point: validate and parse deal request."""
+        """Entry point: validate, parse deal request, and plan audience.
+
+        When a ``CampaignBrief`` was passed at construction, this stage
+        also runs the Audience Planner step (proposal §5.3 / bead
+        ar-ts30 §18) so the resulting ``AudiencePlan`` is available to
+        every subsequent stage. Callers may instead seed
+        ``state.audience_plan`` directly (e.g. when threading a plan
+        from a parent pipeline that already ran the planner); in that
+        case we preserve the plan verbatim and skip the planner run.
+        """
         request = self.state.request
 
         if not request:
@@ -261,11 +308,38 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
             self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "errors": self.state.errors}
 
+        # Audience planning: run BEFORE any seller-bound call so the plan
+        # rides on the deal request. Preserve a caller-supplied plan
+        # verbatim; otherwise call run_audience_planner_step on the brief
+        # if one was provided. The planner is the same one used by
+        # CampaignPipeline -- proposal §18 row dictates parity.
+        if self.state.audience_plan is None and self._brief is not None:
+            try:
+                planner_result = run_audience_planner_step(self._brief)
+                self._audience_planner_result = planner_result
+                self.state.audience_plan = planner_result.plan
+                if planner_result.plan is not None:
+                    logger.info(
+                        "buyer_deal_flow: audience plan resolved "
+                        "(audience_plan_id=%s)",
+                        planner_result.plan.audience_plan_id,
+                    )
+            except Exception as e:  # noqa: BLE001 - audience is additive; do not abort the deal flow
+                # Audience planning is additive on this path. Failure must
+                # not break the deal flow -- record the warning and keep
+                # going audience-blind so legacy callers see no regression.
+                logger.warning(
+                    "buyer_deal_flow: audience planner failed (%s); "
+                    "continuing audience-blind",
+                    e,
+                )
+                self.state.errors.append(f"Audience planner warning: {e}")
+
         # Store buyer context in state
         self.state.buyer_context = self._buyer_context.model_dump()
 
         self.state.status = BuyerDealFlowStatus.REQUEST_RECEIVED
-        self.state.updated_at = datetime.utcnow()
+        self.state.updated_at = utc_now()
 
         # Emit quote.requested event
         emit_event_sync(
@@ -322,7 +396,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
 
             # Parse discovery results (simplified - in production would parse structured data)
             # For now, store raw results and let the agent process
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = utc_now()
 
             # Emit inventory.discovered event
             emit_event_sync(
@@ -415,7 +489,7 @@ Return the product_id of the best matching product and explain why.""",
                 )
                 self.state.pricing_details = {"raw": pricing_result}
 
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = utc_now()
 
             return {
                 "status": "success",
@@ -462,18 +536,24 @@ Return the product_id of the best matching product and explain why.""",
         try:
             self.state.status = BuyerDealFlowStatus.REQUESTING_DEAL
 
+            # Forward the AudiencePlan (when present) so the seller-bound
+            # call carries the typed plan onto the wire per the §5
+            # field additions. Tests assert the plan survives the flow ->
+            # tool boundary.
+            audience_plan_payload: AudiencePlan | None = self.state.audience_plan
             deal_result = self._deal_tool._run(
                 product_id=product_id,
                 deal_type=self.state.deal_type.value,
                 impressions=self.state.impressions,
                 flight_start=self.state.flight_start,
                 flight_end=self.state.flight_end,
+                audience_plan=audience_plan_payload,
             )
 
             # Store deal response
             self.state.deal_response = {"raw": deal_result}
             self.state.status = BuyerDealFlowStatus.DEAL_CREATED
-            self.state.updated_at = datetime.utcnow()
+            self.state.updated_at = utc_now()
 
             # Persist deal creation status
             self._persist_deal_status("deal_created")
@@ -506,6 +586,7 @@ Return the product_id of the best matching product and explain why.""",
         Returns:
             Current state summary
         """
+        plan = self.state.audience_plan
         return {
             "status": self.state.status.value,
             "request": self.state.request,
@@ -519,7 +600,23 @@ Return the product_id of the best matching product and explain why.""",
             "deal_response": self.state.deal_response,
             "errors": self.state.errors,
             "updated_at": self.state.updated_at.isoformat(),
+            # Surface the audience_plan_id when one was resolved so callers
+            # can correlate logs / audit trails by hash (proposal §5.1).
+            "audience_plan_id": (
+                plan.audience_plan_id if plan is not None else None
+            ),
         }
+
+    def get_audience_planner_result(self) -> Optional[AudiencePlannerResult]:
+        """Return the Audience Planner output for this flow run, if any.
+
+        Populated by ``receive_request`` when a brief was supplied at
+        construction. Mirrors ``CampaignPipeline.get_audience_planner_result``
+        on Path A so tests can introspect the planner identically across
+        both paths.
+        """
+
+        return self._audience_planner_result
 
 
 async def run_buyer_deal_flow(
@@ -532,6 +629,8 @@ async def run_buyer_deal_flow(
     flight_end: Optional[str] = None,
     base_url: Optional[str] = None,
     store: Optional[DealStore] = None,
+    brief: Optional[CampaignBrief] = None,
+    audience_plan: Optional[AudiencePlan] = None,
 ) -> dict[str, Any]:
     """Convenience function to run the buyer deal flow.
 
@@ -545,6 +644,13 @@ async def run_buyer_deal_flow(
         flight_end: Deal end date
         base_url: Server URL (defaults to Settings.iab_server_url)
         store: Optional DealStore for persistence.
+        brief: Optional ``CampaignBrief`` -- when supplied the Audience
+            Planner runs and threads an ``AudiencePlan`` onto seller
+            calls (proposal §5.3 / bead ar-ts30 §18).
+        audience_plan: Optional pre-built ``AudiencePlan``. Takes
+            precedence over ``brief`` -- used when the parent pipeline
+            already ran the planner and wants to pass the resolved plan
+            verbatim into BuyerDealFlow.
 
     Returns:
         Flow result with Deal ID and activation instructions
@@ -568,6 +674,7 @@ async def run_buyer_deal_flow(
             client=client,
             buyer_context=buyer_context,
             store=store,
+            brief=brief,
         )
 
         # Set initial state
@@ -577,6 +684,10 @@ async def run_buyer_deal_flow(
         flow.state.max_cpm = max_cpm
         flow.state.flight_start = flight_start
         flow.state.flight_end = flight_end
+        # An explicit caller-supplied plan takes precedence over the brief
+        # path -- the planner is skipped and the plan is preserved verbatim.
+        if audience_plan is not None:
+            flow.state.audience_plan = audience_plan
 
         # Run flow
         result = flow.kickoff()

@@ -445,8 +445,8 @@ Maps legacy `ExecutionStatus` values used in `DealBookingFlow`. The mapping is o
 
 ## Related
 
-- [Deal Store](deal-store.md) --- Persistence layer; enforces state machine on `update_deal_status()`
-- [Event Bus](event-bus.md) --- State transitions emit events for observability
-- [Booking Flow](booking-flow.md) --- End-to-end campaign workflow using the state machine
+- Deal Store (`storage/deal_store.py`) --- Persistence layer; enforces state machine on `update_deal_status()`
+- Event Bus (`events/bus.py`) --- State transitions emit events for observability
+- Booking Flow (`flows/deal_booking_flow.py`) --- End-to-end campaign workflow using the state machine
 - [Deals API](../api/deals.md) --- Deal lifecycle statuses exposed via REST
 - [Seller Order Lifecycle](https://iabtechlab.github.io/seller-agent/state-machines/order-lifecycle/) --- Seller-side state machine (buyer states complement these)

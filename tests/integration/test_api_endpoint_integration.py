@@ -105,8 +105,15 @@ class TestBookingEndpointLifecycle:
         assert status_resp.status_code == 200
         status_data = status_resp.json()
         assert status_data["job_id"] == job_id
-        # Status should be pending or running (background task may or may not have started)
-        assert status_data["status"] in ("pending", "running", "failed", "completed")
+        # Status should be any valid job state (background task may or may not have started;
+        # awaiting_approval is valid when auto_approve=False and flow ran to completion)
+        assert status_data["status"] in (
+            "pending",
+            "running",
+            "failed",
+            "completed",
+            "awaiting_approval",
+        )
 
         jobs.pop(job_id, None)
 

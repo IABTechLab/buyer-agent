@@ -15,9 +15,11 @@ from ...booking.deal_id import generate_deal_id
 from ...booking.pricing import PricingCalculator
 from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
 from ...clients.unified_client import UnifiedClient
+from ...models.audience_plan import AudiencePlan
 from ...models.buyer_identity import (
     AccessTier,
     BuyerContext,
+    DealRequest,
     DealResponse,
     DealType,
 )
@@ -56,6 +58,13 @@ class RequestDealInput(BaseModel):
         default=None,
         description="Target CPM for negotiation (agency/advertiser tier only)",
         ge=0,
+    )
+    audience_plan: AudiencePlan | None = Field(
+        default=None,
+        description=(
+            "Typed AudiencePlan threaded onto the seller-bound deal "
+            "request (proposal §5.1). None on legacy paths."
+        ),
     )
 
 
@@ -139,6 +148,7 @@ Returns:
         flight_start: str | None = None,
         flight_end: str | None = None,
         target_cpm: float | None = None,
+        audience_plan: AudiencePlan | None = None,
     ) -> str:
         """Synchronous wrapper for async deal request."""
         return run_async(
@@ -149,6 +159,7 @@ Returns:
                 flight_start=flight_start,
                 flight_end=flight_end,
                 target_cpm=target_cpm,
+                audience_plan=audience_plan,
             )
         )
 
@@ -160,6 +171,7 @@ Returns:
         flight_start: str | None = None,
         flight_end: str | None = None,
         target_cpm: float | None = None,
+        audience_plan: AudiencePlan | None = None,
     ) -> str:
         """Request a deal ID from the seller."""
         try:
@@ -188,6 +200,27 @@ Returns:
             product = product_result.data
             if not product:
                 return f"Product {product_id} not found."
+              
+            # Build the seller-bound DealRequest payload so the plan
+            # rides on the wire (proposal §5.2 / §5.3 / bead ar-ts30 §18).
+            # We construct the payload even when audience_plan is None so
+            # tests can inspect a single payload object regardless of
+            # whether audience targeting was supplied.
+            deal_request_payload = self.build_deal_request_payload(
+                product_id=product_id,
+                deal_type=deal_type,
+                impressions=impressions,
+                flight_start=flight_start,
+                flight_end=flight_end,
+                target_cpm=target_cpm,
+                audience_plan=audience_plan,
+            )
+            # Stash the payload + plan on the tool instance so tests and
+            # observability code can inspect what crossed the boundary
+            # without parsing the formatted text. Mirrors the §5 wire
+            # additions to QuoteRequest / DealBookingRequest.
+            self._last_deal_request = deal_request_payload
+            self._last_audience_plan = audience_plan
 
             # IAB Diligence Platform approval gate — must pass before a Deal ID is issued.
             gate_error, approval_banner = await self._check_sgp_approval(product)
@@ -202,9 +235,10 @@ Returns:
                 flight_start=flight_start,
                 flight_end=flight_end,
                 target_cpm=target_cpm,
+                audience_plan=audience_plan,
             )
 
-            formatted = self._format_deal_response(deal_response)
+            formatted = self._format_deal_response(deal_response, audience_plan)
             if approval_banner:
                 formatted = f"{approval_banner}\n{formatted}"
             return formatted
@@ -299,6 +333,7 @@ Returns:
         flight_start: str | None,
         flight_end: str | None,
         target_cpm: float | None,
+        audience_plan: AudiencePlan | None = None,
     ) -> DealResponse:
         """Create a deal response with calculated pricing.
 
@@ -359,7 +394,46 @@ Returns:
             expires_at=(now + timedelta(days=7)).strftime("%Y-%m-%d"),
         )
 
-    def _format_deal_response(self, deal: DealResponse) -> str:
+    def build_deal_request_payload(
+        self,
+        product_id: str,
+        deal_type: str,
+        impressions: int | None,
+        flight_start: str | None,
+        flight_end: str | None,
+        target_cpm: float | None,
+        audience_plan: AudiencePlan | None,
+        notes: str | None = None,
+    ) -> DealRequest:
+        """Construct the typed seller-bound payload for the deal request.
+
+        The Audience Planner step on BuyerDealFlow puts an ``AudiencePlan``
+        on flow state; this helper materializes the wire-shape ``DealRequest``
+        so the plan rides on the seller-bound payload (proposal §5.2 / §5.3
+        + bead ar-ts30 §18). Tests assert the plan survives this boundary.
+        """
+
+        try:
+            deal_type_enum = DealType(deal_type.upper())
+        except ValueError:
+            deal_type_enum = DealType.PREFERRED_DEAL
+
+        return DealRequest(
+            product_id=product_id,
+            deal_type=deal_type_enum,
+            impressions=impressions,
+            flight_start=flight_start,
+            flight_end=flight_end,
+            target_cpm=target_cpm,
+            notes=notes,
+            audience_plan=audience_plan,
+        )
+
+    def _format_deal_response(
+        self,
+        deal: DealResponse,
+        audience_plan: AudiencePlan | None = None,
+    ) -> str:
         """Format deal response for output."""
         deal_type_names = {
             DealType.PROGRAMMATIC_GUARANTEED: "Programmatic Guaranteed (PG)",
@@ -384,6 +458,14 @@ Returns:
 
         if deal.impressions:
             output_lines.append(f"Impressions: {deal.impressions:,}")
+
+        # Surface the AudiencePlan id when one rode on the request -- gives
+        # the human reviewer (and audit trail) a stable handle linking
+        # buyer state to seller-side records (proposal §5.1 step 2).
+        if audience_plan is not None:
+            output_lines.append(
+                f"Audience Plan ID: {audience_plan.audience_plan_id}"
+            )
 
         output_lines.extend(
             [
