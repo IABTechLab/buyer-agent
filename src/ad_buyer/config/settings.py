@@ -72,6 +72,11 @@ class Settings(BaseSettings):
             return []
         return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
 
+    # Mixpeek contextual enrichment
+    mixpeek_api_key: str = ""
+    mixpeek_base_url: str = "https://api.mixpeek.com"
+    mixpeek_namespace: str = ""
+
     # Environment
     environment: str = "development"
     log_level: str = "INFO"

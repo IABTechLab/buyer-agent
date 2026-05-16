@@ -69,6 +69,7 @@ from ..tools.deal_library.deal_entry import (
     ManualDealEntry,
     create_manual_deal,
 )
+from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 
 logger = logging.getLogger(__name__)
 
@@ -2874,6 +2875,151 @@ async def help_prompt() -> list[Message]:
                 "negotiation, orders, approvals, templates, reporting, SSP "
                 "connectors, and API keys.",
     )]
+
+
+# ---------------------------------------------------------------------------
+# Contextual Enrichment (Mixpeek)
+# ---------------------------------------------------------------------------
+
+
+def _get_mixpeek_client() -> MixpeekClient:
+    """Create a MixpeekClient from current settings."""
+    s = Settings()
+    return MixpeekClient(
+        api_key=s.mixpeek_api_key,
+        base_url=s.mixpeek_base_url,
+        namespace=s.mixpeek_namespace,
+    )
+
+
+async def _discover_iab_retriever(client: MixpeekClient) -> str | None:
+    """Find an IAB text search retriever in the current namespace."""
+    retrievers = await client.list_retrievers()
+    for r in retrievers:
+        name = r.get("retriever_name", "").lower()
+        if "iab" in name and "text" in name:
+            return r["retriever_id"]
+    for r in retrievers:
+        if "iab" in r.get("retriever_name", "").lower():
+            return r["retriever_id"]
+    return None
+
+
+@mcp.tool(
+    name="classify_content",
+    description=(
+        "Classify page or ad-creative content into IAB v3.0 taxonomy "
+        "categories using Mixpeek. Supply text content to classify. "
+        "Returns ranked IAB category matches with hierarchical paths "
+        "(e.g. Sports > American Football) and confidence scores for "
+        "contextual targeting."
+    ),
+)
+async def classify_content(
+    text: str,
+    retriever_id: str | None = None,
+    limit: int = 10,
+) -> str:
+    """Classify content into IAB taxonomy categories via Mixpeek retriever."""
+    if not text:
+        return json.dumps({"error": "text must be provided"})
+
+    client = _get_mixpeek_client()
+    try:
+        rid = retriever_id
+        if not rid:
+            rid = await _discover_iab_retriever(client)
+            if not rid:
+                return json.dumps({
+                    "error": "No IAB retriever found in this namespace. "
+                    "Set MIXPEEK_NAMESPACE or pass retriever_id explicitly."
+                })
+
+        result = await client.classify_content(
+            retriever_id=rid, text=text, limit=limit,
+        )
+        docs = result.get("documents", [])
+        categories = [
+            {
+                "category": d.get("iab_category_name"),
+                "path": d.get("iab_path", []),
+                "tier": d.get("iab_tier"),
+                "score": round(d.get("score", 0), 4),
+            }
+            for d in docs
+        ]
+        return json.dumps({"categories": categories}, indent=2)
+    except MixpeekError as exc:
+        return json.dumps({"error": str(exc)})
+    finally:
+        await client.close()
+
+
+@mcp.tool(
+    name="check_brand_safety",
+    description=(
+        "Evaluate page or ad-creative content for brand-safety risk. "
+        "Classifies content into IAB categories and flags sensitive "
+        "categories (gambling, adult, etc.). Returns safe/unsafe "
+        "verdict, risk level (low/medium/high), and flagged categories."
+    ),
+)
+async def check_brand_safety(
+    text: str,
+    retriever_id: str | None = None,
+    threshold: float = 0.80,
+) -> str:
+    """Check content for brand-safety risk via Mixpeek."""
+    if not text:
+        return json.dumps({"error": "text must be provided"})
+
+    client = _get_mixpeek_client()
+    try:
+        rid = retriever_id
+        if not rid:
+            rid = await _discover_iab_retriever(client)
+            if not rid:
+                return json.dumps({
+                    "error": "No IAB retriever found in this namespace."
+                })
+
+        result = await client.check_brand_safety(
+            retriever_id=rid, text=text, threshold=threshold,
+        )
+        return json.dumps(result, indent=2)
+    except MixpeekError as exc:
+        return json.dumps({"error": str(exc)})
+    finally:
+        await client.close()
+
+
+@mcp.tool(
+    name="contextual_search",
+    description=(
+        "Search indexed ad inventory using a Mixpeek retriever pipeline. "
+        "Pipelines can combine multimodal search, brand-safety filtering, "
+        "IAB taxonomy enrichment, and reranking. Returns matching inventory "
+        "with relevance scores and enriched metadata."
+    ),
+)
+async def contextual_search(
+    query: str,
+    retriever_id: str,
+    limit: int = 10,
+) -> str:
+    """Search inventory via a Mixpeek retriever pipeline."""
+    client = _get_mixpeek_client()
+    try:
+        result = await client.search_content(
+            retriever_id=retriever_id,
+            query=query,
+            limit=limit,
+        )
+        return json.dumps(result, indent=2)
+    except MixpeekError as exc:
+        return json.dumps({"error": str(exc)})
+    finally:
+        await client.close()
 
 
 # ---------------------------------------------------------------------------
