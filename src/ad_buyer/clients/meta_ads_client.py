@@ -1,9 +1,10 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Meta Ads client — wraps the meta_ads Python API (from meta-ads-cli package).
+"""Meta Ads API client — calls the Meta Marketing API (graph.facebook.com) directly.
 
-Uses meta_ads.api.MetaAdsAPI directly (no subprocess) for campaign management.
+Uses meta_ads.api.MetaAdsAPI for campaign/adset/creative/ad management and
+httpx for insights — both call the same graph.facebook.com endpoints.
 Auth: META_ACCESS_TOKEN / META_AD_ACCOUNT_ID / META_PAGE_ID env vars.
 All created resources are PAUSED by default.
 
@@ -21,10 +22,10 @@ class MetaAPIError(Exception):
     """Raised when the Meta API returns a 4xx/5xx error."""
 
 
-class MetaAdsCLIClient:
-    """Meta Ads client using the meta_ads Python API directly.
+class MetaAdsClient:
+    """Meta Ads API client — calls graph.facebook.com directly.
 
-    Wraps meta_ads.api.MetaAdsAPI which calls graph.facebook.com under the hood.
+    Uses meta_ads.api.MetaAdsAPI for write operations and httpx for insights.
     All write operations create resources in PAUSED state by default.
     """
 
@@ -48,7 +49,7 @@ class MetaAdsCLIClient:
         except ImportError:
             raise ImportError(
                 "meta-ads-cli is not installed. "
-                "Install with: pip install -e '.[meta]' or uv pip install meta-ads-cli"
+                "Install with: pip install -e '.[meta]'"
             )
         return MetaAdsAPI(
             access_token=self._access_token,
@@ -63,7 +64,7 @@ class MetaAdsCLIClient:
         try:
             from meta_ads.api import MetaAPIError as _MetaAPIError
         except ImportError:
-            raise ImportError("meta-ads-cli not installed")
+            raise ImportError("meta-ads-cli not installed — pip install -e '.[meta]'")
         try:
             return fn(*args, **kwargs)
         except _MetaAPIError as e:

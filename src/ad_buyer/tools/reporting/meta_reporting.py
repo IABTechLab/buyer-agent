@@ -1,12 +1,12 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Meta Ads reporting tool — campaign insights via meta ads CLI."""
+"""Meta Ads reporting tool — campaign insights via Meta Ads API."""
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...clients.meta_ads_cli_client import MetaAdsCLIClient, MetaAuthError, MetaAPIError
+from ...clients.meta_ads_client import MetaAdsClient, MetaAuthError, MetaAPIError
 from ...config.settings import settings
 
 
@@ -37,7 +37,7 @@ Args:
         if not settings.meta_page_id:
             return "META_PAGE_ID not set in .env"
 
-        cli = MetaAdsCLIClient(
+        client = MetaAdsClient(
             access_token=settings.meta_access_token,
             ad_account_id=settings.meta_ad_account_id,
             page_id=settings.meta_page_id,
@@ -48,7 +48,7 @@ Args:
 
         for campaign_id in campaign_ids:
             try:
-                rows = cli.get_insights(campaign_id, date_preset=date_preset)
+                rows = client.get_insights(campaign_id, date_preset=date_preset)
                 for row in rows:
                     spend       = float(row.get("spend", 0))
                     impressions = int(row.get("impressions", 0))

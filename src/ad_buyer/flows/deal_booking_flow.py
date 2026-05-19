@@ -837,7 +837,7 @@ class DealBookingFlow(Flow[BookingState]):
         Returns:
             (campaign_id, ad_set_id, "meta")
         """
-        from ..clients.meta_ads_cli_client import MetaAdsCLIClient, MetaAuthError, MetaAPIError
+        from ..clients.meta_ads_client import MetaAdsClient, MetaAuthError, MetaAPIError
         from ..config.settings import settings as _settings
 
         if not _settings.meta_access_token or not _settings.meta_ad_account_id:
@@ -867,7 +867,7 @@ class DealBookingFlow(Flow[BookingState]):
         bid_amount_cents = max(int((rec.cpm or 5.0) * 100), 1)
         campaign_name = f"{brief.get('name', 'Campaign')} — {rec.product_name}"
 
-        cli = MetaAdsCLIClient(
+        client = MetaAdsClient(
             access_token=_settings.meta_access_token,
             ad_account_id=_settings.meta_ad_account_id,
             page_id=_settings.meta_page_id,
@@ -875,7 +875,7 @@ class DealBookingFlow(Flow[BookingState]):
         )
 
         # 1. Create campaign
-        camp = cli.create_campaign(
+        camp = client.create_campaign(
             name=campaign_name,
             objective=meta_obj,
             daily_budget_cents=daily_budget_cents,
@@ -885,7 +885,7 @@ class DealBookingFlow(Flow[BookingState]):
             raise ValueError(f"Campaign creation failed — no id in response: {camp}")
 
         # 2. Create ad set
-        adset = cli.create_adset(
+        adset = client.create_adset(
             campaign_id=campaign_id,
             name=f"{rec.product_name} Ad Set",
             optimization_goal=optimization_goal,

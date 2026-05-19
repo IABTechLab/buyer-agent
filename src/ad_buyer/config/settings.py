@@ -108,13 +108,13 @@ class Settings(BaseSettings):
     gam_api_version: str = "v202411"
 
     # --------------------------------------------------------------------------
-    # Meta Ads CLI integration
+    # Meta Ads API integration
     # --------------------------------------------------------------------------
     # System user access token (from Meta Business Manager → System Users)
     meta_access_token: str = ""
     # Ad account ID (format: act_XXXXXXXXX — assign to system user in Business Manager)
     meta_ad_account_id: str = ""
-    # Facebook Page ID (required for ad creative creation via CLI)
+    # Facebook Page ID (required for ad creative creation)
     meta_page_id: str = ""
     # Graph API version (used for reach estimates)
     meta_api_version: str = "v21.0"

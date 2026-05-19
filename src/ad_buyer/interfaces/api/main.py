@@ -552,7 +552,7 @@ async def get_campaign_report(
     """Get delivery reports for a completed booking job.
 
     Fetches data from:
-    - Meta Ads CLI (for social channel bookings — campaign insights)
+    - Meta Ads API (for social channel bookings — campaign insights)
     - GAM REST API (for IAB/OpenDirect booked lines — TBD, requires GAM credentials)
 
     Requires META_ACCESS_TOKEN + META_AD_ACCOUNT_ID + META_PAGE_ID in .env
@@ -747,9 +747,9 @@ async def meta_direct_report(
         raise HTTPException(status_code=400, detail="campaign_ids must be a comma-separated list of Meta campaign IDs")
     try:
         import httpx
-        from ...clients.meta_ads_cli_client import MetaAdsCLIClient
+        from ...clients.meta_ads_client import MetaAdsClient
 
-        cli = MetaAdsCLIClient(
+        client = MetaAdsClient(
             access_token=settings.meta_access_token,
             ad_account_id=settings.meta_ad_account_id,
             page_id=settings.meta_page_id,
@@ -775,7 +775,7 @@ async def meta_direct_report(
         rows = []
         for cid in ids:
             details = campaign_details.get(cid, {})
-            insights = cli.get_insights(cid, date_preset=date_preset, fields=insight_fields)
+            insights = client.get_insights(cid, date_preset=date_preset, fields=insight_fields)
             insight = insights[0] if insights else {}
             rows.append({
                 "campaign_id":    cid,

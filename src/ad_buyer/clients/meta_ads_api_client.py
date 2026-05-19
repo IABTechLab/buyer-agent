@@ -1,10 +1,11 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Meta Ads direct Graph API client — reach estimates only.
+"""Meta Ads reach-estimate client — Graph API reach estimates only.
 
 Used in the research phase to estimate audience reach + CPM before booking.
-All other operations (booking, reporting, lifecycle) use MetaAdsCLIClient.
+All other operations (booking, reporting, lifecycle) use MetaAdsClient
+(meta_ads_client.py).
 """
 
 import json
@@ -13,11 +14,10 @@ import httpx
 
 
 class MetaAdsAPIClient:
-    """Direct Graph API httpx client scoped to reach estimation.
+    """Graph API httpx client scoped to reach estimation.
 
-    The Meta Ads CLI does not expose a reach-estimate command, so this
-    client calls graph.facebook.com/v{version}/{account}/reachestimate
-    directly using the same system user access token.
+    Calls graph.facebook.com/v{version}/{account}/reachestimate
+    directly using a system user access token.
     """
 
     def __init__(
