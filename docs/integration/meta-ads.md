@@ -97,9 +97,9 @@ After the user approves recommendations, the buyer agent creates two resources p
 | `video_views` | `OUTCOME_ENGAGEMENT` |
 | `lead_generation` | `OUTCOME_LEADS` |
 
-### Budget Enforcement
+### Budget Allocation
 
-The buyer agent enforces the `channels` field in the booking brief. Budget is split equally across all requested channels regardless of LLM allocation:
+The `PortfolioCrew` LLM allocates budget across channels based on campaign objectives, audience fit, and KPIs. If `channels` is specified in the brief, the LLM is instructed to allocate only to those channels:
 
 ```json
 {
@@ -108,7 +108,7 @@ The buyer agent enforces the `channels` field in the booking brief. Budget is sp
 }
 ```
 
-Results in `$5,000` per channel (33.3% each).
+The LLM will distribute the `$15,000` across `branding`, `ctv`, and `social` based on which best fits the campaign objectives.
 
 ### Example Booking Request
 

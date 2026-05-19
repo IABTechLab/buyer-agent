@@ -314,28 +314,30 @@ class DealBookingFlow(Flow[BookingState]):
             # Try to extract JSON from the result
             allocations = self._parse_allocations(result_str)
 
-            # If brief specifies explicit channels, enforce them —
-            # redistribute budget equally across requested channels only,
-            # ignoring whatever the LLM decided.
+            # Fallback: if brief specifies channels and LLM allocated to wrong ones,
+            # filter to only the requested channels and rescale budgets proportionally.
             requested = [
                 c.lower()
                 for c in self.state.campaign_brief.get("channels", [])
                 if c.strip()
             ]
             if requested:
-                total_budget = self.state.campaign_brief.get("budget", 0)
-                per_channel = total_budget / len(requested)
-                pct = round(100 / len(requested), 1)
-                allocations = {
-                    ch: {
-                        "budget": per_channel,
-                        "percentage": pct,
-                        "rationale": allocations.get(ch, {}).get(
-                            "rationale", f"Requested channel: {ch}"
-                        ),
-                    }
+                filtered = {
+                    ch: allocations[ch]
                     for ch in requested
+                    if ch in allocations and allocations[ch].get("budget", 0) > 0
                 }
+                if filtered:
+                    grand_total = self.state.campaign_brief.get("budget", 0)
+                    alloc_total = sum(v["budget"] for v in filtered.values())
+                    for ch in filtered:
+                        filtered[ch]["budget"] = round(
+                            filtered[ch]["budget"] / alloc_total * grand_total, 2
+                        )
+                        filtered[ch]["percentage"] = round(
+                            filtered[ch]["budget"] / grand_total * 100, 1
+                        )
+                    allocations = filtered
 
             # Store allocations (normalize channel keys to lowercase)
             for channel, alloc_data in allocations.items():
