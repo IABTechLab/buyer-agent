@@ -6,7 +6,7 @@
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...clients.meta_ads_client import MetaAdsClient, MetaAuthError, MetaAPIError
+from ...clients.meta_ads_client import MetaAdsClient, MetaAPIError, MetaAuthError
 from ...config.settings import settings
 
 
@@ -44,19 +44,19 @@ Args:
             api_version=settings.meta_api_version,
         )
 
-        output = f"Meta Ads Performance Report — {len(campaign_ids)} campaign(s)\n{'='*50}\n\n"
+        output = f"Meta Ads Performance Report — {len(campaign_ids)} campaign(s)\n{'=' * 50}\n\n"
 
         for campaign_id in campaign_ids:
             try:
                 rows = client.get_insights(campaign_id, date_preset=date_preset)
                 for row in rows:
-                    spend       = float(row.get("spend", 0))
+                    spend = float(row.get("spend", 0))
                     impressions = int(row.get("impressions", 0))
-                    reach       = int(row.get("reach", 0))
-                    frequency   = float(row.get("frequency", 0))
-                    ctr         = float(row.get("ctr", 0))
-                    cpm         = float(row.get("cpm", 0))
-                    output += f"""Campaign: {row.get('campaign_name', campaign_id)}
+                    reach = int(row.get("reach", 0))
+                    frequency = float(row.get("frequency", 0))
+                    ctr = float(row.get("ctr", 0))
+                    cpm = float(row.get("cpm", 0))
+                    output += f"""Campaign: {row.get("campaign_name", campaign_id)}
   Spend:       ${spend:,.2f}
   Impressions: {impressions:,}
   Reach:       {reach:,} unique users

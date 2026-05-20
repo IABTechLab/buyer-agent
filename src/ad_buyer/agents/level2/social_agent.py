@@ -21,7 +21,8 @@ def create_social_agent() -> Agent:
         backstory=(
             "Expert in Meta Ads ecosystem with deep knowledge of Facebook Feed, Instagram Reels, "
             "Stories, and Audience Network inventory. Skilled at matching campaign objectives "
-            "(brand awareness, reach, conversions) to optimal Meta placements and bidding strategies."
+            "(brand awareness, reach, conversions) to optimal Meta placements "
+            "and bidding strategies."
         ),
         llm=settings.manager_llm_model,
         verbose=settings.crew_verbose,

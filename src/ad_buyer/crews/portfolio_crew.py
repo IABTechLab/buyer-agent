@@ -45,8 +45,10 @@ def create_portfolio_crew(
 
     if requested_channels:
         channel_instruction = (
-            f"IMPORTANT: The campaign brief specifies these channels ONLY: {requested_channels}.\n"
-            f"You MUST allocate the full budget of ${total_budget:,.2f} across ONLY these channels.\n"
+            f"IMPORTANT: The campaign brief specifies these channels ONLY: "
+            f"{requested_channels}.\n"
+            f"You MUST allocate the full budget of ${total_budget:,.2f} "
+            f"across ONLY these channels.\n"
             f"Do NOT include any other channels in your response."
         )
         channel_keys = requested_channels
@@ -63,8 +65,7 @@ def create_portfolio_crew(
         channel_keys = ["branding", "mobile_app", "ctv", "performance", "social"]
 
     expected_output_example = "\n".join(
-        f'    "{ch}": {{"budget": X, "percentage": Y, "rationale": "..."}}'
-        for ch in channel_keys
+        f'    "{ch}": {{"budget": X, "percentage": Y, "rationale": "..."}}' for ch in channel_keys
     )
 
     # Define budget allocation task

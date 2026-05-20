@@ -36,20 +36,19 @@ class MetaAdsClient:
         page_id: str,
         api_version: str = "v21.0",
     ):
-        self._access_token  = access_token
+        self._access_token = access_token
         # meta_ads expects numeric account ID without act_ prefix
         self._ad_account_id = ad_account_id.replace("act_", "")
-        self._page_id       = page_id
-        self._api_version   = api_version
+        self._page_id = page_id
+        self._api_version = api_version
 
     def _api(self, dry_run: bool = False):
         """Return a MetaAdsAPI instance."""
         try:
-            from meta_ads.api import MetaAdsAPI, MetaAPIError as _MetaAPIError
+            from meta_ads.api import MetaAdsAPI
         except ImportError:
             raise ImportError(
-                "meta-ads-cli is not installed. "
-                "Install with: pip install -e '.[meta]'"
+                "meta-ads-cli is not installed. Install with: pip install -e '.[meta]'"
             )
         return MetaAdsAPI(
             access_token=self._access_token,
@@ -69,8 +68,8 @@ class MetaAdsClient:
             return fn(*args, **kwargs)
         except _MetaAPIError as e:
             code = getattr(e, "error_code", None)
-            msg  = str(e)
-            if code in (190, 102, 32):          # token expired / invalid
+            msg = str(e)
+            if code in (190, 102, 32):  # token expired / invalid
                 raise MetaAuthError(f"Meta auth error (code {code}): {msg}") from e
             raise MetaAPIError(f"Meta API error (code {code}): {msg}") from e
 
@@ -103,6 +102,7 @@ class MetaAdsClient:
     def list_campaigns(self) -> list[dict[str, Any]]:
         """List campaigns for the ad account via Graph API."""
         import httpx
+
         r = httpx.get(
             f"https://graph.facebook.com/{self._api_version}/act_{self._ad_account_id}/campaigns",
             params={
@@ -166,6 +166,7 @@ class MetaAdsClient:
         image_hash: str = ""
         if image_path:
             import pathlib
+
             image_hash = self._wrap(api.upload_image, pathlib.Path(image_path))
 
         creative_id = self._wrap(
@@ -213,9 +214,16 @@ class MetaAdsClient:
     ) -> list[dict[str, Any]]:
         """Get performance insights via Graph API."""
         import httpx
+
         default_fields = [
-            "campaign_name", "spend", "impressions", "reach",
-            "frequency", "clicks", "ctr", "cpm",
+            "campaign_name",
+            "spend",
+            "impressions",
+            "reach",
+            "frequency",
+            "clicks",
+            "ctr",
+            "cpm",
         ]
         r = httpx.get(
             f"https://graph.facebook.com/{self._api_version}/{campaign_id}/insights",

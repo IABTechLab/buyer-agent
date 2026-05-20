@@ -73,8 +73,8 @@ class OpenDirectClient:
     async def list_products(self, skip: int = 0, top: int = 50, **filters: Any) -> list[Product]:
         """List available products with pagination."""
         params = {"$skip": skip, "$top": top, **filters}
-        async with self._make_client() as client:
-            response = await client.get("/products", params=params)
+        async with self._make_client() as http:
+            response = await http.get("/products", params=params)
             response.raise_for_status()
         data = response.json()
         products = data.get("products", data) if isinstance(data, dict) else data
@@ -82,15 +82,15 @@ class OpenDirectClient:
 
     async def get_product(self, product_id: str) -> Product:
         """Get a single product by ID."""
-        async with self._make_client() as client:
-            response = await client.get(f"/products/{product_id}")
+        async with self._make_client() as http:
+            response = await http.get(f"/products/{product_id}")
             response.raise_for_status()
         return Product.model_validate(response.json())
 
     async def search_products(self, filters: dict[str, Any]) -> list[Product]:
         """Search products with filters."""
-        async with self._make_client() as client:
-            response = await client.post("/products/search", json=filters)
+        async with self._make_client() as http:
+            response = await http.post("/products/search", json=filters)
             response.raise_for_status()
         data = response.json()
         products = data.get("products", data) if isinstance(data, dict) else data
@@ -105,8 +105,8 @@ class OpenDirectClient:
         Returns:
             AvailsResponse with availability and pricing info
         """
-        async with self._make_client() as client:
-            response = await client.post(
+        async with self._make_client() as http:
+            response = await http.post(
                 "/products/avails", json=request.model_dump(by_alias=True, exclude_none=True)
             )
             response.raise_for_status()
@@ -125,10 +125,11 @@ class OpenDirectClient:
         Returns:
             Created Account with ID
         """
-        response = await self._client.post(
-            "/accounts", json=account.model_dump(by_alias=True, exclude_none=True)
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.post(
+                "/accounts", json=account.model_dump(by_alias=True, exclude_none=True)
+            )
+            response.raise_for_status()
         return Account.model_validate(response.json())
 
     async def get_account(self, account_id: str) -> Account:
@@ -140,8 +141,9 @@ class OpenDirectClient:
         Returns:
             Account object
         """
-        response = await self._client.get(f"/accounts/{account_id}")
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(f"/accounts/{account_id}")
+            response.raise_for_status()
         return Account.model_validate(response.json())
 
     async def list_accounts(self, skip: int = 0, top: int = 50) -> list[Account]:
@@ -155,8 +157,9 @@ class OpenDirectClient:
             List of Account objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get("/accounts", params=params)
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get("/accounts", params=params)
+            response.raise_for_status()
         data = response.json()
         accounts = data.get("accounts", data) if isinstance(data, dict) else data
         return [Account.model_validate(a) for a in accounts]
@@ -175,11 +178,12 @@ class OpenDirectClient:
         Returns:
             Created Order with ID
         """
-        response = await self._client.post(
-            f"/accounts/{account_id}/orders",
-            json=order.model_dump(by_alias=True, exclude_none=True),
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.post(
+                f"/accounts/{account_id}/orders",
+                json=order.model_dump(by_alias=True, exclude_none=True),
+            )
+            response.raise_for_status()
         return Order.model_validate(response.json())
 
     async def get_order(self, account_id: str, order_id: str) -> Order:
@@ -192,8 +196,9 @@ class OpenDirectClient:
         Returns:
             Order object
         """
-        response = await self._client.get(f"/accounts/{account_id}/orders/{order_id}")
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(f"/accounts/{account_id}/orders/{order_id}")
+            response.raise_for_status()
         return Order.model_validate(response.json())
 
     async def list_orders(self, account_id: str, skip: int = 0, top: int = 50) -> list[Order]:
@@ -208,8 +213,9 @@ class OpenDirectClient:
             List of Order objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(f"/accounts/{account_id}/orders", params=params)
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(f"/accounts/{account_id}/orders", params=params)
+            response.raise_for_status()
         data = response.json()
         orders = data.get("orders", data) if isinstance(data, dict) else data
         return [Order.model_validate(o) for o in orders]
@@ -225,11 +231,12 @@ class OpenDirectClient:
         Returns:
             Updated Order object
         """
-        response = await self._client.patch(
-            f"/accounts/{account_id}/orders/{order_id}",
-            json=order.model_dump(by_alias=True, exclude_none=True),
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.patch(
+                f"/accounts/{account_id}/orders/{order_id}",
+                json=order.model_dump(by_alias=True, exclude_none=True),
+            )
+            response.raise_for_status()
         return Order.model_validate(response.json())
 
     # -------------------------------------------------------------------------
@@ -247,11 +254,12 @@ class OpenDirectClient:
         Returns:
             Created Line with ID
         """
-        response = await self._client.post(
-            f"/accounts/{account_id}/orders/{order_id}/lines",
-            json=line.model_dump(by_alias=True, exclude_none=True),
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.post(
+                f"/accounts/{account_id}/orders/{order_id}/lines",
+                json=line.model_dump(by_alias=True, exclude_none=True),
+            )
+            response.raise_for_status()
         return Line.model_validate(response.json())
 
     async def get_line(self, account_id: str, order_id: str, line_id: str) -> Line:
@@ -265,10 +273,11 @@ class OpenDirectClient:
         Returns:
             Line object
         """
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}"
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(
+                f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}"
+            )
+            response.raise_for_status()
         return Line.model_validate(response.json())
 
     async def list_lines(
@@ -286,10 +295,11 @@ class OpenDirectClient:
             List of Line objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders/{order_id}/lines", params=params
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(
+                f"/accounts/{account_id}/orders/{order_id}/lines", params=params
+            )
+            response.raise_for_status()
         data = response.json()
         lines = data.get("lines", data) if isinstance(data, dict) else data
         return [Line.model_validate(ln) for ln in lines]
@@ -305,11 +315,12 @@ class OpenDirectClient:
         Returns:
             Updated Line with Reserved status
         """
-        response = await self._client.patch(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
-            params={"action": "reserve"},
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.patch(
+                f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
+                params={"action": "reserve"},
+            )
+            response.raise_for_status()
         return Line.model_validate(response.json())
 
     async def book_line(self, account_id: str, order_id: str, line_id: str) -> Line:
@@ -323,11 +334,12 @@ class OpenDirectClient:
         Returns:
             Updated Line with Booked status
         """
-        response = await self._client.patch(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
-            params={"action": "book"},
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.patch(
+                f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
+                params={"action": "book"},
+            )
+            response.raise_for_status()
         return Line.model_validate(response.json())
 
     async def cancel_line(self, account_id: str, order_id: str, line_id: str) -> Line:
@@ -341,11 +353,12 @@ class OpenDirectClient:
         Returns:
             Updated Line with Cancelled status
         """
-        response = await self._client.patch(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
-            params={"action": "cancel"},
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.patch(
+                f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
+                params={"action": "cancel"},
+            )
+            response.raise_for_status()
         return Line.model_validate(response.json())
 
     async def get_line_stats(self, account_id: str, order_id: str, line_id: str) -> LineStats:
@@ -359,10 +372,11 @@ class OpenDirectClient:
         Returns:
             LineStats with delivery and performance metrics
         """
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}/stats"
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(
+                f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}/stats"
+            )
+            response.raise_for_status()
         return LineStats.model_validate(response.json())
 
     # -------------------------------------------------------------------------
@@ -379,11 +393,12 @@ class OpenDirectClient:
         Returns:
             Created Creative with ID
         """
-        response = await self._client.post(
-            f"/accounts/{account_id}/creatives",
-            json=creative.model_dump(by_alias=True, exclude_none=True),
-        )
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.post(
+                f"/accounts/{account_id}/creatives",
+                json=creative.model_dump(by_alias=True, exclude_none=True),
+            )
+            response.raise_for_status()
         return Creative.model_validate(response.json())
 
     async def get_creative(self, account_id: str, creative_id: str) -> Creative:
@@ -396,11 +411,14 @@ class OpenDirectClient:
         Returns:
             Creative object
         """
-        response = await self._client.get(f"/accounts/{account_id}/creatives/{creative_id}")
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(f"/accounts/{account_id}/creatives/{creative_id}")
+            response.raise_for_status()
         return Creative.model_validate(response.json())
 
-    async def list_creatives(self, account_id: str, skip: int = 0, top: int = 50) -> list[Creative]:
+    async def list_creatives(
+        self, account_id: str, skip: int = 0, top: int = 50
+    ) -> list[Creative]:
         """List creatives for an account.
 
         Args:
@@ -412,8 +430,9 @@ class OpenDirectClient:
             List of Creative objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(f"/accounts/{account_id}/creatives", params=params)
-        response.raise_for_status()
+        async with self._make_client() as http:
+            response = await http.get(f"/accounts/{account_id}/creatives", params=params)
+            response.raise_for_status()
         data = response.json()
         creatives = data.get("creatives", data) if isinstance(data, dict) else data
         return [Creative.model_validate(c) for c in creatives]
@@ -423,8 +442,7 @@ class OpenDirectClient:
     # -------------------------------------------------------------------------
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        await self._client.aclose()
+        """No-op — each request manages its own client lifetime."""
 
     async def __aenter__(self) -> "OpenDirectClient":
         """Async context manager entry."""
