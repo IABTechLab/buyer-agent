@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     redis_url: str | None = None
 
     # CrewAI Settings
-    crew_memory_enabled: bool = True
+    crew_memory_enabled: bool = False
     crew_verbose: bool = True
     crew_max_iterations: int = 15
 
@@ -91,6 +91,19 @@ class Settings(BaseSettings):
     # - "hybrid": prefer advertiser-supplied; else local; else mock
     # Override via EMBEDDING_MODE env var.
     embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
+
+    # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # Meta Ads API integration
+    # --------------------------------------------------------------------------
+    # System user access token (from Meta Business Manager → System Users)
+    meta_access_token: str = ""
+    # Ad account ID (format: act_XXXXXXXXX — assign to system user in Business Manager)
+    meta_ad_account_id: str = ""
+    # Facebook Page ID (required for ad creative creation)
+    meta_page_id: str = ""
+    # Graph API version (used for reach estimates)
+    meta_api_version: str = "v21.0"
 
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,

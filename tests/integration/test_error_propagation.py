@@ -45,8 +45,11 @@ class TestClientErrorPropagation:
             "Server Error", request=MagicMock(), response=mock_response
         )
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
+        mock_http = MagicMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+        with patch.object(client, "_make_client", return_value=mock_http):
             with pytest.raises(httpx.HTTPStatusError):
                 await client.list_products()
 
@@ -171,11 +174,11 @@ class TestSessionErrorPropagation:
         mock_response.status_code = 503
         mock_response.text = "Service unavailable"
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with pytest.raises(RuntimeError, match="Failed to create session"):
                 await manager.create_session("http://seller.example.com")
@@ -210,13 +213,13 @@ class TestSessionErrorPropagation:
         failed_retry_resp = MagicMock()
         failed_retry_resp.status_code = 500
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(
                 side_effect=[expired_resp, new_session_resp, failed_retry_resp]
             )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with pytest.raises(RuntimeError, match="Failed to send message"):
                 await manager.send_message(seller_url, "active-sess", {"type": "query"})
@@ -233,7 +236,7 @@ class TestNegotiationErrorPropagation:
         )
         client = NegotiationClient()
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_http = AsyncMock()
             error_response = MagicMock()
             error_response.status_code = 500
@@ -243,8 +246,8 @@ class TestNegotiationErrorPropagation:
                 response=error_response,
             )
             mock_http.post = AsyncMock(return_value=error_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_http)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with pytest.raises(httpx.HTTPStatusError):
                 await client.auto_negotiate(

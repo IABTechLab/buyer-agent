@@ -53,6 +53,7 @@ app = FastAPI(
         {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
         {"name": "Products", "description": "Seller inventory product search"},
         {"name": "Events", "description": "Event bus query endpoints"},
+        {"name": "Reporting", "description": "Campaign delivery reporting (Meta + Seller)"},
     ],
 )
 
@@ -234,7 +235,7 @@ def _persist_job(job_id: str, job: dict[str, Any]) -> None:
             booked_lines=json.dumps(job.get("booked_lines", [])),
             errors=json.dumps(job.get("errors", [])),
         )
-    except (sqlite3.Error, OSError, ValueError, AttributeError):
+    except (sqlite3.Error, OSError, ValueError, AttributeError, TypeError):
         logger.exception("Failed to persist job %s", job_id)
 
 
@@ -410,9 +411,10 @@ async def approve_recommendations(
     # Execute approvals
     result = flow.approve_recommendations(request.approved_product_ids)
 
-    # Update job
+    # Update job — refresh recommendations with live statuses from flow state
     job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
+    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
@@ -450,7 +452,8 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
     result = flow.approve_all()
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
+    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
 
@@ -492,13 +495,19 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
     client = _create_client()
     tool = ProductSearchTool(client)
 
-    result = tool._run(
-        channel=request.channel,
-        format=request.format,
-        min_price=request.min_price,
-        max_price=request.max_price,
-        limit=request.limit,
-    )
+    try:
+        result = tool._run(
+            channel=request.channel,
+            format=request.format,
+            min_price=request.min_price,
+            max_price=request.max_price,
+            limit=request.limit,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Product search failed: seller unreachable or returned an error — {e}",
+        )
 
     return {"results": result}
 
@@ -535,6 +544,222 @@ async def list_events(
     }
 
 
+@app.get("/reports/{job_id}", tags=["Reporting"])
+async def get_campaign_report(
+    job_id: str,
+    date_range: str = "last_30d",
+) -> dict[str, Any]:
+    """Get delivery reports for a completed booking job.
+
+    Fetches data from:
+    - Meta Ads API (for social channel bookings — campaign insights)
+    - Seller agent deal performance API (for IAB/OpenDirect booked lines)
+
+    Requires META_ACCESS_TOKEN + META_AD_ACCOUNT_ID + META_PAGE_ID in .env
+    for Meta reporting.
+    """
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job = jobs[job_id]
+    booked_lines = job.get("booked_lines", [])
+    if not booked_lines:
+        return {"job_id": job_id, "message": "No booked lines to report on", "reports": []}
+
+    meta_campaign_ids = [
+        b["order_id"]
+        for b in booked_lines
+        if b.get("channel") in ("social", "meta")
+    ]
+    seller_lines = [
+        b
+        for b in booked_lines
+        if b.get("channel") not in ("social", "meta") and b.get("seller_deal_id")
+    ]
+
+    reports: list[dict[str, Any]] = []
+
+    if meta_campaign_ids and settings.meta_access_token:
+        try:
+            from ...tools.reporting.meta_reporting import MetaReportingTool
+
+            tool = MetaReportingTool()
+            reports.append({
+                "source": "Meta",
+                "campaign_ids": meta_campaign_ids,
+                "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
+            })
+        except Exception as e:
+            reports.append({"source": "Meta", "campaign_ids": meta_campaign_ids, "error": str(e)})
+    elif meta_campaign_ids:
+        reports.append({
+            "source": "Meta",
+            "campaign_ids": meta_campaign_ids,
+            "message": "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID",
+        })
+
+    if seller_lines:
+        import httpx
+
+        seller_url = settings.opendirect_base_url.rstrip("/")
+        seller_reports = []
+        for b in seller_lines:
+            deal_id = b["seller_deal_id"]
+            try:
+                r = httpx.get(
+                    f"{seller_url}/api/v1/deals/{deal_id}/performance",
+                    timeout=30,
+                )
+                r.raise_for_status()
+                seller_reports.append({
+                    "deal_id": deal_id,
+                    "channel": b.get("channel"),
+                    "performance": r.json(),
+                })
+            except Exception as e:
+                seller_reports.append({
+                    "deal_id": deal_id,
+                    "channel": b.get("channel"),
+                    "error": str(e),
+                })
+        reports.append({
+            "source": "Seller",
+            "seller_url": seller_url,
+            "deals": seller_reports,
+        })
+
+    return {
+        "job_id": job_id,
+        "campaign_name": job.get("brief", {}).get("name"),
+        "date_range": date_range,
+        "reports": reports,
+    }
+
+
+def _sanitize_meta_error(e: Exception) -> str:
+    """Strip access tokens from Meta API error messages before returning to client."""
+    msg = str(e)
+    if settings.meta_access_token and settings.meta_access_token in msg:
+        msg = msg.replace(settings.meta_access_token, "***")
+    return msg
+
+
+@app.get("/meta/campaigns", tags=["Reporting"])
+async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
+    """List Meta Ads campaigns directly from the ad account (no booking job required).
+
+    Returns campaigns with id, name, status, and objective.
+    Requires META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env.
+    """
+    if not (settings.meta_access_token and settings.meta_ad_account_id):
+        raise HTTPException(status_code=503, detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env")
+    try:
+        import httpx
+        account_id = settings.meta_ad_account_id.replace("act_", "")
+        r = httpx.get(
+            f"https://graph.facebook.com/{settings.meta_api_version}/act_{account_id}/campaigns",
+            params={
+                "fields": "id,name,effective_status,objective,daily_budget,created_time",
+                "limit": limit,
+                "access_token": settings.meta_access_token,
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+        campaigns = data.get("data", [])
+        return {
+            "ad_account_id": settings.meta_ad_account_id,
+            "campaigns": campaigns,
+            "count": len(campaigns),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))
+
+
+@app.get("/meta/report", tags=["Reporting"])
+async def meta_direct_report(
+    campaign_ids: str,
+    date_preset: str = "last_30d",
+) -> dict[str, Any]:
+    """Pull insights directly from Meta Ads by campaign ID(s).
+
+    Args:
+        campaign_ids: Comma-separated Meta campaign IDs (e.g. 23856280731590791,23856280738900791)
+        date_preset: last_7d | last_14d | last_30d | last_90d | this_month
+
+    Returns spend, impressions, reach, clicks, CTR, CPM per campaign.
+    Requires META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env.
+    """
+    if not (settings.meta_access_token and settings.meta_ad_account_id):
+        raise HTTPException(status_code=503, detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env")
+    ids = [cid.strip() for cid in campaign_ids.split(",") if cid.strip()]
+    if not ids:
+        raise HTTPException(status_code=400, detail="campaign_ids must be a comma-separated list of Meta campaign IDs")
+    try:
+        import httpx
+        from ...clients.meta_ads_client import MetaAdsClient
+
+        client = MetaAdsClient(
+            access_token=settings.meta_access_token,
+            ad_account_id=settings.meta_ad_account_id,
+            page_id=settings.meta_page_id,
+            api_version=settings.meta_api_version,
+        )
+
+        # Fetch campaign details for all IDs in one batch request
+        campaign_details: dict[str, dict] = {}
+        for cid in ids:
+            r = httpx.get(
+                f"https://graph.facebook.com/{settings.meta_api_version}/{cid}",
+                params={
+                    "fields": "id,name,effective_status,objective,daily_budget,created_time",
+                    "access_token": settings.meta_access_token,
+                },
+                timeout=30,
+            )
+            if r.status_code == 200:
+                campaign_details[cid] = r.json()
+
+        # Fetch insights per campaign
+        insight_fields = ["campaign_name", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpm"]
+        rows = []
+        for cid in ids:
+            details = campaign_details.get(cid, {})
+            insights = client.get_insights(cid, date_preset=date_preset, fields=insight_fields)
+            insight = insights[0] if insights else {}
+            rows.append({
+                "campaign_id":    cid,
+                "campaign_name":  details.get("name") or insight.get("campaign_name", cid),
+                "status":         details.get("effective_status", "UNKNOWN"),
+                "objective":      details.get("objective", ""),
+                "daily_budget":   details.get("daily_budget", ""),
+                "created_time":   details.get("created_time", ""),
+                "spend":          float(insight.get("spend", 0)),
+                "impressions":    int(insight.get("impressions", 0)),
+                "reach":          int(insight.get("reach", 0)),
+                "frequency":      float(insight.get("frequency", 0)),
+                "clicks":         int(insight.get("clicks", 0)),
+                "ctr":            float(insight.get("ctr", 0)),
+                "cpm":            float(insight.get("cpm", 0)),
+            })
+
+        summary = {
+            "total_spend":       round(sum(r["spend"] for r in rows), 2),
+            "total_impressions": sum(r["impressions"] for r in rows),
+            "total_clicks":      sum(r["clicks"] for r in rows),
+            "total_reach":       sum(r["reach"] for r in rows),
+        }
+        return {
+            "ad_account_id": settings.meta_ad_account_id,
+            "date_preset":   date_preset,
+            "campaigns":     rows,
+            "summary":       summary,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))
+
+
 @app.get("/events/{event_id}", tags=["Events"])
 async def get_event(event_id: str) -> dict[str, Any]:
     """Retrieve a single event by ID."""
@@ -569,7 +794,14 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        result = flow.kickoff()
+        flow.kickoff()
+
+        # If consolidate_recommendations didn't fire (CrewAI or_() limitation), collect manually.
+        if not flow.state.pending_approvals:
+            for recs in flow.state.channel_recommendations.values():
+                for rec in recs:
+                    rec.status = "pending_approval"
+                    flow.state.pending_approvals.append(rec)
 
         job["progress"] = 0.8
         job["budget_allocations"] = {
@@ -581,7 +813,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
 
         if request.auto_approve:
             flow.approve_all()
-            job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+            job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
             job["status"] = "completed"
         else:
             job["status"] = "awaiting_approval"

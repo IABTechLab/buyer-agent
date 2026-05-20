@@ -34,6 +34,7 @@ from ..agents.level2.branding_agent import create_branding_agent
 from ..agents.level2.ctv_agent import create_ctv_agent
 from ..agents.level2.mobile_app_agent import create_mobile_app_agent
 from ..agents.level2.performance_agent import create_performance_agent
+from ..agents.level2.social_agent import create_social_agent
 from ..agents.level3.execution_agent import create_execution_agent
 from ..agents.level3.research_agent import create_research_agent
 from ..clients.opendirect_client import OpenDirectClient
@@ -333,23 +334,36 @@ Provide ranked recommendations with rationale.
     }
 ]""",
     recommendation_task_description="""
-Review the research findings and select the best inventory for this
-branding campaign. Consider:
+Review the research findings and select the best inventory for this branding campaign.
 
+STRICT RULES:
+- Only recommend products that were ACTUALLY FOUND and returned by the search tools.
+- Use the EXACT product_id values from the research results. Do NOT invent, modify, or
+  suffix product IDs (e.g. do not create "prod-003-split" from "prod-003").
+- Each item in your recommendations list must be a single bookable product from the catalog.
+- If no suitable products were found, return an empty recommendations list.
+
+Evaluate each found product on:
 1. Alignment with campaign objectives
-2. Budget efficiency
-3. Reach and frequency
-4. Quality metrics
+2. Budget efficiency (impressions per dollar)
+3. Reach and quality metrics
 
-Finalize your recommendations for approval.
+Output ONLY the JSON below — no extra text, no markdown outside the JSON block:
 """,
-    recommendation_task_output="""Final recommendations with booking priority:
-{
-    "recommendations": [...],
-    "total_impressions": X,
-    "total_cost": Y,
-    "summary": "..."
-}""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher from search results>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -377,9 +391,29 @@ Provide ranked recommendations with rationale.
     research_task_output="""List of recommended products with fraud scores and MMP support.""",
     recommendation_task_description="""
 Review the research findings and select the best mobile inventory.
-Prioritize quality over scale - low fraud and proper attribution are critical.
+Prioritize quality over scale — low fraud and proper attribution are critical.
+
+STRICT RULES:
+- Only recommend products ACTUALLY FOUND by the search tools.
+- Use EXACT product_id values from the research results. Do NOT invent new IDs.
+- If no suitable products were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
 """,
-    recommendation_task_output="""Final recommendations with booking priority.""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -408,8 +442,28 @@ Provide ranked recommendations with rationale.
     recommendation_task_description="""
 Review the research findings and select the best CTV inventory.
 Balance reach with frequency management across devices.
+
+STRICT RULES:
+- Only recommend products ACTUALLY FOUND by the search tools.
+- Use EXACT product_id values from the research results. Do NOT invent new IDs.
+- If no suitable products were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
 """,
-    recommendation_task_output="""Final recommendations with booking priority.""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -439,8 +493,28 @@ Provide ranked recommendations with rationale.
     recommendation_task_description="""
 Review the research findings and select the best performance inventory.
 Optimize for ROAS and conversion efficiency.
+
+STRICT RULES:
+- Only recommend products ACTUALLY FOUND by the search tools.
+- Use EXACT product_id values from the research results. Do NOT invent new IDs.
+- If no suitable products were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
 """,
-    recommendation_task_output="""Final recommendations with booking priority.""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "<exact id from search results>",
+        "product_name": "<exact name from search results>",
+        "publisher": "<publisher>",
+        "format": "<format>",
+        "impressions": <integer>,
+        "cpm": <float>,
+        "cost": <float>,
+        "rationale": "<why this product>"
+    }
+]
+```""",
 )
 
 
@@ -484,6 +558,98 @@ def create_performance_crew(
     return _build_channel_crew(_PERFORMANCE_SPEC, client, channel_brief, audience_plan)
 
 
+_SOCIAL_SPEC = _ChannelCrewSpec(
+    manager_agent_factory=create_social_agent,
+    research_task_template="""
+Research Meta Ads inventory for a social media campaign:
+
+Budget: ${budget:,.2f}
+Flight: {start_date} to {end_date}
+Target Audience: {target_audience}
+Objectives: {objectives}
+{audience_context}
+
+Use the search_meta_placements tool to find Facebook, Instagram, and
+Audience Network placements with estimated reach and CPM.
+Provide ranked recommendations with rationale.
+""",
+    research_task_output="List of recommended Meta placements with reach estimates.",
+    recommendation_task_description="""
+Review the Meta Ads research findings and select the best placements.
+
+STRICT RULES:
+- Only recommend placements ACTUALLY returned by search_meta_placements.
+- Use EXACT product_id values (format: meta:placement-name). Do NOT invent IDs.
+- If no suitable placements were found, return an empty list.
+
+Output ONLY the JSON below — no extra text:
+""",
+    recommendation_task_output="""```json
+[
+    {
+        "product_id": "meta:<placement-name>",
+        "product_name": "<placement display name>",
+        "publisher": "Meta",
+        "format": "video or display",
+        "impressions": <estimated_impressions>,
+        "cpm": <estimated_cpm>,
+        "cost": <budget_for_this_placement>,
+        "rationale": "<why this placement>"
+    }
+]
+```""",
+)
+
+
+def create_social_crew(
+    client: OpenDirectClient,
+    channel_brief: dict[str, Any],
+    audience_plan: AudiencePlan | dict[str, Any] | None = None,
+) -> Crew:
+    """Create the Social Media (Meta Ads) Specialist crew.
+
+    Does NOT use OpenDirectClient for research — uses MetaInventoryTool
+    against the Meta Graph API for reach estimates instead.
+    The client param is accepted for interface compatibility only.
+    """
+    from ..tools.research.meta_inventory import MetaInventoryTool
+
+    meta_tool = MetaInventoryTool()
+    manager_agent = create_social_agent()
+    research_agent = create_research_agent(tools=[meta_tool])
+    execution_agent = create_execution_agent(tools=[])
+
+    audience_context = _format_audience_context(audience_plan)
+
+    research_task = Task(
+        description=_SOCIAL_SPEC.research_task_template.format(
+            budget=channel_brief.get("budget", 0),
+            start_date=channel_brief.get("start_date"),
+            end_date=channel_brief.get("end_date"),
+            target_audience=channel_brief.get("target_audience", {}),
+            objectives=channel_brief.get("objectives", []),
+            audience_context=audience_context,
+        ),
+        expected_output=_SOCIAL_SPEC.research_task_output,
+        agent=research_agent,
+    )
+    recommendation_task = Task(
+        description=_SOCIAL_SPEC.recommendation_task_description,
+        expected_output=_SOCIAL_SPEC.recommendation_task_output,
+        agent=manager_agent,
+        context=[research_task],
+    )
+
+    return Crew(
+        agents=[research_agent, execution_agent],
+        tasks=[research_task, recommendation_task],
+        process=Process.hierarchical,
+        manager_agent=manager_agent,
+        memory=settings.crew_memory_enabled,
+        verbose=settings.crew_verbose,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Direct-invocation convenience wrapper (proposal §5.3 / bead ar-5y8v)
 # ---------------------------------------------------------------------------
@@ -498,6 +664,8 @@ _CHANNEL_FACTORIES = {
     "mobile": create_mobile_crew,
     "mobile_app": create_mobile_crew,  # alias used by deal_booking_flow
     "performance": create_performance_crew,
+    "social": create_social_crew,
+    "meta": create_social_crew,        # alias
 }
 
 
