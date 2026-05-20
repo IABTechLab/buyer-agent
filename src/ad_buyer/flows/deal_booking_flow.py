@@ -829,7 +829,7 @@ class DealBookingFlow(Flow[BookingState]):
 
         return quote_id, deal_id, order_id
 
-    def _book_via_meta_cli(self, rec: Any) -> tuple[str, str, str]:
+    def _book_via_meta_api(self, rec: Any) -> tuple[str, str, str]:
         """Book a Meta Ads campaign via 4 sequential CLI commands.
 
         Steps:
@@ -937,7 +937,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             try:
                 if rec.channel in ("social", "meta"):
-                    campaign_id, ad_set_id, _ = self._book_via_meta_cli(rec)
+                    campaign_id, ad_set_id, _ = self._book_via_meta_api(rec)
                     order_id = campaign_id
                     line_id_override = ad_set_id
                     booking_status = "paused"
