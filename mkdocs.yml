@@ -105,7 +105,6 @@ nav:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
       - Meta Ads: integration/meta-ads.md
-      - Google Ad Manager Reporting: integration/gam-reporting.md
   - AI Assistant Setup:
       - Claude (Desktop & Web): claude-desktop-setup.md
       - ChatGPT, Codex & AI IDEs: multi-client-setup.md

@@ -227,7 +227,7 @@ To report on all campaigns booked within a specific job:
 GET /reports/{job_id}?date_range=last_30d
 ```
 
-The buyer agent automatically identifies Meta campaign IDs from `booked_lines` and pulls insights for each. IAB OpenDirect order IDs in the same job are routed to GAM reporting. See [Bookings API](../api/bookings.md) for details.
+The buyer agent automatically identifies Meta campaign IDs from `booked_lines` and pulls insights for each. IAB OpenDirect order IDs in the same job are routed to the seller agent's delivery performance endpoint. See [Bookings API](../api/bookings.md) for details.
 
 !!! tip "Access token security"
     The Meta access token is never exposed in API error responses. It is automatically redacted to `***` before any error message reaches the HTTP response.
@@ -236,6 +236,6 @@ The buyer agent automatically identifies Meta campaign IDs from `booked_lines` a
 
 ## Related
 
-- [GAM Reporting](gam-reporting.md) --- Pull delivery data from Google Ad Manager
+- [Seller Agent Integration](seller-agent.md) --- How buyer and seller agents communicate
 - [Bookings API](../api/bookings.md) --- Full booking flow reference
 - [Configuration Reference](../guides/configuration.md) --- All environment variables

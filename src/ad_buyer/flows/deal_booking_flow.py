@@ -930,6 +930,7 @@ class DealBookingFlow(Flow[BookingState]):
         for rec in approved:
             booking_status = "booked"
             order_id = "order_pending"
+            seller_deal_id: str | None = None
             line_id_override: str | None = None
 
             try:
@@ -939,7 +940,7 @@ class DealBookingFlow(Flow[BookingState]):
                     line_id_override = ad_set_id
                     booking_status = "paused"
                 else:
-                    _quote_id, _deal_id, order_id = self._book_via_seller_api(rec)
+                    _quote_id, seller_deal_id, order_id = self._book_via_seller_api(rec)
                     booking_status = "booked"
             except Exception as e:  # noqa: BLE001
                 booking_status = "booking_failed"
@@ -949,6 +950,7 @@ class DealBookingFlow(Flow[BookingState]):
             booked = BookedLine(
                 line_id=line_id_override or f"line_{rec.product_id}",
                 order_id=order_id,
+                seller_deal_id=seller_deal_id,
                 product_id=rec.product_id,
                 product_name=rec.product_name,
                 channel=rec.channel,

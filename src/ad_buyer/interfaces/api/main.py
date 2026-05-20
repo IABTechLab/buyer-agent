@@ -53,7 +53,7 @@ app = FastAPI(
         {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
         {"name": "Products", "description": "Seller inventory product search"},
         {"name": "Events", "description": "Event bus query endpoints"},
-        {"name": "Reporting", "description": "Campaign delivery reporting (Meta + GAM)"},
+        {"name": "Reporting", "description": "Campaign delivery reporting (Meta + Seller)"},
     ],
 )
 
@@ -553,7 +553,7 @@ async def get_campaign_report(
 
     Fetches data from:
     - Meta Ads API (for social channel bookings — campaign insights)
-    - GAM REST API (for IAB/OpenDirect booked lines — TBD, requires GAM credentials)
+    - Seller agent deal performance API (for IAB/OpenDirect booked lines)
 
     Requires META_ACCESS_TOKEN + META_AD_ACCOUNT_ID + META_PAGE_ID in .env
     for Meta reporting.
@@ -566,14 +566,15 @@ async def get_campaign_report(
     if not booked_lines:
         return {"job_id": job_id, "message": "No booked lines to report on", "reports": []}
 
-    iam_order_ids = [
-        b["order_id"] for b in booked_lines
-        if b.get("channel") not in ("social", "meta")
-        and b.get("order_id", "").startswith("ORD-")
-    ]
     meta_campaign_ids = [
-        b["order_id"] for b in booked_lines
+        b["order_id"]
+        for b in booked_lines
         if b.get("channel") in ("social", "meta")
+    ]
+    seller_lines = [
+        b
+        for b in booked_lines
+        if b.get("channel") not in ("social", "meta") and b.get("seller_deal_id")
     ]
 
     reports: list[dict[str, Any]] = []
@@ -581,6 +582,7 @@ async def get_campaign_report(
     if meta_campaign_ids and settings.meta_access_token:
         try:
             from ...tools.reporting.meta_reporting import MetaReportingTool
+
             tool = MetaReportingTool()
             reports.append({
                 "source": "Meta",
@@ -596,35 +598,35 @@ async def get_campaign_report(
             "message": "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID",
         })
 
-    if iam_order_ids:
-        if settings.gam_enabled and settings.gam_network_code and settings.gam_json_key_path:
+    if seller_lines:
+        import httpx
+
+        seller_url = settings.opendirect_base_url.rstrip("/")
+        seller_reports = []
+        for b in seller_lines:
+            deal_id = b["seller_deal_id"]
             try:
-                from ...tools.reporting.gam_reporting import GAMReportingTool
-                tool = GAMReportingTool()
-                gam_report = tool._run(
-                    order_ids=iam_order_ids,
-                    date_range=date_range.upper().replace("-", "_"),
+                r = httpx.get(
+                    f"{seller_url}/api/v1/deals/{deal_id}/performance",
+                    timeout=30,
                 )
-                reports.append({
-                    "source": "GAM",
-                    "order_ids": iam_order_ids,
-                    "report": gam_report,
+                r.raise_for_status()
+                seller_reports.append({
+                    "deal_id": deal_id,
+                    "channel": b.get("channel"),
+                    "performance": r.json(),
                 })
             except Exception as e:
-                reports.append({
-                    "source": "GAM",
-                    "order_ids": iam_order_ids,
+                seller_reports.append({
+                    "deal_id": deal_id,
+                    "channel": b.get("channel"),
                     "error": str(e),
                 })
-        else:
-            reports.append({
-                "source": "GAM",
-                "order_ids": iam_order_ids,
-                "message": (
-                    "GAM not configured — set GAM_ENABLED=true, GAM_NETWORK_CODE, "
-                    "GAM_JSON_KEY_PATH in .env"
-                ),
-            })
+        reports.append({
+            "source": "Seller",
+            "seller_url": seller_url,
+            "deals": seller_reports,
+        })
 
     return {
         "job_id": job_id,
@@ -632,57 +634,6 @@ async def get_campaign_report(
         "date_range": date_range,
         "reports": reports,
     }
-
-
-@app.get("/gam/orders", tags=["Reporting"])
-async def gam_list_orders(limit: int = 10) -> dict[str, Any]:
-    """List GAM orders directly from the network (no booking job required).
-
-    Returns the most recent orders with id, name, and status.
-    Requires GAM_ENABLED=true, GAM_NETWORK_CODE, GAM_JSON_KEY_PATH in .env.
-    """
-    if not (settings.gam_enabled and settings.gam_network_code and settings.gam_json_key_path):
-        raise HTTPException(status_code=503, detail="GAM not configured — set GAM_ENABLED=true, GAM_NETWORK_CODE, GAM_JSON_KEY_PATH")
-    try:
-        from ...clients.gam_reporting_client import GAMReportingClient
-        client = GAMReportingClient()
-        client.connect()
-        orders = client.list_orders(limit=limit)
-        network = client.get_network()
-        client.disconnect()
-        return {"network": network, "orders": orders, "count": len(orders)}
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
-
-
-@app.get("/gam/report", tags=["Reporting"])
-async def gam_direct_report(
-    order_ids: str,
-    days: int = 30,
-) -> dict[str, Any]:
-    """Pull delivery report directly from GAM by order ID(s).
-
-    Args:
-        order_ids: Comma-separated numeric GAM order IDs (e.g. 54058762,54058882)
-        days: Look-back window in days (default 30)
-
-    Returns order metadata, line items, and delivery data (impressions, clicks, revenue).
-    Requires GAM_ENABLED=true, GAM_NETWORK_CODE, GAM_JSON_KEY_PATH in .env.
-    """
-    if not (settings.gam_enabled and settings.gam_network_code and settings.gam_json_key_path):
-        raise HTTPException(status_code=503, detail="GAM not configured — set GAM_ENABLED=true, GAM_NETWORK_CODE, GAM_JSON_KEY_PATH")
-    ids = [oid.strip() for oid in order_ids.split(",") if oid.strip()]
-    if not ids:
-        raise HTTPException(status_code=400, detail="order_ids must be a comma-separated list of numeric GAM order IDs")
-    try:
-        from ...clients.gam_reporting_client import GAMReportingClient
-        client = GAMReportingClient()
-        client.connect()
-        report = client.get_delivery_report(ids, days=days)
-        client.disconnect()
-        return report
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
 
 
 def _sanitize_meta_error(e: Exception) -> str:

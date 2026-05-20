@@ -93,20 +93,6 @@ class Settings(BaseSettings):
     embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
 
     # --------------------------------------------------------------------------
-    # Google Ad Manager (GAM) — read-only reporting
-    # Same field names as seller agent for operational consistency
-    # --------------------------------------------------------------------------
-    # Feature flag — set true once service account is configured
-    gam_enabled: bool = False
-    # GAM network code (GAM UI → Admin → Global Settings → Network code)
-    gam_network_code: str = ""
-    # Path to service account JSON key file
-    gam_json_key_path: str = ""
-    # Application name sent in API requests
-    gam_application_name: str = "AAMPBuyerAgent"
-    # GAM REST API version
-    gam_api_version: str = "v202411"
-
     # --------------------------------------------------------------------------
     # Meta Ads API integration
     # --------------------------------------------------------------------------
