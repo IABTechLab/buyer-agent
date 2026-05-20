@@ -7,7 +7,7 @@ import json
 import logging
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from crewai.flow.flow import Flow, listen, or_, start
@@ -147,7 +147,7 @@ class DealBookingFlow(Flow[BookingState]):
             return {"status": "failed", "errors": self.state.errors}
 
         self.state.execution_status = ExecutionStatus.BRIEF_RECEIVED
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         # Emit campaign.created event
         emit_event_sync(
@@ -196,7 +196,7 @@ class DealBookingFlow(Flow[BookingState]):
             gaps = self._identify_audience_gaps(target_audience, coverage_estimates)
             self.state.audience_gaps = gaps
 
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {
                 "status": "success",
@@ -317,9 +317,7 @@ class DealBookingFlow(Flow[BookingState]):
             # Fallback: if brief specifies channels and LLM allocated to wrong ones,
             # filter to only the requested channels and rescale budgets proportionally.
             requested = [
-                c.lower()
-                for c in self.state.campaign_brief.get("channels", [])
-                if c.strip()
+                c.lower() for c in self.state.campaign_brief.get("channels", []) if c.strip()
             ]
             if requested:
                 filtered = {
@@ -351,7 +349,7 @@ class DealBookingFlow(Flow[BookingState]):
                     )
 
             self.state.execution_status = ExecutionStatus.BUDGET_ALLOCATED
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             # Emit budget.allocated event
             emit_event_sync(
@@ -433,13 +431,13 @@ class DealBookingFlow(Flow[BookingState]):
             result_str = str(result)
             recommendations = self._parse_recommendations(result_str, "branding")
             if not recommendations:
-                for task in (crew.tasks or []):
+                for task in crew.tasks or []:
                     if task.output:
                         recommendations = self._parse_recommendations(task.output.raw, "branding")
                         if recommendations:
                             break
             self.state.channel_recommendations["branding"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "branding", "status": "success", "count": len(recommendations)}
 
@@ -468,13 +466,13 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "ctv")
             if not recommendations:
-                for task in (crew.tasks or []):
+                for task in crew.tasks or []:
                     if task.output:
                         recommendations = self._parse_recommendations(task.output.raw, "ctv")
                         if recommendations:
                             break
             self.state.channel_recommendations["ctv"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "ctv", "status": "success", "count": len(recommendations)}
 
@@ -503,13 +501,13 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
             if not recommendations:
-                for task in (crew.tasks or []):
+                for task in crew.tasks or []:
                     if task.output:
                         recommendations = self._parse_recommendations(task.output.raw, "mobile_app")
                         if recommendations:
                             break
             self.state.channel_recommendations["mobile_app"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "mobile_app", "status": "success", "count": len(recommendations)}
 
@@ -538,13 +536,15 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "performance")
             if not recommendations:
-                for task in (crew.tasks or []):
+                for task in crew.tasks or []:
                     if task.output:
-                        recommendations = self._parse_recommendations(task.output.raw, "performance")
+                        recommendations = self._parse_recommendations(
+                            task.output.raw, "performance"
+                        )
                         if recommendations:
                             break
             self.state.channel_recommendations["performance"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "performance", "status": "success", "count": len(recommendations)}
 
@@ -676,13 +676,13 @@ class DealBookingFlow(Flow[BookingState]):
             result_str = str(result)
             recommendations = self._parse_recommendations(result_str, "social")
             if not recommendations:
-                for task in (crew.tasks or []):
+                for task in crew.tasks or []:
                     if task.output:
                         recommendations = self._parse_recommendations(task.output.raw, "social")
                         if recommendations:
                             break
             self.state.channel_recommendations["social"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "social", "status": "success", "count": len(recommendations)}
 
@@ -690,7 +690,9 @@ class DealBookingFlow(Flow[BookingState]):
             self.state.errors.append(f"Social research failed: {e}")
             return {"channel": "social", "status": "failed", "error": str(e)}
 
-    @listen(or_(research_branding, research_ctv, research_mobile, research_performance, research_social))
+    @listen(
+        or_(research_branding, research_ctv, research_mobile, research_performance, research_social)
+    )
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
         """Consolidate all channel recommendations for approval."""
         # Check if all active channels have reported
@@ -713,7 +715,7 @@ class DealBookingFlow(Flow[BookingState]):
                 self.state.pending_approvals.append(rec)
 
         self.state.execution_status = ExecutionStatus.AWAITING_APPROVAL
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         # Persist awaiting-approval status for each recommendation's deal
         if self._store is not None:
@@ -763,7 +765,7 @@ class DealBookingFlow(Flow[BookingState]):
                 rec.status = "rejected"
 
         self.state.execution_status = ExecutionStatus.EXECUTING_BOOKINGS
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         return self._execute_bookings()
 
@@ -839,7 +841,7 @@ class DealBookingFlow(Flow[BookingState]):
         Returns:
             (campaign_id, ad_set_id, "meta")
         """
-        from ..clients.meta_ads_client import MetaAdsClient, MetaAuthError, MetaAPIError
+        from ..clients.meta_ads_client import MetaAdsClient
         from ..config.settings import settings as _settings
 
         if not _settings.meta_access_token or not _settings.meta_ad_account_id:
@@ -853,10 +855,10 @@ class DealBookingFlow(Flow[BookingState]):
 
         obj_map = {
             "brand_awareness": "OUTCOME_AWARENESS",
-            "reach":           "OUTCOME_AWARENESS",
-            "traffic":         "OUTCOME_TRAFFIC",
-            "conversions":     "OUTCOME_SALES",
-            "video_views":     "OUTCOME_ENGAGEMENT",
+            "reach": "OUTCOME_AWARENESS",
+            "traffic": "OUTCOME_TRAFFIC",
+            "conversions": "OUTCOME_SALES",
+            "video_views": "OUTCOME_ENGAGEMENT",
             "lead_generation": "OUTCOME_LEADS",
         }
         objectives = brief.get("objectives", ["brand_awareness"])
@@ -955,7 +957,7 @@ class DealBookingFlow(Flow[BookingState]):
                 impressions=rec.impressions,
                 cost=rec.cost,
                 booking_status=booking_status,
-                booked_at=datetime.now(timezone.utc),
+                booked_at=datetime.now(UTC),
             )
             self.state.booked_lines.append(booked)
 
@@ -966,7 +968,7 @@ class DealBookingFlow(Flow[BookingState]):
                 self._persist_deal_status(store_deal_id, booking_status)
 
         self.state.execution_status = ExecutionStatus.COMPLETED
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         # Emit deal.booked event for each booked line
         for booked in self.state.booked_lines:

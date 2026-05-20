@@ -45,8 +45,11 @@ class TestClientErrorPropagation:
             "Server Error", request=MagicMock(), response=mock_response
         )
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
+        mock_http = MagicMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+        with patch.object(client, "_make_client", return_value=mock_http):
             with pytest.raises(httpx.HTTPStatusError):
                 await client.list_products()
 

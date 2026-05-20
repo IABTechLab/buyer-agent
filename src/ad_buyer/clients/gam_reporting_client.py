@@ -44,7 +44,7 @@ class GAMReportingClient:
         application_name: str | None = None,
         api_version: str | None = None,
     ):
-        self._network_code     = network_code     or _settings.gam_network_code
+        self._network_code = network_code or _settings.gam_network_code
         self._credentials_path = credentials_path or _settings.gam_json_key_path
         self._application_name = application_name or _settings.gam_application_name
         # Normalise version — fall back to default if retired version supplied
@@ -59,9 +59,7 @@ class GAMReportingClient:
     def connect(self) -> None:
         """Connect to GAM SOAP API using service account credentials."""
         if not self._network_code or not self._credentials_path:
-            raise ValueError(
-                "GAM_NETWORK_CODE and GAM_JSON_KEY_PATH must be set in .env."
-            )
+            raise ValueError("GAM_NETWORK_CODE and GAM_JSON_KEY_PATH must be set in .env.")
         try:
             from googleads import ad_manager, oauth2
 
@@ -102,8 +100,8 @@ class GAMReportingClient:
         return {
             "network_code": net.networkCode,
             "display_name": net.displayName,
-            "currency":     net.currencyCode,
-            "timezone":     net.timeZone,
+            "currency": net.currencyCode,
+            "timezone": net.timeZone,
         }
 
     # -------------------------------------------------------------------------
@@ -113,6 +111,7 @@ class GAMReportingClient:
     def get_order(self, order_id: str) -> dict[str, Any]:
         """Get a single GAM order by numeric ID."""
         from googleads import ad_manager
+
         svc = self._service("OrderService")
         sb = ad_manager.StatementBuilder()
         sb.Where("id = :id").WithBindVariable("id", int(order_id))
@@ -123,24 +122,24 @@ class GAMReportingClient:
             return {}
         o = orders[0]
         return {
-            "id":            str(o.id),
-            "name":          o.name,
-            "status":        o.status,
+            "id": str(o.id),
+            "name": o.name,
+            "status": o.status,
             "advertiser_id": str(getattr(o, "advertiserId", "")),
-            "start_date":    str(getattr(o, "startDateTime", "")),
-            "end_date":      str(getattr(o, "endDateTime", "")),
+            "start_date": str(getattr(o, "startDateTime", "")),
+            "end_date": str(getattr(o, "endDateTime", "")),
         }
 
     def list_orders(self, limit: int = 10) -> list[dict[str, Any]]:
         """List recent orders in the network."""
         from googleads import ad_manager
+
         svc = self._service("OrderService")
         sb = ad_manager.StatementBuilder()
         sb.Limit(limit)
         result = svc.getOrdersByStatement(sb.ToStatement())
         return [
-            {"id": str(o.id), "name": o.name, "status": o.status}
-            for o in (result.results or [])
+            {"id": str(o.id), "name": o.name, "status": o.status} for o in (result.results or [])
         ]
 
     # -------------------------------------------------------------------------
@@ -150,17 +149,18 @@ class GAMReportingClient:
     def list_line_items(self, order_id: str) -> list[dict[str, Any]]:
         """List line items for a given order ID."""
         from googleads import ad_manager
+
         svc = self._service("LineItemService")
         sb = ad_manager.StatementBuilder()
         sb.Where("orderId = :orderId").WithBindVariable("orderId", int(order_id))
         result = svc.getLineItemsByStatement(sb.ToStatement())
         return [
             {
-                "id":               str(li.id),
-                "name":             li.name,
-                "status":           li.status,
+                "id": str(li.id),
+                "name": li.name,
+                "status": li.status,
                 "impressions_goal": getattr(getattr(li, "primaryGoal", None), "units", -1),
-                "cost_type":        getattr(li, "costType", "CPM"),
+                "cost_type": getattr(li, "costType", "CPM"),
             }
             for li in (result.results or [])
         ]
@@ -194,8 +194,10 @@ class GAMReportingClient:
         report_job = {
             "reportQuery": {
                 "dimensions": [
-                    "ORDER_ID", "ORDER_NAME",
-                    "LINE_ITEM_ID", "LINE_ITEM_NAME",
+                    "ORDER_ID",
+                    "ORDER_NAME",
+                    "LINE_ITEM_ID",
+                    "LINE_ITEM_NAME",
                 ],
                 "columns": [
                     "AD_SERVER_IMPRESSIONS",
@@ -204,7 +206,7 @@ class GAMReportingClient:
                 ],
                 "dateRangeType": "CUSTOM_DATE",
                 "startDate": {"year": start.year, "month": start.month, "day": start.day},
-                "endDate":   {"year": today.year, "month": today.month, "day": today.day},
+                "endDate": {"year": today.year, "month": today.month, "day": today.day},
             }
         }
 
@@ -222,6 +224,7 @@ class GAMReportingClient:
 
         # Download and parse CSV
         import io
+
         downloader = self._client.GetDataDownloader(version=self._api_version)
         buf = io.BytesIO()
         downloader.DownloadReportToFile(job_id, "CSV_EXCEL", buf, use_gzip_compression=False)
@@ -238,15 +241,17 @@ class GAMReportingClient:
             parts = line.split(",")
             if len(parts) < 7:
                 continue
-            rows.append({
-                "order_id":       parts[0].strip(),
-                "order_name":     parts[1].strip(),
-                "line_item_id":   parts[2].strip(),
-                "line_item_name": parts[3].strip(),
-                "impressions":    int(parts[4].strip() or 0),
-                "clicks":         int(parts[5].strip() or 0),
-                "revenue_usd":    float(parts[6].strip() or 0),
-            })
+            rows.append(
+                {
+                    "order_id": parts[0].strip(),
+                    "order_name": parts[1].strip(),
+                    "line_item_id": parts[2].strip(),
+                    "line_item_name": parts[3].strip(),
+                    "impressions": int(parts[4].strip() or 0),
+                    "clicks": int(parts[5].strip() or 0),
+                    "revenue_usd": float(parts[6].strip() or 0),
+                }
+            )
         return rows
 
     # -------------------------------------------------------------------------
@@ -273,10 +278,12 @@ class GAMReportingClient:
             entry: dict[str, Any] = {"order_id": oid}
             try:
                 order = self.get_order(oid)
-                entry.update({
-                    "order_name": order.get("name", oid),
-                    "status":     order.get("status", "UNKNOWN"),
-                })
+                entry.update(
+                    {
+                        "order_name": order.get("name", oid),
+                        "status": order.get("status", "UNKNOWN"),
+                    }
+                )
             except Exception as e:
                 entry.update({"order_name": oid, "status": "ERROR", "error": str(e)})
             try:
@@ -292,14 +299,15 @@ class GAMReportingClient:
         except Exception as e:
             report_rows = [{"error": str(e)}]
 
+        ok = [r for r in report_rows if "error" not in r]
         summary = {
-            "impressions": sum(r.get("impressions", 0) for r in report_rows if "error" not in r),
-            "clicks":      sum(r.get("clicks", 0)      for r in report_rows if "error" not in r),
-            "revenue_usd": round(sum(r.get("revenue_usd", 0) for r in report_rows if "error" not in r), 2),
+            "impressions": sum(r.get("impressions", 0) for r in ok),
+            "clicks": sum(r.get("clicks", 0) for r in ok),
+            "revenue_usd": round(sum(r.get("revenue_usd", 0) for r in ok), 2),
         }
 
         return {
-            "orders":      orders_out,
+            "orders": orders_out,
             "report_rows": report_rows,
-            "summary":     summary,
+            "summary": summary,
         }

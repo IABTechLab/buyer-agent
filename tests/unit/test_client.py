@@ -64,14 +64,17 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
+        mock_http = MagicMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+        with patch.object(client, "_make_client", return_value=mock_http):
             products = await client.list_products(skip=0, top=10)
 
         assert len(products) == 1
         assert products[0].id == "prod_1"
         assert products[0].name == "Test Product"
-        mock_get.assert_called_once()
+        mock_http.get.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_product(self, client):
@@ -88,8 +91,11 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
+        mock_http = MagicMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.get = AsyncMock(return_value=mock_response)
+        with patch.object(client, "_make_client", return_value=mock_http):
             product = await client.get_product("prod_123")
 
         assert product.id == "prod_123"
@@ -123,8 +129,11 @@ class TestOpenDirectClient:
             end_date=datetime(2025, 2, 28),
         )
 
-        with patch.object(client._client, "post", new_callable=AsyncMock) as mock_post:
-            mock_post.return_value = mock_response
+        mock_http = MagicMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.post = AsyncMock(return_value=mock_response)
+        with patch.object(client, "_make_client", return_value=mock_http):
             result = await client.create_order("acct_123", order)
 
         assert result.id == "order_new"
@@ -148,8 +157,11 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, "patch", new_callable=AsyncMock) as mock_patch:
-            mock_patch.return_value = mock_response
+        mock_http = MagicMock()
+        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
+        mock_http.__aexit__ = AsyncMock(return_value=False)
+        mock_http.patch = AsyncMock(return_value=mock_response)
+        with patch.object(client, "_make_client", return_value=mock_http):
             result = await client.book_line("acct_123", "order_456", "line_123")
 
         assert result.id == "line_123"

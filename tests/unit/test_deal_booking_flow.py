@@ -846,7 +846,8 @@ class TestApprovalAndBooking:
         """Approving specific IDs books only those."""
         self._setup_pending_approvals(flow)
 
-        result = flow.approve_recommendations(["prod_a", "prod_c"])
+        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
+            result = flow.approve_recommendations(["prod_a", "prod_c"])
 
         assert result["status"] == "success"
         assert result["booked"] == 2
@@ -861,7 +862,8 @@ class TestApprovalAndBooking:
         """approve_all approves every pending recommendation."""
         self._setup_pending_approvals(flow)
 
-        result = flow.approve_all()
+        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
+            result = flow.approve_all()
 
         assert result["status"] == "success"
         assert result["booked"] == 3
@@ -882,7 +884,8 @@ class TestApprovalAndBooking:
         """Booked lines are created with correct fields."""
         self._setup_pending_approvals(flow)
 
-        flow.approve_recommendations(["prod_a"])
+        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
+            flow.approve_recommendations(["prod_a"])
 
         assert len(flow.state.booked_lines) == 1
         booked = flow.state.booked_lines[0]
@@ -890,14 +893,15 @@ class TestApprovalAndBooking:
         assert booked.channel == "branding"
         assert booked.impressions == 500000
         assert booked.cost == 7500.0  # 500000 * 15.0 / 1000
-        assert booked.booking_status == "pending_execution"
+        assert booked.booking_status == "booked"
         assert isinstance(booked.booked_at, datetime)
 
     def test_total_cost_and_impressions(self, flow):
         """Result includes aggregated totals."""
         self._setup_pending_approvals(flow)
 
-        result = flow.approve_all()
+        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
+            result = flow.approve_all()
 
         expected_cost = 7500.0 + 7500.0 + 8000.0
         expected_impressions = 500000 + 300000 + 800000

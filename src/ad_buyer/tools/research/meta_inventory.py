@@ -10,15 +10,18 @@ from ...clients.meta_ads_api_client import MetaAdsAPIClient
 from ...config.settings import settings
 
 _CHANNEL_PLACEMENTS: dict[str, list[str]] = {
-    "social":      ["FACEBOOK_FEED", "INSTAGRAM_FEED", "INSTAGRAM_REELS", "FACEBOOK_VIDEO_FEEDS"],
-    "branding":    ["FACEBOOK_VIDEO_FEEDS", "INSTAGRAM_REELS"],
+    "social": ["FACEBOOK_FEED", "INSTAGRAM_FEED", "INSTAGRAM_REELS", "FACEBOOK_VIDEO_FEEDS"],
+    "branding": ["FACEBOOK_VIDEO_FEEDS", "INSTAGRAM_REELS"],
     "performance": ["FACEBOOK_FEED", "AUDIENCE_NETWORK_REWARDED_VIDEO"],
-    "ctv":         ["INSTAGRAM_REELS"],
+    "ctv": ["INSTAGRAM_REELS"],
 }
 
 
 class MetaInventoryInput(BaseModel):
-    channel: str = Field(default="social", description="IAB channel: social, branding, performance, ctv")
+    channel: str = Field(
+        default="social",
+        description="IAB channel: social, branding, performance, ctv",
+    )
     budget: float = Field(..., description="Total budget in USD")
     objectives: list[str] = Field(default=["brand_awareness"], description="Campaign objectives")
     demographics: dict = Field(default_factory=dict, description="Age/gender targeting")
@@ -84,8 +87,9 @@ Returns: Available Meta placements with reach estimates and CPM."""
             estimated_reach = (lower + upper) // 2 or int(budget * 100)
         except Exception as e:
             estimated_reach = int(budget * 100)
-            return self._format(placements, channel, budget, estimated_reach,
-                                note=f"(estimated — API error: {e})")
+            return self._format(
+                placements, channel, budget, estimated_reach, note=f"(estimated — API error: {e})"
+            )
 
         return self._format(placements, channel, budget, estimated_reach)
 
@@ -106,7 +110,7 @@ Returns: Available Meta placements with reach estimates and CPM."""
         for i, p in enumerate(placements, 1):
             pid = f"meta:{p.lower().replace('_', '-')}"
             fmt = "video" if "VIDEO" in p or "REELS" in p else "display"
-            out += f"""{i}. {p.replace('_', ' ').title()}
+            out += f"""{i}. {p.replace("_", " ").title()}
    Product ID: {pid}
    Publisher: Meta (Facebook/Instagram)
    Channel: {channel}
