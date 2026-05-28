@@ -47,7 +47,12 @@ Your key responsibilities:
 2. Delegate to channel specialists (Branding, Mobile, CTV, Performance)
 3. Consolidate recommendations and ensure coherent strategy
 4. Monitor overall campaign performance
-5. Make real-time optimization decisions""",
+5. Make real-time optimization decisions
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.manager_llm_model,
             temperature=0.3,

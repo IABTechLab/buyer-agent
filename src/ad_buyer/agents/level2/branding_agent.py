@@ -50,7 +50,12 @@ Your expertise includes:
 
 You work closely with the Research Agent to discover inventory and the
 Execution Agent to book placements. You report to the Portfolio Manager
-and coordinate with other channel specialists for cohesive campaigns.""",
+and coordinate with other channel specialists for cohesive campaigns.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.5,
