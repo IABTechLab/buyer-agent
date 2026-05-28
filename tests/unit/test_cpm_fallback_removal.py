@@ -22,7 +22,7 @@ from ad_buyer.models.buyer_identity import (
     BuyerIdentity,
 )
 from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline
-from ad_buyer.tools.dsp import DiscoverInventoryTool, RequestDealTool
+from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, RequestDealTool
 
 
 # ---------------------------------------------------------------------------
