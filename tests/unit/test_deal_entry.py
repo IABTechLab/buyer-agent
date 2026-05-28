@@ -478,45 +478,6 @@ class TestDealDataStructure:
         # metadata key should no longer be present
         assert "metadata" not in data
 
-    def test_deal_data_includes_v2_fields_as_top_level_keys(self):  # noqa: F811
-        """V2 fields must also appear as top-level deal_data keys for save_deal()."""
-        from ad_buyer.tools.deal_library.deal_entry import (
-            ManualDealEntry,
-            create_manual_deal,
-        )
-
-        entry = ManualDealEntry(
-            display_name="V2 Top-Level Deal",
-            seller_url="https://seller.example.com",
-            seller_org="NBCUniversal",
-            seller_domain="nbcuniversal.com",
-            seller_type="PUBLISHER",
-            buyer_org="MediaCo",
-            buyer_id="buyer-001",
-            price_model="CPM",
-            fixed_price_cpm=15.50,
-            bid_floor_cpm=12.00,
-            currency="EUR",
-            media_type="CTV",
-            description="Premium CTV inventory",
-        )
-        result = create_manual_deal(entry)
-
-        data = result.deal_data
-        # These must be top-level keys so save_deal() writes to v2 columns
-        assert data["display_name"] == "V2 Top-Level Deal"
-        assert data["seller_org"] == "NBCUniversal"
-        assert data["seller_domain"] == "nbcuniversal.com"
-        assert data["seller_type"] == "PUBLISHER"
-        assert data["buyer_org"] == "MediaCo"
-        assert data["buyer_id"] == "buyer-001"
-        assert data["price_model"] == "CPM"
-        assert data["fixed_price_cpm"] == 15.50
-        assert data["bid_floor_cpm"] == 12.00
-        assert data["currency"] == "EUR"
-        assert data["media_type"] == "CTV"
-        assert data["description"] == "Premium CTV inventory"
-
     def test_deal_data_v2_fields_absent_when_not_provided(self):
         """Optional v2 fields should be absent from deal_data when not provided."""
         from ad_buyer.tools.deal_library.deal_entry import (
