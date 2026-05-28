@@ -21,7 +21,7 @@ Optionally persists results to a DealStore when one is attached.
 import json
 import logging
 import sqlite3
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 
@@ -30,7 +30,6 @@ from ..models.deals import (
     DealResponse,
     QuoteRequest,
     QuoteResponse,
-    SellerErrorResponse,
 )
 from ..models.linear_tv import CancellationRequest, MakegoodRequest
 
@@ -114,8 +113,8 @@ class DealsClient:
         self,
         seller_url: str,
         *,
-        api_key: Optional[str] = None,
-        bearer_token: Optional[str] = None,
+        api_key: str | None = None,
+        bearer_token: str | None = None,
         timeout: float = _DEFAULT_TIMEOUT,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         deal_store: Any = None,
@@ -376,7 +375,7 @@ class DealsClient:
         Raises:
             DealsClientError: On non-retryable errors or when retries are exhausted.
         """
-        last_error: Optional[DealsClientError] = None
+        last_error: DealsClientError | None = None
 
         for attempt in range(1, self._max_retries + 1):
             try:

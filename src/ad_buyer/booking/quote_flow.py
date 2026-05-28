@@ -12,7 +12,7 @@ This module is used by both DealLibrary and the campaign
 channel specialists for creating deals.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from ..models.buyer_identity import BuyerContext
@@ -137,7 +137,7 @@ class QuoteFlowClient:
         )
 
         # Default flight dates
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not flight_start:
             flight_start = now.strftime("%Y-%m-%d")
         if not flight_end:

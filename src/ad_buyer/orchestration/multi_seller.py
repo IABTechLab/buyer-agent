@@ -31,8 +31,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..clients.capability_client import (
@@ -54,7 +55,6 @@ from .audience_degradation import (
     CannotFulfillPlan,
     DegradationLog,
     DegradationLogEntry,
-    SellerAudienceCapabilities,
     degrade_plan_for_seller,
     synthesize_capabilities_from_unsupported,
 )
@@ -213,8 +213,8 @@ class InventoryRequirements:
     deal_types: list[str]
     content_categories: list[str] = field(default_factory=list)
     excluded_sellers: list[str] = field(default_factory=list)
-    min_impressions: Optional[int] = None
-    max_cpm: Optional[float] = None
+    min_impressions: int | None = None
+    max_cpm: float | None = None
     audience_plan: AudiencePlan | None = None
     audience_strictness: AudienceStrictness | None = None
 
@@ -244,7 +244,7 @@ class DealParams:
     impressions: int
     flight_start: str
     flight_end: str
-    target_cpm: Optional[float] = None
+    target_cpm: float | None = None
     media_type: str = "digital"
     audience_plan: AudiencePlan | None = None
 
@@ -266,9 +266,9 @@ class SellerQuoteResult:
 
     seller_id: str
     seller_url: str
-    quote: Optional[QuoteResponse]
+    quote: QuoteResponse | None
     deal_type: str
-    error: Optional[str]
+    error: str | None
 
 
 @dataclass
@@ -373,10 +373,10 @@ class MultiSellerOrchestrator:
         self,
         registry_client: Any,
         deals_client_factory: Callable[..., Any],
-        event_bus: Optional[Any] = None,
-        quote_normalizer: Optional[QuoteNormalizer] = None,
+        event_bus: Any | None = None,
+        quote_normalizer: QuoteNormalizer | None = None,
         quote_timeout: float = 30.0,
-        capability_client: Optional[CapabilityClient] = None,
+        capability_client: CapabilityClient | None = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
@@ -396,7 +396,7 @@ class MultiSellerOrchestrator:
     async def _emit(
         self,
         event_type: EventType,
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Emit an event to the event bus.  Fail-open."""
@@ -535,7 +535,7 @@ class MultiSellerOrchestrator:
                     error=None,
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 msg = f"Quote request timed out after {self._quote_timeout}s"
                 logger.warning(
                     "Seller %s timed out on quote request", seller.agent_id
@@ -596,7 +596,7 @@ class MultiSellerOrchestrator:
     async def evaluate_and_rank(
         self,
         quote_results: list[SellerQuoteResult],
-        max_cpm: Optional[float] = None,
+        max_cpm: float | None = None,
     ) -> list[NormalizedQuote]:
         """Normalize and rank collected quotes.
 

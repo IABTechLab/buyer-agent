@@ -4,7 +4,7 @@
 """Deal ID request tool for buyer deal workflows."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from crewai.tools import BaseTool
@@ -17,7 +17,6 @@ from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_dom
 from ...clients.unified_client import UnifiedClient
 from ...models.audience_plan import AudiencePlan
 from ...models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     DealRequest,
     DealResponse,
@@ -200,7 +199,7 @@ Returns:
             product = product_result.data
             if not product:
                 return f"Product {product_id} not found."
-              
+
             # Build the seller-bound DealRequest payload so the plan
             # rides on the wire (proposal §5.2 / §5.3 / bead ar-ts30 §18).
             # We construct the payload even when audience_plan is None so
@@ -374,7 +373,7 @@ Returns:
             identity_seed=identity.agency_id or identity.seat_id or "public",
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not flight_start:
             flight_start = now.strftime("%Y-%m-%d")
         if not flight_end:

@@ -12,7 +12,7 @@ to the duplicated pricing logic previously in:
 
 import pytest
 
-from ad_buyer.booking.pricing import PricingCalculator, PricingResult
+from ad_buyer.booking.pricing import PricingCalculator
 from ad_buyer.models.buyer_identity import AccessTier
 
 

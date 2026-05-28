@@ -10,20 +10,17 @@ when sellers have not provided it. Each test targets a specific
 fallback that was previously hardcoded in the codebase.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ad_buyer.booking.quote_flow import QuoteFlowClient
 from ad_buyer.models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     BuyerIdentity,
 )
 from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline
 from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, RequestDealTool
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -241,7 +238,9 @@ class TestQuoteFlowNoFallback:
 
         # Must NOT return a PricingResult with base_price=0
         # Should indicate pricing is unavailable
-        assert result is None or (hasattr(result, "pricing_source") and result.pricing_source == "unavailable")
+        assert result is None or (
+            hasattr(result, "pricing_source") and result.pricing_source == "unavailable"
+        )
 
     def test_null_base_price_returns_unavailable(self, agency_context):
         """Product with basePrice=None should return unavailable."""
@@ -258,7 +257,9 @@ class TestQuoteFlowNoFallback:
 
         result = client.get_pricing(product_null_price)
 
-        assert result is None or (hasattr(result, "pricing_source") and result.pricing_source == "unavailable")
+        assert result is None or (
+            hasattr(result, "pricing_source") and result.pricing_source == "unavailable"
+        )
 
     def test_non_numeric_base_price_returns_unavailable(self, agency_context):
         """Product with non-numeric basePrice should return unavailable."""
@@ -275,7 +276,9 @@ class TestQuoteFlowNoFallback:
 
         result = client.get_pricing(product_bad_price)
 
-        assert result is None or (hasattr(result, "pricing_source") and result.pricing_source == "unavailable")
+        assert result is None or (
+            hasattr(result, "pricing_source") and result.pricing_source == "unavailable"
+        )
 
     def test_valid_price_returns_pricing_result(self, agency_context):
         """Product with valid basePrice should return normal PricingResult."""

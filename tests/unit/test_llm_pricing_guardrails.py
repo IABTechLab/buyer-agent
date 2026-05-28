@@ -19,9 +19,9 @@ import pytest
 
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent
+from ad_buyer.agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
 from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
 from ad_buyer.agents.level2.deal_library_agent import create_deal_library_agent
-from ad_buyer.agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
 from ad_buyer.agents.level2.linear_tv_agent import create_linear_tv_agent
 from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.performance_agent import create_performance_agent
@@ -29,7 +29,6 @@ from ad_buyer.agents.level3.audience_planner_agent import create_audience_planne
 from ad_buyer.agents.level3.execution_agent import create_execution_agent
 from ad_buyer.agents.level3.reporting_agent import create_reporting_agent
 from ad_buyer.agents.level3.research_agent import create_research_agent
-
 
 # ---------------------------------------------------------------------------
 # All agent factory functions, for parametrized testing
