@@ -14,8 +14,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow, BuyerDealFlowStatus
+from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,

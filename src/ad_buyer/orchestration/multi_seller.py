@@ -519,7 +519,7 @@ class MultiSellerOrchestrator:
                     timeout=self._quote_timeout,
                 )
 
-                cpm_display = f"{quote.pricing.final_cpm:.2f}" if quote.pricing.final_cpm is not None else "unavailable"
+                cpm_display = f"{quote.pricing.final_cpm:.2f}" if quote.pricing.final_cpm is not None else "unavailable"  # noqa: E501
                 logger.info(
                     "Received quote %s from seller %s (CPM: %s)",
                     quote.quote_id,
@@ -765,7 +765,7 @@ class MultiSellerOrchestrator:
                     },
                 )
 
-                deal_cpm_display = f"{deal.pricing.final_cpm:.2f}" if deal.pricing.final_cpm is not None else "unavailable"
+                deal_cpm_display = f"{deal.pricing.final_cpm:.2f}" if deal.pricing.final_cpm is not None else "unavailable"  # noqa: E501
                 logger.info(
                     "Booked deal %s from seller %s (CPM: %s)",
                     deal.deal_id,

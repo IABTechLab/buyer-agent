@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -407,7 +407,7 @@ class SetupWizard:
         step = self.get_step(step_number)
         step.status = WizardStepStatus.COMPLETED
         step.config = dict(config)
-        step.completed_at = datetime.now(timezone.utc).isoformat()
+        step.completed_at = datetime.now(UTC).isoformat()
         return step
 
     def skip_step(self, step_number: int) -> WizardStep:
@@ -431,7 +431,7 @@ class SetupWizard:
             )
         step.status = WizardStepStatus.SKIPPED
         step.config = dict(step.defaults)
-        step.completed_at = datetime.now(timezone.utc).isoformat()
+        step.completed_at = datetime.now(UTC).isoformat()
         return step
 
     # -- Auto-detection -----------------------------------------------------
@@ -457,7 +457,7 @@ class SetupWizard:
                     "environment": settings.environment,
                     "api_key": "(configured)",
                 }
-                step1.completed_at = datetime.now(timezone.utc).isoformat()
+                step1.completed_at = datetime.now(UTC).isoformat()
 
         # Step 2: Seller Connections -- detect if seller endpoints configured
         step2 = self.get_step(2)
@@ -468,7 +468,7 @@ class SetupWizard:
                 step2.config = {
                     "seller_endpoints": endpoints,
                 }
-                step2.completed_at = datetime.now(timezone.utc).isoformat()
+                step2.completed_at = datetime.now(UTC).isoformat()
 
         # Steps 3-8 cannot be auto-detected from settings alone;
         # they require user configuration.

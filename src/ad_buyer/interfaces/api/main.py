@@ -6,26 +6,23 @@
 import json
 import logging
 import sqlite3
+import sys
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-import sys
-
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
-from ...time_utils import utc_now
 from ...flows.deal_booking_flow import DealBookingFlow
-from ...models.flow_state import BookingState
 from ...storage import DealStore
 from ...storage.order_store import OrderStore
+from ...time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +67,9 @@ app.add_middleware(
 # Mount MCP server (Streamable HTTP at /mcp)
 # Starlette doesn't call mounted sub-app lifespans, so we must run the
 # session manager ourselves to keep its task group alive.
-from ..mcp_server import mcp as _mcp_server, mount_mcp
+from ..mcp_server import mcp as _mcp_server  # noqa: E402
+from ..mcp_server import mount_mcp  # noqa: E402
+
 mount_mcp(app)
 
 
@@ -89,13 +88,13 @@ async def lifespan(application):
 app.router.lifespan_context = lifespan
 
 # Mount order status/audit router (buyer-nz9)
-from .order_endpoints import create_order_router
+from .order_endpoints import create_order_router  # noqa: E402
 
 # Lazy OrderStore singleton
-_order_store: Optional[OrderStore] = None
+_order_store: OrderStore | None = None
 
 
-def _get_order_store() -> Optional[OrderStore]:
+def _get_order_store() -> OrderStore | None:
     """Return a lazily-initialised OrderStore singleton.
 
     Returns None (and logs a warning) if initialisation fails so that
@@ -160,10 +159,10 @@ async def api_key_auth_middleware(request: Request, call_next):
 jobs: dict[str, dict[str, Any]] = {}
 
 # Lazy DealStore singleton
-_deal_store: Optional[DealStore] = None
+_deal_store: DealStore | None = None
 
 
-def _get_store() -> Optional[DealStore]:
+def _get_store() -> DealStore | None:
     """Return a lazily-initialised DealStore singleton.
 
     Returns None (and logs a warning) if initialisation fails so that
@@ -183,10 +182,10 @@ def _get_store() -> Optional[DealStore]:
 
 
 # Lazy OrderStore singleton
-_order_store: Optional[OrderStore] = None
+_order_store: OrderStore | None = None
 
 
-def _get_order_store() -> Optional[OrderStore]:
+def _get_order_store() -> OrderStore | None:
     """Return a lazily-initialised OrderStore singleton.
 
     Returns None (and logs a warning) if initialisation fails so that
@@ -206,7 +205,7 @@ def _get_order_store() -> Optional[OrderStore]:
 
 
 # Mount buyer order status/audit endpoints
-from .order_endpoints import create_order_router as _create_order_router
+from .order_endpoints import create_order_router as _create_order_router  # noqa: E402
 
 
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
@@ -249,7 +248,7 @@ class CampaignBrief(BaseModel):
     end_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     target_audience: dict[str, Any]
     kpis: dict[str, Any] = Field(default_factory=dict)
-    channels: Optional[list[str]] = None
+    channels: list[str] | None = None
 
 
 class BookingRequest(BaseModel):
@@ -276,10 +275,10 @@ class BookingStatus(BaseModel):
     job_id: str
     status: str
     progress: float
-    budget_allocations: Optional[dict[str, Any]] = None
-    recommendations: Optional[list[dict[str, Any]]] = None
-    booked_lines: Optional[list[dict[str, Any]]] = None
-    errors: Optional[list[str]] = None
+    budget_allocations: dict[str, Any] | None = None
+    recommendations: list[dict[str, Any]] | None = None
+    booked_lines: list[dict[str, Any]] | None = None
+    errors: list[str] | None = None
     created_at: str
     updated_at: str
 
@@ -293,10 +292,10 @@ class ApprovalRequest(BaseModel):
 class ProductSearchRequest(BaseModel):
     """Request to search products."""
 
-    channel: Optional[str] = None
-    format: Optional[str] = None
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
+    channel: str | None = None
+    format: str | None = None
+    min_price: float | None = None
+    max_price: float | None = None
     limit: int = Field(default=10, ge=1, le=50)
 
 
@@ -462,7 +461,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
 
 @app.get("/bookings", tags=["Bookings"])
 async def list_bookings(
-    status: Optional[str] = None,
+    status: str | None = None,
     limit: int = 20,
 ) -> dict[str, Any]:
     """List all booking jobs."""
@@ -510,9 +509,9 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
 
 @app.get("/events", tags=["Events"])
 async def list_events(
-    event_type: Optional[str] = None,
-    flow_id: Optional[str] = None,
-    session_id: Optional[str] = None,
+    event_type: str | None = None,
+    flow_id: str | None = None,
+    session_id: str | None = None,
     limit: int = 50,
 ) -> dict[str, Any]:
     """List events from the event bus.
@@ -569,7 +568,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        result = flow.kickoff()
+        _result = flow.kickoff()
 
         job["progress"] = 0.8
         job["budget_allocations"] = {

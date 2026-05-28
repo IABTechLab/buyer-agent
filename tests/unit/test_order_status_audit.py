@@ -12,10 +12,7 @@ Covers:
 - Audit trail
 """
 
-import json
-import time
-from datetime import datetime, UTC
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
@@ -24,11 +21,8 @@ from ad_buyer.models.state_machine import (
     BuyerDealStatus,
     DealStateMachine,
     InvalidTransitionError,
-    OrderAuditLog,
-    StateTransition,
 )
 from ad_buyer.storage.order_store import OrderStore
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -444,11 +438,10 @@ class TestBuyerOrderEndpoints:
     @pytest.fixture
     def api_client(self, order_store):
         """Create a test client for the buyer API with order endpoints."""
+        from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
         from ad_buyer.interfaces.api.order_endpoints import create_order_router
-
-        from fastapi import FastAPI
 
         test_app = FastAPI()
         router = create_order_router(order_store)

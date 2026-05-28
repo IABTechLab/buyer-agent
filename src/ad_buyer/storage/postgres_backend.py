@@ -9,7 +9,7 @@ Requires asyncpg: pip install asyncpg
 
 import json
 import time
-from typing import Any, Optional
+from typing import Any
 
 from ad_buyer.storage.base import StorageBackend
 
@@ -71,7 +71,7 @@ class PostgresBackend(StorageBackend):
         if self._pool is None:
             raise RuntimeError("Storage not connected. Call connect() first.")
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Retrieve a value by key, respecting TTL."""
         self._ensure_pool()
         async with self._pool.acquire() as conn:
@@ -90,7 +90,7 @@ class PostgresBackend(StorageBackend):
             # asyncpg returns JSONB as native Python objects
             return row["value"]
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Store a value with optional TTL (seconds)."""
         self._ensure_pool()
         expires_at = time.time() + ttl if ttl else None

@@ -3,7 +3,6 @@
 
 """Audience Discovery Tool - Discover available audience signals from sellers."""
 
-from typing import Any, Optional, Type
 
 import httpx
 from crewai.tools import BaseTool
@@ -20,11 +19,11 @@ class AudienceDiscoveryInput(BaseModel):
     seller_endpoint: str = Field(
         description="Seller's capability discovery endpoint URL"
     )
-    signal_types: Optional[list[str]] = Field(
+    signal_types: list[str] | None = Field(
         default=None,
         description="Filter by signal types: identity, contextual, reinforcement",
     )
-    min_coverage: Optional[float] = Field(
+    min_coverage: float | None = Field(
         default=None,
         ge=0,
         le=100,
@@ -44,13 +43,13 @@ class AudienceDiscoveryTool(BaseTool):
     Returns a list of audience signals the seller can provide, including
     coverage percentages and UCP compatibility status. Use this to understand
     what targeting options are available before planning audiences."""
-    args_schema: Type[BaseModel] = AudienceDiscoveryInput
+    args_schema: type[BaseModel] = AudienceDiscoveryInput
 
     def _run(
         self,
         seller_endpoint: str,
-        signal_types: Optional[list[str]] = None,
-        min_coverage: Optional[float] = None,
+        signal_types: list[str] | None = None,
+        min_coverage: float | None = None,
     ) -> str:
         """Execute the audience discovery."""
         return run_async(
@@ -60,8 +59,8 @@ class AudienceDiscoveryTool(BaseTool):
     async def _arun(
         self,
         seller_endpoint: str,
-        signal_types: Optional[list[str]] = None,
-        min_coverage: Optional[float] = None,
+        signal_types: list[str] | None = None,
+        min_coverage: float | None = None,
     ) -> str:
         """Async implementation of audience discovery."""
         client = UCPClient()

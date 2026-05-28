@@ -15,14 +15,12 @@ from datetime import UTC, datetime
 import pytest
 
 from ad_buyer.interfaces.mcp_server import mcp
-from ad_buyer.storage.campaign_store import CampaignStore
-from ad_buyer.storage.pacing_store import PacingStore
 from ad_buyer.models.campaign import (
     ChannelSnapshot,
-    DealSnapshot,
     PacingSnapshot,
 )
-
+from ad_buyer.storage.campaign_store import CampaignStore
+from ad_buyer.storage.pacing_store import PacingStore
 
 # ---------------------------------------------------------------------------
 # Helpers

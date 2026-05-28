@@ -9,8 +9,6 @@ from unittest.mock import patch
 
 import pytest
 
-from ad_buyer.events.bus import EventBus
-
 # ---------------------------------------------------------------------------
 # EventType enum tests
 # ---------------------------------------------------------------------------
@@ -124,7 +122,7 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        callback = lambda e: received.append(e)
+        callback = lambda e: received.append(e)  # noqa: E731
 
         asyncio.get_event_loop().run_until_complete(bus.subscribe("deal.booked", callback))
 

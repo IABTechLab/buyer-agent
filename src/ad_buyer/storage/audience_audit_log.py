@@ -46,8 +46,9 @@ import json
 import logging
 import sqlite3
 import threading
+from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Any, Iterable
+from typing import Any
 
 from .schema import AUDIENCE_AUDIT_LOG_INDEXES, AUDIENCE_AUDIT_LOG_TABLE
 

@@ -71,7 +71,6 @@ from ad_buyer.orchestration.multi_seller import (
 )
 from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline
 
-
 # ===========================================================================
 # Fixtures
 # ===========================================================================
@@ -403,14 +402,14 @@ class TestCampaignPipelineThreeTypeHappyPath:
 # consistent with the unit-level coverage there but framed end-to-end against
 # the same brief-driven 3-type plan the happy-path test uses.
 
-from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
-from ad_buyer.clients.capability_client import CapabilityDiscoveryResult
-from ad_buyer.models.audience_plan import AudienceStrictness
-from ad_buyer.models.deals import DealBookingRequest, DealResponse
-from ad_buyer.orchestration.audience_degradation import (
+from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer  # noqa: E402
+from ad_buyer.clients.capability_client import CapabilityDiscoveryResult  # noqa: E402
+from ad_buyer.models.audience_plan import AudienceStrictness  # noqa: E402
+from ad_buyer.models.deals import DealBookingRequest, DealResponse  # noqa: E402
+from ad_buyer.orchestration.audience_degradation import (  # noqa: E402
     SellerAudienceCapabilities,
 )
-from ad_buyer.storage import audience_audit_log
+from ad_buyer.storage import audience_audit_log  # noqa: E402
 
 
 def _audience_plan_from_brief() -> AudiencePlan:
@@ -554,8 +553,7 @@ def _orchestrator_with_caps(
 
 # `Callable` is needed by the helper above. Imported lazily to keep the
 # test 1 path's imports stable.
-from typing import Callable  # noqa: E402
-
+from collections.abc import Callable  # noqa: E402
 
 # ===========================================================================
 # 2. Capability degradation against a legacy-default seller

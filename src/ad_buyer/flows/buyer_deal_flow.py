@@ -15,7 +15,7 @@ import logging
 import sqlite3
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from crewai import Crew, Task
 from crewai.flow.flow import Flow, listen, start
@@ -25,25 +25,21 @@ from ..agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specia
 from ..clients.sgp_client import SGPClient
 from ..clients.unified_client import UnifiedClient
 from ..config.settings import settings
+from ..events.helpers import emit_event_sync
+from ..events.models import EventType
 from ..models.audience_plan import AudiencePlan
-from ..time_utils import utc_now
 from ..models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     BuyerIdentity,
-    DealRequest,
-    DealResponse,
     DealType,
 )
 from ..models.campaign_brief import CampaignBrief
-from ..events.helpers import emit_event_sync
-from ..events.models import EventType
-from ..models.state_machine import BuyerDealStatus, DealStateMachine, InvalidTransitionError
 from ..pipelines.audience_planner_step import (
     AudiencePlannerResult,
     run_audience_planner_step,
 )
 from ..storage.deal_store import DealStore
+from ..time_utils import utc_now
 from ..tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 from ..tools.research import SGPVendorApprovalTool
 
@@ -68,10 +64,10 @@ class DiscoveredProduct(BaseModel):
     product_id: str
     product_name: str
     publisher: str
-    channel: Optional[str] = None
+    channel: str | None = None
     base_cpm: float
     tiered_cpm: float
-    available_impressions: Optional[int] = None
+    available_impressions: int | None = None
     targeting: list[str] = Field(default_factory=list)
     score: float = Field(default=0.0, description="Match score for the request")
 
@@ -85,25 +81,25 @@ class BuyerDealFlowState(BaseModel):
         default=DealType.PREFERRED_DEAL,
         description="Requested deal type",
     )
-    impressions: Optional[int] = Field(
+    impressions: int | None = Field(
         default=None,
         description="Requested impression volume",
     )
-    max_cpm: Optional[float] = Field(
+    max_cpm: float | None = Field(
         default=None,
         description="Maximum CPM budget",
     )
-    flight_start: Optional[str] = Field(
+    flight_start: str | None = Field(
         default=None,
         description="Deal start date",
     )
-    flight_end: Optional[str] = Field(
+    flight_end: str | None = Field(
         default=None,
         description="Deal end date",
     )
 
     # Buyer context
-    buyer_context: Optional[dict[str, Any]] = Field(
+    buyer_context: dict[str, Any] | None = Field(
         default=None,
         description="Serialized buyer context",
     )
@@ -113,19 +109,19 @@ class BuyerDealFlowState(BaseModel):
         default_factory=list,
         description="Products found during discovery",
     )
-    selected_product_id: Optional[str] = Field(
+    selected_product_id: str | None = Field(
         default=None,
         description="Product selected for deal creation",
     )
 
     # Pricing
-    pricing_details: Optional[dict[str, Any]] = Field(
+    pricing_details: dict[str, Any] | None = Field(
         default=None,
         description="Pricing information for selected product",
     )
 
     # Deal result
-    deal_response: Optional[dict[str, Any]] = Field(
+    deal_response: dict[str, Any] | None = Field(
         default=None,
         description="Created deal information",
     )
@@ -135,7 +131,7 @@ class BuyerDealFlowState(BaseModel):
     # Audience Planner running at receive_request when a CampaignBrief was
     # supplied. None on legacy paths so behavior is unchanged when the
     # caller did not opt into audience targeting (proposal §5.3 / §18).
-    audience_plan: Optional[AudiencePlan] = Field(
+    audience_plan: AudiencePlan | None = Field(
         default=None,
         description="Typed AudiencePlan threaded onto seller-bound calls",
     )
@@ -172,8 +168,8 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         self,
         client: UnifiedClient,
         buyer_context: BuyerContext,
-        store: Optional[DealStore] = None,
-        brief: Optional[CampaignBrief] = None,
+        store: DealStore | None = None,
+        brief: CampaignBrief | None = None,
         sgp_client: SGPClient | None = None,
     ):
         """Initialize the flow with client, buyer context, and optional persistence.
@@ -195,14 +191,14 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
         self._client = client
         self._buyer_context = buyer_context
         self._store = store
-        self._store_deal_id: Optional[str] = None
+        self._store_deal_id: str | None = None
         # Cached brief for audience planning. The planner runs once at
         # receive_request; the resulting plan is held on flow state so
         # downstream stages can reference it without re-running the loop.
-        self._brief: Optional[CampaignBrief] = brief
+        self._brief: CampaignBrief | None = brief
         # Cached planner result for tests / observability (mirrors
         # CampaignPipeline.get_audience_planner_result on Path A).
-        self._audience_planner_result: Optional[AudiencePlannerResult] = None
+        self._audience_planner_result: AudiencePlannerResult | None = None
 
         if sgp_client is None and settings.sgp_api_key:
             sgp_client = SGPClient(
@@ -502,7 +498,7 @@ Return the product_id of the best matching product and explain why.""",
             self.state.status = BuyerDealFlowStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
-    def _extract_product_id(self, text: str) -> Optional[str]:
+    def _extract_product_id(self, text: str) -> str | None:
         """Extract product ID from agent response."""
         import re
 
@@ -607,7 +603,7 @@ Return the product_id of the best matching product and explain why.""",
             ),
         }
 
-    def get_audience_planner_result(self) -> Optional[AudiencePlannerResult]:
+    def get_audience_planner_result(self) -> AudiencePlannerResult | None:
         """Return the Audience Planner output for this flow run, if any.
 
         Populated by ``receive_request`` when a brief was supplied at
@@ -623,14 +619,14 @@ async def run_buyer_deal_flow(
     request: str,
     buyer_identity: BuyerIdentity,
     deal_type: DealType = DealType.PREFERRED_DEAL,
-    impressions: Optional[int] = None,
-    max_cpm: Optional[float] = None,
-    flight_start: Optional[str] = None,
-    flight_end: Optional[str] = None,
-    base_url: Optional[str] = None,
-    store: Optional[DealStore] = None,
-    brief: Optional[CampaignBrief] = None,
-    audience_plan: Optional[AudiencePlan] = None,
+    impressions: int | None = None,
+    max_cpm: float | None = None,
+    flight_start: str | None = None,
+    flight_end: str | None = None,
+    base_url: str | None = None,
+    store: DealStore | None = None,
+    brief: CampaignBrief | None = None,
+    audience_plan: AudiencePlan | None = None,
 ) -> dict[str, Any]:
     """Convenience function to run the buyer deal flow.
 

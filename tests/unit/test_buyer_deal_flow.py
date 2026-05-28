@@ -19,10 +19,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ad_buyer.flows.buyer_deal_flow import (
-    DiscoveredProduct,
     BuyerDealFlow,
     BuyerDealFlowState,
     BuyerDealFlowStatus,
+    DiscoveredProduct,
     run_buyer_deal_flow,
 )
 from ad_buyer.models.buyer_identity import (

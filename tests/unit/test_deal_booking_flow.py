@@ -15,7 +15,7 @@ Covers:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -209,7 +209,7 @@ class TestReceiveCampaignBrief:
     def test_updated_at_is_set(self, flow, valid_campaign_brief):
         """updated_at timestamp is refreshed on success."""
         flow.state.campaign_brief = valid_campaign_brief
-        before = flow.state.updated_at
+        _before = flow.state.updated_at
 
         flow.receive_campaign_brief()
 
@@ -382,7 +382,7 @@ class TestParseAllocations:
 
     def test_json_embedded_in_text(self, flow_with_brief):
         """JSON embedded in surrounding text is extracted."""
-        text = 'Here is my analysis:\n{"branding": {"budget": 50000, "percentage": 50, "rationale": "Test"}}\nDone.'
+        text = 'Here is my analysis:\n{"branding": {"budget": 50000, "percentage": 50, "rationale": "Test"}}\nDone.'  # noqa: E501
 
         result = flow_with_brief._parse_allocations(text)
 
@@ -466,7 +466,7 @@ class TestAllocateBudget:
         mock_crew.kickoff.return_value = allocation_json
         mock_create_crew.return_value = mock_crew
 
-        result = flow_with_brief.allocate_budget({"status": "success"})
+        _result = flow_with_brief.allocate_budget({"status": "success"})
 
         assert "branding" in flow_with_brief.state.budget_allocations
         assert "ctv" in flow_with_brief.state.budget_allocations
@@ -725,7 +725,7 @@ class TestParseRecommendations:
 
     def test_json_in_surrounding_text(self, flow):
         """JSON array embedded in text is still parsed."""
-        text = 'Recommendations:\n[{"product_id": "x", "product_name": "Test", "publisher": "P", "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'
+        text = 'Recommendations:\n[{"product_id": "x", "product_name": "Test", "publisher": "P", "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'  # noqa: E501
 
         recs = flow._parse_recommendations(text, "ctv")
 
@@ -961,7 +961,7 @@ class TestGetStatus:
                 impressions=100000,
                 cost=1500,
                 booking_status="booked",
-                booked_at=datetime.now(timezone.utc),
+                booked_at=datetime.now(UTC),
             )
         ]
         flow.state.execution_status = ExecutionStatus.COMPLETED

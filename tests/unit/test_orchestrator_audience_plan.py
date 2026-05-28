@@ -20,14 +20,13 @@ from dataclasses import asdict
 import pytest
 
 from ad_buyer.models.audience_plan import AudiencePlan, AudienceRef
+from ad_buyer.models.campaign_brief import ChannelType
 from ad_buyer.models.deals import DealBookingRequest, QuoteRequest
 from ad_buyer.orchestration.multi_seller import (
     DealParams,
     InventoryRequirements,
 )
 from ad_buyer.pipelines.campaign_pipeline import CampaignPlan, ChannelPlan
-from ad_buyer.models.campaign_brief import ChannelType
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -24,7 +24,6 @@ import httpx
 import pytest
 from httpx import ASGITransport
 
-
 # ---------------------------------------------------------------------------
 # Route presence — always passes if mount_mcp works
 # ---------------------------------------------------------------------------
@@ -119,10 +118,10 @@ async def test_streamable_http_initialize_handshake():
 
     # Must not be 404 (route not found) or 405 (method not allowed)
     assert response.status_code != 404, (
-        f"POST /mcp returned 404 — Streamable HTTP transport not mounted"
+        "POST /mcp returned 404 — Streamable HTTP transport not mounted"
     )
     assert response.status_code != 405, (
-        f"POST /mcp returned 405 — wrong method for Streamable HTTP"
+        "POST /mcp returned 405 — wrong method for Streamable HTTP"
     )
 
     # Happy path: 200 with MCP initialize response

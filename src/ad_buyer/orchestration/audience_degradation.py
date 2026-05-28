@@ -44,7 +44,8 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import Any, Iterable, Literal
+from collections.abc import Iterable
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 

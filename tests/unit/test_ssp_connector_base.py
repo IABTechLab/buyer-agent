@@ -26,7 +26,6 @@ from ad_buyer.tools.deal_library.ssp_connector_base import (
     SSPRateLimitError,
 )
 
-
 # ---------------------------------------------------------------------------
 # Minimal concrete subclass for testing
 # ---------------------------------------------------------------------------

@@ -12,7 +12,8 @@ Usage:
 """
 
 import asyncio
-from ad_buyer.clients import UnifiedClient, Protocol
+
+from ad_buyer.clients import Protocol, UnifiedClient
 
 
 async def main():

@@ -18,7 +18,6 @@ Bead: ar-gkbr (proposal §5.7 layer 1+2 + §6 row 13).
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -27,9 +26,9 @@ import pytest
 
 from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ad_buyer.clients.capability_client import (
+    DEFAULT_CACHE_TTL_SECONDS,
     CapabilityClient,
     CapabilityDiscoveryResult,
-    DEFAULT_CACHE_TTL_SECONDS,
 )
 from ad_buyer.clients.deals_client import DealsClientError
 from ad_buyer.models.audience_plan import (
@@ -43,10 +42,8 @@ from ad_buyer.orchestration.audience_degradation import (
     SellerAudienceCapabilities,
 )
 from ad_buyer.orchestration.multi_seller import (
-    DealSelection,
     MultiSellerOrchestrator,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

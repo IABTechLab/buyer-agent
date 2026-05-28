@@ -1,5 +1,6 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
+# ruff: noqa: E501  (long lines unavoidable in docstrings/string literals)
 
 """OpenRTB carrier mapping for `AudiencePlan` (impression-time wire shape).
 

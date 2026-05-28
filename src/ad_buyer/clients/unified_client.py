@@ -559,7 +559,7 @@ class UnifiedClient:
 
                 result.data["pricing"] = {
                     "base_price": pricing.base_price,
-                    "tiered_price": round(pricing.final_price, 2) if pricing.final_price is not None else None,
+                    "tiered_price": round(pricing.final_price, 2) if pricing.final_price is not None else None,  # noqa: E501
                     "tier": tier_obj.value if self.buyer_identity else "public",
                     "tier_discount": discount if self.buyer_identity else 0,
                     "volume_discount": pricing.volume_discount,
@@ -572,8 +572,8 @@ class UnifiedClient:
                 result.data["pricing"] = {
                     "base_price": None,
                     "tiered_price": None,
-                    "tier": self.buyer_identity.get_access_tier().value if self.buyer_identity else "public",
-                    "tier_discount": self.buyer_identity.get_discount_percentage() if self.buyer_identity else 0,
+                    "tier": self.buyer_identity.get_access_tier().value if self.buyer_identity else "public",  # noqa: E501
+                    "tier_discount": self.buyer_identity.get_discount_percentage() if self.buyer_identity else 0,  # noqa: E501
                     "volume_discount": 0.0,
                     "requested_volume": volume,
                     "deal_type": deal_type,

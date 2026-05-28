@@ -28,14 +28,16 @@ import pytest
 # Optional MCP SDK imports
 # ---------------------------------------------------------------------------
 try:
-    from mcp.client.streamable_http import streamable_http_client
     from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
     MCP_HTTP_AVAILABLE = True
 except ImportError:
     try:
         # Older SDK versions use the camelCase name
-        from mcp.client.streamable_http import streamablehttp_client as streamable_http_client  # type: ignore[no-redef]
         from mcp import ClientSession
+        from mcp.client.streamable_http import (
+            streamablehttp_client as streamable_http_client,  # type: ignore[no-redef]
+        )
         MCP_HTTP_AVAILABLE = True
     except ImportError:
         MCP_HTTP_AVAILABLE = False
@@ -72,7 +74,7 @@ async def _call(session: "ClientSession", name: str, args: dict | None = None):
             session.call_tool(name, arguments=args or {}),
             timeout=TOOL_TIMEOUT,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         pytest.fail(f"Tool '{name}' timed out after {TOOL_TIMEOUT}s on /mcp")
 
     content = result.content

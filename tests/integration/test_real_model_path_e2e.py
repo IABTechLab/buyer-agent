@@ -29,7 +29,6 @@ import pytest
 
 from ad_buyer.clients.ucp_client import (
     UCPClient,
-    _SIMILARITY_THRESHOLDS,
     _similarity_thresholds_for_mode,
 )
 from ad_buyer.config.settings import settings
@@ -40,10 +39,8 @@ from ad_buyer.models.audience_plan import (
     ComplianceContext,
 )
 from ad_buyer.tools.audience.embedding_mint import (
-    EmbeddingMintTool,
     embedding_mode_label,
 )
-
 
 try:
     import sentence_transformers  # noqa: F401

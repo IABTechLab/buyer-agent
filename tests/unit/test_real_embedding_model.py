@@ -8,11 +8,12 @@ import os
 
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
-import pytest
 from unittest.mock import patch
 
-from ad_buyer.config.settings import settings
+import pytest
+
 from ad_buyer.clients.ucp_client import UCPClient
+from ad_buyer.config.settings import settings
 
 try:
     import sentence_transformers  # noqa: F401
@@ -140,6 +141,7 @@ class TestComplianceContextProvenance:
 class TestEmbeddingModeLabel:
     def test_label_per_mode(self):
         from unittest.mock import patch
+
         from ad_buyer.config.settings import settings
         from ad_buyer.tools.audience.embedding_mint import embedding_mode_label
 
@@ -155,6 +157,7 @@ class TestEmbeddingModeLabel:
 
     def test_mint_tool_format_uses_dynamic_label(self):
         from unittest.mock import patch
+
         from ad_buyer.config.settings import settings
         from ad_buyer.tools.audience.embedding_mint import EmbeddingMintTool
 

@@ -7,16 +7,15 @@ Mirrors the seller-agent's factory pattern for structural consistency.
 Supports SQLite (default), Redis, and Hybrid backends.
 """
 
-from typing import Optional
 
 from ad_buyer.storage.base import StorageBackend
 from ad_buyer.storage.sqlite_backend import SQLiteBackend
 
 
 def get_storage_backend(
-    storage_type: Optional[str] = None,
-    database_url: Optional[str] = None,
-    redis_url: Optional[str] = None,
+    storage_type: str | None = None,
+    database_url: str | None = None,
+    redis_url: str | None = None,
 ) -> StorageBackend:
     """Create and return the appropriate storage backend.
 
@@ -88,7 +87,7 @@ def get_storage_backend(
 
 
 # Global storage instance (lazy initialization)
-_storage_instance: Optional[StorageBackend] = None
+_storage_instance: StorageBackend | None = None
 
 
 async def get_storage() -> StorageBackend:

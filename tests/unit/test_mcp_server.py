@@ -90,7 +90,7 @@ class TestMCPMounting:
                 route_paths.append(route.path)
 
         # Streamable HTTP transport (canonical)
-        assert any("/mcp" == str(p) or (str(p).startswith("/mcp") and not str(p).startswith("/mcp-sse")) for p in route_paths), (
+        assert any("/mcp" == str(p) or (str(p).startswith("/mcp") and not str(p).startswith("/mcp-sse")) for p in route_paths), (  # noqa: E501
             f"Expected /mcp (Streamable HTTP) in buyer API app routes, got: {route_paths}"
         )
         # Legacy SSE transport

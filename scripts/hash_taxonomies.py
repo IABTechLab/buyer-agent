@@ -122,7 +122,7 @@ def main() -> int:
             and agentic.get("files") == computed["files"]
         )
         if not ok:
-            print("MISMATCH between computed agentic hashes and taxonomies.lock.json", file=sys.stderr)
+            print("MISMATCH between computed agentic hashes and taxonomies.lock.json", file=sys.stderr)  # noqa: E501
             print(f"  computed sha256: {computed['sha256']}", file=sys.stderr)
             print(f"  lock     sha256: {agentic.get('sha256')}", file=sys.stderr)
             return 1
