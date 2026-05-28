@@ -87,7 +87,12 @@ def create_audience_planner_agent(
         - Portfolio Manager on campaign audience strategy
         - Channel Specialists on channel-specific audience availability
         - Research Agent on inventory discovery
-        - Sellers' Audience Validator agents via UCP exchange""",
+        - Sellers' Audience Validator agents via UCP exchange
+
+        CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+        explicitly provided by sellers through quotes or media kits. If no pricing is
+        available from the seller, state clearly that pricing requires negotiation. Do
+        not fill in CPMs from market knowledge or training data.""",
         verbose=verbose,
         allow_delegation=False,  # Makes final audience decisions
         memory=True,

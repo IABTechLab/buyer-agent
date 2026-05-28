@@ -4,7 +4,7 @@
 """Deal ID request tool for buyer deal workflows."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from crewai.tools import BaseTool
@@ -17,7 +17,6 @@ from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_dom
 from ...clients.unified_client import UnifiedClient
 from ...models.audience_plan import AudiencePlan
 from ...models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     DealRequest,
     DealResponse,
@@ -200,7 +199,7 @@ Returns:
             product = product_result.data
             if not product:
                 return f"Product {product_id} not found."
-              
+
             # Build the seller-bound DealRequest payload so the plan
             # rides on the wire (proposal §5.2 / §5.3 / bead ar-ts30 §18).
             # We construct the payload even when audience_plan is None so
@@ -237,6 +236,14 @@ Returns:
                 target_cpm=target_cpm,
                 audience_plan=audience_plan,
             )
+
+            if deal_response is None:
+                product_name = product.get("name", product_id)
+                return (
+                    f"Error: No pricing available for product '{product_name}' "
+                    f"(ID: {product_id}). Seller has not provided a CPM. "
+                    "Negotiation required before deal creation."
+                )
 
             formatted = self._format_deal_response(deal_response, audience_plan)
             if approval_banner:
@@ -334,18 +341,20 @@ Returns:
         flight_end: str | None,
         target_cpm: float | None,
         audience_plan: AudiencePlan | None = None,
-    ) -> DealResponse:
+    ) -> DealResponse | None:
         """Create a deal response with calculated pricing.
 
         Uses the centralized PricingCalculator and deal ID generator
         from ad_buyer.booking to avoid duplicated logic.
+
+        Returns None when the product has no valid pricing available.
         """
         tier = self._buyer_context.identity.get_access_tier()
         discount = self._buyer_context.identity.get_discount_percentage()
-        base_price = product.get("basePrice", product.get("price", 20.0))
+        base_price = product.get("basePrice", product.get("price"))
 
         if not isinstance(base_price, (int, float)):
-            base_price = 20.0
+            return None
 
         calculator = PricingCalculator()
         pricing = calculator.calculate(
@@ -364,7 +373,7 @@ Returns:
             identity_seed=identity.agency_id or identity.seat_id or "public",
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not flight_start:
             flight_start = now.strftime("%Y-%m-%d")
         if not flight_end:
