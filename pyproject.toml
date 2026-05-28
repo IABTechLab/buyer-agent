@@ -28,6 +28,10 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.5.0",
     "mypy>=1.11.0",
+    # flask is imported transitively by src/ad_buyer/demo/{campaign_demo,deal_library_dashboard}.py
+    # which the demo Flask-app unit tests under tests/unit/ import. Without this,
+    # pytest collection fails with ModuleNotFoundError before any tests run.
+    "flask>=3.0",
 ]
 docs = [
     "mkdocs-material>=9.5.0",
