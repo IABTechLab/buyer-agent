@@ -230,9 +230,13 @@ class TestStorageFactory:
         with pytest.raises(ValueError, match="Unknown storage type"):
             get_storage_backend(storage_type="invalid")
 
-    def test_factory_redis_requires_url(self):
+    def test_factory_redis_requires_url(self, monkeypatch):
+        # Ensure ambient REDIS_URL (e.g. set by CI) does not satisfy the check.
+        from ad_buyer.config.settings import settings
+
+        monkeypatch.setattr(settings, "redis_url", None, raising=False)
         with pytest.raises(ValueError, match="Redis URL required"):
-            get_storage_backend(storage_type="redis")
+            get_storage_backend(storage_type="redis", redis_url=None)
 
     def test_factory_hybrid_requires_postgres_url(self):
         with pytest.raises(ValueError, match="PostgreSQL URL required"):
@@ -242,11 +246,16 @@ class TestStorageFactory:
                 redis_url="redis://localhost:6379/0",
             )
 
-    def test_factory_hybrid_requires_redis_url(self):
+    def test_factory_hybrid_requires_redis_url(self, monkeypatch):
+        # Ensure ambient REDIS_URL (e.g. set by CI) does not satisfy the check.
+        from ad_buyer.config.settings import settings
+
+        monkeypatch.setattr(settings, "redis_url", None, raising=False)
         with pytest.raises(ValueError, match="Redis URL required"):
             get_storage_backend(
                 storage_type="hybrid",
                 database_url="postgresql+asyncpg://user:pass@localhost/db",
+                redis_url=None,
             )
 
     def test_sqlite_backend_is_storage_backend(self):
