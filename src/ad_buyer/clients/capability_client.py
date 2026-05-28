@@ -41,8 +41,9 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 
@@ -57,7 +58,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _legacy_default_capabilities() -> "SellerAudienceCapabilities":
+def _legacy_default_capabilities() -> SellerAudienceCapabilities:
     """Return `SellerAudienceCapabilities.legacy_default()` (deferred import).
 
     Wraps the deferred import so call sites stay readable. The first call
@@ -71,7 +72,7 @@ def _legacy_default_capabilities() -> "SellerAudienceCapabilities":
     return _SAC.legacy_default()
 
 
-def _validate_capabilities(block: dict[str, Any]) -> "SellerAudienceCapabilities":
+def _validate_capabilities(block: dict[str, Any]) -> SellerAudienceCapabilities:
     """Parse a JSON block into `SellerAudienceCapabilities` (deferred import)."""
 
     from ..orchestration.audience_degradation import (

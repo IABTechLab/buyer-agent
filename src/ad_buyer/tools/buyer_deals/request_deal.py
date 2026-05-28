@@ -38,7 +38,7 @@ class RequestDealInput(BaseModel):
     )
     deal_type: str = Field(
         default="PD",
-        description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",
+        description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",  # noqa: E501
     )
     impressions: int | None = Field(
         default=None,

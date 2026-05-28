@@ -28,14 +28,13 @@ References:
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Type
+from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...clients.ucp_client import UCPClient
 from ...models.audience_plan import AudienceRef, ComplianceContext
-
 
 # Static fallback label preserved for backward compatibility with
 # existing imports (`from ad_buyer.tools.audience import
@@ -140,7 +139,7 @@ class EmbeddingMintTool(BaseTool):
         "is currently a SHA256-seeded mock (bead §22 will swap in a real "
         "model)."
     )
-    args_schema: Type[BaseModel] = EmbeddingMintInput
+    args_schema: type[BaseModel] = EmbeddingMintInput
 
     # Public attribute that renders the active mode's label per the
     # current `settings.embedding_mode`. Backward-compat default points
@@ -198,7 +197,7 @@ class EmbeddingMintTool(BaseTool):
         # description because they together define the audience identity;
         # the consent fields are policy and may vary across activations
         # without the underlying audience changing.
-        seed_payload = f"{name}\x00{description}".encode("utf-8")
+        seed_payload = f"{name}\x00{description}".encode()
         digest = hashlib.sha256(seed_payload).hexdigest()
         identifier = f"emb://{digest}"
 

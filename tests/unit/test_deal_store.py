@@ -766,7 +766,7 @@ class TestFlowIntegration:
 
     def test_persist_deal_helper_without_store(self):
         """When store is None, no persistence happens (no error)."""
-        store: Optional[DealStore] = None
+        store: DealStore | None = None
         # This simulates the guard pattern in flows
         if store is not None:
             store.save_deal(
@@ -956,7 +956,7 @@ class TestEdgeCases:
     def test_list_deals_created_after_filter(self, deal_store):
         """list_deals created_after filter works correctly."""
         # Create a deal, then filter by a time before it
-        did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
+        _did = deal_store.save_deal(seller_url="http://a.com", product_id="p1")
         # Filter with a very old date should include it
         results = deal_store.list_deals(created_after="2000-01-01T00:00:00Z")
         assert len(results) == 1

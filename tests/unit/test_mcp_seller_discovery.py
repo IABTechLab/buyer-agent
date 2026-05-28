@@ -10,14 +10,13 @@ bead: buyer-nob
 """
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ad_buyer.interfaces.mcp_server import mcp
 from ad_buyer.media_kit.models import MediaKit, MediaKitError, PackageSummary
 from ad_buyer.registry.models import AgentCapability, AgentCard, TrustLevel
-
 
 # ---------------------------------------------------------------------------
 # Helpers

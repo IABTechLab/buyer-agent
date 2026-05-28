@@ -511,7 +511,7 @@ class DealsClient:
                 deal_type=request.deal_type,
                 status="quoted",
                 price=quote.pricing.final_cpm if quote.pricing.final_cpm is not None else 0.0,
-                original_price=quote.pricing.base_cpm if quote.pricing.base_cpm is not None else 0.0,
+                original_price=quote.pricing.base_cpm if quote.pricing.base_cpm is not None else 0.0,  # noqa: E501
                 impressions=quote.terms.impressions,
                 flight_start=quote.terms.flight_start,
                 flight_end=quote.terms.flight_end,

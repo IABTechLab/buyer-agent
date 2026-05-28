@@ -27,8 +27,8 @@ import pytest_asyncio
 # Optional pytest-asyncio support — skip gracefully if not installed
 # -------------------------------------------------------------------------
 try:
-    from mcp.client.sse import sse_client
     from mcp import ClientSession
+    from mcp.client.sse import sse_client
     MCP_AVAILABLE = True
 except ImportError:
     MCP_AVAILABLE = False

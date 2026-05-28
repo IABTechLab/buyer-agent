@@ -789,7 +789,9 @@ class TestModuleImports:
 
     def test_index_exchange_connector_importable(self):
         """IndexExchangeConnector can be imported from the connectors package."""
-        from ad_buyer.tools.deal_library.connectors.index_exchange import IndexExchangeConnector  # noqa: F401
+        from ad_buyer.tools.deal_library.connectors.index_exchange import (
+            IndexExchangeConnector,  # noqa: F401
+        )
 
     def test_index_exchange_connector_in_connectors_init(self):
         """IndexExchangeConnector is exported from the connectors __init__."""

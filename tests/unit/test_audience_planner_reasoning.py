@@ -35,18 +35,11 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 
-from ad_buyer.models.audience_plan import (
-    AudiencePlan,
-    AudienceRef,
-    AudienceStrictness,
-    ComplianceContext,
-)
 from ad_buyer.models.campaign_brief import (
     CampaignBrief,
     parse_campaign_brief,
 )
 from ad_buyer.pipelines.audience_planner_reasoning import (
-    ReasoningResult,
     classify_intent,
     pick_primary,
     run_audience_reasoning,
@@ -57,7 +50,6 @@ from ad_buyer.tools.audience import (
     CoverageEstimationTool,
     EmbeddingMintTool,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

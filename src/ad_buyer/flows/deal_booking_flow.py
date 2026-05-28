@@ -7,7 +7,7 @@ import json
 import logging
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from crewai.flow.flow import Flow, listen, or_, start
@@ -154,7 +154,7 @@ class DealBookingFlow(Flow[BookingState]):
             return {"status": "failed", "errors": self.state.errors}
 
         self.state.execution_status = ExecutionStatus.BRIEF_RECEIVED
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         # Emit campaign.created event
         emit_event_sync(
@@ -203,7 +203,7 @@ class DealBookingFlow(Flow[BookingState]):
             gaps = self._identify_audience_gaps(target_audience, coverage_estimates)
             self.state.audience_gaps = gaps
 
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {
                 "status": "success",
@@ -332,7 +332,7 @@ class DealBookingFlow(Flow[BookingState]):
                     )
 
             self.state.execution_status = ExecutionStatus.BUDGET_ALLOCATED
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             # Emit budget.allocated event
             emit_event_sync(
@@ -413,7 +413,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "branding")
             self.state.channel_recommendations["branding"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "branding", "status": "success", "count": len(recommendations)}
 
@@ -442,7 +442,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "ctv")
             self.state.channel_recommendations["ctv"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "ctv", "status": "success", "count": len(recommendations)}
 
@@ -471,7 +471,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
             self.state.channel_recommendations["mobile_app"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "mobile_app", "status": "success", "count": len(recommendations)}
 
@@ -500,7 +500,7 @@ class DealBookingFlow(Flow[BookingState]):
 
             recommendations = self._parse_recommendations(str(result), "performance")
             self.state.channel_recommendations["performance"] = recommendations
-            self.state.updated_at = datetime.now(timezone.utc)
+            self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "performance", "status": "success", "count": len(recommendations)}
 
@@ -574,7 +574,7 @@ class DealBookingFlow(Flow[BookingState]):
                 self.state.pending_approvals.append(rec)
 
         self.state.execution_status = ExecutionStatus.AWAITING_APPROVAL
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         # Persist awaiting-approval status for each recommendation's deal
         if self._store is not None:
@@ -624,7 +624,7 @@ class DealBookingFlow(Flow[BookingState]):
                 rec.status = "rejected"
 
         self.state.execution_status = ExecutionStatus.EXECUTING_BOOKINGS
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         return self._execute_bookings()
 
@@ -659,7 +659,7 @@ class DealBookingFlow(Flow[BookingState]):
                 impressions=rec.impressions,
                 cost=rec.cost,
                 booking_status="pending_execution",
-                booked_at=datetime.now(timezone.utc),
+                booked_at=datetime.now(UTC),
             )
             self.state.booked_lines.append(booked)
 
@@ -670,7 +670,7 @@ class DealBookingFlow(Flow[BookingState]):
                 self._persist_deal_status(deal_id, "booked")
 
         self.state.execution_status = ExecutionStatus.COMPLETED
-        self.state.updated_at = datetime.now(timezone.utc)
+        self.state.updated_at = datetime.now(UTC)
 
         # Emit deal.booked event for each booked line
         for booked in self.state.booked_lines:

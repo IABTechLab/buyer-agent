@@ -83,7 +83,7 @@ class TestCORSConfiguration:
         assert origins == ["https://app.example.com", "https://admin.example.com"]
 
     def test_app_cors_middleware_uses_settings(self):
-        """The FastAPI app should use settings-based origins (wildcard is acceptable for MCP server)."""
+        """The FastAPI app should use settings-based origins (wildcard is acceptable for MCP server)."""  # noqa: E501
         from ad_buyer.interfaces.api.main import app
 
         # Find the CORSMiddleware in the app's middleware stack

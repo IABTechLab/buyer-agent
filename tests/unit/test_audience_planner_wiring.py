@@ -64,7 +64,6 @@ from ad_buyer.tools.audience import (
     TaxonomyLookupTool,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures (mirror test_campaign_pipeline.py at minimum)
 # ---------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (long lines unavoidable in docstrings/string literals)
 """E2-10: cross-repo schema-drift hardening.
 
 Asserts that the buyer's `AudienceRef`/`AudiencePlan`/`ComplianceContext`
@@ -33,7 +34,6 @@ from ad_buyer.models.audience_plan import (
     AudienceRef,
     ComplianceContext,
 )
-
 
 CANONICAL_SCHEMA_PATH = Path(
     "/Users/aidancardella/dev/agent_range/.worktrees/audience-extension/docs/api/audience_plan_schemas.json"

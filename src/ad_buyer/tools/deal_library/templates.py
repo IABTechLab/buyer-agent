@@ -33,8 +33,6 @@ from typing import Any
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...storage.deal_store import DealStore
-
 logger = logging.getLogger(__name__)
 
 # Valid actions for both tools

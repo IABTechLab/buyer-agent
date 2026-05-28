@@ -31,19 +31,18 @@ bead: ar-llj4, ar-uxpw
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
 import random
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
-from ..events.bus import EventBus, InMemoryEventBus
+from ..events.bus import InMemoryEventBus
 from ..events.models import Event, EventType
 from ..models.campaign import (
     ChannelSnapshot,
@@ -51,12 +50,8 @@ from ..models.campaign import (
     PacingSnapshot,
 )
 from ..models.campaign_brief import (
-    CampaignBrief,
-    ChannelAllocation,
-    ChannelType,
     parse_campaign_brief,
 )
-from ..models.state_machine import CampaignStatus
 from ..pacing.engine import BudgetPacingEngine, PacingConfig
 from ..reporting.campaign_report import CampaignReporter
 from ..storage.campaign_store import CampaignStore
@@ -86,8 +81,8 @@ def _build_sample_briefs() -> list[dict[str, Any]]:
                 "flight_start": "2026-07-01",
                 "flight_end": "2026-09-30",
                 "channels": [
-                    {"channel": "CTV", "budget_pct": 60, "format_prefs": ["video_30s", "video_15s"]},
-                    {"channel": "DISPLAY", "budget_pct": 40, "format_prefs": ["300x250", "728x90", "160x600"]},
+                    {"channel": "CTV", "budget_pct": 60, "format_prefs": ["video_30s", "video_15s"]},  # noqa: E501
+                    {"channel": "DISPLAY", "budget_pct": 40, "format_prefs": ["300x250", "728x90", "160x600"]},  # noqa: E501
                 ],
                 "target_audience": ["IAB-AUD-1001", "IAB-AUD-1045"],
                 "kpis": [
@@ -137,7 +132,7 @@ def _build_sample_briefs() -> list[dict[str, Any]]:
                 "flight_start": "2026-10-01",
                 "flight_end": "2026-12-31",
                 "channels": [
-                    {"channel": "DISPLAY", "budget_pct": 100, "format_prefs": ["300x250", "320x50"]},
+                    {"channel": "DISPLAY", "budget_pct": 100, "format_prefs": ["300x250", "320x50"]},  # noqa: E501
                 ],
                 "target_audience": ["IAB-AUD-3001"],
                 "kpis": [
@@ -185,7 +180,7 @@ class DemoPipelineHelper:
         self._creative_results: dict[str, list] = {}
 
     def _emit_sync(self, event_type: EventType, campaign_id: str = "",
-                   payload: Optional[dict] = None) -> None:
+                   payload: dict | None = None) -> None:
         """Emit an event synchronously to the InMemoryEventBus."""
         event = Event(
             event_type=event_type,
@@ -432,13 +427,13 @@ class DemoPipelineHelper:
             raise KeyError(f"Campaign not found: {campaign_id}")
 
         booking = self._booking_results.get(campaign_id, {})
-        plan = self._plans.get(campaign_id)
+        _plan = self._plans.get(campaign_id)
 
         # Generate simulated creative assets matched to channels
         creative_specs = {
             "CTV": [
-                ("CTV Hero Spot 30s", "video", {"duration": "30s", "resolution": "1920x1080"}, "valid"),
-                ("CTV Bumper 15s", "video", {"duration": "15s", "resolution": "1920x1080"}, "valid"),
+                ("CTV Hero Spot 30s", "video", {"duration": "30s", "resolution": "1920x1080"}, "valid"),  # noqa: E501
+                ("CTV Bumper 15s", "video", {"duration": "15s", "resolution": "1920x1080"}, "valid"),  # noqa: E501
             ],
             "DISPLAY": [
                 ("Leaderboard 728x90", "display", {"width": 728, "height": 90}, "valid"),
@@ -449,7 +444,7 @@ class DemoPipelineHelper:
                 ("Audio Spot 30s", "audio", {"duration": "30s", "format": "mp3"}, "valid"),
             ],
             "NATIVE": [
-                ("Native Article Card", "native", {"headline_max": 50, "image": "1200x627"}, "valid"),
+                ("Native Article Card", "native", {"headline_max": 50, "image": "1200x627"}, "valid"),  # noqa: E501
             ],
             "DOOH": [
                 ("DOOH Full Screen", "display", {"width": 1920, "height": 1080}, "valid"),
@@ -472,7 +467,7 @@ class DemoPipelineHelper:
                     asset_name=spec_name,
                     asset_type=asset_type,
                     format_spec=json.dumps(format_spec),
-                    source_url=f"https://cdn.demo.com/creatives/{spec_name.lower().replace(' ', '-')}.{asset_type}",
+                    source_url=f"https://cdn.demo.com/creatives/{spec_name.lower().replace(' ', '-')}.{asset_type}",  # noqa: E501
                     validation_status=status,
                 )
 
@@ -546,7 +541,7 @@ class DemoPipelineHelper:
 
         snapshot = PacingSnapshot(
             campaign_id=campaign_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             total_budget=total_budget,
             total_spend=0.0,
             pacing_pct=0.0,
@@ -598,10 +593,10 @@ class DemoPipelineHelper:
         flight_start_str = campaign["flight_start"]
         flight_end_str = campaign["flight_end"]
         flight_start = datetime.fromisoformat(flight_start_str).replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
         flight_end = datetime.fromisoformat(flight_end_str).replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
 
         # Simulate "current time" as 35% through the flight
@@ -1239,7 +1234,7 @@ def _run_headless(database_url: str, sample_index: int = 0, output: str = "json"
     r = client.post("/api/submit-brief", json=brief)
     if r.status_code != 200 or not (r.get_json() or {}).get("success"):
         body = r.get_json() or {}
-        _emit("1-brief", {"status": "failed", "http": r.status_code, "error": body.get("error", "?")})
+        _emit("1-brief", {"status": "failed", "http": r.status_code, "error": body.get("error", "?")})  # noqa: E501
         return 1
     campaign_id = r.get_json().get("campaign_id")
     _emit("1-brief", {"status": "submitted", "campaign_id": campaign_id})

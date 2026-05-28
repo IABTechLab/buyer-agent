@@ -10,7 +10,7 @@ Requires redis package: pip install redis
 """
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 from ad_buyer.storage.base import StorageBackend
 
@@ -46,7 +46,7 @@ class RedisBackend(StorageBackend):
 
         self.redis_url = redis_url
         self.key_prefix = key_prefix
-        self._client: Optional[redis.Redis] = None
+        self._client: redis.Redis | None = None
 
     def _prefixed_key(self, key: str) -> str:
         """Add prefix to key for namespacing."""
@@ -74,7 +74,7 @@ class RedisBackend(StorageBackend):
             await self._client.aclose()
             self._client = None
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Retrieve a value by key."""
         if not self._client:
             raise RuntimeError("Storage not connected. Call connect() first.")
@@ -85,7 +85,7 @@ class RedisBackend(StorageBackend):
 
         return json.loads(value)
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Store a value with optional TTL (seconds)."""
         if not self._client:
             raise RuntimeError("Storage not connected. Call connect() first.")

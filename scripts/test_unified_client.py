@@ -5,9 +5,10 @@
 
 import asyncio
 import sys
+
 sys.path.insert(0, "/Users/bjt/Documents/crewaiTest/ad_buyer_system/src")
 
-from ad_buyer.clients import UnifiedClient, Protocol
+from ad_buyer.clients import Protocol, UnifiedClient
 
 
 async def main():

@@ -13,9 +13,8 @@ import json
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.storage.deal_store import DealStore
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -196,7 +195,7 @@ class TestListDeals:
         """list_deals should filter by media_type when provided."""
         store = _make_deal_store()
         _seed_deal(store, display_name="CTV Deal", media_type="CTV", seller_deal_id="CTV-001")
-        _seed_deal(store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001")
+        _seed_deal(store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001")  # noqa: E501
         _set_deal_store(store)
 
         result = await mcp.call_tool("list_deals", {"media_type": "CTV"})
@@ -754,7 +753,7 @@ class TestGetPortfolioSummary:
         """get_portfolio_summary should break down deals by media_type."""
         store = _make_deal_store()
         _seed_deal(store, display_name="CTV Deal", media_type="CTV", seller_deal_id="CTV-001")
-        _seed_deal(store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001")
+        _seed_deal(store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001")  # noqa: E501
         _set_deal_store(store)
 
         result = await mcp.call_tool("get_portfolio_summary", {})

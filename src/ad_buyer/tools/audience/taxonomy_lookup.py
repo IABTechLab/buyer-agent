@@ -8,7 +8,6 @@ during the "classify intent" phase of its reasoning loop (proposal §5.5
 step 1) to map raw `target_audience` strings into typed `AudienceRef`s.
 """
 
-from typing import Type
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -53,7 +52,7 @@ class TaxonomyLookupTool(BaseTool):
         "entry's name, parent, and tier path, or a not-found response. "
         "No network access -- all data is local."
     )
-    args_schema: Type[BaseModel] = TaxonomyLookupInput
+    args_schema: type[BaseModel] = TaxonomyLookupInput
 
     def _run(self, taxonomy: str, identifier: str) -> str:
         """Execute the lookup and format the result for the agent."""

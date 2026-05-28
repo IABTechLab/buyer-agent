@@ -13,7 +13,7 @@ optimization decisions, experiments, etc.).
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any
 
 
 class StorageBackend(ABC):
@@ -28,11 +28,11 @@ class StorageBackend(ABC):
         """Close connection to storage backend."""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Retrieve a value by key."""
 
     @abstractmethod
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Store a value with optional TTL (seconds)."""
 
     @abstractmethod
@@ -51,7 +51,7 @@ class StorageBackend(ABC):
     # Deal operations
     # ------------------------------------------------------------------
 
-    async def get_deal(self, deal_id: str) -> Optional[dict]:
+    async def get_deal(self, deal_id: str) -> dict | None:
         """Get a deal by ID."""
         return await self.get(f"deal:{deal_id}")
 
@@ -63,7 +63,7 @@ class StorageBackend(ABC):
         """Delete a deal."""
         return await self.delete(f"deal:{deal_id}")
 
-    async def list_deals(self, filters: Optional[dict] = None) -> list[dict]:
+    async def list_deals(self, filters: dict | None = None) -> list[dict]:
         """List all deals, optionally filtered."""
         keys = await self.keys("deal:*")
         deals = []
@@ -83,7 +83,7 @@ class StorageBackend(ABC):
     # Campaign operations
     # ------------------------------------------------------------------
 
-    async def get_campaign(self, campaign_id: str) -> Optional[dict]:
+    async def get_campaign(self, campaign_id: str) -> dict | None:
         """Get a campaign by ID."""
         return await self.get(f"campaign:{campaign_id}")
 
@@ -91,7 +91,7 @@ class StorageBackend(ABC):
         """Store a campaign."""
         await self.set(f"campaign:{campaign_id}", data)
 
-    async def list_campaigns(self, filters: Optional[dict] = None) -> list[dict]:
+    async def list_campaigns(self, filters: dict | None = None) -> list[dict]:
         """List campaigns, optionally filtered by status."""
         keys = await self.keys("campaign:*")
         campaigns = []
@@ -109,7 +109,7 @@ class StorageBackend(ABC):
     # Order operations
     # ------------------------------------------------------------------
 
-    async def get_order(self, order_id: str) -> Optional[dict]:
+    async def get_order(self, order_id: str) -> dict | None:
         """Get an order by ID."""
         return await self.get(f"order:{order_id}")
 
@@ -117,7 +117,7 @@ class StorageBackend(ABC):
         """Store an order."""
         await self.set(f"order:{order_id}", data)
 
-    async def list_orders(self, filters: Optional[dict] = None) -> list[dict]:
+    async def list_orders(self, filters: dict | None = None) -> list[dict]:
         """List orders, optionally filtered by status."""
         keys = await self.keys("order:*")
         orders = []
@@ -135,12 +135,12 @@ class StorageBackend(ABC):
     # Session operations
     # ------------------------------------------------------------------
 
-    async def get_session(self, session_id: str) -> Optional[dict]:
+    async def get_session(self, session_id: str) -> dict | None:
         """Get a session by ID."""
         return await self.get(f"session:{session_id}")
 
     async def set_session(
-        self, session_id: str, data: dict, ttl: Optional[int] = None
+        self, session_id: str, data: dict, ttl: int | None = None
     ) -> None:
         """Store a session with optional TTL."""
         await self.set(f"session:{session_id}", data, ttl=ttl)
@@ -165,7 +165,7 @@ class StorageBackend(ABC):
     # Conversion event operations (optimization)
     # ------------------------------------------------------------------
 
-    async def get_conversion(self, event_id: str) -> Optional[dict]:
+    async def get_conversion(self, event_id: str) -> dict | None:
         """Get a conversion event by ID."""
         return await self.get(f"conversion:{event_id}")
 
@@ -173,7 +173,7 @@ class StorageBackend(ABC):
         """Store a conversion event."""
         await self.set(f"conversion:{event_id}", data)
 
-    async def list_conversions(self, filters: Optional[dict] = None) -> list[dict]:
+    async def list_conversions(self, filters: dict | None = None) -> list[dict]:
         """List conversion events, optionally filtered."""
         keys = await self.keys("conversion:*")
         conversions = []
@@ -184,7 +184,7 @@ class StorageBackend(ABC):
             if filters:
                 if "deal_id" in filters and conversion.get("deal_id") != filters["deal_id"]:
                     continue
-                if "campaign_id" in filters and conversion.get("campaign_id") != filters["campaign_id"]:
+                if "campaign_id" in filters and conversion.get("campaign_id") != filters["campaign_id"]:  # noqa: E501
                     continue
             conversions.append(conversion)
         return conversions
@@ -193,7 +193,7 @@ class StorageBackend(ABC):
     # Optimization decision operations
     # ------------------------------------------------------------------
 
-    async def get_optimization_decision(self, decision_id: str) -> Optional[dict]:
+    async def get_optimization_decision(self, decision_id: str) -> dict | None:
         """Get an optimization decision by ID."""
         return await self.get(f"opt_decision:{decision_id}")
 
@@ -201,7 +201,7 @@ class StorageBackend(ABC):
         """Store an optimization decision."""
         await self.set(f"opt_decision:{decision_id}", data)
 
-    async def list_optimization_decisions(self, filters: Optional[dict] = None) -> list[dict]:
+    async def list_optimization_decisions(self, filters: dict | None = None) -> list[dict]:
         """List optimization decisions, optionally filtered."""
         keys = await self.keys("opt_decision:*")
         decisions = []
@@ -210,7 +210,7 @@ class StorageBackend(ABC):
             if decision is None:
                 continue
             if filters:
-                if "campaign_id" in filters and decision.get("campaign_id") != filters["campaign_id"]:
+                if "campaign_id" in filters and decision.get("campaign_id") != filters["campaign_id"]:  # noqa: E501
                     continue
             decisions.append(decision)
         return decisions
@@ -219,7 +219,7 @@ class StorageBackend(ABC):
     # Experiment operations
     # ------------------------------------------------------------------
 
-    async def get_experiment(self, experiment_id: str) -> Optional[dict]:
+    async def get_experiment(self, experiment_id: str) -> dict | None:
         """Get an experiment by ID."""
         return await self.get(f"experiment:{experiment_id}")
 
@@ -227,7 +227,7 @@ class StorageBackend(ABC):
         """Store an experiment."""
         await self.set(f"experiment:{experiment_id}", data)
 
-    async def list_experiments(self, filters: Optional[dict] = None) -> list[dict]:
+    async def list_experiments(self, filters: dict | None = None) -> list[dict]:
         """List experiments, optionally filtered."""
         keys = await self.keys("experiment:*")
         experiments = []
@@ -238,7 +238,7 @@ class StorageBackend(ABC):
             if experiment is None:
                 continue
             if filters:
-                if "campaign_id" in filters and experiment.get("campaign_id") != filters["campaign_id"]:
+                if "campaign_id" in filters and experiment.get("campaign_id") != filters["campaign_id"]:  # noqa: E501
                     continue
                 if "status" in filters and experiment.get("status") != filters["status"]:
                     continue
@@ -249,7 +249,7 @@ class StorageBackend(ABC):
     # Supply path score operations
     # ------------------------------------------------------------------
 
-    async def get_supply_path_score(self, supply_path_hash: str) -> Optional[dict]:
+    async def get_supply_path_score(self, supply_path_hash: str) -> dict | None:
         """Get a supply path score."""
         return await self.get(f"supply_path:{supply_path_hash}")
 
@@ -271,7 +271,7 @@ class StorageBackend(ABC):
     # Quote operations
     # ------------------------------------------------------------------
 
-    async def get_quote(self, quote_id: str) -> Optional[dict]:
+    async def get_quote(self, quote_id: str) -> dict | None:
         """Get a quote by ID."""
         return await self.get(f"quote:{quote_id}")
 
@@ -283,7 +283,7 @@ class StorageBackend(ABC):
     # Negotiation operations
     # ------------------------------------------------------------------
 
-    async def get_negotiation(self, proposal_id: str) -> Optional[dict]:
+    async def get_negotiation(self, proposal_id: str) -> dict | None:
         """Get negotiation history by proposal ID."""
         return await self.get(f"negotiation:{proposal_id}")
 
@@ -295,7 +295,7 @@ class StorageBackend(ABC):
     # Model artifact operations
     # ------------------------------------------------------------------
 
-    async def get_model_artifact(self, model_name: str) -> Optional[dict]:
+    async def get_model_artifact(self, model_name: str) -> dict | None:
         """Get a serialized model artifact."""
         return await self.get(f"model:{model_name}")
 
@@ -307,7 +307,7 @@ class StorageBackend(ABC):
     # Pacing snapshot operations
     # ------------------------------------------------------------------
 
-    async def get_pacing_snapshot(self, snapshot_id: str) -> Optional[dict]:
+    async def get_pacing_snapshot(self, snapshot_id: str) -> dict | None:
         """Get a pacing snapshot by ID."""
         return await self.get(f"pacing:{snapshot_id}")
 

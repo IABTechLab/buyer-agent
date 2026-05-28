@@ -17,7 +17,6 @@ from ad_buyer.interfaces.mcp_server import mcp
 from ad_buyer.storage.deal_store import DealStore
 from ad_buyer.storage.order_store import OrderStore
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -37,8 +36,8 @@ def _make_deal_store() -> DealStore:
     Uses a temp file rather than :memory: so the database survives
     disconnect/reconnect cycles in MCP tool finally blocks.
     """
-    import tempfile
     import os
+    import tempfile
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     store = DealStore(f"sqlite:///{path}")
@@ -52,8 +51,8 @@ def _make_order_store() -> OrderStore:
     Uses a temp file rather than :memory: so the database survives
     disconnect/reconnect cycles in MCP tool finally blocks.
     """
-    import tempfile
     import os
+    import tempfile
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     store = OrderStore(f"sqlite:///{path}")

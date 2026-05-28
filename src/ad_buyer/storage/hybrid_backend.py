@@ -8,7 +8,7 @@ experiments, etc.) goes to PostgreSQL for durability.  Sessions, caches, and
 ephemeral data go to Redis for speed and automatic TTL eviction.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from ad_buyer.storage.base import StorageBackend
 
@@ -59,10 +59,10 @@ class HybridBackend(StorageBackend):
         await self._redis.disconnect()
         await self._pg.disconnect()
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         return await self._backend_for(key).get(key)
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         await self._backend_for(key).set(key, value, ttl=ttl)
 
     async def delete(self, key: str) -> bool:

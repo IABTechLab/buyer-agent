@@ -4,11 +4,11 @@
 """End-to-end test of A2A client against IAB hosted servers."""
 
 import asyncio
-import json
 import sys
+
 sys.path.insert(0, "/Users/bjt/Documents/crewaiTest/ad_buyer_system/src")
 
-from ad_buyer.clients.a2a_client import A2AClient, A2AError, A2AResponse
+from ad_buyer.clients.a2a_client import A2AClient, A2AError
 
 
 async def main():
@@ -25,7 +25,7 @@ async def main():
         print("\n[1] Testing MCP Info endpoint...")
         try:
             mcp_info = await client.get_mcp_info()
-            print(f"  MCP Info retrieved")
+            print("  MCP Info retrieved")
             print(f"  Server: {mcp_info.get('name', 'unknown')}")
             print(f"  Tools: {mcp_info.get('tools', 'N/A')}")
             tools_list = mcp_info.get('toolsList', [])

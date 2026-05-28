@@ -19,7 +19,6 @@ from ad_buyer.data.taxonomy_loader import (
 )
 from ad_buyer.models.audience_plan import AudienceRef, ComplianceContext
 
-
 # ---------------------------------------------------------------------------
 # Loader basics
 # ---------------------------------------------------------------------------

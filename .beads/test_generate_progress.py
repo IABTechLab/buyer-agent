@@ -14,7 +14,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 import generate_progress as gp
 
-
 # ---------------------------------------------------------------------------
 # Fixtures: synthetic issue data
 # ---------------------------------------------------------------------------
@@ -467,7 +466,6 @@ class TestEndToEnd:
 
             # No bead appears twice (check the ID column specifically)
             # Table format: | icon | ID | Task | ... — ID is in column index 2
-            import re
             bead_ids = []
             for line in content.split("\n"):
                 if not line.startswith("|") or "buyer-" not in line:

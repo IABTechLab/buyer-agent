@@ -18,8 +18,6 @@ Callers may migrate from direct DealStore access to the pluggable
 backend incrementally; the two coexist.
 """
 
-from typing import Optional
-
 from .base import StorageBackend
 from .deal_store import DealStore
 from .factory import get_storage_backend

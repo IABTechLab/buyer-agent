@@ -189,7 +189,7 @@ class TestLinearTVQuoteRequest:
                 target_cpp=50000.0,
             ),
         )
-        result = await c.request_quote(quote_req)
+        _result = await c.request_quote(quote_req)
 
         body = json.loads(capture.last.content)
         assert body["media_type"] == "linear_tv"

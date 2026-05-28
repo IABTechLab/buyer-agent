@@ -20,7 +20,6 @@ from ad_buyer.tools.deal_library.templates import (
     ManageSupplyPathTemplateTool,
 )
 
-
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------

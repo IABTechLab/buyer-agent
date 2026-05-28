@@ -389,7 +389,7 @@ class PubMaticConnector(SSPConnector):
                 except ValueError:
                     pass
             raise SSPRateLimitError(
-                f"PubMatic API rate limit exceeded (HTTP 429)",
+                "PubMatic API rate limit exceeded (HTTP 429)",
                 retry_after=retry_after,
             )
 

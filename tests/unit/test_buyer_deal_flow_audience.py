@@ -44,7 +44,6 @@ from ad_buyer.models.buyer_identity import (
 )
 from ad_buyer.models.campaign_brief import CampaignBrief, parse_campaign_brief
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

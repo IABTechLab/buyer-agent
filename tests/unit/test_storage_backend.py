@@ -330,10 +330,10 @@ class TestHybridBackendRouting:
         Since we can't spin up real PG/Redis in unit tests, we use two
         SQLiteBackends to verify the routing logic.
         """
-        from ad_buyer.storage.hybrid_backend import HybridBackend
-
         # Use two separate SQLite backends as stand-ins
         import tempfile
+
+        from ad_buyer.storage.hybrid_backend import HybridBackend
 
         fd2, path2 = tempfile.mkstemp(suffix=".db")
         os.close(fd2)

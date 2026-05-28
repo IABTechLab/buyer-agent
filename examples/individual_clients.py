@@ -12,7 +12,8 @@ Usage:
 """
 
 import asyncio
-from ad_buyer.clients import IABMCPClient, A2AClient
+
+from ad_buyer.clients import A2AClient, IABMCPClient
 
 
 async def mcp_example():

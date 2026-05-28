@@ -40,7 +40,6 @@ from ad_buyer.orchestration.audience_degradation import (
     synthesize_capabilities_from_unsupported,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

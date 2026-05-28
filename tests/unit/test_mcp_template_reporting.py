@@ -15,16 +15,15 @@ from datetime import UTC, datetime
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
-from ad_buyer.storage.campaign_store import CampaignStore
-from ad_buyer.storage.deal_store import DealStore
-from ad_buyer.storage.pacing_store import PacingStore
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.models.campaign import (
     ChannelSnapshot,
     DealSnapshot,
     PacingSnapshot,
 )
-
+from ad_buyer.storage.campaign_store import CampaignStore
+from ad_buyer.storage.deal_store import DealStore
+from ad_buyer.storage.pacing_store import PacingStore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -242,7 +241,7 @@ class TestListTemplates:
 
     @pytest.mark.asyncio
     async def test_filter_by_supply_path_type(self):
-        """list_templates with template_type='supply_path' should only return supply path templates."""
+        """list_templates with template_type='supply_path' should only return supply path templates."""  # noqa: E501
         store = _make_deal_store()
         store.save_deal_template(name="Sports PG")
         store.save_supply_path_template(name="Direct Paths")

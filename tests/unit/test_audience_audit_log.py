@@ -18,9 +18,7 @@ Bead: ar-q2uh.
 
 from __future__ import annotations
 
-import json
 import sqlite3
-from typing import Any
 
 import pytest
 
@@ -40,7 +38,6 @@ from ad_buyer.storage.audience_audit_log import (
     EVENT_DEGRADATION,
     KNOWN_EVENT_TYPES,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

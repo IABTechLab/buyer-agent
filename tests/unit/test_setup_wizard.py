@@ -8,7 +8,6 @@ skip/complete logic, auto-detection, and MCP tool integration.
 """
 
 import json
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -17,10 +16,8 @@ from ad_buyer.services.setup_wizard import (
     SetupWizard,
     WizardPhase,
     WizardState,
-    WizardStep,
     WizardStepStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # Wizard Initialization

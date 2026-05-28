@@ -12,17 +12,16 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv(usecwd=True))
 
-import typer
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.table import Table
+import typer  # noqa: E402
+from rich.console import Console  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.progress import Progress, SpinnerColumn, TextColumn  # noqa: E402
+from rich.table import Table  # noqa: E402
 
-from ...clients.opendirect_client import OpenDirectClient
-from ...config.settings import settings
-from ...flows.deal_booking_flow import DealBookingFlow
-from ...models.flow_state import BookingState
-from ...tools.research.product_search import ProductSearchTool
+from ...clients.opendirect_client import OpenDirectClient  # noqa: E402
+from ...config.settings import settings  # noqa: E402
+from ...flows.deal_booking_flow import DealBookingFlow  # noqa: E402
+from ...tools.research.product_search import ProductSearchTool  # noqa: E402
 
 app = typer.Typer(
     name="ad-buyer",
@@ -97,7 +96,7 @@ def book(
     if dry_run:
         console.print("[yellow]DRY RUN MODE - No bookings will be made[/yellow]\n")
 
-    # Initialize flow — pass initial state via constructor (CrewAI 1.10.1 removed flow.state setter).
+    # Initialize flow — pass initial state via constructor (CrewAI 1.10.1 removed flow.state setter).  # noqa: E501
     client = _create_client()
     flow = DealBookingFlow(client, campaign_brief=brief)
 

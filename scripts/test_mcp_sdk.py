@@ -5,6 +5,7 @@
 
 import asyncio
 import sys
+
 sys.path.insert(0, "/Users/bjt/Documents/crewaiTest/ad_buyer_system/src")
 
 from mcp import ClientSession
@@ -35,7 +36,7 @@ async def main():
                 tools_result = await session.list_tools()
                 print(f"  Found {len(tools_result.tools)} tools:")
                 for tool in tools_result.tools[:5]:
-                    print(f"    - {tool.name}: {tool.description[:50] if tool.description else 'No description'}...")
+                    print(f"    - {tool.name}: {tool.description[:50] if tool.description else 'No description'}...")  # noqa: E501
                 if len(tools_result.tools) > 5:
                     print(f"    ... and {len(tools_result.tools) - 5} more")
 
@@ -61,7 +62,7 @@ async def main():
                             data = json.loads(content.text)
                             account_id = data.get("id")
                             print(f"  Account ID: {account_id}")
-                        except:
+                        except:  # noqa: E722
                             print(f"  Text: {content.text}")
 
                 # Create order if we have account

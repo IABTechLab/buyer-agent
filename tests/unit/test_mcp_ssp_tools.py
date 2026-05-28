@@ -14,15 +14,13 @@ bead: buyer-sozw
 from __future__ import annotations
 
 import json
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.storage.deal_store import DealStore
 from ad_buyer.tools.deal_library.ssp_connector_base import SSPFetchResult
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -343,7 +341,7 @@ class TestImportDealsSSP:
             data = json.loads(_extract_text(result))
 
         # Must have same structure as import_deals_csv
-        for field in ("total_rows", "successful", "failed", "skipped", "errors", "deal_ids", "timestamp"):
+        for field in ("total_rows", "successful", "failed", "skipped", "errors", "deal_ids", "timestamp"):  # noqa: E501
             assert field in data, f"Missing field: {field}"
 
     @pytest.mark.asyncio

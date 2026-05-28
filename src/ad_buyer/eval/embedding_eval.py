@@ -24,7 +24,6 @@ from unittest.mock import patch
 from ad_buyer.clients.ucp_client import UCPClient
 from ad_buyer.config.settings import settings
 
-
 # Fixed corpus of audience briefs covering each of the 3 audience types and
 # semantically related pairs (so distinctiveness has signal).
 EMBEDDING_EVAL_FIXTURES: list[dict[str, Any]] = [

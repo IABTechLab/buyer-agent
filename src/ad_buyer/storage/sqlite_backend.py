@@ -11,7 +11,7 @@ Suitable for development and single-instance deployments.
 import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import aiosqlite
 
@@ -38,7 +38,7 @@ class SQLiteBackend(StorageBackend):
         else:
             self.db_path = database_url
 
-        self._connection: Optional[aiosqlite.Connection] = None
+        self._connection: aiosqlite.Connection | None = None
 
     async def connect(self) -> None:
         """Establish connection and create tables."""
@@ -78,7 +78,7 @@ class SQLiteBackend(StorageBackend):
             )
             await self._connection.commit()
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Retrieve a value by key."""
         if not self._connection:
             raise RuntimeError("Storage not connected. Call connect() first.")
@@ -101,7 +101,7 @@ class SQLiteBackend(StorageBackend):
 
             return json.loads(value)
 
-    async def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
         """Store a value with optional TTL (seconds)."""
         if not self._connection:
             raise RuntimeError("Storage not connected. Call connect() first.")

@@ -151,7 +151,7 @@ class TestDiscoverInventoryFilters:
             success=True, data=[_product(base_price=15.0)]
         )
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(query="cheap inventory", max_cpm=20.0)
+        _result = await tool._arun(query="cheap inventory", max_cpm=20.0)
         # Verify search was called (query triggers search_products)
         mock_client.search_products.assert_called_once()
         call_kwargs = mock_client.search_products.call_args
@@ -166,7 +166,7 @@ class TestDiscoverInventoryFilters:
             success=True, data=[_product(availableImpressions=10_000_000)]
         )
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(query="big campaigns", min_impressions=5_000_000)
+        _result = await tool._arun(query="big campaigns", min_impressions=5_000_000)
         call_kwargs = mock_client.search_products.call_args
         filters = call_kwargs.kwargs.get("filters") or call_kwargs[1].get("filters")
         assert filters["minImpressions"] == 5_000_000
