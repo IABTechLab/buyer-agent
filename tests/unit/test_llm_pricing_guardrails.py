@@ -21,7 +21,7 @@ from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent
 from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
 from ad_buyer.agents.level2.deal_library_agent import create_deal_library_agent
-from ad_buyer.agents.level2.dsp_agent import create_dsp_agent
+from ad_buyer.agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
 from ad_buyer.agents.level2.linear_tv_agent import create_linear_tv_agent
 from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.performance_agent import create_performance_agent
@@ -40,7 +40,7 @@ ALL_AGENT_FACTORIES = [
     ("branding_agent", create_branding_agent),
     ("ctv_agent", create_ctv_agent),
     ("deal_library_agent", create_deal_library_agent),
-    ("dsp_agent", create_dsp_agent),
+    ("buyer_deal_specialist_agent", create_buyer_deal_specialist_agent),
     ("linear_tv_agent", create_linear_tv_agent),
     ("mobile_app_agent", create_mobile_app_agent),
     ("performance_agent", create_performance_agent),

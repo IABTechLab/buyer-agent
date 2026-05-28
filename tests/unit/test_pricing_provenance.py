@@ -348,7 +348,7 @@ class TestGetPricingToolNullGuard:
     @pytest.mark.asyncio
     async def test_no_base_price_shows_unavailable(self):
         """Product with no basePrice should show pricing as unavailable."""
-        from ad_buyer.tools.dsp.get_pricing import GetPricingTool
+        from ad_buyer.tools.buyer_deals.get_pricing import GetPricingTool
 
         mock_client = MagicMock()
         mock_client.get_product = AsyncMock(
@@ -381,7 +381,7 @@ class TestGetPricingToolNullGuard:
     @pytest.mark.asyncio
     async def test_none_base_price_shows_unavailable(self):
         """Product with basePrice=None should show pricing as unavailable."""
-        from ad_buyer.tools.dsp.get_pricing import GetPricingTool
+        from ad_buyer.tools.buyer_deals.get_pricing import GetPricingTool
 
         mock_client = MagicMock()
         mock_client.get_product = AsyncMock(
