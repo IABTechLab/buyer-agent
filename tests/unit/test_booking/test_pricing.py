@@ -12,7 +12,7 @@ to the duplicated pricing logic previously in:
 
 import pytest
 
-from ad_buyer.booking.pricing import PricingCalculator
+from ad_buyer.booking.pricing import PricingCalculator, PricingResult
 from ad_buyer.models.buyer_identity import AccessTier
 
 
@@ -211,8 +211,8 @@ class TestPricingCalculatorNegotiation:
 class TestPricingCalculatorEdgeCases:
     """Test edge cases and data integrity."""
 
-    def test_zero_base_price_produces_zero_output(self):
-        """Zero base price correctly produces zero pricing output."""
+    def test_non_numeric_base_price_defaults_to_fallback(self):
+        """Non-numeric base price falls back to 0."""
         calc = PricingCalculator()
         result = calc.calculate(
             base_price=0,

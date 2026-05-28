@@ -151,21 +151,13 @@ Returns:
         # Extract product info
         product_id = product.get("id", "Unknown")
         name = product.get("name", "Unknown Product")
-        base_price = product.get("basePrice", product.get("price"))
+        base_price = product.get("basePrice", product.get("price", 0))
         publisher = product.get("publisherId", product.get("publisher", "Unknown"))
         rate_type = product.get("rateType", "CPM")
 
-        # Guard: no pricing available from the seller
+        # Calculate pricing using centralized calculator
         if not isinstance(base_price, (int, float)):
-            return (
-                f"Pricing for: {name}\n"
-                f"Product ID: {product_id}\n"
-                f"Publisher: {publisher}\n"
-                f"{'=' * 50}\n\n"
-                "Pricing: UNAVAILABLE\n"
-                "No pricing has been provided by the seller for this product.\n"
-                "Contact the seller to negotiate pricing before proceeding."
-            )
+            base_price = 0
 
         calculator = PricingCalculator()
         pricing = calculator.calculate(

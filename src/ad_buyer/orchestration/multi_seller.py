@@ -31,9 +31,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable, Optional
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..clients.capability_client import (
@@ -55,6 +54,7 @@ from .audience_degradation import (
     CannotFulfillPlan,
     DegradationLog,
     DegradationLogEntry,
+    SellerAudienceCapabilities,
     degrade_plan_for_seller,
     synthesize_capabilities_from_unsupported,
 )
@@ -213,8 +213,8 @@ class InventoryRequirements:
     deal_types: list[str]
     content_categories: list[str] = field(default_factory=list)
     excluded_sellers: list[str] = field(default_factory=list)
-    min_impressions: int | None = None
-    max_cpm: float | None = None
+    min_impressions: Optional[int] = None
+    max_cpm: Optional[float] = None
     audience_plan: AudiencePlan | None = None
     audience_strictness: AudienceStrictness | None = None
 
@@ -244,7 +244,7 @@ class DealParams:
     impressions: int
     flight_start: str
     flight_end: str
-    target_cpm: float | None = None
+    target_cpm: Optional[float] = None
     media_type: str = "digital"
     audience_plan: AudiencePlan | None = None
 
@@ -266,9 +266,9 @@ class SellerQuoteResult:
 
     seller_id: str
     seller_url: str
-    quote: QuoteResponse | None
+    quote: Optional[QuoteResponse]
     deal_type: str
-    error: str | None
+    error: Optional[str]
 
 
 @dataclass
@@ -373,10 +373,10 @@ class MultiSellerOrchestrator:
         self,
         registry_client: Any,
         deals_client_factory: Callable[..., Any],
-        event_bus: Any | None = None,
-        quote_normalizer: QuoteNormalizer | None = None,
+        event_bus: Optional[Any] = None,
+        quote_normalizer: Optional[QuoteNormalizer] = None,
         quote_timeout: float = 30.0,
-        capability_client: CapabilityClient | None = None,
+        capability_client: Optional[CapabilityClient] = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
@@ -396,7 +396,7 @@ class MultiSellerOrchestrator:
     async def _emit(
         self,
         event_type: EventType,
-        payload: dict[str, Any] | None = None,
+        payload: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
         """Emit an event to the event bus.  Fail-open."""
@@ -519,12 +519,11 @@ class MultiSellerOrchestrator:
                     timeout=self._quote_timeout,
                 )
 
-                cpm_display = f"{quote.pricing.final_cpm:.2f}" if quote.pricing.final_cpm is not None else "unavailable"
                 logger.info(
-                    "Received quote %s from seller %s (CPM: %s)",
+                    "Received quote %s from seller %s (CPM: %.2f)",
                     quote.quote_id,
                     seller.agent_id,
-                    cpm_display,
+                    quote.pricing.final_cpm,
                 )
 
                 return SellerQuoteResult(
@@ -535,7 +534,7 @@ class MultiSellerOrchestrator:
                     error=None,
                 )
 
-            except TimeoutError:
+            except asyncio.TimeoutError:
                 msg = f"Quote request timed out after {self._quote_timeout}s"
                 logger.warning(
                     "Seller %s timed out on quote request", seller.agent_id
@@ -596,7 +595,7 @@ class MultiSellerOrchestrator:
     async def evaluate_and_rank(
         self,
         quote_results: list[SellerQuoteResult],
-        max_cpm: float | None = None,
+        max_cpm: Optional[float] = None,
     ) -> list[NormalizedQuote]:
         """Normalize and rank collected quotes.
 
@@ -627,11 +626,11 @@ class MultiSellerOrchestrator:
         # Normalize and rank
         ranked = self._normalizer.compare_quotes(quote_tuples)
 
-        # Apply max CPM filter (skip unpriced quotes — they have effective_cpm=None)
+        # Apply max CPM filter
         if max_cpm is not None:
             ranked = [
                 nq for nq in ranked
-                if nq.effective_cpm is not None and nq.effective_cpm <= max_cpm
+                if nq.effective_cpm <= max_cpm
             ]
 
         logger.info(
@@ -765,12 +764,11 @@ class MultiSellerOrchestrator:
                     },
                 )
 
-                deal_cpm_display = f"{deal.pricing.final_cpm:.2f}" if deal.pricing.final_cpm is not None else "unavailable"
                 logger.info(
-                    "Booked deal %s from seller %s (CPM: %s)",
+                    "Booked deal %s from seller %s (CPM: %.2f)",
                     deal.deal_id,
                     nq.seller_id,
-                    deal_cpm_display,
+                    deal.pricing.final_cpm,
                 )
 
             except _SellerIncompatibleForCampaign as exc:
