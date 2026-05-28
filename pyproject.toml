@@ -37,6 +37,16 @@ docs = [
     "mkdocs-material>=9.5.0",
     "mkdocs-mermaid2-plugin>=1.1.0",
 ]
+redis = [
+    "redis>=5.0.0",
+]
+postgres = [
+    "asyncpg>=0.29.0",
+]
+production = [
+    "redis>=5.0.0",
+    "asyncpg>=0.29.0",
+]
 
 [project.scripts]
 ad-buyer = "ad_buyer.interfaces.cli.main:app"

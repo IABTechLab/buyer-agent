@@ -106,35 +106,36 @@ While `LLM_TEMPERATURE` sets the global default, each agent type uses a tuned te
 
 ---
 
-### Database
+### Storage Backend
+
+The pluggable storage backend (used by campaigns, orders, sessions, conversions, optimization, experiments, pacing) is selected with `STORAGE_TYPE`. The legacy DealStore always uses SQLite directly via `DATABASE_URL`. See [Storage Backends](../architecture/storage-backends.md) for the full reference.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DATABASE_URL` | `str` | `sqlite:///./ad_buyer.db` | SQLAlchemy connection string for the deal store and local persistence. |
-
-Supports any SQLAlchemy-compatible database. SQLite is the default for development; use PostgreSQL or MySQL for production.
+| `STORAGE_TYPE` | `str` | `sqlite` | Backend selector — `sqlite`, `redis`, or `hybrid` (Postgres + Redis). |
+| `DATABASE_URL` | `str` | `sqlite:///./ad_buyer.db` | SQLite or PostgreSQL connection string. For `hybrid`, use `postgresql+asyncpg://user:pass@host/db`. |
+| `REDIS_URL` | `str` | `None` | Redis connection URL — required for `redis` and `hybrid`; optional otherwise. |
+| `POSTGRES_POOL_MIN` | `int` | `2` | Minimum asyncpg connection pool size (hybrid only). |
+| `POSTGRES_POOL_MAX` | `int` | `10` | Maximum asyncpg connection pool size (hybrid only). |
 
 ```bash
-# PostgreSQL
-DATABASE_URL=postgresql://user:pass@localhost:5432/ad_buyer
-
-# SQLite (default)
+# SQLite (default — single-instance, dev/demos)
+STORAGE_TYPE=sqlite
 DATABASE_URL=sqlite:///./ad_buyer.db
-```
 
----
-
-### Redis
-
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `REDIS_URL` | `str` | `None` | Redis connection URL for caching and session management. Optional. |
-
-When set, Redis is used for CrewAI memory persistence and session caching. When `None`, in-memory storage is used.
-
-```bash
+# Redis (ephemeral-heavy, no durable Postgres)
+STORAGE_TYPE=redis
 REDIS_URL=redis://localhost:6379/0
+
+# Hybrid (recommended for production multi-instance)
+STORAGE_TYPE=hybrid
+DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
+REDIS_URL=redis://cache.example.com:6379/0
 ```
+
+Redis is also used for CrewAI memory persistence and session caching whenever `REDIS_URL` is set, regardless of `STORAGE_TYPE`. When `REDIS_URL` is unset, CrewAI uses in-memory storage.
+
+The Redis (`pip install -e ".[redis]"`) and asyncpg (`pip install -e ".[postgres]"`) drivers are optional extras. Install `".[production]"` to get both.
 
 ---
 

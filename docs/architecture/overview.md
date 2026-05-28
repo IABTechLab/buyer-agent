@@ -77,7 +77,8 @@ The Architecture section covers these topics:
 | **[Buyer Deal Flow](buyer-deal-flow.md)** | Single-deal flow for direct DSP integration without multi-channel orchestration |
 | **[Order State Machine](../state-machines/order-lifecycle.md)** | 12 deal states and 9 campaign states with guard conditions and audit trail |
 | **[Event Bus](../event-bus/overview.md)** | 13 event types providing structured observability across all flows |
-| **[Deal Store](deal-store.md)** | SQLite persistence for deals, events, and session state |
+| **[Deal Store](deal-store.md)** | Synchronous SQLite persistence for deal lifecycle, negotiation history, and audit trail |
+| **[Storage Backends](storage-backends.md)** | Pluggable async backend (SQLite / Redis / Postgres+Redis hybrid) used by domain stores beyond DealStore |
 | **[Models](models.md)** | Pydantic data models for API requests, flow state, and deal records |
 | **[Tools Reference](tools.md)** | CrewAI tools available to agents for research, booking, and negotiation |
 

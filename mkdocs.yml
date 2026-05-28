@@ -74,6 +74,7 @@ nav:
       - Booking Flow: architecture/booking-flow.md
       - Buyer Deal Flow: architecture/buyer-deal-flow.md
       - Deal Store: architecture/deal-store.md
+      - Storage Backends: architecture/storage-backends.md
       - Models: architecture/models.md
       - Tools Reference: architecture/tools.md
       - MCP Server: architecture/mcp-server.md
