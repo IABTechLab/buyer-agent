@@ -10,16 +10,14 @@ a provenance source (`pricing_source`), and that the system refuses to
 produce a CPM when the seller has not provided one.
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ad_buyer.booking.pricing import PricingCalculator, PricingResult, PricingSource
-from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
+from ad_buyer.booking.pricing import PricingCalculator, PricingSource
+from ad_buyer.booking.quote_normalizer import QuoteNormalizer
 from ad_buyer.models.buyer_identity import AccessTier, BuyerContext, BuyerIdentity
 from ad_buyer.models.deals import PricingInfo, ProductInfo, QuoteResponse, TermsInfo
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -469,7 +467,7 @@ class TestUnifiedClientPricingGuard:
     async def test_get_pricing_no_base_price_no_crash(self):
         """get_pricing on a product with no basePrice should not crash
         and should not populate fabricated pricing."""
-        from ad_buyer.clients.unified_client import UnifiedClient, Protocol
+        from ad_buyer.clients.unified_client import UnifiedClient
 
         client = UnifiedClient(
             base_url="http://localhost:5000",

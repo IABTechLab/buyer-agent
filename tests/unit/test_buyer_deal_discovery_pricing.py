@@ -19,10 +19,10 @@ import pytest
 
 from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.flows.buyer_deal_flow import (
-    DiscoveredProduct,
     BuyerDealFlow,
     BuyerDealFlowState,
     BuyerDealFlowStatus,
+    DiscoveredProduct,
 )
 from ad_buyer.models.buyer_identity import (
     AccessTier,

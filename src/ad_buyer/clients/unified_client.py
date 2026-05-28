@@ -544,7 +544,6 @@ class UnifiedClient:
         if result.data and isinstance(result.data, dict):
             base_price = result.data.get("basePrice", result.data.get("price"))
             if isinstance(base_price, (int, float)) and self.buyer_identity:
-                from ..models.buyer_identity import AccessTier
 
                 tier_obj = self.buyer_identity.get_access_tier()
                 discount = self.buyer_identity.get_discount_percentage()
