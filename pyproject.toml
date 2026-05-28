@@ -52,7 +52,7 @@ production = [
 ad-buyer = "ad_buyer.interfaces.cli.main:app"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
