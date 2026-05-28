@@ -27,6 +27,7 @@ def client() -> UnifiedClient:
 # Registry coverage: every registered tool returns a non-empty string.
 # ---------------------------------------------------------------------------
 
+
 def test_every_registered_tool_has_non_empty_mapping(client: UnifiedClient):
     """Each entry in _TOOL_NL_REGISTRY must produce a non-empty string."""
     sample_args = {
@@ -55,14 +56,13 @@ def test_every_registered_tool_has_non_empty_mapping(client: UnifiedClient):
         )
         # Sanity: callable-backed entries should differ from no-arg fallback
         if callable(entry):
-            assert with_arg_msg != "", (
-                f"Callable entry returned empty for {tool_name!r}"
-            )
+            assert with_arg_msg != "", f"Callable entry returned empty for {tool_name!r}"
 
 
 # ---------------------------------------------------------------------------
 # Unknown tool fallback: never empty, never raises.
 # ---------------------------------------------------------------------------
+
 
 def test_unknown_tool_returns_generic_fallback(client: UnifiedClient):
     msg = client._tool_to_natural_language("totally_made_up_tool", {})
@@ -72,9 +72,7 @@ def test_unknown_tool_returns_generic_fallback(client: UnifiedClient):
 
 
 def test_unknown_tool_with_args_includes_args(client: UnifiedClient):
-    msg = client._tool_to_natural_language(
-        "totally_made_up_tool", {"foo": "bar", "n": 3}
-    )
+    msg = client._tool_to_natural_language("totally_made_up_tool", {"foo": "bar", "n": 3})
     assert "totally_made_up_tool" in msg
     assert "foo=bar" in msg
     assert "n=3" in msg
@@ -106,6 +104,7 @@ def test_none_args_is_safe(client: UnifiedClient):
 # Case insensitivity.
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize(
     "name",
     ["list_products", "LIST_PRODUCTS", "List_Products", "  list_products  "],
@@ -118,6 +117,7 @@ def test_case_insensitive_lookup(client: UnifiedClient, name: str):
 # ---------------------------------------------------------------------------
 # Backward-compatible behavior with the previous test suite expectations.
 # ---------------------------------------------------------------------------
+
 
 def test_create_account_includes_name_and_type(client: UnifiedClient):
     msg = client._tool_to_natural_language(
@@ -163,10 +163,9 @@ def test_get_by_id_tools_render_id(client: UnifiedClient):
 # preserved) but still returns a useful, non-empty message.
 # ---------------------------------------------------------------------------
 
+
 def test_listing_tool_with_args_falls_through_to_generic(client: UnifiedClient):
-    msg = client._tool_to_natural_language(
-        "list_orders", {"accountId": "acct-9"}
-    )
+    msg = client._tool_to_natural_language("list_orders", {"accountId": "acct-9"})
     assert msg
     # Should mention either the tool name or the arg; generic renderer does both
     assert "list_orders" in msg

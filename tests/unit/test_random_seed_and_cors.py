@@ -68,9 +68,7 @@ class TestCORSConfiguration:
         )
         origins = s.get_cors_origins()
         # MCP server default: wildcard — auth is enforced via X-API-Key, not origin
-        assert origins == ["*"], (
-            f"Expected wildcard default for MCP server, got: {origins}"
-        )
+        assert origins == ["*"], f"Expected wildcard default for MCP server, got: {origins}"
 
     def test_settings_custom_cors_origins(self):
         """CORS origins should be configurable."""

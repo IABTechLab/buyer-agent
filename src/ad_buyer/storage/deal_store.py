@@ -1545,7 +1545,24 @@ class DealStore:
     # Deal Templates (v5, Strategic Plan Section 6.3)
     # ------------------------------------------------------------------
 
-    def save_deal_template(self, *, template_id: str | None = None, name: str, deal_type_pref: str | None = None, inventory_types: str | None = None, preferred_publishers: str | None = None, excluded_publishers: str | None = None, targeting_defaults: str | None = None, default_price: float | None = None, max_cpm: float | None = None, min_impressions: int | None = None, default_flight_days: int | None = None, supply_path_prefs: str | None = None, advertiser_id: str | None = None, agency_id: str | None = None) -> str:  # noqa: E501
+    def save_deal_template(
+        self,
+        *,
+        template_id: str | None = None,
+        name: str,
+        deal_type_pref: str | None = None,
+        inventory_types: str | None = None,
+        preferred_publishers: str | None = None,
+        excluded_publishers: str | None = None,
+        targeting_defaults: str | None = None,
+        default_price: float | None = None,
+        max_cpm: float | None = None,
+        min_impressions: int | None = None,
+        default_flight_days: int | None = None,
+        supply_path_prefs: str | None = None,
+        advertiser_id: str | None = None,
+        agency_id: str | None = None,
+    ) -> str:  # noqa: E501
         """Insert a new deal template. Returns the template ID."""
         if template_id is None:
             template_id = str(uuid.uuid4())
@@ -1560,7 +1577,24 @@ class DealStore:
                     supply_path_prefs, advertiser_id, agency_id,
                     created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (template_id, name, deal_type_pref, inventory_types, preferred_publishers, excluded_publishers, targeting_defaults, default_price, max_cpm, min_impressions, default_flight_days, supply_path_prefs, advertiser_id, agency_id, now, now),  # noqa: E501
+                (
+                    template_id,
+                    name,
+                    deal_type_pref,
+                    inventory_types,
+                    preferred_publishers,
+                    excluded_publishers,
+                    targeting_defaults,
+                    default_price,
+                    max_cpm,
+                    min_impressions,
+                    default_flight_days,
+                    supply_path_prefs,
+                    advertiser_id,
+                    agency_id,
+                    now,
+                    now,
+                ),  # noqa: E501
             )
             self._conn.commit()
         logger.info("Saved deal template %s: %s", template_id, name)
@@ -1573,7 +1607,13 @@ class DealStore:
             row = cursor.fetchone()
         return dict(row) if row else None
 
-    def list_deal_templates(self, *, advertiser_id: str | None = None, deal_type_pref: str | None = None, limit: int = 100) -> list[dict[str, Any]]:  # noqa: E501
+    def list_deal_templates(
+        self,
+        *,
+        advertiser_id: str | None = None,
+        deal_type_pref: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:  # noqa: E501
         """List deal templates with optional filters."""
         conditions: list[str] = []
         params: list[Any] = []
@@ -1595,7 +1635,21 @@ class DealStore:
         """Update fields on an existing deal template."""
         if not kwargs:
             return False
-        allowed = {"name", "deal_type_pref", "inventory_types", "preferred_publishers", "excluded_publishers", "targeting_defaults", "default_price", "max_cpm", "min_impressions", "default_flight_days", "supply_path_prefs", "advertiser_id", "agency_id"}  # noqa: E501
+        allowed = {
+            "name",
+            "deal_type_pref",
+            "inventory_types",
+            "preferred_publishers",
+            "excluded_publishers",
+            "targeting_defaults",
+            "default_price",
+            "max_cpm",
+            "min_impressions",
+            "default_flight_days",
+            "supply_path_prefs",
+            "advertiser_id",
+            "agency_id",
+        }  # noqa: E501
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1603,7 +1657,9 @@ class DealStore:
         set_clause = ", ".join(f"{col} = ?" for col in updates)
         values = list(updates.values()) + [template_id]
         with self._lock:
-            cursor = self._conn.execute(f"UPDATE deal_templates SET {set_clause} WHERE id = ?", values)  # noqa: E501
+            cursor = self._conn.execute(
+                f"UPDATE deal_templates SET {set_clause} WHERE id = ?", values
+            )  # noqa: E501
             self._conn.commit()
             return cursor.rowcount > 0
 
@@ -1618,7 +1674,19 @@ class DealStore:
     # Supply Path Templates (v5, Strategic Plan Section 6.4)
     # ------------------------------------------------------------------
 
-    def save_supply_path_template(self, *, template_id: str | None = None, name: str, scoring_weights: str | None = None, max_reseller_hops: int | None = None, require_sellers_json: int | None = None, preferred_ssps: str | None = None, blocked_ssps: str | None = None, preferred_curators: str | None = None, rules: str | None = None) -> str:  # noqa: E501
+    def save_supply_path_template(
+        self,
+        *,
+        template_id: str | None = None,
+        name: str,
+        scoring_weights: str | None = None,
+        max_reseller_hops: int | None = None,
+        require_sellers_json: int | None = None,
+        preferred_ssps: str | None = None,
+        blocked_ssps: str | None = None,
+        preferred_curators: str | None = None,
+        rules: str | None = None,
+    ) -> str:  # noqa: E501
         """Insert a new supply path template. Returns the template ID."""
         if template_id is None:
             template_id = str(uuid.uuid4())
@@ -1630,7 +1698,19 @@ class DealStore:
                     require_sellers_json, preferred_ssps, blocked_ssps,
                     preferred_curators, rules, created_at, updated_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (template_id, name, scoring_weights, max_reseller_hops, require_sellers_json, preferred_ssps, blocked_ssps, preferred_curators, rules, now, now),  # noqa: E501
+                (
+                    template_id,
+                    name,
+                    scoring_weights,
+                    max_reseller_hops,
+                    require_sellers_json,
+                    preferred_ssps,
+                    blocked_ssps,
+                    preferred_curators,
+                    rules,
+                    now,
+                    now,
+                ),  # noqa: E501
             )
             self._conn.commit()
         logger.info("Saved supply path template %s: %s", template_id, name)
@@ -1639,14 +1719,18 @@ class DealStore:
     def get_supply_path_template(self, template_id: str) -> dict[str, Any] | None:
         """Retrieve a supply path template by ID."""
         with self._lock:
-            cursor = self._conn.execute("SELECT * FROM supply_path_templates WHERE id = ?", (template_id,))  # noqa: E501
+            cursor = self._conn.execute(
+                "SELECT * FROM supply_path_templates WHERE id = ?", (template_id,)
+            )  # noqa: E501
             row = cursor.fetchone()
         return dict(row) if row else None
 
     def list_supply_path_templates(self, *, limit: int = 100) -> list[dict[str, Any]]:
         """List supply path templates."""
         with self._lock:
-            cursor = self._conn.execute("SELECT * FROM supply_path_templates ORDER BY created_at DESC LIMIT ?", (limit,))  # noqa: E501
+            cursor = self._conn.execute(
+                "SELECT * FROM supply_path_templates ORDER BY created_at DESC LIMIT ?", (limit,)
+            )  # noqa: E501
             rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
@@ -1654,7 +1738,16 @@ class DealStore:
         """Update fields on an existing supply path template."""
         if not kwargs:
             return False
-        allowed = {"name", "scoring_weights", "max_reseller_hops", "require_sellers_json", "preferred_ssps", "blocked_ssps", "preferred_curators", "rules"}  # noqa: E501
+        allowed = {
+            "name",
+            "scoring_weights",
+            "max_reseller_hops",
+            "require_sellers_json",
+            "preferred_ssps",
+            "blocked_ssps",
+            "preferred_curators",
+            "rules",
+        }  # noqa: E501
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1662,14 +1755,18 @@ class DealStore:
         set_clause = ", ".join(f"{col} = ?" for col in updates)
         values = list(updates.values()) + [template_id]
         with self._lock:
-            cursor = self._conn.execute(f"UPDATE supply_path_templates SET {set_clause} WHERE id = ?", values)  # noqa: E501
+            cursor = self._conn.execute(
+                f"UPDATE supply_path_templates SET {set_clause} WHERE id = ?", values
+            )  # noqa: E501
             self._conn.commit()
             return cursor.rowcount > 0
 
     def delete_supply_path_template(self, template_id: str) -> bool:
         """Delete a supply path template by ID."""
         with self._lock:
-            cursor = self._conn.execute("DELETE FROM supply_path_templates WHERE id = ?", (template_id,))  # noqa: E501
+            cursor = self._conn.execute(
+                "DELETE FROM supply_path_templates WHERE id = ?", (template_id,)
+            )  # noqa: E501
             self._conn.commit()
             return cursor.rowcount > 0
 

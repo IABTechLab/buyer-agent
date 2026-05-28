@@ -32,9 +32,9 @@ class SQLiteBackend(StorageBackend):
             database_url: SQLite connection string (e.g., sqlite:///./ad_buyer.db)
         """
         if database_url.startswith("sqlite:///"):
-            self.db_path = database_url[len("sqlite:///"):]
+            self.db_path = database_url[len("sqlite:///") :]
         elif database_url.startswith("sqlite://"):
-            self.db_path = database_url[len("sqlite://"):]
+            self.db_path = database_url[len("sqlite://") :]
         else:
             self.db_path = database_url
 
@@ -123,9 +123,7 @@ class SQLiteBackend(StorageBackend):
         if not self._connection:
             raise RuntimeError("Storage not connected. Call connect() first.")
 
-        async with self._connection.execute(
-            "DELETE FROM kv_store WHERE key = ?", (key,)
-        ) as cursor:
+        async with self._connection.execute("DELETE FROM kv_store WHERE key = ?", (key,)) as cursor:
             await self._connection.commit()
             return cursor.rowcount > 0
 

@@ -35,6 +35,7 @@ def _current_settings():
     """
     return sys.modules[__name__].settings
 
+
 app = FastAPI(
     title="Ad Buyer Agent API",
     description=(
@@ -469,13 +470,15 @@ async def list_bookings(
     for job_id, job in jobs.items():
         if status and job["status"] != status:
             continue
-        job_list.append({
-            "job_id": job_id,
-            "status": job["status"],
-            "campaign_name": job["brief"].get("name"),
-            "budget": job["brief"].get("budget"),
-            "created_at": job["created_at"],
-        })
+        job_list.append(
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "campaign_name": job["brief"].get("name"),
+                "budget": job["brief"].get("budget"),
+                "created_at": job["created_at"],
+            }
+        )
 
     # Sort by created_at descending
     job_list.sort(key=lambda x: x["created_at"], reverse=True)
@@ -574,9 +577,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["budget_allocations"] = {
             k: v.model_dump() for k, v in flow.state.budget_allocations.items()
         }
-        job["recommendations"] = [
-            r.model_dump() for r in flow.state.pending_approvals
-        ]
+        job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
 
         if request.auto_approve:
             flow.approve_all()

@@ -253,9 +253,7 @@ Returns:
         except (OSError, ValueError, RuntimeError) as e:
             return f"Error requesting deal: {e}"
 
-    async def _check_sgp_approval(
-        self, product: dict
-    ) -> tuple[str | None, str | None]:
+    async def _check_sgp_approval(self, product: dict) -> tuple[str | None, str | None]:
         """Gate a deal request against IAB Diligence Platform approval.
 
         Returns ``(error_message, banner)``:
@@ -284,7 +282,8 @@ Returns:
             approvals = await self._sgp_client.check_approvals([raw_domain])
         except SGPClientError as exc:
             logger.warning(
-                "IAB Diligence Platform lookup failed for %s during deal request", domain,
+                "IAB Diligence Platform lookup failed for %s during deal request",
+                domain,
                 exc_info=True,
             )
             # Fail closed — enforcement is on, so we must not issue a Deal ID
@@ -472,9 +471,7 @@ Returns:
         # the human reviewer (and audit trail) a stable handle linking
         # buyer state to seller-side records (proposal §5.1 step 2).
         if audience_plan is not None:
-            output_lines.append(
-                f"Audience Plan ID: {audience_plan.audience_plan_id}"
-            )
+            output_lines.append(f"Audience Plan ID: {audience_plan.audience_plan_id}")
 
         output_lines.extend(
             [

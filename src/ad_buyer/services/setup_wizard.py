@@ -163,9 +163,7 @@ class WizardState:
     @property
     def current_phase(self) -> WizardPhase:
         """Current phase based on developer step completion."""
-        developer_steps = [
-            s for s in self.steps if s.phase == WizardPhase.DEVELOPER
-        ]
+        developer_steps = [s for s in self.steps if s.phase == WizardPhase.DEVELOPER]
         all_dev_done = all(
             s.status
             in (
@@ -378,9 +376,7 @@ class SetupWizard:
             ValueError: If step_number is not 1-8.
         """
         if step_number < 1 or step_number > 8:
-            raise ValueError(
-                f"Invalid step number: {step_number}. Must be 1-8."
-            )
+            raise ValueError(f"Invalid step number: {step_number}. Must be 1-8.")
         return self._steps[step_number - 1]
 
     def get_state(self) -> WizardState:
@@ -389,9 +385,7 @@ class SetupWizard:
 
     # -- Step operations ----------------------------------------------------
 
-    def complete_step(
-        self, step_number: int, config: dict[str, Any]
-    ) -> WizardStep:
+    def complete_step(self, step_number: int, config: dict[str, Any]) -> WizardStep:
         """Mark a step as completed with the given configuration.
 
         Args:
@@ -426,9 +420,7 @@ class SetupWizard:
         """
         step = self.get_step(step_number)
         if step_number == 8:
-            raise ValueError(
-                "Step 8 (Review & Launch) cannot be skipped."
-            )
+            raise ValueError("Step 8 (Review & Launch) cannot be skipped.")
         step.status = WizardStepStatus.SKIPPED
         step.config = dict(step.defaults)
         step.completed_at = datetime.now(UTC).isoformat()

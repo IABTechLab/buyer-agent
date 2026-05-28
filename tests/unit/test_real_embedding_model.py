@@ -45,9 +45,7 @@ class TestEmbeddingModes:
         sample = [0.1] * 384
         with patch.object(settings, "embedding_mode", "advertiser"):
             client = UCPClient()
-            r = client.create_query_embedding_with_provenance(
-                REQS, advertiser_vector=sample
-            )
+            r = client.create_query_embedding_with_provenance(REQS, advertiser_vector=sample)
         assert r.provenance == "advertiser_supplied"
         assert r.embedding.vector == sample
         assert r.dimension == 384
@@ -57,9 +55,7 @@ class TestEmbeddingModes:
         bad = [0.5] * 100
         with patch.object(settings, "embedding_mode", "advertiser"):
             client = UCPClient()
-            r = client.create_query_embedding_with_provenance(
-                REQS, advertiser_vector=bad
-            )
+            r = client.create_query_embedding_with_provenance(REQS, advertiser_vector=bad)
         # Out-of-range advertiser vector skipped, mock used (mode=advertiser
         # has no local fallback configured, so mock is the safe default).
         assert r.provenance == "mock"
@@ -69,9 +65,7 @@ class TestEmbeddingModes:
         sample = [0.2] * 384
         with patch.object(settings, "embedding_mode", "hybrid"):
             client = UCPClient()
-            r = client.create_query_embedding_with_provenance(
-                REQS, advertiser_vector=sample
-            )
+            r = client.create_query_embedding_with_provenance(REQS, advertiser_vector=sample)
         assert r.provenance == "advertiser_supplied"
         assert r.embedding.vector == sample
 
@@ -83,9 +77,7 @@ class TestEmbeddingModes:
         assert r.provenance in ("local_buyer", "mock")
         assert 256 <= r.dimension <= 1024 or r.dimension == 384
 
-    @pytest.mark.skipif(
-        not SBERT_AVAILABLE, reason="sentence-transformers not installed"
-    )
+    @pytest.mark.skipif(not SBERT_AVAILABLE, reason="sentence-transformers not installed")
     def test_local_mode_loads_real_model(self):
         # Best-effort: model download may be blocked in CI. Either way the
         # function returns a well-formed result.
@@ -168,4 +160,5 @@ class TestEmbeddingModeLabel:
 
     def test_backward_compat_static_constant(self):
         from ad_buyer.tools.audience import EMBEDDING_MODE_LABEL_MOCK
+
         assert "MOCK" in EMBEDDING_MODE_LABEL_MOCK

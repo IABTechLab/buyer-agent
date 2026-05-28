@@ -69,9 +69,7 @@ def embedding_mode_label() -> str:
     # (keeps test fixtures that patch settings simple).
     from ...config.settings import settings
 
-    return _EMBEDDING_MODE_LABELS.get(
-        settings.embedding_mode, EMBEDDING_MODE_LABEL_MOCK
-    )
+    return _EMBEDDING_MODE_LABELS.get(settings.embedding_mode, EMBEDDING_MODE_LABEL_MOCK)
 
 
 class EmbeddingMintInput(BaseModel):
@@ -92,16 +90,12 @@ class EmbeddingMintInput(BaseModel):
     )
     jurisdiction: str = Field(
         default="GLOBAL",
-        description=(
-            "Jurisdiction code for the consent context "
-            "(e.g. 'US', 'EU', 'GLOBAL')."
-        ),
+        description=("Jurisdiction code for the consent context (e.g. 'US', 'EU', 'GLOBAL')."),
     )
     consent_framework: str = Field(
         default="advertiser-1p",
         description=(
-            "Consent framework backing the mint: 'IAB-TCFv2', 'GPP', "
-            "'advertiser-1p', or 'none'."
+            "Consent framework backing the mint: 'IAB-TCFv2', 'GPP', 'advertiser-1p', or 'none'."
         ),
     )
 

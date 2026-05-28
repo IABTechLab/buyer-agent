@@ -326,12 +326,8 @@ def discovery_client() -> MagicMock:
         _product("p2", "denied.example.com"),
         _product("p3", "unknown.example.com"),
     ]
-    client.search_products = AsyncMock(
-        return_value=MagicMock(success=True, data=products)
-    )
-    client.list_products = AsyncMock(
-        return_value=MagicMock(success=True, data=products)
-    )
+    client.search_products = AsyncMock(return_value=MagicMock(success=True, data=products))
+    client.list_products = AsyncMock(return_value=MagicMock(success=True, data=products))
     return client
 
 
@@ -355,9 +351,7 @@ def _discovery_sgp_mock() -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_discovery_enforce_filters_not_approved(
-    discovery_client, agency_context
-):
+async def test_discovery_enforce_filters_not_approved(discovery_client, agency_context):
     """When enforcing, NOT APPROVED rows are dropped before formatting."""
     from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
 
@@ -377,9 +371,7 @@ async def test_discovery_enforce_filters_not_approved(
 
 
 @pytest.mark.asyncio
-async def test_discovery_enforce_warn_keeps_unknowns(
-    discovery_client, agency_context
-):
+async def test_discovery_enforce_warn_keeps_unknowns(discovery_client, agency_context):
     """warn policy keeps unknowns in the result and emits a warning line."""
     from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
 
@@ -399,9 +391,7 @@ async def test_discovery_enforce_warn_keeps_unknowns(
 
 
 @pytest.mark.asyncio
-async def test_discovery_enforce_allow_keeps_unknowns_silently(
-    discovery_client, agency_context
-):
+async def test_discovery_enforce_allow_keeps_unknowns_silently(discovery_client, agency_context):
     """allow policy keeps unknowns and suppresses the per-row annotation."""
     from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
 
@@ -462,9 +452,7 @@ async def test_discovery_fails_closed_when_sgp_unreachable_and_enforcing(
 
 
 @pytest.mark.asyncio
-async def test_discovery_no_enforce_swallows_sgp_error(
-    discovery_client, agency_context, caplog
-):
+async def test_discovery_no_enforce_swallows_sgp_error(discovery_client, agency_context, caplog):
     """Without enforcement, transport error returns unannotated results."""
     from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
 
@@ -486,9 +474,7 @@ async def test_discovery_no_enforce_swallows_sgp_error(
 
 
 @pytest.mark.asyncio
-async def test_discovery_no_sgp_client_pass_through(
-    discovery_client, agency_context
-):
+async def test_discovery_no_sgp_client_pass_through(discovery_client, agency_context):
     """Without an SGP client, discovery behaves as before — no annotations, no filter."""
     from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
 

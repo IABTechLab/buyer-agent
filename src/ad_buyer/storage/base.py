@@ -139,9 +139,7 @@ class StorageBackend(ABC):
         """Get a session by ID."""
         return await self.get(f"session:{session_id}")
 
-    async def set_session(
-        self, session_id: str, data: dict, ttl: int | None = None
-    ) -> None:
+    async def set_session(self, session_id: str, data: dict, ttl: int | None = None) -> None:
         """Store a session with optional TTL."""
         await self.set(f"session:{session_id}", data, ttl=ttl)
 
@@ -184,7 +182,10 @@ class StorageBackend(ABC):
             if filters:
                 if "deal_id" in filters and conversion.get("deal_id") != filters["deal_id"]:
                     continue
-                if "campaign_id" in filters and conversion.get("campaign_id") != filters["campaign_id"]:  # noqa: E501
+                if (
+                    "campaign_id" in filters
+                    and conversion.get("campaign_id") != filters["campaign_id"]
+                ):  # noqa: E501
                     continue
             conversions.append(conversion)
         return conversions
@@ -210,7 +211,10 @@ class StorageBackend(ABC):
             if decision is None:
                 continue
             if filters:
-                if "campaign_id" in filters and decision.get("campaign_id") != filters["campaign_id"]:  # noqa: E501
+                if (
+                    "campaign_id" in filters
+                    and decision.get("campaign_id") != filters["campaign_id"]
+                ):  # noqa: E501
                     continue
             decisions.append(decision)
         return decisions
@@ -238,7 +242,10 @@ class StorageBackend(ABC):
             if experiment is None:
                 continue
             if filters:
-                if "campaign_id" in filters and experiment.get("campaign_id") != filters["campaign_id"]:  # noqa: E501
+                if (
+                    "campaign_id" in filters
+                    and experiment.get("campaign_id") != filters["campaign_id"]
+                ):  # noqa: E501
                     continue
                 if "status" in filters and experiment.get("status") != filters["status"]:
                     continue

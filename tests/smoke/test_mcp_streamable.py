@@ -30,6 +30,7 @@ import pytest
 try:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamable_http_client
+
     MCP_HTTP_AVAILABLE = True
 except ImportError:
     try:
@@ -38,6 +39,7 @@ except ImportError:
         from mcp.client.streamable_http import (
             streamablehttp_client as streamable_http_client,  # type: ignore[no-redef]
         )
+
         MCP_HTTP_AVAILABLE = True
     except ImportError:
         MCP_HTTP_AVAILABLE = False
@@ -54,6 +56,7 @@ pytestmark = [
 # ---------------------------------------------------------------------------
 # Session helper — context manager, not a fixture, avoids AUTO-mode doubling
 # ---------------------------------------------------------------------------
+
 
 @asynccontextmanager
 async def _mcp_session():
@@ -93,6 +96,7 @@ async def _call(session: "ClientSession", name: str, args: dict | None = None):
 # Connection
 # ---------------------------------------------------------------------------
 
+
 async def test_streamable_http_connection():
     """/mcp must accept a session and initialize successfully."""
     async with _mcp_session() as session:
@@ -113,6 +117,7 @@ async def test_streamable_http_tool_list():
 # ---------------------------------------------------------------------------
 # Foundation tools
 # ---------------------------------------------------------------------------
+
 
 async def test_health_check():
     async with _mcp_session() as session:
@@ -143,6 +148,7 @@ async def test_get_config():
 # Deal library
 # ---------------------------------------------------------------------------
 
+
 async def test_list_deals():
     async with _mcp_session() as session:
         err, data = await _call(session, "list_deals")
@@ -154,13 +160,17 @@ async def test_list_deals():
 async def test_create_and_inspect_deal():
     """Create a deal via /mcp, then inspect it — verifies round-trip."""
     async with _mcp_session() as session:
-        err, data = await _call(session, "create_deal_manual", {
-            "display_name": "Streamable HTTP Test Deal",
-            "seller_url": "http://mcp-http-test.example.com",
-            "deal_type": "PD",
-            "price": 18.0,
-            "currency": "USD",
-        })
+        err, data = await _call(
+            session,
+            "create_deal_manual",
+            {
+                "display_name": "Streamable HTTP Test Deal",
+                "seller_url": "http://mcp-http-test.example.com",
+                "deal_type": "PD",
+                "price": 18.0,
+                "currency": "USD",
+            },
+        )
         assert not err and data.get("success"), f"create_deal_manual failed: {data}"
         deal_id = data["deal_id"]
 
@@ -181,6 +191,7 @@ async def test_get_portfolio_summary():
 # Seller discovery
 # ---------------------------------------------------------------------------
 
+
 async def test_discover_sellers():
     async with _mcp_session() as session:
         err, data = await _call(session, "discover_sellers")
@@ -191,8 +202,9 @@ async def test_discover_sellers():
 async def test_get_seller_media_kit_unreachable():
     """Unreachable seller must return structured error, not crash."""
     async with _mcp_session() as session:
-        err, data = await _call(session, "get_seller_media_kit",
-                                {"seller_url": "http://127.0.0.1:19999"})
+        err, data = await _call(
+            session, "get_seller_media_kit", {"seller_url": "http://127.0.0.1:19999"}
+        )
     assert not err, f"get_seller_media_kit raised: {data}"
     assert "error" in data
 
@@ -200,6 +212,7 @@ async def test_get_seller_media_kit_unreachable():
 # ---------------------------------------------------------------------------
 # Campaigns & Orders
 # ---------------------------------------------------------------------------
+
 
 async def test_list_campaigns():
     async with _mcp_session() as session:
@@ -219,14 +232,16 @@ async def test_list_orders():
 # API keys
 # ---------------------------------------------------------------------------
 
+
 async def test_api_key_lifecycle():
     """Full create → list → revoke lifecycle over /mcp."""
     seller = "http://mcp-http-key-test.example.com"
     raw_key = "mcp-http-test-key-xyz999"
 
     async with _mcp_session() as session:
-        err, created = await _call(session, "create_api_key",
-                                   {"seller_url": seller, "api_key": raw_key})
+        err, created = await _call(
+            session, "create_api_key", {"seller_url": seller, "api_key": raw_key}
+        )
         assert not err and created.get("created"), f"create_api_key failed: {created}"
         assert raw_key not in created["masked_key"], "Raw key must be masked"
 

@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 _DEAL_TYPE_MAP: dict[str, str] = {
     "PG": "PG",
     "PD": "PD",
-    "PMP": "PA",      # Private Marketplace → Private Auction
+    "PMP": "PA",  # Private Marketplace → Private Auction
     "PA": "PA",
     # Lowercase aliases (defensive; IX docs show uppercase)
     "pg": "PG",
@@ -436,9 +436,7 @@ class IndexExchangeConnector(SSPConnector):
         try:
             response = self._client.get(url, params=params, headers=headers)
         except httpx.TransportError as exc:
-            raise SSPConnectionError(
-                f"Index Exchange API network error: {exc}"
-            ) from exc
+            raise SSPConnectionError(f"Index Exchange API network error: {exc}") from exc
 
         if response.status_code in (401, 403):
             raise SSPAuthError(
@@ -462,8 +460,7 @@ class IndexExchangeConnector(SSPConnector):
 
         if response.status_code >= 500:
             raise SSPConnectionError(
-                f"Index Exchange API server error (HTTP {response.status_code}): "
-                f"{response.text}",
+                f"Index Exchange API server error (HTTP {response.status_code}): {response.text}",
                 status_code=response.status_code,
             )
 

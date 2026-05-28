@@ -220,9 +220,7 @@ def log_event(
     """
 
     if not plan_id:
-        logger.warning(
-            "audience_audit_log.log_event called with empty plan_id; skipping"
-        )
+        logger.warning("audience_audit_log.log_event called with empty plan_id; skipping")
         return
 
     if event_type not in KNOWN_EVENT_TYPES:
@@ -260,8 +258,7 @@ def log_event(
             conn.commit()
     except sqlite3.Error as exc:  # noqa: BLE001 -- audit log is fail-open
         logger.warning(
-            "audience_audit_log.log_event: failed to insert "
-            "plan_id=%s event_type=%s: %s",
+            "audience_audit_log.log_event: failed to insert plan_id=%s event_type=%s: %s",
             plan_id,
             event_type,
             exc,

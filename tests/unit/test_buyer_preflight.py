@@ -167,9 +167,7 @@ def _make_deal_response(
     )
 
 
-def _ranked_quote(
-    quote_id: str = "q-1", seller_id: str = "seller-a"
-) -> NormalizedQuote:
+def _ranked_quote(quote_id: str = "q-1", seller_id: str = "seller-a") -> NormalizedQuote:
     return NormalizedQuote(
         seller_id=seller_id,
         quote_id=quote_id,
@@ -476,13 +474,9 @@ class _RecordingCapabilityClient:
         self._caps_by_url = caps_by_url
         self.calls: list[str] = []
 
-    async def discover_capabilities(
-        self, seller_endpoint: str
-    ) -> CapabilityDiscoveryResult:
+    async def discover_capabilities(self, seller_endpoint: str) -> CapabilityDiscoveryResult:
         self.calls.append(seller_endpoint)
-        caps = self._caps_by_url.get(
-            seller_endpoint, SellerAudienceCapabilities.legacy_default()
-        )
+        caps = self._caps_by_url.get(seller_endpoint, SellerAudienceCapabilities.legacy_default())
         return CapabilityDiscoveryResult(
             capabilities=caps,
             cache_status="miss",
@@ -578,9 +572,7 @@ class TestPreflightStrictnessGate:
     """Tests 7a / 7b / 7c: pre-flight degrades plan, applies strictness."""
 
     @pytest.mark.asyncio
-    async def test_primary_required_with_version_mismatch_skips_seller(
-        self, deals_client_factory
-    ):
+    async def test_primary_required_with_version_mismatch_skips_seller(self, deals_client_factory):
         """primary=required + standard taxonomy version mismatch -> seller skipped.
 
         The seller advertises only Audience Taxonomy v2.0 (which the buyer's
@@ -620,10 +612,7 @@ class TestPreflightStrictnessGate:
         assert "seller-a" in selection.incompatible_sellers
         assert selection.booked_deals == []
         assert len(selection.failed_bookings) == 1
-        assert (
-            selection.failed_bookings[0]["error_code"]
-            == "audience_plan_unsupported"
-        )
+        assert selection.failed_bookings[0]["error_code"] == "audience_plan_unsupported"
 
     @pytest.mark.asyncio
     async def test_extensions_optional_dropped_proceeds(self, deals_client_factory):
@@ -703,9 +692,7 @@ class TestPreflightStrictnessGate:
         assert booking_arg.audience_plan.primary.identifier == "3-7"
 
     @pytest.mark.asyncio
-    async def test_constraints_required_dropped_skips_seller(
-        self, deals_client_factory
-    ):
+    async def test_constraints_required_dropped_skips_seller(self, deals_client_factory):
         """constraints=required + dropped -> seller skipped.
 
         Promotes the optional-by-default constraint policy to required; the
@@ -816,9 +803,7 @@ class TestPreflightRetryComposition:
         assert retry_request.audience_plan.extensions == []
 
     @pytest.mark.asyncio
-    async def test_preflight_dropped_extensions_no_retry_needed(
-        self, deals_client_factory
-    ):
+    async def test_preflight_dropped_extensions_no_retry_needed(self, deals_client_factory):
         """When pre-flight already strips ext, the seller never sees them."""
 
         seller_url = "https://seller-no-ext.example.com"

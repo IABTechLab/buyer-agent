@@ -547,9 +547,7 @@ def kickoff_channel_crew_with_audience(
     factory = _CHANNEL_FACTORIES.get(channel)
     if factory is None:
         valid = sorted(_CHANNEL_FACTORIES.keys())
-        raise ValueError(
-            f"Unknown channel {channel!r}; expected one of {valid}"
-        )
+        raise ValueError(f"Unknown channel {channel!r}; expected one of {valid}")
 
     # If the caller passed a CampaignBrief but no plan, run the planner
     # step inline. The import is local because the planner module pulls

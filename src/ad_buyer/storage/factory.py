@@ -7,7 +7,6 @@ Mirrors the seller-agent's factory pattern for structural consistency.
 Supports SQLite (default), Redis, and Hybrid backends.
 """
 
-
 from ad_buyer.storage.base import StorageBackend
 from ad_buyer.storage.sqlite_backend import SQLiteBackend
 

@@ -574,8 +574,8 @@ class TestFetchDealsDeduplication:
         connector = _connector_with_transport(transport)
         result = connector.fetch_deals()
 
-        assert result.successful == 4   # 4 unique deals
-        assert result.skipped == 1      # 1 duplicate skipped
+        assert result.successful == 4  # 4 unique deals
+        assert result.skipped == 1  # 1 duplicate skipped
         assert len(result.deals) == 4
 
 

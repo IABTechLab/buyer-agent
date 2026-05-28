@@ -54,10 +54,12 @@ def _make_api_key_store():
 
 def _reconnecting(store):
     """Return a lambda that reconnects the store before returning it."""
+
     def _get():
         if hasattr(store, "_conn") and store._conn is None:
             store.connect()
         return store
+
     return _get
 
 
@@ -198,9 +200,7 @@ class TestListPendingApprovals:
             _reconnecting(store),
         )
 
-        result = await mcp.call_tool(
-            "list_pending_approvals", {"campaign_id": "camp-001"}
-        )
+        result = await mcp.call_tool("list_pending_approvals", {"campaign_id": "camp-001"})
         data = json.loads(_extract_text(result))
         assert data["total"] == 1
         assert data["pending"][0]["campaign_id"] == "camp-001"
@@ -238,11 +238,14 @@ class TestApproveOrReject:
             _reconnecting(store),
         )
 
-        result = await mcp.call_tool("approve_or_reject", {
-            "approval_request_id": "req-001",
-            "decision": "approved",
-            "reviewer": "test-user",
-        })
+        result = await mcp.call_tool(
+            "approve_or_reject",
+            {
+                "approval_request_id": "req-001",
+                "decision": "approved",
+                "reviewer": "test-user",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["approval_request_id"] == "req-001"
         assert data["new_status"] == "approved"
@@ -258,12 +261,15 @@ class TestApproveOrReject:
             _reconnecting(store),
         )
 
-        result = await mcp.call_tool("approve_or_reject", {
-            "approval_request_id": "req-001",
-            "decision": "rejected",
-            "reviewer": "test-user",
-            "reason": "Budget too high",
-        })
+        result = await mcp.call_tool(
+            "approve_or_reject",
+            {
+                "approval_request_id": "req-001",
+                "decision": "rejected",
+                "reviewer": "test-user",
+                "reason": "Budget too high",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["new_status"] == "rejected"
         assert data["reason"] == "Budget too high"
@@ -278,11 +284,14 @@ class TestApproveOrReject:
             _reconnecting(store),
         )
 
-        result = await mcp.call_tool("approve_or_reject", {
-            "approval_request_id": "nonexistent",
-            "decision": "approved",
-            "reviewer": "test-user",
-        })
+        result = await mcp.call_tool(
+            "approve_or_reject",
+            {
+                "approval_request_id": "nonexistent",
+                "decision": "approved",
+                "reviewer": "test-user",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -296,11 +305,14 @@ class TestApproveOrReject:
             _reconnecting(store),
         )
 
-        result = await mcp.call_tool("approve_or_reject", {
-            "approval_request_id": "req-001",
-            "decision": "rejected",
-            "reviewer": "test-user",
-        })
+        result = await mcp.call_tool(
+            "approve_or_reject",
+            {
+                "approval_request_id": "req-001",
+                "decision": "rejected",
+                "reviewer": "test-user",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -314,11 +326,14 @@ class TestApproveOrReject:
             _reconnecting(store),
         )
 
-        result = await mcp.call_tool("approve_or_reject", {
-            "approval_request_id": "req-001",
-            "decision": "approved",
-            "reviewer": "test-user",
-        })
+        result = await mcp.call_tool(
+            "approve_or_reject",
+            {
+                "approval_request_id": "req-001",
+                "decision": "approved",
+                "reviewer": "test-user",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "timestamp" in data
 
@@ -408,10 +423,13 @@ class TestCreateApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("create_api_key", {
-            "seller_url": "http://seller-a.com",
-            "api_key": "new-secret-key-123",
-        })
+        result = await mcp.call_tool(
+            "create_api_key",
+            {
+                "seller_url": "http://seller-a.com",
+                "api_key": "new-secret-key-123",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["seller_url"] == "http://seller-a.com"
         assert data["created"] is True
@@ -429,10 +447,13 @@ class TestCreateApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("create_api_key", {
-            "seller_url": "http://seller-a.com",
-            "api_key": "new-key",
-        })
+        result = await mcp.call_tool(
+            "create_api_key",
+            {
+                "seller_url": "http://seller-a.com",
+                "api_key": "new-key",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["created"] is True
         assert key_store.get_key("http://seller-a.com") == "new-key"
@@ -446,10 +467,13 @@ class TestCreateApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("create_api_key", {
-            "seller_url": "http://seller-a.com",
-            "api_key": "supersecretvalue12345",
-        })
+        result = await mcp.call_tool(
+            "create_api_key",
+            {
+                "seller_url": "http://seller-a.com",
+                "api_key": "supersecretvalue12345",
+            },
+        )
         text = _extract_text(result)
         assert "supersecretvalue12345" not in text
 
@@ -462,10 +486,13 @@ class TestCreateApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("create_api_key", {
-            "seller_url": "http://seller-a.com",
-            "api_key": "test-key",
-        })
+        result = await mcp.call_tool(
+            "create_api_key",
+            {
+                "seller_url": "http://seller-a.com",
+                "api_key": "test-key",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "timestamp" in data
 
@@ -488,9 +515,12 @@ class TestRevokeApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("revoke_api_key", {
-            "seller_url": "http://seller-a.com",
-        })
+        result = await mcp.call_tool(
+            "revoke_api_key",
+            {
+                "seller_url": "http://seller-a.com",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["revoked"] is True
         assert data["seller_url"] == "http://seller-a.com"
@@ -507,9 +537,12 @@ class TestRevokeApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("revoke_api_key", {
-            "seller_url": "http://nonexistent.com",
-        })
+        result = await mcp.call_tool(
+            "revoke_api_key",
+            {
+                "seller_url": "http://nonexistent.com",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["revoked"] is False
 
@@ -522,8 +555,11 @@ class TestRevokeApiKey:
             lambda: key_store,
         )
 
-        result = await mcp.call_tool("revoke_api_key", {
-            "seller_url": "http://seller-a.com",
-        })
+        result = await mcp.call_tool(
+            "revoke_api_key",
+            {
+                "seller_url": "http://seller-a.com",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "timestamp" in data

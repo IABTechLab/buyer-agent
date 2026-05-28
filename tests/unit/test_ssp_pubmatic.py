@@ -386,7 +386,10 @@ class TestNormalizeDeal:
     def test_notes_mapped_to_description(self):
         """notes → description."""
         normalized = self.connector._normalize_deal(self._pg_deal())
-        assert normalized["description"] == "Premium sports programming package with guaranteed delivery"  # noqa: E501
+        assert (
+            normalized["description"]
+            == "Premium sports programming package with guaranteed delivery"
+        )  # noqa: E501
 
     def test_null_notes_is_none(self):
         """null notes → description is None."""
@@ -463,7 +466,9 @@ class TestFetchDealsHappyPath:
     def test_fetch_deals_empty_response(self):
         """fetch_deals() handles empty deals list."""
         transport = _MockTransport(
-            _make_response(200, {"status": "success", "total": 0, "page": 1, "page_size": 100, "deals": []})  # noqa: E501
+            _make_response(
+                200, {"status": "success", "total": 0, "page": 1, "page_size": 100, "deals": []}
+            )  # noqa: E501
         )
         connector = _connector_with_transport(transport)
         result = connector.fetch_deals()

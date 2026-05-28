@@ -257,10 +257,18 @@ class TestQuoteNormalizerNullPricing:
         both gracefully — unpriced quotes are excluded from ranking."""
         normalizer = QuoteNormalizer()
         quotes = [
-            (_make_quote(quote_id="q-priced", seller_id="seller-a",
-                         final_cpm=10.0, base_cpm=12.0), "PD"),
-            (_make_quote(quote_id="q-unpriced", seller_id="seller-b",
-                         final_cpm=None, base_cpm=None), "PD"),
+            (
+                _make_quote(
+                    quote_id="q-priced", seller_id="seller-a", final_cpm=10.0, base_cpm=12.0
+                ),
+                "PD",
+            ),
+            (
+                _make_quote(
+                    quote_id="q-unpriced", seller_id="seller-b", final_cpm=None, base_cpm=None
+                ),
+                "PD",
+            ),
         ]
         ranked = normalizer.compare_quotes(quotes)
         # Unpriced quotes should be separated from the ranked list

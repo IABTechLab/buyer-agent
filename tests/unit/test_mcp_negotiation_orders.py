@@ -38,6 +38,7 @@ def _make_deal_store() -> DealStore:
     """
     import os
     import tempfile
+
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     store = DealStore(f"sqlite:///{path}")
@@ -53,6 +54,7 @@ def _make_order_store() -> OrderStore:
     """
     import os
     import tempfile
+
     fd, path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     store = OrderStore(f"sqlite:///{path}")
@@ -66,10 +68,12 @@ def _reconnecting(store):
     MCP tools call store.disconnect() in their finally blocks. For
     multi-call tests, the store needs to be reconnected on each access.
     """
+
     def _get():
         if store._conn is None:
             store.connect()
         return store
+
     return _get
 
 
@@ -186,12 +190,15 @@ class TestStartNegotiation:
             "ad_buyer.interfaces.mcp_server._get_deal_store", _reconnecting(deal_store)
         )
 
-        result = await mcp.call_tool("start_negotiation", {
-            "seller_url": "http://localhost:8001",
-            "product_id": "pkg-001",
-            "product_name": "Premium CTV",
-            "initial_price": 20.0,
-        })
+        result = await mcp.call_tool(
+            "start_negotiation",
+            {
+                "seller_url": "http://localhost:8001",
+                "product_id": "pkg-001",
+                "product_name": "Premium CTV",
+                "initial_price": 20.0,
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert "deal_id" in data
@@ -206,19 +213,20 @@ class TestStartNegotiation:
             "ad_buyer.interfaces.mcp_server._get_deal_store", _reconnecting(deal_store)
         )
 
-        result = await mcp.call_tool("start_negotiation", {
-            "seller_url": "http://localhost:8001",
-            "product_id": "pkg-001",
-            "product_name": "Premium CTV",
-            "initial_price": 20.0,
-        })
+        result = await mcp.call_tool(
+            "start_negotiation",
+            {
+                "seller_url": "http://localhost:8001",
+                "product_id": "pkg-001",
+                "product_name": "Premium CTV",
+                "initial_price": 20.0,
+            },
+        )
         data = json.loads(_extract_text(result))
         deal_id = data["deal_id"]
 
         # Verify round was recorded via the get_negotiation_status tool
-        status_result = await mcp.call_tool(
-            "get_negotiation_status", {"deal_id": deal_id}
-        )
+        status_result = await mcp.call_tool("get_negotiation_status", {"deal_id": deal_id})
         status_data = json.loads(_extract_text(status_result))
 
         assert status_data["rounds_count"] == 1
@@ -233,12 +241,15 @@ class TestStartNegotiation:
             "ad_buyer.interfaces.mcp_server._get_deal_store", _reconnecting(deal_store)
         )
 
-        result = await mcp.call_tool("start_negotiation", {
-            "seller_url": "http://localhost:8001",
-            "product_id": "pkg-001",
-            "product_name": "Premium CTV",
-            "initial_price": 20.0,
-        })
+        result = await mcp.call_tool(
+            "start_negotiation",
+            {
+                "seller_url": "http://localhost:8001",
+                "product_id": "pkg-001",
+                "product_name": "Premium CTV",
+                "initial_price": 20.0,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert isinstance(data, dict)
         assert "timestamp" in data
@@ -260,9 +271,7 @@ class TestGetNegotiationStatus:
             "ad_buyer.interfaces.mcp_server._get_deal_store", _reconnecting(deal_store)
         )
 
-        result = await mcp.call_tool("get_negotiation_status", {
-            "deal_id": "nonexistent"
-        })
+        result = await mcp.call_tool("get_negotiation_status", {"deal_id": "nonexistent"})
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -276,9 +285,7 @@ class TestGetNegotiationStatus:
             "ad_buyer.interfaces.mcp_server._get_deal_store", _reconnecting(deal_store)
         )
 
-        result = await mcp.call_tool("get_negotiation_status", {
-            "deal_id": deal_id
-        })
+        result = await mcp.call_tool("get_negotiation_status", {"deal_id": deal_id})
         data = json.loads(_extract_text(result))
 
         assert data["deal_id"] == deal_id
@@ -295,9 +302,7 @@ class TestGetNegotiationStatus:
             "ad_buyer.interfaces.mcp_server._get_deal_store", _reconnecting(deal_store)
         )
 
-        result = await mcp.call_tool("get_negotiation_status", {
-            "deal_id": deal_id
-        })
+        result = await mcp.call_tool("get_negotiation_status", {"deal_id": deal_id})
         data = json.loads(_extract_text(result))
 
         assert data["deal_id"] == deal_id
@@ -441,9 +446,7 @@ class TestGetOrderStatus:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("get_order_status", {
-            "order_id": "nonexistent"
-        })
+        result = await mcp.call_tool("get_order_status", {"order_id": "nonexistent"})
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -461,9 +464,7 @@ class TestGetOrderStatus:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("get_order_status", {
-            "order_id": "order-001"
-        })
+        result = await mcp.call_tool("get_order_status", {"order_id": "order-001"})
         data = json.loads(_extract_text(result))
 
         assert data["order_id"] == "order-001"
@@ -479,9 +480,7 @@ class TestGetOrderStatus:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("get_order_status", {
-            "order_id": "order-001"
-        })
+        result = await mcp.call_tool("get_order_status", {"order_id": "order-001"})
         data = json.loads(_extract_text(result))
         assert "timestamp" in data
 
@@ -502,10 +501,13 @@ class TestTransitionOrder:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("transition_order", {
-            "order_id": "nonexistent",
-            "to_status": "booked",
-        })
+        result = await mcp.call_tool(
+            "transition_order",
+            {
+                "order_id": "nonexistent",
+                "to_status": "booked",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -518,10 +520,13 @@ class TestTransitionOrder:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("transition_order", {
-            "order_id": "order-001",
-            "to_status": "booked",
-        })
+        result = await mcp.call_tool(
+            "transition_order",
+            {
+                "order_id": "order-001",
+                "to_status": "booked",
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert data["order_id"] == "order-001"
@@ -529,9 +534,7 @@ class TestTransitionOrder:
         assert data["previous_status"] == "pending"
 
         # Verify the order was actually updated via get_order_status
-        status_result = await mcp.call_tool(
-            "get_order_status", {"order_id": "order-001"}
-        )
+        status_result = await mcp.call_tool("get_order_status", {"order_id": "order-001"})
         status_data = json.loads(_extract_text(status_result))
         assert status_data["status"] == "booked"
 
@@ -544,11 +547,14 @@ class TestTransitionOrder:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("transition_order", {
-            "order_id": "order-001",
-            "to_status": "booked",
-            "reason": "Seller confirmed booking",
-        })
+        result = await mcp.call_tool(
+            "transition_order",
+            {
+                "order_id": "order-001",
+                "to_status": "booked",
+                "reason": "Seller confirmed booking",
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert data["reason"] == "Seller confirmed booking"
@@ -562,9 +568,12 @@ class TestTransitionOrder:
             "ad_buyer.interfaces.mcp_server._get_order_store", _reconnecting(order_store)
         )
 
-        result = await mcp.call_tool("transition_order", {
-            "order_id": "order-001",
-            "to_status": "booked",
-        })
+        result = await mcp.call_tool(
+            "transition_order",
+            {
+                "order_id": "order-001",
+                "to_status": "booked",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "timestamp" in data

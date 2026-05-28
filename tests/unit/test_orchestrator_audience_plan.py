@@ -93,9 +93,7 @@ class TestAcceptsAudiencePlan:
 
     def test_inventory_requirements_accepts_plan(self) -> None:
         plan = _build_minimal_plan()
-        ir = InventoryRequirements(
-            media_type="ctv", deal_types=["PD"], audience_plan=plan
-        )
+        ir = InventoryRequirements(media_type="ctv", deal_types=["PD"], audience_plan=plan)
         assert ir.audience_plan is plan
         assert ir.audience_plan.primary.identifier == "3-7"
 
@@ -140,9 +138,7 @@ class TestRoundTrip:
         rebuilt = QuoteRequest(**data)
 
         assert rebuilt.audience_plan is not None
-        assert (
-            rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
-        )
+        assert rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
         assert rebuilt.audience_plan.primary.identifier == "3-7"
 
     def test_deal_booking_request_round_trips(self) -> None:
@@ -153,16 +149,12 @@ class TestRoundTrip:
         rebuilt = DealBookingRequest(**data)
 
         assert rebuilt.audience_plan is not None
-        assert (
-            rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
-        )
+        assert rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
 
     def test_inventory_requirements_round_trips_via_asdict(self) -> None:
         # InventoryRequirements is a dataclass; round-trip via asdict + ctor.
         plan = _build_minimal_plan()
-        ir = InventoryRequirements(
-            media_type="ctv", deal_types=["PD"], audience_plan=plan
-        )
+        ir = InventoryRequirements(media_type="ctv", deal_types=["PD"], audience_plan=plan)
 
         # asdict recursively converts the AudiencePlan to a dict; rebuilding
         # requires re-validating the plan dict back into an AudiencePlan.
@@ -179,9 +171,7 @@ class TestRoundTrip:
         )
 
         assert rebuilt.audience_plan is not None
-        assert (
-            rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
-        )
+        assert rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
         assert rebuilt.audience_plan.primary.identifier == "3-7"
 
     def test_deal_params_round_trips_via_asdict(self) -> None:
@@ -209,9 +199,7 @@ class TestRoundTrip:
         )
 
         assert rebuilt.audience_plan is not None
-        assert (
-            rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
-        )
+        assert rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
 
 
 # ---------------------------------------------------------------------------

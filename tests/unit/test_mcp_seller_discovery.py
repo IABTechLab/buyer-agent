@@ -152,8 +152,10 @@ class TestDiscoverSellers:
         ctv_cap = AgentCapability(name="ctv", description="CTV inventory")
         sellers = [
             _make_agent_card(
-                agent_id="s1", name="CTV Publisher",
-                url="http://ctv.com", capabilities=[ctv_cap],
+                agent_id="s1",
+                name="CTV Publisher",
+                url="http://ctv.com",
+                capabilities=[ctv_cap],
             ),
         ]
         mock_client = AsyncMock()
@@ -163,9 +165,7 @@ class TestDiscoverSellers:
             lambda: mock_client,
         )
 
-        result = await mcp.call_tool(
-            "discover_sellers", {"capability": "ctv"}
-        )
+        result = await mcp.call_tool("discover_sellers", {"capability": "ctv"})
         data = json.loads(_extract_text(result))
 
         assert data["total"] == 1
@@ -319,8 +319,11 @@ class TestGetSellerMediaKit:
         pkg = data["packages"][0]
 
         required_fields = [
-            "package_id", "name", "ad_formats",
-            "price_range", "rate_type",
+            "package_id",
+            "name",
+            "ad_formats",
+            "price_range",
+            "rate_type",
         ]
         for field in required_fields:
             assert field in pkg, f"Missing field: {field}"
@@ -502,9 +505,7 @@ class TestCompareSellers:
             lambda: mock_client,
         )
 
-        result = await mcp.call_tool(
-            "compare_sellers", {"seller_urls": []}
-        )
+        result = await mcp.call_tool("compare_sellers", {"seller_urls": []})
         data = json.loads(_extract_text(result))
 
         assert data["sellers_compared"] == 0
@@ -549,9 +550,7 @@ class TestCompareSellers:
             lambda: mock_client,
         )
 
-        result = await mcp.call_tool(
-            "compare_sellers", {"seller_urls": []}
-        )
+        result = await mcp.call_tool("compare_sellers", {"seller_urls": []})
         data = json.loads(_extract_text(result))
         assert isinstance(data, dict)
         assert "timestamp" in data
@@ -564,7 +563,8 @@ class TestCompareSellers:
             seller_name="Publisher A",
             packages=[
                 _make_package_summary(
-                    name="Display", ad_formats=["display", "native"],
+                    name="Display",
+                    ad_formats=["display", "native"],
                     seller_url="http://a.example.com",
                 ),
             ],
@@ -574,7 +574,8 @@ class TestCompareSellers:
             seller_name="Publisher B",
             packages=[
                 _make_package_summary(
-                    name="Video", ad_formats=["video"],
+                    name="Video",
+                    ad_formats=["video"],
                     seller_url="http://b.example.com",
                 ),
             ],

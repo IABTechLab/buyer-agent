@@ -133,15 +133,9 @@ class TestLogAndRead:
 
 class TestOrdering:
     def test_multiple_events_returned_in_insertion_order(self, temp_audit_db):
-        audience_audit_log.log_event(
-            "plan-multi", EVENT_CAPABILITY_REJECTION, {"step": 1}
-        )
-        audience_audit_log.log_event(
-            "plan-multi", EVENT_DEGRADATION, {"step": 2}
-        )
-        audience_audit_log.log_event(
-            "plan-multi", EVENT_DEGRADATION, {"step": 3}
-        )
+        audience_audit_log.log_event("plan-multi", EVENT_CAPABILITY_REJECTION, {"step": 1})
+        audience_audit_log.log_event("plan-multi", EVENT_DEGRADATION, {"step": 2})
+        audience_audit_log.log_event("plan-multi", EVENT_DEGRADATION, {"step": 3})
 
         events = audience_audit_log.get_events("plan-multi")
         assert len(events) == 3
@@ -189,9 +183,7 @@ class TestEdgeCases:
     def test_unknown_event_type_still_writes(self, temp_audit_db):
         # Forward-compat: callers can experiment with new types ahead of
         # constants landing here. The helper logs a WARN but does NOT drop.
-        audience_audit_log.log_event(
-            "plan-fc", "future_event_type", {"x": 1}
-        )
+        audience_audit_log.log_event("plan-fc", "future_event_type", {"x": 1})
         events = audience_audit_log.get_events("plan-fc")
         assert len(events) == 1
         assert events[0]["event_type"] == "future_event_type"
@@ -221,17 +213,14 @@ class TestSchemaMigration:
         # NOT `audience_audit_log`. We use `deals` from the schema module so
         # the legacy DB is realistic.
         legacy = sqlite3.connect(str(db_path))
-        legacy.execute(
-            "CREATE TABLE pretend_other_table (id INTEGER PRIMARY KEY)"
-        )
+        legacy.execute("CREATE TABLE pretend_other_table (id INTEGER PRIMARY KEY)")
         legacy.commit()
         legacy.close()
 
         # Confirm the table is genuinely missing before the helper touches it.
         check = sqlite3.connect(str(db_path))
         cursor = check.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND "
-            "name='audience_audit_log'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='audience_audit_log'"
         )
         assert cursor.fetchone() is None
         check.close()
@@ -239,15 +228,12 @@ class TestSchemaMigration:
         # Point the helper at this legacy file and write an event.
         audience_audit_log.configure(f"sqlite:///{db_path}")
         try:
-            audience_audit_log.log_event(
-                "plan-legacy", EVENT_DEGRADATION, {"first": True}
-            )
+            audience_audit_log.log_event("plan-legacy", EVENT_DEGRADATION, {"first": True})
 
             # The table now exists.
             check2 = sqlite3.connect(str(db_path))
             cursor = check2.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND "
-                "name='audience_audit_log'"
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='audience_audit_log'"
             )
             assert cursor.fetchone() is not None
             check2.close()
@@ -336,9 +322,7 @@ class _FakeDealsClient:
 
 class TestOrchestratorEmitsAuditEvents:
     @pytest.mark.asyncio
-    async def test_degrade_and_retry_emits_degradation_and_rejection(
-        self, temp_audit_db
-    ):
+    async def test_degrade_and_retry_emits_degradation_and_rejection(self, temp_audit_db):
         plan = _make_audience_plan()
         plan_id = plan.audience_plan_id
         assert plan_id  # sanity: auto-computed
@@ -374,9 +358,7 @@ class TestOrchestratorEmitsAuditEvents:
         assert EVENT_DEGRADATION in types
 
         # Capability-rejection event preserves the seller's structured list.
-        rejection = next(
-            e for e in events if e["event_type"] == EVENT_CAPABILITY_REJECTION
-        )
+        rejection = next(e for e in events if e["event_type"] == EVENT_CAPABILITY_REJECTION)
         assert rejection["payload"]["seller_id"] == "seller-1"
         assert rejection["payload"]["unsupported"] == [
             {
@@ -386,9 +368,7 @@ class TestOrchestratorEmitsAuditEvents:
         ]
 
         # Degradation event captures what was stripped.
-        degradation = next(
-            e for e in events if e["event_type"] == EVENT_DEGRADATION
-        )
+        degradation = next(e for e in events if e["event_type"] == EVENT_DEGRADATION)
         assert degradation["payload"]["seller_id"] == "seller-1"
         assert degradation["payload"]["deal_id"] == "deal-001"
         assert isinstance(degradation["payload"]["log"], list)

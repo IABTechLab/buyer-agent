@@ -316,8 +316,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
                 self.state.audience_plan = planner_result.plan
                 if planner_result.plan is not None:
                     logger.info(
-                        "buyer_deal_flow: audience plan resolved "
-                        "(audience_plan_id=%s)",
+                        "buyer_deal_flow: audience plan resolved (audience_plan_id=%s)",
                         planner_result.plan.audience_plan_id,
                     )
             except Exception as e:  # noqa: BLE001 - audience is additive; do not abort the deal flow
@@ -325,8 +324,7 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
                 # not break the deal flow -- record the warning and keep
                 # going audience-blind so legacy callers see no regression.
                 logger.warning(
-                    "buyer_deal_flow: audience planner failed (%s); "
-                    "continuing audience-blind",
+                    "buyer_deal_flow: audience planner failed (%s); continuing audience-blind",
                     e,
                 )
                 self.state.errors.append(f"Audience planner warning: {e}")
@@ -439,12 +437,12 @@ class BuyerDealFlow(Flow[BuyerDealFlowState]):
 for the following request: {self.state.request}
 
 Discovery results:
-{discovery_result.get('discovery_result', 'No results')}
+{discovery_result.get("discovery_result", "No results")}
 
 Criteria:
 - Deal type: {self.state.deal_type.value}
-- Max CPM: {self.state.max_cpm or 'No limit'}
-- Volume: {self.state.impressions or 'Flexible'}
+- Max CPM: {self.state.max_cpm or "No limit"}
+- Volume: {self.state.impressions or "Flexible"}
 
 Return the product_id of the best matching product and explain why.""",
                 expected_output="Product ID and selection rationale",
@@ -588,9 +586,7 @@ Return the product_id of the best matching product and explain why.""",
             "request": self.state.request,
             "deal_type": self.state.deal_type.value,
             "access_tier": (
-                self._buyer_context.get_access_tier().value
-                if self._buyer_context
-                else "unknown"
+                self._buyer_context.get_access_tier().value if self._buyer_context else "unknown"
             ),
             "selected_product_id": self.state.selected_product_id,
             "deal_response": self.state.deal_response,
@@ -598,9 +594,7 @@ Return the product_id of the best matching product and explain why.""",
             "updated_at": self.state.updated_at.isoformat(),
             # Surface the audience_plan_id when one was resolved so callers
             # can correlate logs / audit trails by hash (proposal §5.1).
-            "audience_plan_id": (
-                plan.audience_plan_id if plan is not None else None
-            ),
+            "audience_plan_id": (plan.audience_plan_id if plan is not None else None),
         }
 
     def get_audience_planner_result(self) -> AudiencePlannerResult | None:
@@ -654,6 +648,7 @@ async def run_buyer_deal_flow(
     # Resolve server URL from Settings if not provided
     if base_url is None:
         from ..config.settings import get_settings
+
         base_url = get_settings().iab_server_url
 
     # Create buyer context

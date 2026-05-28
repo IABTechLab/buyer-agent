@@ -219,9 +219,7 @@ class CapabilityClient:
             return
         self._cache.pop(self._cache_key(seller_endpoint), None)
 
-    async def discover_capabilities(
-        self, seller_endpoint: str
-    ) -> CapabilityDiscoveryResult:
+    async def discover_capabilities(self, seller_endpoint: str) -> CapabilityDiscoveryResult:
         """Discover a seller's audience capabilities.
 
         Hits the cache first, returns immediately on a fresh hit. On a
@@ -275,8 +273,7 @@ class CapabilityClient:
                 await client.aclose()
         except (httpx.HTTPError, ValueError) as exc:
             logger.warning(
-                "capability_client fetch failed endpoint=%s err=%s -- "
-                "treating as legacy",
+                "capability_client fetch failed endpoint=%s err=%s -- treating as legacy",
                 seller_endpoint,
                 exc,
             )
@@ -288,8 +285,7 @@ class CapabilityClient:
 
         if response.status_code != 200:
             logger.warning(
-                "capability_client non-200 endpoint=%s status=%d -- "
-                "treating as legacy",
+                "capability_client non-200 endpoint=%s status=%d -- treating as legacy",
                 seller_endpoint,
                 response.status_code,
             )
@@ -304,8 +300,7 @@ class CapabilityClient:
             payload = response.json()
         except ValueError as exc:
             logger.warning(
-                "capability_client invalid JSON endpoint=%s err=%s -- "
-                "treating as legacy",
+                "capability_client invalid JSON endpoint=%s err=%s -- treating as legacy",
                 seller_endpoint,
                 exc,
             )
@@ -322,8 +317,7 @@ class CapabilityClient:
             # fallback -- standard segments only, no constraints, no
             # extensions, no exclusions, no agentic.
             logger.info(
-                "capability_client legacy seller (no audience_capabilities) "
-                "endpoint=%s",
+                "capability_client legacy seller (no audience_capabilities) endpoint=%s",
                 seller_endpoint,
             )
             caps = _legacy_default_capabilities()
@@ -356,8 +350,7 @@ class CapabilityClient:
         self._store(key, caps, fetched_at=now, max_age=max_age)
 
         logger.info(
-            "capability_client %s endpoint=%s schema=%s agentic=%s "
-            "supports=(c=%s,e=%s,x=%s)",
+            "capability_client %s endpoint=%s schema=%s agentic=%s supports=(c=%s,e=%s,x=%s)",
             cache_status,
             seller_endpoint,
             caps.schema_version,

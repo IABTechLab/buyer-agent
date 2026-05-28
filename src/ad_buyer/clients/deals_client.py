@@ -62,9 +62,7 @@ _DEFAULT_MAX_RETRIES = 3
 # Code-internal naming continues to use `ucp_*` (no rename per §5.6 lock).
 _UCP_CONTENT_TYPE = "application/vnd.ucp.embedding+json; v=1"
 _AGENTIC_AUDIENCES_CONTENT_TYPE = "application/vnd.iab.agentic-audiences+json; v=1"
-_AUDIENCE_PLAN_ACCEPT = (
-    f"{_UCP_CONTENT_TYPE}, {_AGENTIC_AUDIENCES_CONTENT_TYPE}"
-)
+_AUDIENCE_PLAN_ACCEPT = f"{_UCP_CONTENT_TYPE}, {_AGENTIC_AUDIENCES_CONTENT_TYPE}"
 
 
 class DealsClientError(Exception):
@@ -389,7 +387,10 @@ class DealsClient:
                 if attempt < self._max_retries:
                     logger.warning(
                         "Timeout on attempt %d/%d for %s %s",
-                        attempt, self._max_retries, method, path,
+                        attempt,
+                        self._max_retries,
+                        method,
+                        path,
                     )
                     continue
                 raise last_error from exc
@@ -416,7 +417,11 @@ class DealsClient:
                 if attempt < self._max_retries:
                     logger.warning(
                         "Retryable error %d on attempt %d/%d for %s %s",
-                        response.status_code, attempt, self._max_retries, method, path,
+                        response.status_code,
+                        attempt,
+                        self._max_retries,
+                        method,
+                        path,
                     )
                     continue
                 raise last_error
@@ -460,16 +465,10 @@ class DealsClient:
             if isinstance(inner, dict):
                 error_code = str(inner.get("error", "") or "")
                 # Surface the inner "message" / "detail" / repr for humans.
-                detail = str(
-                    inner.get("message")
-                    or inner.get("detail")
-                    or ""
-                )
+                detail = str(inner.get("message") or inner.get("detail") or "")
                 raw_unsupported = inner.get("unsupported")
                 if isinstance(raw_unsupported, list):
-                    unsupported = [
-                        u for u in raw_unsupported if isinstance(u, dict)
-                    ]
+                    unsupported = [u for u in raw_unsupported if isinstance(u, dict)]
             else:
                 # Flat shape: {"error": "...", "detail": "..."}
                 error_code = str(data.get("error", "") or "")
@@ -511,15 +510,19 @@ class DealsClient:
                 deal_type=request.deal_type,
                 status="quoted",
                 price=quote.pricing.final_cpm if quote.pricing.final_cpm is not None else 0.0,
-                original_price=quote.pricing.base_cpm if quote.pricing.base_cpm is not None else 0.0,  # noqa: E501
+                original_price=quote.pricing.base_cpm
+                if quote.pricing.base_cpm is not None
+                else 0.0,  # noqa: E501
                 impressions=quote.terms.impressions,
                 flight_start=quote.terms.flight_start,
                 flight_end=quote.terms.flight_end,
-                metadata=json.dumps({
-                    "quote_id": quote.quote_id,
-                    "buyer_tier": quote.buyer_tier,
-                    "expires_at": quote.expires_at,
-                }),
+                metadata=json.dumps(
+                    {
+                        "quote_id": quote.quote_id,
+                        "buyer_tier": quote.buyer_tier,
+                        "expires_at": quote.expires_at,
+                    }
+                ),
             )
         except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist quote %s to DealStore", quote.quote_id)
@@ -544,15 +547,17 @@ class DealsClient:
                 impressions=deal.terms.impressions,
                 flight_start=deal.terms.flight_start,
                 flight_end=deal.terms.flight_end,
-                metadata=json.dumps({
-                    "quote_id": deal.quote_id,
-                    "buyer_tier": deal.buyer_tier,
-                    "expires_at": deal.expires_at,
-                    "activation_instructions": deal.activation_instructions,
-                    "openrtb_params": (
-                        deal.openrtb_params.model_dump() if deal.openrtb_params else None
-                    ),
-                }),
+                metadata=json.dumps(
+                    {
+                        "quote_id": deal.quote_id,
+                        "buyer_tier": deal.buyer_tier,
+                        "expires_at": deal.expires_at,
+                        "activation_instructions": deal.activation_instructions,
+                        "openrtb_params": (
+                            deal.openrtb_params.model_dump() if deal.openrtb_params else None
+                        ),
+                    }
+                ),
             )
         except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist deal %s to DealStore", deal.deal_id)
@@ -577,6 +582,4 @@ class DealsClient:
                     )
                     break
         except (sqlite3.Error, OSError, ValueError, AttributeError):
-            logger.exception(
-                "Failed to update stored deal status for %s", deal.deal_id
-            )
+            logger.exception("Failed to update stored deal status for %s", deal.deal_id)

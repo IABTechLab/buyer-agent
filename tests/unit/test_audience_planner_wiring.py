@@ -430,9 +430,7 @@ class TestResearchAgentRelocation:
         for agent in crew.agents:
             if agent.role == research_role:
                 return {type(t) for t in agent.tools}
-        raise AssertionError(
-            f"Could not find Research Agent (role={research_role!r}) in crew"
-        )
+        raise AssertionError(f"Could not find Research Agent (role={research_role!r}) in crew")
 
     def test_branding_crew_research_agent_has_no_audience_tools(
         self, opendirect_client, channel_brief
@@ -452,9 +450,7 @@ class TestResearchAgentRelocation:
         assert AudienceMatchingTool not in types
         assert CoverageEstimationTool not in types
 
-    def test_ctv_crew_research_agent_has_no_audience_tools(
-        self, opendirect_client, channel_brief
-    ):
+    def test_ctv_crew_research_agent_has_no_audience_tools(self, opendirect_client, channel_brief):
         crew = create_ctv_crew(opendirect_client, channel_brief)
         types = self._research_agent_tools(crew)
         assert AudienceDiscoveryTool not in types

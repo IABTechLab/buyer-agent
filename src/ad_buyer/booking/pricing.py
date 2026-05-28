@@ -94,14 +94,16 @@ class PricingCalculator:
     # Volume discount thresholds (only for agency/advertiser tiers)
     VOLUME_DISCOUNT_THRESHOLDS: list[tuple[int, float]] = [
         (10_000_000, 10.0),  # 10M+ impressions: 10% discount
-        (5_000_000, 5.0),    # 5M+ impressions: 5% discount
+        (5_000_000, 5.0),  # 5M+ impressions: 5% discount
     ]
 
     # Tiers eligible for volume discounts
-    VOLUME_ELIGIBLE_TIERS: frozenset[AccessTier] = frozenset({
-        AccessTier.AGENCY,
-        AccessTier.ADVERTISER,
-    })
+    VOLUME_ELIGIBLE_TIERS: frozenset[AccessTier] = frozenset(
+        {
+            AccessTier.AGENCY,
+            AccessTier.ADVERTISER,
+        }
+    )
 
     def calculate(
         self,

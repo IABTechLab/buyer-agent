@@ -55,7 +55,7 @@ class RedisBackend(StorageBackend):
     def _unprefixed_key(self, key: str) -> str:
         """Remove prefix from key."""
         if key.startswith(self.key_prefix):
-            return key[len(self.key_prefix):]
+            return key[len(self.key_prefix) :]
         return key
 
     async def connect(self) -> None:

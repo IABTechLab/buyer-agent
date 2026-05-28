@@ -71,9 +71,7 @@ class TestRequestDealNoFallback:
             "channel": "ctv",
             # No basePrice, no price
         }
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=product_no_price
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=product_no_price)
 
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod-001")
@@ -93,9 +91,7 @@ class TestRequestDealNoFallback:
             "name": "Premium Display",
             "basePrice": "contact_sales",
         }
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=product_bad_price
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=product_bad_price)
 
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod-002")
@@ -113,9 +109,7 @@ class TestRequestDealNoFallback:
             "name": "Premium Audio",
             "basePrice": None,
         }
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=product_null_price
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=product_null_price)
 
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod-003")
@@ -132,9 +126,7 @@ class TestRequestDealNoFallback:
             "name": "Premium Display",
             "basePrice": 25.0,
         }
-        mock_client.get_product.return_value = MagicMock(
-            success=True, data=product_with_price
-        )
+        mock_client.get_product.return_value = MagicMock(success=True, data=product_with_price)
 
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod-004")
@@ -161,9 +153,7 @@ class TestDiscoverInventoryNoFallback:
             "availableImpressions": 5_000_000,
             # No basePrice, no price
         }
-        mock_client.list_products.return_value = MagicMock(
-            success=True, data=[product_no_price]
-        )
+        mock_client.list_products.return_value = MagicMock(success=True, data=[product_no_price])
 
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun()
@@ -183,9 +173,7 @@ class TestDiscoverInventoryNoFallback:
             "channel": "display",
             "availableImpressions": 3_000_000,
         }
-        mock_client.list_products.return_value = MagicMock(
-            success=True, data=[product_null_price]
-        )
+        mock_client.list_products.return_value = MagicMock(success=True, data=[product_null_price])
 
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun()
@@ -202,9 +190,7 @@ class TestDiscoverInventoryNoFallback:
             "channel": "display",
             "availableImpressions": 5_000_000,
         }
-        mock_client.list_products.return_value = MagicMock(
-            success=True, data=[product_with_price]
-        )
+        mock_client.list_products.return_value = MagicMock(success=True, data=[product_with_price])
 
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun()
@@ -340,9 +326,7 @@ class TestCampaignPipelineNoAssumedCPM:
 
     def test_estimate_impressions_with_explicit_cpm(self):
         """_estimate_impressions with an explicit CPM should still work."""
-        result = CampaignPipeline._estimate_impressions(
-            budget=60_000.0, assumed_cpm=20.0
-        )
+        result = CampaignPipeline._estimate_impressions(budget=60_000.0, assumed_cpm=20.0)
 
         # (60000 / 20) * 1000 = 3,000,000
         assert result == 3_000_000

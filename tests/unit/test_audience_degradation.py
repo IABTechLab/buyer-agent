@@ -55,9 +55,7 @@ def _standard(identifier: str = "3-7", version: str = "1.1") -> AudienceRef:
     )
 
 
-def _contextual(
-    identifier: str = "IAB1-2", version: str = "3.1"
-) -> AudienceRef:
+def _contextual(identifier: str = "IAB1-2", version: str = "3.1") -> AudienceRef:
     return AudienceRef(
         type="contextual",
         identifier=identifier,
@@ -384,7 +382,8 @@ class TestCardinalityCaps:
         plan = AudiencePlan(
             primary=_standard(),
             constraints=[
-                _contextual(f"IAB1-{i}") for i in range(1, 6)  # 5 constraints
+                _contextual(f"IAB1-{i}")
+                for i in range(1, 6)  # 5 constraints
             ],
         )
         # Seller accepts only 2 constraints.

@@ -41,9 +41,7 @@ def _discover_tool_methods() -> list[tuple[str, str]]:
                 method = getattr(cls, method_name)
                 if not callable(method):
                     continue
-                discovered.append(
-                    (f"{cls.__module__}.{cls_name}.{method_name}", method_name)
-                )
+                discovered.append((f"{cls.__module__}.{cls_name}.{method_name}", method_name))
     return discovered
 
 

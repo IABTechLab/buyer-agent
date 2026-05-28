@@ -17,9 +17,7 @@ from ...models.ucp import UCPConsent
 class AudienceMatchingInput(BaseModel):
     """Input schema for audience matching tool."""
 
-    seller_endpoint: str = Field(
-        description="Seller's UCP exchange endpoint URL"
-    )
+    seller_endpoint: str = Field(description="Seller's UCP exchange endpoint URL")
     demographics: dict[str, Any] | None = Field(
         default=None,
         description="Demographic targeting (age, gender, income, etc.)",
@@ -166,10 +164,12 @@ class AudienceMatchingTool(BaseTool):
         alternatives = []
         if has_behaviors:
             gaps.append("behavioral_targeting")
-            alternatives.append({
-                "gap": "behavioral_targeting",
-                "suggestion": "Use contextual signals with frequency capping as proxy",
-            })
+            alternatives.append(
+                {
+                    "gap": "behavioral_targeting",
+                    "suggestion": "Use contextual signals with frequency capping as proxy",
+                }
+            )
 
         return AudienceValidationResult(
             validation_status=status,
@@ -177,7 +177,8 @@ class AudienceMatchingTool(BaseTool):
             matched_capabilities=[
                 "cap_ctx_categories",
                 "cap_ctx_keywords",
-            ] + (["cap_demo_age", "cap_demo_gender"] if has_demographics else []),
+            ]
+            + (["cap_demo_age", "cap_demo_gender"] if has_demographics else []),
             gaps=gaps,
             alternatives=alternatives,
             ucp_similarity_score=score,

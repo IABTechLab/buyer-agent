@@ -181,9 +181,7 @@ Returns:
 
             approvals = await self._fetch_approvals(result.data)
             filtered, filter_summary = self._apply_enforcement(result.data, approvals)
-            return self._format_results(
-                filtered, identity_context, approvals, filter_summary
-            )
+            return self._format_results(filtered, identity_context, approvals, filter_summary)
 
         except SGPClientError as e:
             # Reached only when enforcement is on; _fetch_approvals swallows
@@ -223,9 +221,7 @@ Returns:
             return f"   SGP Approval: ✓ APPROVED — {normalized}"
         return f"   SGP Approval: ✗ NOT APPROVED — {normalized}"
 
-    async def _fetch_approvals(
-        self, products: Any
-    ) -> dict[str, ApprovalRecord | None]:
+    async def _fetch_approvals(self, products: Any) -> dict[str, ApprovalRecord | None]:
         """Batch-check SGP approvals for the distinct seller domains in the result.
 
         Returns a dict keyed by normalized domain. Empty dict when no
@@ -253,8 +249,7 @@ Returns:
             if self._sgp_enforce:
                 raise
             logger.warning(
-                "SGP approval lookup failed during discovery; "
-                "continuing without annotations",
+                "SGP approval lookup failed during discovery; continuing without annotations",
                 exc_info=True,
             )
             return {}
