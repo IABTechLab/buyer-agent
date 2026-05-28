@@ -799,9 +799,17 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
                 None,
             )
             if buyer_repo_root is None:
-                raise RuntimeError(
-                    "Could not locate ad_buyer_system in path ancestry "
-                    f"of {here}; set AD_SELLER_SRC_PATH to override."
+                # CI / standalone clones (e.g. IABTechLab/buyer-agent) check
+                # out only the buyer repo, so the ad_buyer_system / sibling
+                # ad_seller_system layout this round-trip needs does not
+                # exist. Skip cleanly here rather than erroring; the test
+                # can still be opted in locally by setting
+                # AD_SELLER_SRC_PATH or by checking out the sibling repos
+                # alongside an ad_buyer_system-named buyer checkout.
+                pytest.skip(
+                    "Cross-repo round-trip requires the sibling "
+                    "ad_seller_system checkout; set AD_SELLER_SRC_PATH to "
+                    f"the seller src/ directory to override. (here={here})"
                 )
             agent_range_root = buyer_repo_root.parent
             seller_main = agent_range_root / "ad_seller_system" / "src"
@@ -827,6 +835,15 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
                 )
             else:
                 seller_src = str(seller_main)
+            # Even with an ad_buyer_system-named ancestor, the sibling
+            # ad_seller_system tree may be absent (partial checkout). Skip
+            # in that case too rather than failing on the import below.
+            if not Path(seller_src).is_dir():
+                pytest.skip(
+                    "Cross-repo round-trip requires the sibling "
+                    f"ad_seller_system checkout; resolved path {seller_src} "
+                    "does not exist. Set AD_SELLER_SRC_PATH to override."
+                )
         sys.path.insert(0, seller_src)
         try:
             from ad_seller.models.audience_ref import AudienceRef as SellerRef
