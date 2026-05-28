@@ -67,11 +67,12 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
 
-    # Database
+    # Database / Storage Configuration
     database_url: str = "sqlite:///./ad_buyer.db"
-
-    # Optional Redis
     redis_url: str | None = None
+    storage_type: str = "sqlite"  # sqlite, redis, hybrid
+    postgres_pool_min: int = 2
+    postgres_pool_max: int = 10
 
     # CrewAI Settings
     crew_memory_enabled: bool = True

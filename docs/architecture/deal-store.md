@@ -13,6 +13,9 @@ Without persistent storage, all deal state lives in memory and is lost on proces
 !!! info "Synchronous by design"
     The DealStore uses synchronous `sqlite3` (not `aiosqlite`) because CrewAI runs flows in worker threads that may not have an asyncio event loop. Thread safety is provided by `check_same_thread=False` and a `threading.Lock()`.
 
+!!! note "DealStore vs. pluggable storage backends"
+    This page describes the **DealStore** — a synchronous SQLite-only persistence layer dedicated to deal lifecycle, negotiation, and booking records. The buyer agent also has a separate, pluggable async [storage backend](storage-backends.md) abstraction (SQLite / Redis / Postgres+Redis hybrid) used by other domain stores (campaigns, orders, sessions, conversions, optimization, experiments, pacing). The two coexist; over time, callers may migrate from direct DealStore access to the pluggable backend.
+
 ---
 
 ## SQLite Schema
