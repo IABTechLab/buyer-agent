@@ -21,7 +21,7 @@ Optionally persists results to a DealStore when one is attached.
 import json
 import logging
 import sqlite3
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -30,6 +30,7 @@ from ..models.deals import (
     DealResponse,
     QuoteRequest,
     QuoteResponse,
+    SellerErrorResponse,
 )
 from ..models.linear_tv import CancellationRequest, MakegoodRequest
 
@@ -113,8 +114,8 @@ class DealsClient:
         self,
         seller_url: str,
         *,
-        api_key: str | None = None,
-        bearer_token: str | None = None,
+        api_key: Optional[str] = None,
+        bearer_token: Optional[str] = None,
         timeout: float = _DEFAULT_TIMEOUT,
         max_retries: int = _DEFAULT_MAX_RETRIES,
         deal_store: Any = None,
@@ -375,7 +376,7 @@ class DealsClient:
         Raises:
             DealsClientError: On non-retryable errors or when retries are exhausted.
         """
-        last_error: DealsClientError | None = None
+        last_error: Optional[DealsClientError] = None
 
         for attempt in range(1, self._max_retries + 1):
             try:
@@ -510,8 +511,8 @@ class DealsClient:
                 product_name=quote.product.name,
                 deal_type=request.deal_type,
                 status="quoted",
-                price=quote.pricing.final_cpm if quote.pricing.final_cpm is not None else 0.0,
-                original_price=quote.pricing.base_cpm if quote.pricing.base_cpm is not None else 0.0,
+                price=quote.pricing.final_cpm,
+                original_price=quote.pricing.base_cpm,
                 impressions=quote.terms.impressions,
                 flight_start=quote.terms.flight_start,
                 flight_end=quote.terms.flight_end,
@@ -539,8 +540,8 @@ class DealsClient:
                 product_name=deal.product.name,
                 deal_type=deal.deal_type,
                 status="booked",
-                price=deal.pricing.final_cpm if deal.pricing.final_cpm is not None else 0.0,
-                original_price=deal.pricing.base_cpm if deal.pricing.base_cpm is not None else 0.0,
+                price=deal.pricing.final_cpm,
+                original_price=deal.pricing.base_cpm,
                 impressions=deal.terms.impressions,
                 flight_start=deal.terms.flight_start,
                 flight_end=deal.terms.flight_end,

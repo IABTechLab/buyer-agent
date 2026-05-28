@@ -327,12 +327,11 @@ Provide ranked recommendations with rationale.
         "publisher": "...",
         "format": "...",
         "impressions": X,
-        "cpm": Y or null,
-        "cost": Z or null,
+        "cpm": Y,
+        "cost": Z,
         "rationale": "..."
     }
-]
-Note: cpm must be null if no seller pricing was provided. NEVER estimate CPM.""",
+]""",
     recommendation_task_description="""
 Review the research findings and select the best inventory for this
 branding campaign. Consider:

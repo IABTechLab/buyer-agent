@@ -27,13 +27,14 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional, Union
 
 from ..events.bus import EventBus
 from ..events.models import Event, EventType
 from ..models.audience_plan import AudiencePlan, coerce_audience_field
 from ..models.campaign_brief import (
     CampaignBrief,
+    ChannelAllocation,
     ChannelType,
     parse_campaign_brief,
 )
@@ -151,7 +152,7 @@ class CampaignPipeline:
         self,
         store: Any,  # CampaignStore or compatible fake
         orchestrator: MultiSellerOrchestrator,
-        event_bus: EventBus | None = None,
+        event_bus: Optional[EventBus] = None,
     ) -> None:
         self._store = store
         self._orchestrator = orchestrator
@@ -176,7 +177,7 @@ class CampaignPipeline:
         self,
         event_type: EventType,
         campaign_id: str = "",
-        payload: dict[str, Any] | None = None,
+        payload: Optional[dict[str, Any]] = None,
     ) -> None:
         """Emit an event to the event bus. Fail-open."""
         if self._event_bus is None:
@@ -198,7 +199,7 @@ class CampaignPipeline:
     # ------------------------------------------------------------------
 
     async def ingest_brief(
-        self, brief_input: str | dict[str, Any]
+        self, brief_input: Union[str, dict[str, Any]]
     ) -> str:
         """Parse and validate a campaign brief, create campaign in DRAFT.
 
@@ -570,7 +571,7 @@ class CampaignPipeline:
     # ------------------------------------------------------------------
 
     async def run(
-        self, brief_input: str | dict[str, Any]
+        self, brief_input: Union[str, dict[str, Any]]
     ) -> dict[str, Any]:
         """Run the complete pipeline: ingest -> plan -> book -> finalize.
 
@@ -694,23 +695,17 @@ class CampaignPipeline:
         })
 
     @staticmethod
-    def _estimate_impressions(
-        budget: float, assumed_cpm: float | None = None
-    ) -> int:
-        """Estimate impression count from budget and CPM.
-
-        When no CPM is available (assumed_cpm is None), returns 0
-        rather than fabricating impressions from a made-up price.
+    def _estimate_impressions(budget: float, assumed_cpm: float = 15.0) -> int:
+        """Estimate impression count from budget and assumed CPM.
 
         Args:
             budget: Channel budget in currency units.
-            assumed_cpm: CPM to use for estimation. Must be explicitly
-                provided — no default is assumed.
+            assumed_cpm: Assumed CPM for estimation (default $15).
 
         Returns:
-            Estimated number of impressions, or 0 if no CPM available.
+            Estimated number of impressions.
         """
-        if assumed_cpm is None or budget <= 0 or assumed_cpm <= 0:
+        if budget <= 0 or assumed_cpm <= 0:
             return 0
         # impressions = (budget / CPM) * 1000
         return int((budget / assumed_cpm) * 1000)
