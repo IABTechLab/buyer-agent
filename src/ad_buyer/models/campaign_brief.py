@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -49,7 +49,7 @@ from .audience_plan import (
 # ---------------------------------------------------------------------------
 
 
-class CampaignObjective(str, Enum):
+class CampaignObjective(StrEnum):
     """Campaign objective types (Section 6.1)."""
 
     AWARENESS = "AWARENESS"
@@ -68,7 +68,7 @@ class CampaignObjective(str, Enum):
         return None
 
 
-class ChannelType(str, Enum):
+class ChannelType(StrEnum):
     """Supported advertising channel types (Section 6.1)."""
 
     CTV = "CTV"
@@ -79,7 +79,7 @@ class ChannelType(str, Enum):
     LINEAR_TV = "LINEAR_TV"
 
 
-class KPIMetric(str, Enum):
+class KPIMetric(StrEnum):
     """Supported KPI metric types (Section 6.1)."""
 
     CPM = "CPM"
@@ -91,7 +91,7 @@ class KPIMetric(str, Enum):
     GRP = "GRP"
 
 
-class PacingModel(str, Enum):
+class PacingModel(StrEnum):
     """Budget pacing models (Section 7.1 / 7.3)."""
 
     EVEN = "EVEN"
@@ -100,7 +100,7 @@ class PacingModel(str, Enum):
     CUSTOM = "CUSTOM"
 
 
-class GeoType(str, Enum):
+class GeoType(StrEnum):
     """Geographic targeting granularity levels."""
 
     COUNTRY = "COUNTRY"
@@ -110,7 +110,7 @@ class GeoType(str, Enum):
     ZIP = "ZIP"
 
 
-class ApprovalStage(str, Enum):
+class ApprovalStage(StrEnum):
     """Stages at which human approval can be required (D-3)."""
 
     PLAN_REVIEW = "PLAN_REVIEW"

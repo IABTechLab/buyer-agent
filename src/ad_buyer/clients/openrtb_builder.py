@@ -9,9 +9,10 @@ in three slots:
 
 | Audience type | OpenRTB carrier |
 |---------------|-----------------|
-| `standard`    | ``user.data[].segment[].id`` (with ``data.name="IAB_Taxonomy"`` and ``data.ext.taxonomy_version``) |
-| `contextual`  | ``site.cat`` + ``site.cattax = 7`` (Content Taxonomy 3.1 enum) |
-| `agentic`     | ``user.ext.iab_agentic_audiences.refs[]`` (namespaced extension; feature-flagged) |
+| `standard`   | ``user.data[].segment[].id``                                       |
+|              | (``data.name="IAB_Taxonomy"``, ``data.ext.taxonomy_version``)      |
+| `contextual` | ``site.cat`` + ``site.cattax = 7`` (Content Taxonomy 3.1 enum)     |
+| `agentic`    | ``user.ext.iab_agentic_audiences.refs[]`` (namespaced extension)   |
 
 The agentic extension is **temporary**: until IAB ratifies an OpenRTB
 extension shape, this is the namespaced key we emit. A 90-day dual-emit
@@ -206,8 +207,7 @@ def build_openrtb_audience_targeting(
     if agentic_refs:
         if not enable_agentic_ext:
             logger.warning(
-                "openrtb_builder skipping agentic refs: "
-                "enable_agentic_openrtb_ext flag disabled",
+                "openrtb_builder skipping agentic refs: enable_agentic_openrtb_ext flag disabled",
                 extra={
                     "openrtb_drop": {
                         "reason": "agentic_ext_feature_flag_disabled",

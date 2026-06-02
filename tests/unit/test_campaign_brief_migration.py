@@ -117,12 +117,8 @@ def test_migrate_empty_list_raises():
 
 def test_migrate_emits_structured_log(caplog):
     caplog.set_level(logging.INFO, logger="ad_buyer.audience.migration")
-    plan = migrate_legacy_audience_list(
-        ["3-7", "3-8"], source_context="test_emits"
-    )
-    records = [
-        r for r in caplog.records if r.name == "ad_buyer.audience.migration"
-    ]
+    plan = migrate_legacy_audience_list(["3-7", "3-8"], source_context="test_emits")
+    records = [r for r in caplog.records if r.name == "ad_buyer.audience.migration"]
     assert len(records) == 1
     payload = getattr(records[0], "audience_migration", None)
     assert payload is not None
@@ -236,9 +232,7 @@ def test_brief_omitting_target_audience_yields_none():
 def test_brief_logs_legacy_conversion(caplog):
     caplog.set_level(logging.INFO, logger="ad_buyer.audience.migration")
     CampaignBrief(**_minimal_brief())
-    records = [
-        r for r in caplog.records if r.name == "ad_buyer.audience.migration"
-    ]
+    records = [r for r in caplog.records if r.name == "ad_buyer.audience.migration"]
     assert len(records) >= 1
     payload = getattr(records[0], "audience_migration", None)
     assert payload is not None

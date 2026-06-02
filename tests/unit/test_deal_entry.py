@@ -478,7 +478,7 @@ class TestDealDataStructure:
         # metadata key should no longer be present
         assert "metadata" not in data
 
-    def test_deal_data_includes_v2_fields_as_top_level_keys(self):
+    def test_deal_data_v2_fields_top_level_for_save_deal(self):
         """V2 fields must also appear as top-level deal_data keys for save_deal()."""
         from ad_buyer.tools.deal_library.deal_entry import (
             ManualDealEntry,

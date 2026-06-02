@@ -217,8 +217,7 @@ class UnifiedClient:
         "list_creatives": "List all creatives",
         # Create tools (args required)
         "create_account": lambda a: (
-            f"Create an account named '{a.get('name')}' "
-            f"of type {a.get('type', 'advertiser')}"
+            f"Create an account named '{a.get('name')}' of type {a.get('type', 'advertiser')}"
         ),
         "create_order": lambda a: (
             f"Create an order named '{a.get('name')}' "
@@ -544,8 +543,6 @@ class UnifiedClient:
         if result.data and isinstance(result.data, dict):
             base_price = result.data.get("basePrice", result.data.get("price", 0))
             if isinstance(base_price, (int, float)) and self.buyer_identity:
-                from ..models.buyer_identity import AccessTier
-
                 tier_obj = self.buyer_identity.get_access_tier()
                 discount = self.buyer_identity.get_discount_percentage()
 

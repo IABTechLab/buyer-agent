@@ -23,7 +23,7 @@ bead: buyer-9zz (2C: Budget Pacing & Reallocation)
 import asyncio
 import logging
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
@@ -78,7 +78,7 @@ class PacingConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PacingAlertLevel(str, Enum):
+class PacingAlertLevel(StrEnum):
     """Severity level for pacing deviation alerts."""
 
     WARNING = "warning"
@@ -448,10 +448,10 @@ class BudgetPacingEngine:
                         reason=(
                             f"{source.channel} underpacing "
                             f"(spend: ${source.spend:,.0f} vs "
-                            f"expected: ${expected_spend * (source.allocated_budget / total_budget):,.0f}), "
+                            f"expected: ${expected_spend * (source.allocated_budget / total_budget):,.0f}), "  # noqa: E501
                             f"{target.channel} overpacing "
                             f"(spend: ${target.spend:,.0f} vs "
-                            f"expected: ${expected_spend * (target.allocated_budget / total_budget):,.0f})"
+                            f"expected: ${expected_spend * (target.allocated_budget / total_budget):,.0f})"  # noqa: E501
                         ),
                     )
                 )

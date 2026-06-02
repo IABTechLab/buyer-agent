@@ -305,7 +305,10 @@ class TestRecommendationConsolidation:
         ]
         flow.state.pending_approvals = recs
 
-        result = flow.approve_recommendations(["prod_1"])
+        with patch.object(
+            flow, "_book_via_seller_api", return_value=("quote_1", "deal_1", "order_1")
+        ):
+            result = flow.approve_recommendations(["prod_1"])
 
         assert result["status"] == "success"
         assert result["booked"] == 1
@@ -339,7 +342,10 @@ class TestRecommendationConsolidation:
         ]
         flow.state.pending_approvals = recs
 
-        result = flow.approve_all()
+        with patch.object(
+            flow, "_book_via_seller_api", return_value=("quote_1", "deal_1", "order_1")
+        ):
+            result = flow.approve_all()
 
         assert result["status"] == "success"
         assert result["booked"] == 2

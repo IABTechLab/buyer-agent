@@ -13,9 +13,8 @@ import json
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.storage.deal_store import DealStore
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -196,7 +195,9 @@ class TestListDeals:
         """list_deals should filter by media_type when provided."""
         store = _make_deal_store()
         _seed_deal(store, display_name="CTV Deal", media_type="CTV", seller_deal_id="CTV-001")
-        _seed_deal(store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001")
+        _seed_deal(
+            store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001"
+        )  # noqa: E501
         _set_deal_store(store)
 
         result = await mcp.call_tool("list_deals", {"media_type": "CTV"})
@@ -216,8 +217,13 @@ class TestListDeals:
         deal = data["deals"][0]
 
         required_fields = [
-            "deal_id", "display_name", "status", "deal_type",
-            "seller_org", "media_type", "price",
+            "deal_id",
+            "display_name",
+            "status",
+            "deal_type",
+            "seller_org",
+            "media_type",
+            "price",
         ]
         for field in required_fields:
             assert field in deal, f"Missing field: {field}"
@@ -273,12 +279,16 @@ class TestSearchDeals:
         """search_deals should find deals by seller_org."""
         store = _make_deal_store()
         _seed_deal(
-            store, display_name="Premium Display",
-            seller_org="NBCUniversal", seller_deal_id="NBC-001",
+            store,
+            display_name="Premium Display",
+            seller_org="NBCUniversal",
+            seller_deal_id="NBC-001",
         )
         _seed_deal(
-            store, display_name="Sports Package",
-            seller_org="Disney", seller_deal_id="DIS-001",
+            store,
+            display_name="Sports Package",
+            seller_org="Disney",
+            seller_deal_id="DIS-001",
         )
         _set_deal_store(store)
 
@@ -401,8 +411,14 @@ class TestInspectDeal:
         data = json.loads(_extract_text(result))
 
         required_fields = [
-            "deal_id", "display_name", "status", "deal_type",
-            "seller_url", "price", "flight_start", "flight_end",
+            "deal_id",
+            "display_name",
+            "status",
+            "deal_type",
+            "seller_url",
+            "price",
+            "flight_start",
+            "flight_end",
         ]
         for field in required_fields:
             assert field in data, f"Missing field: {field}"
@@ -436,7 +452,7 @@ class TestImportDealsCsv:
 
         csv_data = (
             "deal_name,publisher,seller_domain,deal_type,cpm,impressions\n"
-            "ESPN Sports PMP,ESPN,espn.com,PG,$15.00,\"1,000,000\"\n"
+            'ESPN Sports PMP,ESPN,espn.com,PG,$15.00,"1,000,000"\n'
             "CNN News PMP,CNN,cnn.com,PD,$10.00,500000\n"
         )
 
@@ -454,11 +470,7 @@ class TestImportDealsCsv:
         _set_deal_store(store)
 
         # Row missing both deal_id and name (required by parser)
-        csv_data = (
-            "deal_name,publisher,seller_domain\n"
-            "Good Deal,ESPN,espn.com\n"
-            ",,,\n"
-        )
+        csv_data = "deal_name,publisher,seller_domain\nGood Deal,ESPN,espn.com\n,,,\n"
 
         result = await mcp.call_tool("import_deals_csv", {"csv_data": csv_data})
         data = json.loads(_extract_text(result))
@@ -507,15 +519,15 @@ class TestImportDealsCsv:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        csv_data = (
-            "deal_name,publisher,seller_domain\n"
-            "Test Deal,TestPub,testpub.com\n"
-        )
+        csv_data = "deal_name,publisher,seller_domain\nTest Deal,TestPub,testpub.com\n"
 
-        result = await mcp.call_tool("import_deals_csv", {
-            "csv_data": csv_data,
-            "default_seller_url": "https://custom-seller.example.com",
-        })
+        result = await mcp.call_tool(
+            "import_deals_csv",
+            {
+                "csv_data": csv_data,
+                "default_seller_url": "https://custom-seller.example.com",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["successful"] == 1
 
@@ -567,10 +579,13 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "ESPN Sports PMP",
-            "seller_url": "https://espn.seller.example.com",
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "ESPN Sports PMP",
+                "seller_url": "https://espn.seller.example.com",
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert data["success"] is True
@@ -582,19 +597,22 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "Premium CTV Package",
-            "seller_url": "https://seller.example.com",
-            "deal_type": "PG",
-            "media_type": "CTV",
-            "price": 25.00,
-            "impressions": 2000000,
-            "flight_start": "2026-04-01",
-            "flight_end": "2026-06-30",
-            "seller_org": "NBCUniversal",
-            "description": "Premium CTV inventory package",
-            "tags": ["premium", "ctv"],
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "Premium CTV Package",
+                "seller_url": "https://seller.example.com",
+                "deal_type": "PG",
+                "media_type": "CTV",
+                "price": 25.00,
+                "impressions": 2000000,
+                "flight_start": "2026-04-01",
+                "flight_end": "2026-06-30",
+                "seller_org": "NBCUniversal",
+                "description": "Premium CTV inventory package",
+                "tags": ["premium", "ctv"],
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert data["success"] is True
@@ -606,10 +624,13 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "Test Persistence",
-            "seller_url": "https://seller.example.com",
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "Test Persistence",
+                "seller_url": "https://seller.example.com",
+            },
+        )
         data = json.loads(_extract_text(result))
         deal_id = data["deal_id"]
 
@@ -625,11 +646,14 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "Bad Deal",
-            "seller_url": "https://seller.example.com",
-            "deal_type": "INVALID",
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "Bad Deal",
+                "seller_url": "https://seller.example.com",
+                "deal_type": "INVALID",
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert data["success"] is False
@@ -642,10 +666,13 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "",
-            "seller_url": "https://seller.example.com",
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "",
+                "seller_url": "https://seller.example.com",
+            },
+        )
         data = json.loads(_extract_text(result))
 
         assert data["success"] is False
@@ -656,10 +683,13 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "Test JSON",
-            "seller_url": "https://seller.example.com",
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "Test JSON",
+                "seller_url": "https://seller.example.com",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert isinstance(data, dict)
         assert "timestamp" in data
@@ -670,12 +700,15 @@ class TestCreateDealManual:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "Test Metadata",
-            "seller_url": "https://seller.example.com",
-            "advertiser_id": "adv-001",
-            "tags": ["premium"],
-        })
+        result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "Test Metadata",
+                "seller_url": "https://seller.example.com",
+                "advertiser_id": "adv-001",
+                "tags": ["premium"],
+            },
+        )
         data = json.loads(_extract_text(result))
         deal_id = data["deal_id"]
 
@@ -754,7 +787,9 @@ class TestGetPortfolioSummary:
         """get_portfolio_summary should break down deals by media_type."""
         store = _make_deal_store()
         _seed_deal(store, display_name="CTV Deal", media_type="CTV", seller_deal_id="CTV-001")
-        _seed_deal(store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001")
+        _seed_deal(
+            store, display_name="Digital Deal", media_type="DIGITAL", seller_deal_id="DIG-001"
+        )  # noqa: E501
         _set_deal_store(store)
 
         result = await mcp.call_tool("get_portfolio_summary", {})
@@ -770,14 +805,18 @@ class TestGetPortfolioSummary:
         store = _make_deal_store()
         # price=10 CPM, impressions=1M -> value = 10 * 1M / 1000 = $10,000
         _seed_deal(
-            store, display_name="Deal A",
-            price=10.0, impressions=1000000,
+            store,
+            display_name="Deal A",
+            price=10.0,
+            impressions=1000000,
             seller_deal_id="A-001",
         )
         # price=20 CPM, impressions=500K -> value = 20 * 500K / 1000 = $10,000
         _seed_deal(
-            store, display_name="Deal B",
-            price=20.0, impressions=500000,
+            store,
+            display_name="Deal B",
+            price=20.0,
+            impressions=500000,
             seller_deal_id="B-001",
         )
         _set_deal_store(store)
@@ -831,27 +870,30 @@ class TestCreateDealManualRoundtrip:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        create_result = await mcp.call_tool("create_deal_manual", {
-            "display_name": "Premium Video PG",
-            "seller_url": "https://nbcu.seller.example.com",
-            "deal_type": "PG",
-            "status": "active",
-            "seller_org": "NBCUniversal",
-            "seller_domain": "nbcuniversal.com",
-            "seller_type": "PUBLISHER",
-            "buyer_org": "MediaCo Agency",
-            "buyer_id": "buyer-mediaco-001",
-            "price": 15.50,
-            "fixed_price_cpm": 15.50,
-            "bid_floor_cpm": 12.00,
-            "price_model": "CPM",
-            "currency": "EUR",
-            "media_type": "CTV",
-            "impressions": 5000000,
-            "flight_start": "2026-04-01",
-            "flight_end": "2026-06-30",
-            "description": "Premium CTV video inventory for Q2 campaign",
-        })
+        create_result = await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "Premium Video PG",
+                "seller_url": "https://nbcu.seller.example.com",
+                "deal_type": "PG",
+                "status": "active",
+                "seller_org": "NBCUniversal",
+                "seller_domain": "nbcuniversal.com",
+                "seller_type": "PUBLISHER",
+                "buyer_org": "MediaCo Agency",
+                "buyer_id": "buyer-mediaco-001",
+                "price": 15.50,
+                "fixed_price_cpm": 15.50,
+                "bid_floor_cpm": 12.00,
+                "price_model": "CPM",
+                "currency": "EUR",
+                "media_type": "CTV",
+                "impressions": 5000000,
+                "flight_start": "2026-04-01",
+                "flight_end": "2026-06-30",
+                "description": "Premium CTV video inventory for Q2 campaign",
+            },
+        )
         create_data = json.loads(_extract_text(create_result))
         assert create_data["success"] is True
         deal_id = create_data["deal_id"]
@@ -881,11 +923,14 @@ class TestCreateDealManualRoundtrip:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        await mcp.call_tool("create_deal_manual", {
-            "display_name": "CTV Deal",
-            "seller_url": "https://seller.example.com",
-            "media_type": "CTV",
-        })
+        await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "CTV Deal",
+                "seller_url": "https://seller.example.com",
+                "media_type": "CTV",
+            },
+        )
 
         result = await mcp.call_tool("list_deals", {"media_type": "CTV"})
         data = json.loads(_extract_text(result))
@@ -898,11 +943,14 @@ class TestCreateDealManualRoundtrip:
         store = _make_deal_store()
         _set_deal_store(store)
 
-        await mcp.call_tool("create_deal_manual", {
-            "display_name": "NBC Deal",
-            "seller_url": "https://nbc.example.com",
-            "seller_org": "NBCUniversal",
-        })
+        await mcp.call_tool(
+            "create_deal_manual",
+            {
+                "display_name": "NBC Deal",
+                "seller_url": "https://nbc.example.com",
+                "seller_org": "NBCUniversal",
+            },
+        )
 
         result = await mcp.call_tool("search_deals", {"query": "NBCUniversal"})
         data = json.loads(_extract_text(result))

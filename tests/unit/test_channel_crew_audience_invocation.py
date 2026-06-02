@@ -54,7 +54,6 @@ from ad_buyer.models.audience_plan import (
     ComplianceContext,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -171,9 +170,7 @@ class TestFormatAudienceContextDispatch:
         assert "Plan ID:" in result
         assert "Primary:" in result
 
-    def test_legacy_dict_uses_legacy_renderer(
-        self, legacy_dict_plan: dict[str, Any]
-    ) -> None:
+    def test_legacy_dict_uses_legacy_renderer(self, legacy_dict_plan: dict[str, Any]) -> None:
         result = _format_audience_context(legacy_dict_plan)
         # Legacy renderer header (no "typed" qualifier).
         assert "Audience Plan Context:" in result
@@ -221,9 +218,7 @@ class TestTypedAudiencePlanRendering:
         assert "iab-audience" in result
         assert "version=1.1" in result
 
-    def test_contextual_constraint_carries_type_tag(
-        self, typed_plan: AudiencePlan
-    ) -> None:
+    def test_contextual_constraint_carries_type_tag(self, typed_plan: AudiencePlan) -> None:
         result = _format_typed_audience_plan(typed_plan)
         assert "[contextual]" in result
         assert "IAB1-2" in result
@@ -232,9 +227,7 @@ class TestTypedAudiencePlanRendering:
         # Resolved ref -> confidence rendered.
         assert "confidence=0.92" in result
 
-    def test_agentic_extension_carries_compliance(
-        self, typed_plan: AudiencePlan
-    ) -> None:
+    def test_agentic_extension_carries_compliance(self, typed_plan: AudiencePlan) -> None:
         result = _format_typed_audience_plan(typed_plan)
         assert "[agentic]" in result
         assert "emb://buyer.example.com/audiences/auto-converters-q1" in result

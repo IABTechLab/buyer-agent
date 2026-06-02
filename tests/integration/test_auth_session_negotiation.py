@@ -117,11 +117,11 @@ class TestSessionManagerIntegration:
             "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             session_id = await manager.create_session(
                 seller_url,
@@ -177,11 +177,11 @@ class TestSessionManagerIntegration:
             "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             session_id = await manager.get_or_create_session(seller_url)
 
@@ -218,14 +218,14 @@ class TestSessionManagerIntegration:
         success_response.status_code = 200
         success_response.json.return_value = {"reply": "Got your message"}
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client = AsyncMock()
             # First post -> 404 (expired), second post -> new session, third post -> message
             mock_client.post = AsyncMock(
                 side_effect=[expired_response, new_session_response, success_response]
             )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             result = await manager.send_message(
                 seller_url,
@@ -283,13 +283,13 @@ class TestNegotiationFlowIntegration:
         }
         accept_response.raise_for_status = MagicMock()
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_http = AsyncMock()
             mock_http.post = AsyncMock(
                 side_effect=[round1_response, round2_response, accept_response]
             )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_http)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             result = await client.auto_negotiate(
                 seller_url="http://seller.example.com",
@@ -337,13 +337,13 @@ class TestNegotiationFlowIntegration:
         decline_response.json.return_value = {"action": "declined"}
         decline_response.raise_for_status = MagicMock()
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_http = AsyncMock()
             mock_http.post = AsyncMock(
                 side_effect=[counter_response, counter_response_2, decline_response]
             )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_http)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             result = await client.auto_negotiate(
                 seller_url="http://seller.example.com",
@@ -387,11 +387,11 @@ class TestAuthSessionNegotiationChain:
             "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client = AsyncMock()
             mock_client.post = AsyncMock(return_value=session_create_resp)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             session_id = await manager.create_session(
                 seller_url, buyer_identity={"seat_id": "ttd-123"}
@@ -424,11 +424,11 @@ class TestAuthSessionNegotiationChain:
         accept_resp.json.return_value = {"action": "accepted", "final_price": 24.0}
         accept_resp.raise_for_status = MagicMock()
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_http = AsyncMock()
             mock_http.post = AsyncMock(side_effect=[round1_resp, accept_resp])
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_http)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             result = await neg_client.auto_negotiate(
                 seller_url=seller_url,

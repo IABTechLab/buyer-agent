@@ -194,9 +194,7 @@ class TestPlanIdLogging:
         await c.close()
 
         # Exactly one record on the booking logger; carries the canonical id.
-        records = [
-            r for r in caplog.records if r.name == "ad_buyer.audience.booking"
-        ]
+        records = [r for r in caplog.records if r.name == "ad_buyer.audience.booking"]
         assert len(records) == 1
         msg = records[0].getMessage()
         assert plan.audience_plan_id in msg
@@ -216,9 +214,7 @@ class TestPlanIdLogging:
             await c.book_deal(booking)
         await c.close()
 
-        assert [
-            r for r in caplog.records if r.name == "ad_buyer.audience.booking"
-        ] == []
+        assert [r for r in caplog.records if r.name == "ad_buyer.audience.booking"] == []
 
 
 class TestSnapshotResponseParsing:

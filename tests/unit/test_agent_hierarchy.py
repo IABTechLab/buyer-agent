@@ -28,8 +28,8 @@ from crewai.tools import BaseTool
 
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent
-from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
 from ad_buyer.agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
+from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
 from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.performance_agent import create_performance_agent
 from ad_buyer.agents.level3.audience_planner_agent import create_audience_planner_agent
@@ -41,12 +41,7 @@ from ad_buyer.crews.channel_crews import (
     _create_execution_tools,
     _create_research_tools,
     _format_audience_context,
-    create_branding_crew,
-    create_ctv_crew,
-    create_mobile_crew,
-    create_performance_crew,
 )
-from ad_buyer.crews.portfolio_crew import create_portfolio_crew
 
 # ---------------------------------------------------------------------------
 # Helper: create valid BaseTool instances for injection tests
@@ -818,8 +813,8 @@ class TestModuleImports:
     def test_level2_init_exports(self):
         from ad_buyer.agents.level2 import (
             create_branding_agent,
-            create_ctv_agent,
             create_buyer_deal_specialist_agent,
+            create_ctv_agent,
             create_mobile_app_agent,
             create_performance_agent,
         )

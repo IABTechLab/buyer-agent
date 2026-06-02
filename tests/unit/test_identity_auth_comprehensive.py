@@ -1011,10 +1011,10 @@ class TestSessionManagerEdgeCases:
         mock_retry_fail.status_code = 500
         mock_retry_fail.text = "Internal Server Error"
 
-        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
+        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(side_effect=[mock_404, mock_create, mock_retry_fail])
 
             with pytest.raises(RuntimeError, match="Failed to send message"):
@@ -1055,10 +1055,10 @@ class TestSessionManagerEdgeCases:
         )
         manager.store.save(record)
 
-        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
+        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
 
             # Should not raise — network errors are caught
@@ -1085,10 +1085,10 @@ class TestSessionManagerEdgeCases:
         mock_500.status_code = 500
         mock_500.text = "Server Error"
 
-        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
+        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(return_value=mock_500)
 
             with pytest.raises(RuntimeError, match="Failed to send message"):
@@ -1109,10 +1109,10 @@ class TestSessionManagerEdgeCases:
             "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         }
 
-        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
+        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(return_value=mock_response)
 
             session_id = await manager.create_session(
@@ -1131,10 +1131,10 @@ class TestSessionManagerEdgeCases:
             "session_id": "sess-no-id",
         }
 
-        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
+        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(return_value=mock_response)
 
             session_id = await manager.create_session(
@@ -1156,10 +1156,10 @@ class TestSessionManagerEdgeCases:
             # No created_at or expires_at
         }
 
-        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as MockClient:
+        with patch("ad_buyer.sessions.session_manager.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(return_value=mock_response)
 
             session_id = await manager.create_session(

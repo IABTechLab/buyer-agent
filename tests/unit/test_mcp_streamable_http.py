@@ -24,7 +24,6 @@ import httpx
 import pytest
 from httpx import ASGITransport
 
-
 # ---------------------------------------------------------------------------
 # Route presence — always passes if mount_mcp works
 # ---------------------------------------------------------------------------
@@ -37,9 +36,7 @@ class TestMCPRoutePresence:
         """POST /mcp (Streamable HTTP) should be mounted in the buyer app."""
         from ad_buyer.interfaces.api.main import app
 
-        route_paths = [
-            getattr(route, "path", "") for route in app.routes
-        ]
+        route_paths = [getattr(route, "path", "") for route in app.routes]
         assert any(
             p == "/mcp" or (p.startswith("/mcp") and not p.startswith("/mcp-sse"))
             for p in route_paths
@@ -49,9 +46,7 @@ class TestMCPRoutePresence:
         """GET /mcp-sse/sse (legacy SSE fallback) should be mounted in the buyer app."""
         from ad_buyer.interfaces.api.main import app
 
-        route_paths = [
-            getattr(route, "path", "") for route in app.routes
-        ]
+        route_paths = [getattr(route, "path", "") for route in app.routes]
         assert any("/mcp-sse" in p for p in route_paths), (
             f"Expected /mcp-sse (legacy SSE) mount, got: {route_paths}"
         )
@@ -105,9 +100,7 @@ async def test_streamable_http_initialize_handshake():
     }
 
     transport = ASGITransport(app=app)  # lifespan handled by context manager
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://testserver"
-    ) as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
         response = await client.post(
             "/mcp",
             content=json.dumps(initialize_payload),
@@ -119,18 +112,14 @@ async def test_streamable_http_initialize_handshake():
 
     # Must not be 404 (route not found) or 405 (method not allowed)
     assert response.status_code != 404, (
-        f"POST /mcp returned 404 — Streamable HTTP transport not mounted"
+        "POST /mcp returned 404 — Streamable HTTP transport not mounted"
     )
-    assert response.status_code != 405, (
-        f"POST /mcp returned 405 — wrong method for Streamable HTTP"
-    )
+    assert response.status_code != 405, "POST /mcp returned 405 — wrong method for Streamable HTTP"
 
     # Happy path: 200 with MCP initialize response
     if response.status_code == 200:
         body = response.text
         # Response may be JSON or SSE-wrapped JSON; either way, check for MCP fields
-        assert any(
-            field in body for field in ("protocolVersion", "serverInfo", "capabilities")
-        ), (
+        assert any(field in body for field in ("protocolVersion", "serverInfo", "capabilities")), (
             f"POST /mcp returned 200 but body missing MCP negotiation fields: {body[:500]}"
         )

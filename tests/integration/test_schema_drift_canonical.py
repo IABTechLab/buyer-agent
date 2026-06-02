@@ -10,12 +10,16 @@ If either side drifts from the snapshot, this test fails and CI flags
 the divergence before the cross-repo round-trip silently breaks. To
 update the snapshot intentionally:
 
-  PYTHONPATH=src venv/bin/python -c \\
-    'import json; from ad_buyer.models.audience_plan import AudienceRef, AudiencePlan, ComplianceContext; \\
-     print(json.dumps({"ComplianceContext": ComplianceContext.model_json_schema(), \\
-                       "AudienceRef": AudienceRef.model_json_schema(), \\
-                       "AudiencePlan": AudiencePlan.model_json_schema()}, indent=2, sort_keys=True))' \\
-    > /Users/aidancardella/dev/agent_range/.worktrees/audience-extension/docs/api/audience_plan_schemas.json
+  PYTHONPATH=src venv/bin/python -c \
+    'import json; from ad_buyer.models.audience_plan import (
+         AudienceRef, AudiencePlan, ComplianceContext);
+     schemas = {
+         "ComplianceContext": ComplianceContext.model_json_schema(),
+         "AudienceRef": AudienceRef.model_json_schema(),
+         "AudiencePlan": AudiencePlan.model_json_schema(),
+     };
+     print(json.dumps(schemas, indent=2, sort_keys=True))' \
+    > docs/api/audience_plan_schemas.json
 """
 
 from __future__ import annotations
@@ -33,7 +37,6 @@ from ad_buyer.models.audience_plan import (
     AudienceRef,
     ComplianceContext,
 )
-
 
 CANONICAL_SCHEMA_PATH = Path(
     "/Users/aidancardella/dev/agent_range/.worktrees/audience-extension/docs/api/audience_plan_schemas.json"

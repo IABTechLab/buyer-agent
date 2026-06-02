@@ -12,7 +12,7 @@ bead: buyer-uoz (Ad server integration record storage)
 
 import uuid
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 
 
-class RecommendationType(str, Enum):
+class RecommendationType(StrEnum):
     """Pacing recommendation types from the pacing engine."""
 
     REALLOCATE = "REALLOCATE"
@@ -31,7 +31,7 @@ class RecommendationType(str, Enum):
     FLAG = "FLAG"
 
 
-class RecommendationStatus(str, Enum):
+class RecommendationStatus(StrEnum):
     """Status of a pacing recommendation."""
 
     PENDING = "PENDING"
@@ -115,14 +115,14 @@ class PacingSnapshot(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AdServerType(str, Enum):
+class AdServerType(StrEnum):
     """Supported ad server platforms."""
 
     INNOVID = "INNOVID"
     FLASHTALKING = "FLASHTALKING"
 
 
-class AdServerCampaignStatus(str, Enum):
+class AdServerCampaignStatus(StrEnum):
     """Status of the ad server integration for a campaign."""
 
     PENDING = "PENDING"
@@ -132,7 +132,7 @@ class AdServerCampaignStatus(str, Enum):
     ERROR = "ERROR"
 
 
-class BindingServingStatus(str, Enum):
+class BindingServingStatus(StrEnum):
     """Serving status of a deal-to-ad-server binding."""
 
     ACTIVE = "ACTIVE"

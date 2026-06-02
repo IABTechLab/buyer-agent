@@ -20,7 +20,6 @@ from ad_buyer.tools.deal_library.templates import (
     ManageSupplyPathTemplateTool,
 )
 
-
 # -----------------------------------------------------------------------
 # Fixtures
 # -----------------------------------------------------------------------
@@ -59,13 +58,15 @@ class TestDealTemplateCreate:
         """Creating a deal template returns a success message with template ID."""
         result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Standard Sports Video PG",
-                "deal_type_pref": "PG",
-                "inventory_types": ["DIGITAL", "CTV"],
-                "preferred_publishers": ["espn.com", "nfl.com"],
-                "max_cpm": 25.00,
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Standard Sports Video PG",
+                    "deal_type_pref": "PG",
+                    "inventory_types": ["DIGITAL", "CTV"],
+                    "preferred_publishers": ["espn.com", "nfl.com"],
+                    "max_cpm": 25.00,
+                }
+            ),
         )
         assert "successfully" in result.lower() or "created" in result.lower()
         assert "Standard Sports Video PG" in result
@@ -74,20 +75,22 @@ class TestDealTemplateCreate:
         """Creating a template with all fields stores them correctly."""
         result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Full Template",
-                "deal_type_pref": "PD",
-                "inventory_types": ["DIGITAL"],
-                "preferred_publishers": ["nyt.com"],
-                "excluded_publishers": ["sketchy.com"],
-                "targeting_defaults": {"geo": ["US"], "audience": ["sports"]},
-                "max_cpm": 18.50,
-                "min_impressions": 100000,
-                "default_flight_days": 30,
-                "supply_path_prefs": {"max_hops": 2},
-                "advertiser_id": "adv-001",
-                "agency_id": "agency-001",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Full Template",
+                    "deal_type_pref": "PD",
+                    "inventory_types": ["DIGITAL"],
+                    "preferred_publishers": ["nyt.com"],
+                    "excluded_publishers": ["sketchy.com"],
+                    "targeting_defaults": {"geo": ["US"], "audience": ["sports"]},
+                    "max_cpm": 18.50,
+                    "min_impressions": 100000,
+                    "default_flight_days": 30,
+                    "supply_path_prefs": {"max_hops": 2},
+                    "advertiser_id": "adv-001",
+                    "agency_id": "agency-001",
+                }
+            ),
         )
         assert "created" in result.lower() or "successfully" in result.lower()
 
@@ -95,10 +98,12 @@ class TestDealTemplateCreate:
         """Creating a template without advertiser_id makes it agency-wide."""
         result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Agency-Wide Template",
-                "deal_type_pref": "PG",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Agency-Wide Template",
+                    "deal_type_pref": "PG",
+                }
+            ),
         )
         assert "created" in result.lower() or "successfully" in result.lower()
         # Verify it's retrievable and has no advertiser_id
@@ -112,11 +117,13 @@ class TestDealTemplateCreate:
         """Creating a template with advertiser_id scopes it to that advertiser."""
         result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Advertiser Template",
-                "deal_type_pref": "PD",
-                "advertiser_id": "adv-nike",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Advertiser Template",
+                    "deal_type_pref": "PD",
+                    "advertiser_id": "adv-nike",
+                }
+            ),
         )
         assert "created" in result.lower() or "successfully" in result.lower()
 
@@ -124,9 +131,11 @@ class TestDealTemplateCreate:
         """Creating a template without a name returns an error."""
         result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "deal_type_pref": "PG",
-            }),
+            params_json=json.dumps(
+                {
+                    "deal_type_pref": "PG",
+                }
+            ),
         )
         assert "error" in result.lower()
 
@@ -152,11 +161,13 @@ class TestDealTemplateRead:
         # Create first
         create_result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Readable Template",
-                "deal_type_pref": "PG",
-                "max_cpm": 20.00,
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Readable Template",
+                    "deal_type_pref": "PG",
+                    "max_cpm": 20.00,
+                }
+            ),
         )
         # Extract template ID from result
         template_id = _extract_template_id(create_result)
@@ -217,26 +228,32 @@ class TestDealTemplateList:
         """Listing templates with advertiser_id filter returns only matching."""
         deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Nike Template",
-                "deal_type_pref": "PG",
-                "advertiser_id": "adv-nike",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Nike Template",
+                    "deal_type_pref": "PG",
+                    "advertiser_id": "adv-nike",
+                }
+            ),
         )
         deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Agency Wide",
-                "deal_type_pref": "PD",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Agency Wide",
+                    "deal_type_pref": "PD",
+                }
+            ),
         )
         deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Adidas Template",
-                "deal_type_pref": "PG",
-                "advertiser_id": "adv-adidas",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Adidas Template",
+                    "deal_type_pref": "PG",
+                    "advertiser_id": "adv-adidas",
+                }
+            ),
         )
 
         result = deal_template_tool._run(
@@ -277,21 +294,25 @@ class TestDealTemplateUpdate:
         """Updating a template changes the specified fields."""
         create_result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Old Name",
-                "deal_type_pref": "PG",
-                "max_cpm": 15.00,
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Old Name",
+                    "deal_type_pref": "PG",
+                    "max_cpm": 15.00,
+                }
+            ),
         )
         template_id = _extract_template_id(create_result)
 
         update_result = deal_template_tool._run(
             action="update",
-            params_json=json.dumps({
-                "template_id": template_id,
-                "name": "New Name",
-                "max_cpm": 20.00,
-            }),
+            params_json=json.dumps(
+                {
+                    "template_id": template_id,
+                    "name": "New Name",
+                    "max_cpm": 20.00,
+                }
+            ),
         )
         assert "updated" in update_result.lower()
 
@@ -306,11 +327,13 @@ class TestDealTemplateUpdate:
         """Updating default_price succeeds and persists the new value."""
         create_result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Price Update Test",
-                "deal_type_pref": "PG",
-                "default_price": 15.00,
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Price Update Test",
+                    "deal_type_pref": "PG",
+                    "default_price": 15.00,
+                }
+            ),
         )
         template_id = _extract_template_id(create_result)
         assert template_id is not None
@@ -318,10 +341,12 @@ class TestDealTemplateUpdate:
         # Update the default_price
         update_result = deal_template_tool._run(
             action="update",
-            params_json=json.dumps({
-                "template_id": template_id,
-                "default_price": 32.00,
-            }),
+            params_json=json.dumps(
+                {
+                    "template_id": template_id,
+                    "default_price": 32.00,
+                }
+            ),
         )
         assert "updated" in update_result.lower(), (
             f"Expected 'updated' in result but got: {update_result}"
@@ -340,10 +365,12 @@ class TestDealTemplateUpdate:
         """Updating a nonexistent template returns a not-found message."""
         result = deal_template_tool._run(
             action="update",
-            params_json=json.dumps({
-                "template_id": "nonexistent",
-                "name": "Won't Work",
-            }),
+            params_json=json.dumps(
+                {
+                    "template_id": "nonexistent",
+                    "name": "Won't Work",
+                }
+            ),
         )
         assert "not found" in result.lower()
 
@@ -360,10 +387,12 @@ class TestDealTemplateDelete:
         """Deleting a template removes it."""
         create_result = deal_template_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Doomed Template",
-                "deal_type_pref": "PG",
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Doomed Template",
+                    "deal_type_pref": "PG",
+                }
+            ),
         )
         template_id = _extract_template_id(create_result)
 
@@ -418,36 +447,38 @@ class TestSupplyPathTemplateCreate:
         """Creating a supply path template with valid weights returns success."""
         result = supply_path_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Low Fee Direct Paths",
-                "scoring_weights": {
-                    "transparency": 0.3,
-                    "fee": 0.4,
-                    "trust": 0.2,
-                    "performance": 0.1,
-                },
-                "max_reseller_hops": 2,
-                "preferred_ssps": ["index", "pubmatic"],
-                "blocked_ssps": ["shady-exchange"],
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Low Fee Direct Paths",
+                    "scoring_weights": {
+                        "transparency": 0.3,
+                        "fee": 0.4,
+                        "trust": 0.2,
+                        "performance": 0.1,
+                    },
+                    "max_reseller_hops": 2,
+                    "preferred_ssps": ["index", "pubmatic"],
+                    "blocked_ssps": ["shady-exchange"],
+                }
+            ),
         )
         assert "created" in result.lower() or "successfully" in result.lower()
 
-    def test_create_supply_path_template_weights_must_sum_to_one(
-        self, supply_path_tool
-    ):
+    def test_create_supply_path_template_weights_must_sum_to_one(self, supply_path_tool):
         """Weights that don't sum to 1.0 are rejected."""
         result = supply_path_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Bad Weights",
-                "scoring_weights": {
-                    "transparency": 0.3,
-                    "fee": 0.3,
-                    "trust": 0.3,
-                    "performance": 0.3,
-                },
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Bad Weights",
+                    "scoring_weights": {
+                        "transparency": 0.3,
+                        "fee": 0.3,
+                        "trust": 0.3,
+                        "performance": 0.3,
+                    },
+                }
+            ),
         )
         assert "error" in result.lower()
         assert "sum" in result.lower() or "1.0" in result
@@ -456,14 +487,16 @@ class TestSupplyPathTemplateCreate:
         """Creating without a name returns an error."""
         result = supply_path_tool._run(
             action="create",
-            params_json=json.dumps({
-                "scoring_weights": {
-                    "transparency": 0.25,
-                    "fee": 0.25,
-                    "trust": 0.25,
-                    "performance": 0.25,
-                },
-            }),
+            params_json=json.dumps(
+                {
+                    "scoring_weights": {
+                        "transparency": 0.25,
+                        "fee": 0.25,
+                        "trust": 0.25,
+                        "performance": 0.25,
+                    },
+                }
+            ),
         )
         assert "error" in result.lower()
 
@@ -480,16 +513,18 @@ class TestSupplyPathTemplateRead:
         """Reading a template by ID returns its details."""
         create_result = supply_path_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Readable SPO Template",
-                "scoring_weights": {
-                    "transparency": 0.25,
-                    "fee": 0.25,
-                    "trust": 0.25,
-                    "performance": 0.25,
-                },
-                "max_reseller_hops": 2,
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Readable SPO Template",
+                    "scoring_weights": {
+                        "transparency": 0.25,
+                        "fee": 0.25,
+                        "trust": 0.25,
+                        "performance": 0.25,
+                    },
+                    "max_reseller_hops": 2,
+                }
+            ),
         )
         template_id = _extract_template_id(create_result)
         assert template_id is not None
@@ -517,29 +552,33 @@ class TestSupplyPathTemplateUpdate:
         """Updating scoring_weights still validates sum = 1.0."""
         create_result = supply_path_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Weight Test",
-                "scoring_weights": {
-                    "transparency": 0.25,
-                    "fee": 0.25,
-                    "trust": 0.25,
-                    "performance": 0.25,
-                },
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Weight Test",
+                    "scoring_weights": {
+                        "transparency": 0.25,
+                        "fee": 0.25,
+                        "trust": 0.25,
+                        "performance": 0.25,
+                    },
+                }
+            ),
         )
         template_id = _extract_template_id(create_result)
 
         update_result = supply_path_tool._run(
             action="update",
-            params_json=json.dumps({
-                "template_id": template_id,
-                "scoring_weights": {
-                    "transparency": 0.5,
-                    "fee": 0.5,
-                    "trust": 0.5,
-                    "performance": 0.5,
-                },
-            }),
+            params_json=json.dumps(
+                {
+                    "template_id": template_id,
+                    "scoring_weights": {
+                        "transparency": 0.5,
+                        "fee": 0.5,
+                        "trust": 0.5,
+                        "performance": 0.5,
+                    },
+                }
+            ),
         )
         assert "error" in update_result.lower()
 
@@ -551,15 +590,17 @@ class TestSupplyPathTemplateDelete:
         """Deleting a template removes it."""
         create_result = supply_path_tool._run(
             action="create",
-            params_json=json.dumps({
-                "name": "Doomed SPO Template",
-                "scoring_weights": {
-                    "transparency": 0.25,
-                    "fee": 0.25,
-                    "trust": 0.25,
-                    "performance": 0.25,
-                },
-            }),
+            params_json=json.dumps(
+                {
+                    "name": "Doomed SPO Template",
+                    "scoring_weights": {
+                        "transparency": 0.25,
+                        "fee": 0.25,
+                        "trust": 0.25,
+                        "performance": 0.25,
+                    },
+                }
+            ),
         )
         template_id = _extract_template_id(create_result)
 

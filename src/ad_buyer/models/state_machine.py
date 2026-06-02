@@ -25,7 +25,7 @@ Pure Pydantic + stdlib -- no external dependencies.
 import uuid
 from collections.abc import Callable
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -37,7 +37,7 @@ from ..time_utils import utc_now
 # ---------------------------------------------------------------------------
 
 
-class BuyerDealStatus(str, Enum):
+class BuyerDealStatus(StrEnum):
     """Status for buyer deal lifecycle.
 
     Happy path:
@@ -83,7 +83,7 @@ class BuyerDealStatus(str, Enum):
 # ---------------------------------------------------------------------------
 
 
-class BuyerCampaignStatus(str, Enum):
+class BuyerCampaignStatus(StrEnum):
     """Status for buyer campaign/booking lifecycle.
 
     Maps to the existing ExecutionStatus enum used by BookingState.
@@ -105,7 +105,7 @@ class BuyerCampaignStatus(str, Enum):
 # ---------------------------------------------------------------------------
 
 
-class CampaignStatus(str, Enum):
+class CampaignStatus(StrEnum):
     """Status for campaign automation lifecycle.
 
     Happy path:
@@ -342,7 +342,7 @@ class _BaseStateMachine:
 
 def _build_deal_rules() -> list[TransitionRule]:
     """Build the default transition rules for buyer deals."""
-    S = BuyerDealStatus
+    S = BuyerDealStatus  # noqa: N806
     transitions: list[tuple[BuyerDealStatus, BuyerDealStatus, str]] = [
         # Happy path
         (S.QUOTED, S.NEGOTIATING, "Buyer initiates negotiation"),
@@ -383,7 +383,7 @@ def _build_deal_rules() -> list[TransitionRule]:
 
 def _build_campaign_rules() -> list[TransitionRule]:
     """Build the default transition rules for buyer campaigns."""
-    S = BuyerCampaignStatus
+    S = BuyerCampaignStatus  # noqa: N806
     transitions: list[tuple[BuyerCampaignStatus, BuyerCampaignStatus, str]] = [
         # Happy path
         (S.INITIALIZED, S.BRIEF_RECEIVED, "Campaign brief received"),
@@ -505,7 +505,7 @@ def _build_campaign_automation_rules() -> list[TransitionRule]:
     Strategic Plan, including the READY state that separates "campaign is
     prepared" from "campaign is live."
     """
-    S = CampaignStatus
+    S = CampaignStatus  # noqa: N806
     transitions: list[tuple[CampaignStatus, CampaignStatus, str]] = [
         # Happy path
         (S.DRAFT, S.PLANNING, "Campaign planning begins"),

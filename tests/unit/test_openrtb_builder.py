@@ -25,7 +25,6 @@ from ad_buyer.models.audience_plan import (
     ComplianceContext,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -175,11 +174,14 @@ def test_agentic_extension_dropped_when_flag_disabled(
     # Agentic extension NOT emitted.
     assert "ext" not in fragment["user"]
     # Warning logged citing the flag.
-    warning_messages = [r.message for r in caplog.records  # type: ignore[attr-defined]
-                        if r.levelno >= logging.WARNING]
-    assert any(
-        "enable_agentic_openrtb_ext" in m for m in warning_messages
-    ), f"expected flag-disabled warning, got: {warning_messages}"
+    warning_messages = [
+        r.message
+        for r in caplog.records  # type: ignore[attr-defined]
+        if r.levelno >= logging.WARNING
+    ]
+    assert any("enable_agentic_openrtb_ext" in m for m in warning_messages), (
+        f"expected flag-disabled warning, got: {warning_messages}"
+    )
 
 
 def test_agentic_only_plan_with_flag_off_returns_empty_user_block() -> None:
@@ -256,11 +258,14 @@ def test_contextual_exclusions_dropped_with_warning(
 
     # Only the positive contextual ref appears.
     assert fragment["site"]["cat"] == ["IAB1-2"]
-    warning_messages = [r.message for r in caplog.records  # type: ignore[attr-defined]
-                        if r.levelno >= logging.WARNING]
-    assert any(
-        "site.cat" in m or "exclusion" in m.lower() for m in warning_messages
-    ), f"expected dropped-contextual-exclusion warning, got: {warning_messages}"
+    warning_messages = [
+        r.message
+        for r in caplog.records  # type: ignore[attr-defined]
+        if r.levelno >= logging.WARNING
+    ]
+    assert any("site.cat" in m or "exclusion" in m.lower() for m in warning_messages), (
+        f"expected dropped-contextual-exclusion warning, got: {warning_messages}"
+    )
 
 
 # ---------------------------------------------------------------------------

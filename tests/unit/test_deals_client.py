@@ -863,7 +863,7 @@ class TestDealStoreIntegration:
 
         c = _make_client_with_transport(handler, deal_store=mock_store)
         quote_req = QuoteRequest(product_id="ctv-premium-sports", deal_type="PD")
-        result = await c.request_quote(quote_req)
+        await c.request_quote(quote_req)
 
         # Verify store was called
         mock_store.save_deal.assert_called_once()
@@ -884,7 +884,7 @@ class TestDealStoreIntegration:
 
         c = _make_client_with_transport(handler, deal_store=mock_store)
         booking_req = DealBookingRequest(quote_id="qt-abc123")
-        result = await c.book_deal(booking_req)
+        await c.book_deal(booking_req)
 
         mock_store.save_deal.assert_called_once()
         call_kwargs = mock_store.save_deal.call_args[1]

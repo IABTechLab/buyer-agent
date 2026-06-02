@@ -19,8 +19,6 @@ import uuid
 from datetime import date, timedelta
 from typing import Any
 
-import pytest
-
 from ad_buyer.models.audience_plan import AudiencePlan
 from ad_buyer.models.state_machine import CampaignStatus
 from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline, CampaignPlan

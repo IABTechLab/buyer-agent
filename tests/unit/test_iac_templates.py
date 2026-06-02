@@ -28,19 +28,35 @@ class CfnLoader(yaml.SafeLoader):
 
 # Register handlers for all common CloudFormation tags
 _CFN_TAGS = [
-    "!Ref", "!Sub", "!GetAtt", "!Select", "!GetAZs", "!Join",
-    "!If", "!Not", "!Equals", "!And", "!Or", "!FindInMap",
-    "!Base64", "!Cidr", "!ImportValue", "!Split", "!Transform",
+    "!Ref",
+    "!Sub",
+    "!GetAtt",
+    "!Select",
+    "!GetAZs",
+    "!Join",
+    "!If",
+    "!Not",
+    "!Equals",
+    "!And",
+    "!Or",
+    "!FindInMap",
+    "!Base64",
+    "!Cidr",
+    "!ImportValue",
+    "!Split",
+    "!Transform",
 ]
 
 for _tag in _CFN_TAGS:
     CfnLoader.add_multi_constructor(
         _tag,
-        lambda loader, suffix, node: loader.construct_mapping(node)
-        if isinstance(node, yaml.MappingNode)
-        else loader.construct_sequence(node)
-        if isinstance(node, yaml.SequenceNode)
-        else loader.construct_scalar(node),
+        lambda loader, suffix, node: (
+            loader.construct_mapping(node)
+            if isinstance(node, yaml.MappingNode)
+            else loader.construct_sequence(node)
+            if isinstance(node, yaml.SequenceNode)
+            else loader.construct_scalar(node)
+        ),
     )
 
 
@@ -61,9 +77,7 @@ class TestCloudFormationTemplates:
 
     def test_has_format_version(self, cfn_template):
         name, template = cfn_template
-        assert "AWSTemplateFormatVersion" in template, (
-            f"{name}: missing AWSTemplateFormatVersion"
-        )
+        assert "AWSTemplateFormatVersion" in template, f"{name}: missing AWSTemplateFormatVersion"
 
     def test_has_description(self, cfn_template):
         name, template = cfn_template
@@ -83,9 +97,7 @@ class TestCloudFormationTemplates:
         assert "RedisReplicationGroup" in resources, (
             "storage.yaml should define a Redis replication group"
         )
-        assert "RedisSubnetGroup" in resources, (
-            "storage.yaml should define a Redis subnet group"
-        )
+        assert "RedisSubnetGroup" in resources, "storage.yaml should define a Redis subnet group"
 
     def test_network_has_redis_security_group(self):
         template = load_cfn_yaml(CFN_DIR / "network.yaml")
@@ -97,21 +109,15 @@ class TestCloudFormationTemplates:
     def test_main_wires_storage_stack(self):
         template = load_cfn_yaml(CFN_DIR / "main.yaml")
         resources = template["Resources"]
-        assert "StorageStack" in resources, (
-            "main.yaml should include a StorageStack"
-        )
+        assert "StorageStack" in resources, "main.yaml should include a StorageStack"
         assert "NetworkStack" in resources
         assert "ComputeStack" in resources
 
     def test_compute_accepts_redis_params(self):
         template = load_cfn_yaml(CFN_DIR / "compute.yaml")
         params = template["Parameters"]
-        assert "RedisEndpoint" in params, (
-            "compute.yaml should accept RedisEndpoint parameter"
-        )
-        assert "RedisPort" in params, (
-            "compute.yaml should accept RedisPort parameter"
-        )
+        assert "RedisEndpoint" in params, "compute.yaml should accept RedisEndpoint parameter"
+        assert "RedisPort" in params, "compute.yaml should accept RedisPort parameter"
 
 
 class TestTerraformModules:
@@ -139,9 +145,7 @@ class TestTerraformModules:
 
     def test_root_main_references_storage_module(self):
         content = (TF_DIR / "main.tf").read_text()
-        assert 'module "storage"' in content, (
-            "Root main.tf should reference the storage module"
-        )
+        assert 'module "storage"' in content, "Root main.tf should reference the storage module"
         assert "./modules/storage" in content
 
     def test_root_outputs_include_redis(self):

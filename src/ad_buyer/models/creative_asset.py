@@ -25,11 +25,11 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any
 
 
-class AssetType(str, Enum):
+class AssetType(StrEnum):
     """Creative asset type (Section 6.3 creative_type)."""
 
     DISPLAY = "display"
@@ -39,7 +39,7 @@ class AssetType(str, Enum):
     NATIVE = "native"
 
 
-class ValidationStatus(str, Enum):
+class ValidationStatus(StrEnum):
     """Validation status for creative assets."""
 
     PENDING = "pending"

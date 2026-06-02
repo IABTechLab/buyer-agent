@@ -15,16 +15,15 @@ from datetime import UTC, datetime
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
-from ad_buyer.storage.campaign_store import CampaignStore
-from ad_buyer.storage.deal_store import DealStore
-from ad_buyer.storage.pacing_store import PacingStore
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.models.campaign import (
     ChannelSnapshot,
     DealSnapshot,
     PacingSnapshot,
 )
-
+from ad_buyer.storage.campaign_store import CampaignStore
+from ad_buyer.storage.deal_store import DealStore
+from ad_buyer.storage.pacing_store import PacingStore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -70,10 +69,12 @@ def _seed_campaign(store: CampaignStore, **overrides) -> str:
         "currency": "USD",
         "flight_start": "2026-03-01",
         "flight_end": "2026-03-31",
-        "channels": json.dumps([
-            {"channel": "CTV", "budget_pct": 0.6},
-            {"channel": "DISPLAY", "budget_pct": 0.4},
-        ]),
+        "channels": json.dumps(
+            [
+                {"channel": "CTV", "budget_pct": 0.6},
+                {"channel": "DISPLAY", "budget_pct": 0.4},
+            ]
+        ),
     }
     defaults.update(overrides)
     return store.save_campaign(**defaults)
@@ -242,7 +243,7 @@ class TestListTemplates:
 
     @pytest.mark.asyncio
     async def test_filter_by_supply_path_type(self):
-        """list_templates with template_type='supply_path' should only return supply path templates."""
+        """list_templates with template_type='supply_path' should only return supply path templates."""  # noqa: E501
         store = _make_deal_store()
         store.save_deal_template(name="Sports PG")
         store.save_supply_path_template(name="Direct Paths")
@@ -282,12 +283,15 @@ class TestCreateTemplate:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("create_template", {
-                "template_type": "deal",
-                "name": "Sports PG",
-                "deal_type_pref": "PG",
-                "max_cpm": 25.0,
-            })
+            result = await mcp.call_tool(
+                "create_template",
+                {
+                    "template_type": "deal",
+                    "name": "Sports PG",
+                    "deal_type_pref": "PG",
+                    "max_cpm": 25.0,
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "template_id" in data
             assert data["name"] == "Sports PG"
@@ -307,11 +311,14 @@ class TestCreateTemplate:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("create_template", {
-                "template_type": "supply_path",
-                "name": "Direct Paths",
-                "max_reseller_hops": 2,
-            })
+            result = await mcp.call_tool(
+                "create_template",
+                {
+                    "template_type": "supply_path",
+                    "name": "Direct Paths",
+                    "max_reseller_hops": 2,
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "template_id" in data
             assert data["template_type"] == "supply_path"
@@ -330,9 +337,12 @@ class TestCreateTemplate:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("create_template", {
-                "template_type": "deal",
-            })
+            result = await mcp.call_tool(
+                "create_template",
+                {
+                    "template_type": "deal",
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "error" in data
         finally:
@@ -344,9 +354,12 @@ class TestCreateTemplate:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("create_template", {
-                "name": "Test",
-            })
+            result = await mcp.call_tool(
+                "create_template",
+                {
+                    "name": "Test",
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "error" in data
         finally:
@@ -358,10 +371,13 @@ class TestCreateTemplate:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("create_template", {
-                "template_type": "unknown",
-                "name": "Test",
-            })
+            result = await mcp.call_tool(
+                "create_template",
+                {
+                    "template_type": "unknown",
+                    "name": "Test",
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "error" in data
         finally:
@@ -389,9 +405,12 @@ class TestInstantiateFromTemplate:
         )
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("instantiate_from_template", {
-                "template_id": tmpl_id,
-            })
+            result = await mcp.call_tool(
+                "instantiate_from_template",
+                {
+                    "template_id": tmpl_id,
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "deal_id" in data
             assert data["template_id"] == tmpl_id
@@ -424,6 +443,7 @@ class TestInstantiateFromTemplate:
         try:
             # Call the function directly to bypass MCP's pre-parse
             from ad_buyer.interfaces.mcp_server import instantiate_from_template
+
             result_str = instantiate_from_template(
                 template_id=tmpl_id,
                 overrides='{"price": 25.0}',
@@ -444,9 +464,12 @@ class TestInstantiateFromTemplate:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("instantiate_from_template", {
-                "template_id": "nonexistent-id",
-            })
+            result = await mcp.call_tool(
+                "instantiate_from_template",
+                {
+                    "template_id": "nonexistent-id",
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "error" in data
         finally:
@@ -479,9 +502,12 @@ class TestGetDealPerformance:
         store = _make_deal_store()
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("get_deal_performance", {
-                "deal_id": "nonexistent",
-            })
+            result = await mcp.call_tool(
+                "get_deal_performance",
+                {
+                    "deal_id": "nonexistent",
+                },
+            )
             data = json.loads(_extract_text(result))
             assert "error" in data
         finally:
@@ -500,9 +526,12 @@ class TestGetDealPerformance:
         )
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("get_deal_performance", {
-                "deal_id": deal_id,
-            })
+            result = await mcp.call_tool(
+                "get_deal_performance",
+                {
+                    "deal_id": deal_id,
+                },
+            )
             data = json.loads(_extract_text(result))
             assert data["deal_id"] == deal_id
             assert data["product_name"] == "Premium CTV"
@@ -524,9 +553,12 @@ class TestGetDealPerformance:
         )
         _set_deal_store(store)
         try:
-            result = await mcp.call_tool("get_deal_performance", {
-                "deal_id": deal_id,
-            })
+            result = await mcp.call_tool(
+                "get_deal_performance",
+                {
+                    "deal_id": deal_id,
+                },
+            )
             data = json.loads(_extract_text(result))
             assert isinstance(data, dict)
         finally:
@@ -546,15 +578,16 @@ class TestGetCampaignReport:
         """get_campaign_report should error when campaign not found."""
         store = _make_campaign_store()
         pacing_store = _make_pacing_store()
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_campaign_report", {
-            "campaign_id": "nonexistent",
-        })
+        result = await mcp.call_tool(
+            "get_campaign_report",
+            {
+                "campaign_id": "nonexistent",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -565,19 +598,28 @@ class TestGetCampaignReport:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
+            pacing_store,
+            cid,
             channel_snapshots=[
                 ChannelSnapshot(
-                    channel="CTV", allocated_budget=60000.0,
-                    spend=30000.0, pacing_pct=100.0,
-                    impressions=2000000, effective_cpm=15.0, fill_rate=0.85,
+                    channel="CTV",
+                    allocated_budget=60000.0,
+                    spend=30000.0,
+                    pacing_pct=100.0,
+                    impressions=2000000,
+                    effective_cpm=15.0,
+                    fill_rate=0.85,
                 ),
             ],
             deal_snapshots=[
                 DealSnapshot(
-                    deal_id="deal-001", allocated_budget=40000.0,
-                    spend=20000.0, impressions=1000000,
-                    effective_cpm=20.0, fill_rate=0.9, win_rate=0.3,
+                    deal_id="deal-001",
+                    allocated_budget=40000.0,
+                    spend=20000.0,
+                    impressions=1000000,
+                    effective_cpm=20.0,
+                    fill_rate=0.9,
+                    win_rate=0.3,
                 ),
             ],
         )
@@ -587,9 +629,12 @@ class TestGetCampaignReport:
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_campaign_report", {
-            "campaign_id": cid,
-        })
+        result = await mcp.call_tool(
+            "get_campaign_report",
+            {
+                "campaign_id": cid,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["campaign_id"] == cid
         assert "status_summary" in data
@@ -610,9 +655,12 @@ class TestGetCampaignReport:
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_campaign_report", {
-            "campaign_id": cid,
-        })
+        result = await mcp.call_tool(
+            "get_campaign_report",
+            {
+                "campaign_id": cid,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["campaign_id"] == cid
         assert "status_summary" in data
@@ -631,15 +679,16 @@ class TestGetPacingReport:
         """get_pacing_report should error when campaign not found."""
         store = _make_campaign_store()
         pacing_store = _make_pacing_store()
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_pacing_report", {
-            "campaign_id": "nonexistent",
-        })
+        result = await mcp.call_tool(
+            "get_pacing_report",
+            {
+                "campaign_id": "nonexistent",
+            },
+        )
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -650,21 +699,30 @@ class TestGetPacingReport:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
+            pacing_store,
+            cid,
             total_spend=35000.0,
             expected_spend=50000.0,
             pacing_pct=70.0,
             deviation_pct=-30.0,
             channel_snapshots=[
                 ChannelSnapshot(
-                    channel="CTV", allocated_budget=60000.0,
-                    spend=18000.0, pacing_pct=60.0,
-                    impressions=1200000, effective_cpm=15.0, fill_rate=0.85,
+                    channel="CTV",
+                    allocated_budget=60000.0,
+                    spend=18000.0,
+                    pacing_pct=60.0,
+                    impressions=1200000,
+                    effective_cpm=15.0,
+                    fill_rate=0.85,
                 ),
                 ChannelSnapshot(
-                    channel="DISPLAY", allocated_budget=40000.0,
-                    spend=17000.0, pacing_pct=85.0,
-                    impressions=850000, effective_cpm=20.0, fill_rate=0.7,
+                    channel="DISPLAY",
+                    allocated_budget=40000.0,
+                    spend=17000.0,
+                    pacing_pct=85.0,
+                    impressions=850000,
+                    effective_cpm=20.0,
+                    fill_rate=0.7,
                 ),
             ],
         )
@@ -674,9 +732,12 @@ class TestGetPacingReport:
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_pacing_report", {
-            "campaign_id": cid,
-        })
+        result = await mcp.call_tool(
+            "get_pacing_report",
+            {
+                "campaign_id": cid,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["campaign_id"] == cid
         assert data["pacing_status"] in ("behind", "on_track", "ahead", "no_data")
@@ -701,9 +762,12 @@ class TestGetPacingReport:
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_pacing_report", {
-            "campaign_id": cid,
-        })
+        result = await mcp.call_tool(
+            "get_pacing_report",
+            {
+                "campaign_id": cid,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["pacing_status"] == "no_data"
 
@@ -714,7 +778,8 @@ class TestGetPacingReport:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
+            pacing_store,
+            cid,
             total_spend=30000.0,
             expected_spend=50000.0,
             pacing_pct=60.0,
@@ -726,9 +791,12 @@ class TestGetPacingReport:
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_pacing_report", {
-            "campaign_id": cid,
-        })
+        result = await mcp.call_tool(
+            "get_pacing_report",
+            {
+                "campaign_id": cid,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["pacing_status"] == "behind"
 
@@ -739,7 +807,8 @@ class TestGetPacingReport:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
+            pacing_store,
+            cid,
             total_spend=65000.0,
             expected_spend=50000.0,
             pacing_pct=130.0,
@@ -751,8 +820,11 @@ class TestGetPacingReport:
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_pacing_store", lambda: pacing_store
         )
-        result = await mcp.call_tool("get_pacing_report", {
-            "campaign_id": cid,
-        })
+        result = await mcp.call_tool(
+            "get_pacing_report",
+            {
+                "campaign_id": cid,
+            },
+        )
         data = json.loads(_extract_text(result))
         assert data["pacing_status"] == "ahead"

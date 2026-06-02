@@ -290,12 +290,12 @@ class TestNegotiationClientRespectsNegotiationEnabled:
 
         client = NegotiationClient()
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.side_effect = [start_response, accept_response]
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             from ad_buyer.negotiation.models import NegotiationOutcome
 

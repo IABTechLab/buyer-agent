@@ -10,12 +10,12 @@ Provides data models for:
 - TrustLevel: trust status enum
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class TrustLevel(str, Enum):
+class TrustLevel(StrEnum):
     """Trust level of an agent in the registry.
 
     Determines how much access and data an agent receives.

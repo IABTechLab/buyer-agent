@@ -8,8 +8,6 @@ SQLite-backed storage of deals, negotiations, bookings, jobs, and status
 transitions.
 """
 
-from typing import Optional
-
 from .deal_store import DealStore
 from .schema import SCHEMA_VERSION, create_tables, initialize_schema
 

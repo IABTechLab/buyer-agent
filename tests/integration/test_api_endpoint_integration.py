@@ -8,6 +8,7 @@ verifying request routing, authentication middleware, job lifecycle,
 and error propagation from API through to business logic.
 """
 
+from datetime import UTC
 from unittest.mock import patch
 
 import httpx
@@ -268,7 +269,7 @@ class TestApiValidationIntegration:
     async def test_approve_wrong_status_returns_400(self):
         """Approving a job not in awaiting_approval status should return 400."""
         # Manually insert a job in 'running' state
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         job_id = "test-job-running"
         jobs[job_id] = {
@@ -280,8 +281,8 @@ class TestApiValidationIntegration:
             "recommendations": [],
             "booked_lines": [],
             "errors": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
         try:

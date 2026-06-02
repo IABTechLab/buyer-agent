@@ -820,12 +820,12 @@ class TestToolExports:
             SearchPortfolioTool,
         )
 
-        for ToolClass in [
+        for tool_class in [
             ListPortfolioTool,
             SearchPortfolioTool,
             PortfolioSummaryTool,
             InspectDealTool,
         ]:
-            tool = ToolClass(deal_store=deal_store)
+            tool = tool_class(deal_store=deal_store)
             assert tool.name
             assert tool.description

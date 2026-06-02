@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -45,14 +45,14 @@ def _get_settings() -> Settings:
 # ---------------------------------------------------------------------------
 
 
-class WizardPhase(str, Enum):
+class WizardPhase(StrEnum):
     """Two-phase wizard model."""
 
     DEVELOPER = "developer"
     BUSINESS = "business"
 
 
-class WizardStepStatus(str, Enum):
+class WizardStepStatus(StrEnum):
     """Status of an individual wizard step."""
 
     NOT_STARTED = "not_started"
@@ -163,9 +163,7 @@ class WizardState:
     @property
     def current_phase(self) -> WizardPhase:
         """Current phase based on developer step completion."""
-        developer_steps = [
-            s for s in self.steps if s.phase == WizardPhase.DEVELOPER
-        ]
+        developer_steps = [s for s in self.steps if s.phase == WizardPhase.DEVELOPER]
         all_dev_done = all(
             s.status
             in (
@@ -378,9 +376,7 @@ class SetupWizard:
             ValueError: If step_number is not 1-8.
         """
         if step_number < 1 or step_number > 8:
-            raise ValueError(
-                f"Invalid step number: {step_number}. Must be 1-8."
-            )
+            raise ValueError(f"Invalid step number: {step_number}. Must be 1-8.")
         return self._steps[step_number - 1]
 
     def get_state(self) -> WizardState:
@@ -389,9 +385,7 @@ class SetupWizard:
 
     # -- Step operations ----------------------------------------------------
 
-    def complete_step(
-        self, step_number: int, config: dict[str, Any]
-    ) -> WizardStep:
+    def complete_step(self, step_number: int, config: dict[str, Any]) -> WizardStep:
         """Mark a step as completed with the given configuration.
 
         Args:
@@ -407,7 +401,7 @@ class SetupWizard:
         step = self.get_step(step_number)
         step.status = WizardStepStatus.COMPLETED
         step.config = dict(config)
-        step.completed_at = datetime.now(timezone.utc).isoformat()
+        step.completed_at = datetime.now(UTC).isoformat()
         return step
 
     def skip_step(self, step_number: int) -> WizardStep:
@@ -426,12 +420,10 @@ class SetupWizard:
         """
         step = self.get_step(step_number)
         if step_number == 8:
-            raise ValueError(
-                "Step 8 (Review & Launch) cannot be skipped."
-            )
+            raise ValueError("Step 8 (Review & Launch) cannot be skipped.")
         step.status = WizardStepStatus.SKIPPED
         step.config = dict(step.defaults)
-        step.completed_at = datetime.now(timezone.utc).isoformat()
+        step.completed_at = datetime.now(UTC).isoformat()
         return step
 
     # -- Auto-detection -----------------------------------------------------
@@ -457,7 +449,7 @@ class SetupWizard:
                     "environment": settings.environment,
                     "api_key": "(configured)",
                 }
-                step1.completed_at = datetime.now(timezone.utc).isoformat()
+                step1.completed_at = datetime.now(UTC).isoformat()
 
         # Step 2: Seller Connections -- detect if seller endpoints configured
         step2 = self.get_step(2)
@@ -468,7 +460,7 @@ class SetupWizard:
                 step2.config = {
                     "seller_endpoints": endpoints,
                 }
-                step2.completed_at = datetime.now(timezone.utc).isoformat()
+                step2.completed_at = datetime.now(UTC).isoformat()
 
         # Steps 3-8 cannot be auto-detected from settings alone;
         # they require user configuration.

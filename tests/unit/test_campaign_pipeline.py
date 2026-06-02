@@ -240,7 +240,7 @@ class TestPlanCampaign:
         campaign_id = asyncio.get_event_loop().run_until_complete(
             pipeline.ingest_brief(_make_brief_json())
         )
-        plan = asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
         campaign = fake_store.get_campaign(campaign_id)
         assert campaign["status"] == CampaignStatus.PLANNING.value
 
@@ -295,7 +295,7 @@ class TestExecuteBooking:
             pipeline.ingest_brief(_make_brief_json())
         )
         asyncio.get_event_loop().run_until_complete(pipeline.plan_campaign(campaign_id))
-        result = asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
+        asyncio.get_event_loop().run_until_complete(pipeline.execute_booking(campaign_id))
         campaign = fake_store.get_campaign(campaign_id)
         assert campaign["status"] == CampaignStatus.BOOKING.value
 

@@ -17,7 +17,7 @@ spec, but readers searching for either term land here.
 """
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from ..time_utils import utc_now
 
 
-class EmbeddingType(str, Enum):
+class EmbeddingType(StrEnum):
     """Types of embeddings that can be exchanged via UCP."""
 
     CONTEXT = "context"  # Contextual signals from page/content
@@ -35,7 +35,7 @@ class EmbeddingType(str, Enum):
     QUERY = "query"  # Search/query context
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """UCP signal types as defined by IAB Tech Lab."""
 
     IDENTITY = "identity"  # User identity signals (hashed IDs, etc.)
@@ -43,7 +43,7 @@ class SignalType(str, Enum):
     REINFORCEMENT = "reinforcement"  # Feedback/learning signals
 
 
-class SimilarityMetric(str, Enum):
+class SimilarityMetric(StrEnum):
     """Supported similarity metrics for embedding comparison."""
 
     COSINE = "cosine"  # Cosine similarity (most common)

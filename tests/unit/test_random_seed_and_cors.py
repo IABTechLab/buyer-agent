@@ -68,9 +68,7 @@ class TestCORSConfiguration:
         )
         origins = s.get_cors_origins()
         # MCP server default: wildcard — auth is enforced via X-API-Key, not origin
-        assert origins == ["*"], (
-            f"Expected wildcard default for MCP server, got: {origins}"
-        )
+        assert origins == ["*"], f"Expected wildcard default for MCP server, got: {origins}"
 
     def test_settings_custom_cors_origins(self):
         """CORS origins should be configurable."""
@@ -83,7 +81,7 @@ class TestCORSConfiguration:
         assert origins == ["https://app.example.com", "https://admin.example.com"]
 
     def test_app_cors_middleware_uses_settings(self):
-        """The FastAPI app should use settings-based origins (wildcard is acceptable for MCP server)."""
+        """The FastAPI app should use settings-based origins (wildcard is acceptable for MCP server)."""  # noqa: E501
         from ad_buyer.interfaces.api.main import app
 
         # Find the CORSMiddleware in the app's middleware stack

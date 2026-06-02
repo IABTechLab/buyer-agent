@@ -31,8 +31,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..clients.capability_client import (
@@ -54,7 +55,6 @@ from .audience_degradation import (
     CannotFulfillPlan,
     DegradationLog,
     DegradationLogEntry,
-    SellerAudienceCapabilities,
     degrade_plan_for_seller,
     synthesize_capabilities_from_unsupported,
 )
@@ -68,7 +68,7 @@ logger = logging.getLogger(__name__)
 _AUDIENCE_PLAN_UNSUPPORTED_CODE = "audience_plan_unsupported"
 
 
-class _SellerIncompatibleForCampaign(Exception):
+class _SellerIncompatibleForCampaign(Exception):  # noqa: N818
     """Internal signal: seller cannot fulfill the campaign's audience plan.
 
     Raised inside `_book_with_audience_retry` after the degrade-and-retry
@@ -124,9 +124,7 @@ def _entry_role(entry: DegradationLogEntry) -> str:
 
     path = entry.path or ""
     for prefix, role in _ROLE_PREFIXES:
-        if path == prefix or path.startswith(f"{prefix}.") or path.startswith(
-            f"{prefix}["
-        ):
+        if path == prefix or path.startswith(f"{prefix}.") or path.startswith(f"{prefix}["):
             return role
     return "primary"
 
@@ -213,8 +211,8 @@ class InventoryRequirements:
     deal_types: list[str]
     content_categories: list[str] = field(default_factory=list)
     excluded_sellers: list[str] = field(default_factory=list)
-    min_impressions: Optional[int] = None
-    max_cpm: Optional[float] = None
+    min_impressions: int | None = None
+    max_cpm: float | None = None
     audience_plan: AudiencePlan | None = None
     audience_strictness: AudienceStrictness | None = None
 
@@ -244,7 +242,7 @@ class DealParams:
     impressions: int
     flight_start: str
     flight_end: str
-    target_cpm: Optional[float] = None
+    target_cpm: float | None = None
     media_type: str = "digital"
     audience_plan: AudiencePlan | None = None
 
@@ -266,9 +264,9 @@ class SellerQuoteResult:
 
     seller_id: str
     seller_url: str
-    quote: Optional[QuoteResponse]
+    quote: QuoteResponse | None
     deal_type: str
-    error: Optional[str]
+    error: str | None
 
 
 @dataclass
@@ -373,10 +371,10 @@ class MultiSellerOrchestrator:
         self,
         registry_client: Any,
         deals_client_factory: Callable[..., Any],
-        event_bus: Optional[Any] = None,
-        quote_normalizer: Optional[QuoteNormalizer] = None,
+        event_bus: Any | None = None,
+        quote_normalizer: QuoteNormalizer | None = None,
         quote_timeout: float = 30.0,
-        capability_client: Optional[CapabilityClient] = None,
+        capability_client: CapabilityClient | None = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
@@ -396,7 +394,7 @@ class MultiSellerOrchestrator:
     async def _emit(
         self,
         event_type: EventType,
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Emit an event to the event bus.  Fail-open."""
@@ -410,17 +408,13 @@ class MultiSellerOrchestrator:
             )
             await self._event_bus.publish(event)
         except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
-            logger.warning(
-                "Failed to emit event %s: %s", event_type, exc
-            )
+            logger.warning("Failed to emit event %s: %s", event_type, exc)
 
     # ------------------------------------------------------------------
     # Stage 1: Discover sellers
     # ------------------------------------------------------------------
 
-    async def discover_sellers(
-        self, requirements: InventoryRequirements
-    ) -> list[AgentCard]:
+    async def discover_sellers(self, requirements: InventoryRequirements) -> list[AgentCard]:
         """Discover qualifying sellers from the agent registry.
 
         Queries the registry for sellers matching the media type and
@@ -443,16 +437,10 @@ class MultiSellerOrchestrator:
 
         # Filter out excluded sellers
         excluded_set = set(requirements.excluded_sellers)
-        sellers = [
-            s for s in sellers
-            if s.agent_id not in excluded_set
-        ]
+        sellers = [s for s in sellers if s.agent_id not in excluded_set]
 
         # Filter out blocked sellers
-        sellers = [
-            s for s in sellers
-            if s.trust_level != TrustLevel.BLOCKED
-        ]
+        sellers = [s for s in sellers if s.trust_level != TrustLevel.BLOCKED]
 
         # Emit discovery event
         await self._emit(
@@ -534,11 +522,9 @@ class MultiSellerOrchestrator:
                     error=None,
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 msg = f"Quote request timed out after {self._quote_timeout}s"
-                logger.warning(
-                    "Seller %s timed out on quote request", seller.agent_id
-                )
+                logger.warning("Seller %s timed out on quote request", seller.agent_id)
                 return SellerQuoteResult(
                     seller_id=seller.agent_id,
                     seller_url=seller_url,
@@ -595,7 +581,7 @@ class MultiSellerOrchestrator:
     async def evaluate_and_rank(
         self,
         quote_results: list[SellerQuoteResult],
-        max_cpm: Optional[float] = None,
+        max_cpm: float | None = None,
     ) -> list[NormalizedQuote]:
         """Normalize and rank collected quotes.
 
@@ -611,9 +597,7 @@ class MultiSellerOrchestrator:
             (best quote first).
         """
         # Filter to successful quotes only
-        valid_results = [
-            r for r in quote_results if r.quote is not None
-        ]
+        valid_results = [r for r in quote_results if r.quote is not None]
 
         if not valid_results:
             return []
@@ -628,10 +612,7 @@ class MultiSellerOrchestrator:
 
         # Apply max CPM filter
         if max_cpm is not None:
-            ranked = [
-                nq for nq in ranked
-                if nq.effective_cpm <= max_cpm
-            ]
+            ranked = [nq for nq in ranked if nq.effective_cpm <= max_cpm]
 
         logger.info(
             "Evaluated %d quotes, %d passed filters",
@@ -703,8 +684,7 @@ class MultiSellerOrchestrator:
             # Skip if minimum spend exceeds remaining budget
             if nq.minimum_spend > 0 and nq.minimum_spend > remaining_budget:
                 logger.info(
-                    "Skipping quote %s: minimum spend %.2f exceeds "
-                    "remaining budget %.2f",
+                    "Skipping quote %s: minimum spend %.2f exceeds remaining budget %.2f",
                     nq.quote_id,
                     nq.minimum_spend,
                     remaining_budget,
@@ -713,21 +693,18 @@ class MultiSellerOrchestrator:
 
             seller_url = quote_seller_map.get(nq.quote_id)
             if seller_url is None:
-                logger.warning(
-                    "No seller URL for quote %s, skipping", nq.quote_id
+                logger.warning("No seller URL for quote %s, skipping", nq.quote_id)
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": "No seller URL mapping found",
+                    }
                 )
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": "No seller URL mapping found",
-                })
                 continue
 
             try:
                 client = self._deals_client_factory(seller_url)
-                if (
-                    self._capability_client is not None
-                    and audience_plan is not None
-                ):
+                if self._capability_client is not None and audience_plan is not None:
                     deal, deg_log = await self._book_with_preflight_then_retry(
                         client=client,
                         quote_id=nq.quote_id,
@@ -784,12 +761,14 @@ class MultiSellerOrchestrator:
                 )
                 if nq.seller_id not in incompatible_sellers:
                     incompatible_sellers.append(nq.seller_id)
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": str(exc),
-                    "error_code": "audience_plan_unsupported",
-                    "seller_id": nq.seller_id,
-                })
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": str(exc),
+                        "error_code": "audience_plan_unsupported",
+                        "seller_id": nq.seller_id,
+                    }
+                )
 
             except Exception as exc:  # noqa: BLE001 - per-deal isolation; continue booking remaining deals
                 logger.warning(
@@ -797,10 +776,12 @@ class MultiSellerOrchestrator:
                     nq.quote_id,
                     exc,
                 )
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": str(exc),
-                })
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": str(exc),
+                    }
+                )
 
         return DealSelection(
             booked_deals=booked_deals,
@@ -891,9 +872,7 @@ class MultiSellerOrchestrator:
         # Synthesize what the seller doesn't support, run degradation, retry.
         try:
             caps = synthesize_capabilities_from_unsupported(unsupported)
-            degraded_plan, degradation_log = degrade_plan_for_seller(
-                audience_plan, caps
-            )
+            degraded_plan, degradation_log = degrade_plan_for_seller(audience_plan, caps)
         except CannotFulfillPlan as cfp:
             # Degradation stripped the primary -- no usable plan to retry.
             # Record the would-be degradation log so the audit trail still
@@ -913,8 +892,7 @@ class MultiSellerOrchestrator:
                     },
                 )
             raise _SellerIncompatibleForCampaign(
-                f"Cannot reconcile audience_plan with seller {seller_id}: "
-                f"{cfp.reason}"
+                f"Cannot reconcile audience_plan with seller {seller_id}: {cfp.reason}"
             ) from cfp
 
         retry_request = DealBookingRequest(
@@ -928,13 +906,11 @@ class MultiSellerOrchestrator:
             # this campaign so the higher-level error path can route around
             # it. We do NOT auto-route here.
             raise _SellerIncompatibleForCampaign(
-                f"Seller {seller_id} rejected even the degraded plan: "
-                f"{retry_exc}"
+                f"Seller {seller_id} rejected even the degraded plan: {retry_exc}"
             ) from retry_exc
 
         logger.info(
-            "Booked deal from seller %s on retry after degrading "
-            "audience_plan (%d log entries)",
+            "Booked deal from seller %s on retry after degrading audience_plan (%d log entries)",
             seller_id,
             len(degradation_log),
         )
@@ -1022,8 +998,8 @@ class MultiSellerOrchestrator:
         assert self._capability_client is not None  # narrowed by select_and_book
 
         # ---- 1. capability discovery ----
-        discovery: CapabilityDiscoveryResult = (
-            await self._capability_client.discover_capabilities(seller_url)
+        discovery: CapabilityDiscoveryResult = await self._capability_client.discover_capabilities(
+            seller_url
         )
 
         # Audit: every pre-flight call lands in the trail keyed by plan id.
@@ -1051,8 +1027,7 @@ class MultiSellerOrchestrator:
             # Pre-flight stripped the primary entirely. No retry would help;
             # the seller advertises caps that can't carry this campaign.
             raise _SellerIncompatibleForCampaign(
-                f"Pre-flight: seller {seller_id} cannot fulfill plan: "
-                f"{cfp.reason}"
+                f"Pre-flight: seller {seller_id} cannot fulfill plan: {cfp.reason}"
             ) from cfp
 
         # ---- 3. apply strictness gate ----
@@ -1064,9 +1039,7 @@ class MultiSellerOrchestrator:
                 quote_id,
                 reason,
             )
-            raise _SellerIncompatibleForCampaign(
-                f"Pre-flight strictness gate: {reason}"
-            )
+            raise _SellerIncompatibleForCampaign(f"Pre-flight strictness gate: {reason}")
 
         # Audit: when the pre-flight produced any drops we record them.
         # The retry path emits its own degradation event keyed by the same
@@ -1085,8 +1058,7 @@ class MultiSellerOrchestrator:
                 },
             )
             logger.info(
-                "Pre-flight degraded plan for seller=%s quote=%s "
-                "(%d log entries)",
+                "Pre-flight degraded plan for seller=%s quote=%s (%d log entries)",
                 seller_id,
                 quote_id,
                 len(preflight_log),

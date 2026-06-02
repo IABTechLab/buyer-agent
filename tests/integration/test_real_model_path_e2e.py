@@ -29,7 +29,6 @@ import pytest
 
 from ad_buyer.clients.ucp_client import (
     UCPClient,
-    _SIMILARITY_THRESHOLDS,
     _similarity_thresholds_for_mode,
 )
 from ad_buyer.config.settings import settings
@@ -40,10 +39,8 @@ from ad_buyer.models.audience_plan import (
     ComplianceContext,
 )
 from ad_buyer.tools.audience.embedding_mint import (
-    EmbeddingMintTool,
     embedding_mode_label,
 )
-
 
 try:
     import sentence_transformers  # noqa: F401
@@ -57,9 +54,7 @@ REQS = {"interest": "auto", "age": "25-54"}
 
 
 class TestRealModelPath:
-    @pytest.mark.skipif(
-        not SBERT_AVAILABLE, reason="sentence-transformers not installed"
-    )
+    @pytest.mark.skipif(not SBERT_AVAILABLE, reason="sentence-transformers not installed")
     def test_local_model_produces_384_dim_or_falls_back(self):
         with patch.object(settings, "embedding_mode", "local"):
             client = UCPClient()
@@ -175,7 +170,4 @@ class TestRealModelPath:
         plan_json = plan.model_dump_json()
         reconstructed = AudiencePlan.model_validate_json(plan_json)
         assert reconstructed.audience_plan_id == plan.audience_plan_id
-        assert (
-            reconstructed.extensions[0].compliance_context.embedding_provenance
-            == r.provenance
-        )
+        assert reconstructed.extensions[0].compliance_context.embedding_provenance == r.provenance

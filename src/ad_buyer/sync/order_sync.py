@@ -55,9 +55,7 @@ class OrderSyncService:
         """
         seller_data = await self._client.get_order_status(order_id)
         if seller_data is None:
-            logger.info(
-                "Sync skipped for order %s: seller returned None", order_id
-            )
+            logger.info("Sync skipped for order %s: seller returned None", order_id)
             return False
 
         # Update local store with seller's data

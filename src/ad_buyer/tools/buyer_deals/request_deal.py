@@ -3,7 +3,7 @@
 
 """Deal ID request tool for buyer deal workflows."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from crewai.tools import BaseTool
@@ -15,7 +15,6 @@ from ...booking.pricing import PricingCalculator
 from ...clients.unified_client import UnifiedClient
 from ...models.audience_plan import AudiencePlan
 from ...models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     DealRequest,
     DealResponse,
@@ -32,7 +31,7 @@ class RequestDealInput(BaseModel):
     )
     deal_type: str = Field(
         default="PD",
-        description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",
+        description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",  # noqa: E501
     )
     impressions: int | None = Field(
         default=None,
@@ -248,7 +247,7 @@ Returns:
             identity_seed=identity.agency_id or identity.seat_id or "public",
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not flight_start:
             flight_start = now.strftime("%Y-%m-%d")
         if not flight_end:
@@ -347,9 +346,7 @@ Returns:
         # the human reviewer (and audit trail) a stable handle linking
         # buyer state to seller-side records (proposal §5.1 step 2).
         if audience_plan is not None:
-            output_lines.append(
-                f"Audience Plan ID: {audience_plan.audience_plan_id}"
-            )
+            output_lines.append(f"Audience Plan ID: {audience_plan.audience_plan_id}")
 
         output_lines.extend(
             [

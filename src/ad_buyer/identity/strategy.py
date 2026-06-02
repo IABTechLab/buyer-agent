@@ -14,14 +14,14 @@ Seller's tiered pricing:
     - ADVERTISER: 15% discount + volume discounts (full identity)
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 from ad_buyer.models.buyer_identity import AccessTier, BuyerIdentity, DealType
 
 
-class SellerRelationship(str, Enum):
+class SellerRelationship(StrEnum):
     """Level of trust/history with a seller."""
 
     UNKNOWN = "unknown"  # No prior relationship
@@ -30,7 +30,7 @@ class SellerRelationship(str, Enum):
     TRUSTED = "trusted"  # Long-term partner, high trust
 
 
-class CampaignGoal(str, Enum):
+class CampaignGoal(StrEnum):
     """Campaign optimization goal."""
 
     AWARENESS = "awareness"  # Brand awareness, broad reach

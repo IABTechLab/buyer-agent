@@ -10,12 +10,12 @@ These tests verify that:
 4. API job tracking writes to the store via _persist_job
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow, BuyerDealFlowStatus
+from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,
@@ -169,7 +169,10 @@ class TestDealBookingFlowNoStore:
         )
         flow.state.pending_approvals = [rec]
 
-        result = flow.approve_all()
+        with patch.object(
+            flow, "_book_via_seller_api", return_value=("quote_1", "deal_1", "order_1")
+        ):
+            result = flow.approve_all()
         assert result["status"] == "success"
         assert result["booked"] == 1
 
@@ -277,7 +280,10 @@ class TestDealBookingFlowWithStore:
         rec._store_deal_id = deal_id  # type: ignore[attr-defined]
         flow.state.pending_approvals = [rec]
 
-        result = flow.approve_all()
+        with patch.object(
+            flow, "_book_via_seller_api", return_value=("quote_1", "deal_1", "order_1")
+        ):
+            result = flow.approve_all()
         assert result["status"] == "success"
         assert result["booked"] == 1
 

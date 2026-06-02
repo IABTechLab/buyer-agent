@@ -201,12 +201,12 @@ class TestNegotiationClient:
             max_rounds=5,
         )
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.return_value = mock_response
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             session = await self.client.start_negotiation(
                 seller_url="http://localhost:8000",
@@ -242,12 +242,12 @@ class TestNegotiationClient:
             rounds=[],
         )
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.return_value = mock_response
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             round_result = await self.client.counter_offer(session, price=22.0)
 
@@ -277,12 +277,12 @@ class TestNegotiationClient:
             rounds=[],
         )
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.return_value = mock_response
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             result = await self.client.accept(session)
             assert result["status"] == "accepted"
@@ -304,12 +304,12 @@ class TestNegotiationClient:
             rounds=[],
         )
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.return_value = mock_response
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             await self.client.decline(session)
             mock_client_instance.post.assert_called_once()
@@ -359,12 +359,12 @@ class TestAutoNegotiate:
 
         client = NegotiationClient()
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.side_effect = [start_response, accept_response]
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             result = await client.auto_negotiate(
                 seller_url="http://localhost:8000",
@@ -412,12 +412,12 @@ class TestAutoNegotiate:
 
         client = NegotiationClient()
 
-        with patch("httpx.AsyncClient") as MockClient:
+        with patch("httpx.AsyncClient") as mock_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post.side_effect = responses
             mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
             mock_client_instance.__aexit__ = AsyncMock(return_value=None)
-            MockClient.return_value = mock_client_instance
+            mock_client.return_value = mock_client_instance
 
             result = await client.auto_negotiate(
                 seller_url="http://localhost:8000",

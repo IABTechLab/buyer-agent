@@ -9,14 +9,14 @@ session state and outcome.
 """
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 from ..time_utils import utc_now
 
 
-class NegotiationOutcome(str, Enum):
+class NegotiationOutcome(StrEnum):
     """Outcome of a completed negotiation."""
 
     ACCEPTED = "accepted"

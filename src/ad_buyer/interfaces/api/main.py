@@ -6,26 +6,23 @@
 import json
 import logging
 import sqlite3
+import sys
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-import sys
-
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
-from ...time_utils import utc_now
 from ...flows.deal_booking_flow import DealBookingFlow
-from ...models.flow_state import BookingState
 from ...storage import DealStore
 from ...storage.order_store import OrderStore
+from ...time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +34,7 @@ def _current_settings():
     ``settings`` attribute are visible to the middleware at request time.
     """
     return sys.modules[__name__].settings
+
 
 app = FastAPI(
     title="Ad Buyer Agent API",
@@ -71,7 +69,9 @@ app.add_middleware(
 # Mount MCP server (Streamable HTTP at /mcp)
 # Starlette doesn't call mounted sub-app lifespans, so we must run the
 # session manager ourselves to keep its task group alive.
-from ..mcp_server import mcp as _mcp_server, mount_mcp
+from ..mcp_server import mcp as _mcp_server  # noqa: E402
+from ..mcp_server import mount_mcp  # noqa: E402
+
 mount_mcp(app)
 
 
@@ -90,13 +90,13 @@ async def lifespan(application):
 app.router.lifespan_context = lifespan
 
 # Mount order status/audit router (buyer-nz9)
-from .order_endpoints import create_order_router
+from .order_endpoints import create_order_router  # noqa: E402
 
 # Lazy OrderStore singleton
-_order_store: Optional[OrderStore] = None
+_order_store: OrderStore | None = None
 
 
-def _get_order_store() -> Optional[OrderStore]:
+def _get_order_store() -> OrderStore | None:
     """Return a lazily-initialised OrderStore singleton.
 
     Returns None (and logs a warning) if initialisation fails so that
@@ -161,10 +161,10 @@ async def api_key_auth_middleware(request: Request, call_next):
 jobs: dict[str, dict[str, Any]] = {}
 
 # Lazy DealStore singleton
-_deal_store: Optional[DealStore] = None
+_deal_store: DealStore | None = None
 
 
-def _get_store() -> Optional[DealStore]:
+def _get_store() -> DealStore | None:
     """Return a lazily-initialised DealStore singleton.
 
     Returns None (and logs a warning) if initialisation fails so that
@@ -184,10 +184,10 @@ def _get_store() -> Optional[DealStore]:
 
 
 # Lazy OrderStore singleton
-_order_store: Optional[OrderStore] = None
+_order_store: OrderStore | None = None
 
 
-def _get_order_store() -> Optional[OrderStore]:
+def _get_order_store() -> OrderStore | None:
     """Return a lazily-initialised OrderStore singleton.
 
     Returns None (and logs a warning) if initialisation fails so that
@@ -207,7 +207,7 @@ def _get_order_store() -> Optional[OrderStore]:
 
 
 # Mount buyer order status/audit endpoints
-from .order_endpoints import create_order_router as _create_order_router
+from .order_endpoints import create_order_router as _create_order_router  # noqa: E402
 
 
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
@@ -250,7 +250,7 @@ class CampaignBrief(BaseModel):
     end_date: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")
     target_audience: dict[str, Any]
     kpis: dict[str, Any] = Field(default_factory=dict)
-    channels: Optional[list[str]] = None
+    channels: list[str] | None = None
 
 
 class BookingRequest(BaseModel):
@@ -277,10 +277,10 @@ class BookingStatus(BaseModel):
     job_id: str
     status: str
     progress: float
-    budget_allocations: Optional[dict[str, Any]] = None
-    recommendations: Optional[list[dict[str, Any]]] = None
-    booked_lines: Optional[list[dict[str, Any]]] = None
-    errors: Optional[list[str]] = None
+    budget_allocations: dict[str, Any] | None = None
+    recommendations: list[dict[str, Any]] | None = None
+    booked_lines: list[dict[str, Any]] | None = None
+    errors: list[str] | None = None
     created_at: str
     updated_at: str
 
@@ -294,10 +294,10 @@ class ApprovalRequest(BaseModel):
 class ProductSearchRequest(BaseModel):
     """Request to search products."""
 
-    channel: Optional[str] = None
-    format: Optional[str] = None
-    min_price: Optional[float] = None
-    max_price: Optional[float] = None
+    channel: str | None = None
+    format: str | None = None
+    min_price: float | None = None
+    max_price: float | None = None
     limit: int = Field(default=10, ge=1, le=50)
 
 
@@ -465,7 +465,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
 
 @app.get("/bookings", tags=["Bookings"])
 async def list_bookings(
-    status: Optional[str] = None,
+    status: str | None = None,
     limit: int = 20,
 ) -> dict[str, Any]:
     """List all booking jobs."""
@@ -473,13 +473,15 @@ async def list_bookings(
     for job_id, job in jobs.items():
         if status and job["status"] != status:
             continue
-        job_list.append({
-            "job_id": job_id,
-            "status": job["status"],
-            "campaign_name": job["brief"].get("name"),
-            "budget": job["brief"].get("budget"),
-            "created_at": job["created_at"],
-        })
+        job_list.append(
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "campaign_name": job["brief"].get("name"),
+                "budget": job["brief"].get("budget"),
+                "created_at": job["created_at"],
+            }
+        )
 
     # Sort by created_at descending
     job_list.sort(key=lambda x: x["created_at"], reverse=True)
@@ -519,9 +521,9 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
 
 @app.get("/events", tags=["Events"])
 async def list_events(
-    event_type: Optional[str] = None,
-    flow_id: Optional[str] = None,
-    session_id: Optional[str] = None,
+    event_type: str | None = None,
+    flow_id: str | None = None,
+    session_id: str | None = None,
     limit: int = 50,
 ) -> dict[str, Any]:
     """List events from the event bus.
@@ -567,9 +569,7 @@ async def get_campaign_report(
         return {"job_id": job_id, "message": "No booked lines to report on", "reports": []}
 
     meta_campaign_ids = [
-        b["order_id"]
-        for b in booked_lines
-        if b.get("channel") in ("social", "meta")
+        b["order_id"] for b in booked_lines if b.get("channel") in ("social", "meta")
     ]
     seller_lines = [
         b
@@ -584,19 +584,23 @@ async def get_campaign_report(
             from ...tools.reporting.meta_reporting import MetaReportingTool
 
             tool = MetaReportingTool()
-            reports.append({
-                "source": "Meta",
-                "campaign_ids": meta_campaign_ids,
-                "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
-            })
+            reports.append(
+                {
+                    "source": "Meta",
+                    "campaign_ids": meta_campaign_ids,
+                    "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
+                }
+            )
         except Exception as e:
             reports.append({"source": "Meta", "campaign_ids": meta_campaign_ids, "error": str(e)})
     elif meta_campaign_ids:
-        reports.append({
-            "source": "Meta",
-            "campaign_ids": meta_campaign_ids,
-            "message": "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID",
-        })
+        reports.append(
+            {
+                "source": "Meta",
+                "campaign_ids": meta_campaign_ids,
+                "message": "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID",  # noqa: E501
+            }
+        )
 
     if seller_lines:
         import httpx
@@ -611,22 +615,28 @@ async def get_campaign_report(
                     timeout=30,
                 )
                 r.raise_for_status()
-                seller_reports.append({
-                    "deal_id": deal_id,
-                    "channel": b.get("channel"),
-                    "performance": r.json(),
-                })
+                seller_reports.append(
+                    {
+                        "deal_id": deal_id,
+                        "channel": b.get("channel"),
+                        "performance": r.json(),
+                    }
+                )
             except Exception as e:
-                seller_reports.append({
-                    "deal_id": deal_id,
-                    "channel": b.get("channel"),
-                    "error": str(e),
-                })
-        reports.append({
-            "source": "Seller",
-            "seller_url": seller_url,
-            "deals": seller_reports,
-        })
+                seller_reports.append(
+                    {
+                        "deal_id": deal_id,
+                        "channel": b.get("channel"),
+                        "error": str(e),
+                    }
+                )
+        reports.append(
+            {
+                "source": "Seller",
+                "seller_url": seller_url,
+                "deals": seller_reports,
+            }
+        )
 
     return {
         "job_id": job_id,
@@ -652,9 +662,13 @@ async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
     Requires META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env.
     """
     if not (settings.meta_access_token and settings.meta_ad_account_id):
-        raise HTTPException(status_code=503, detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env")
+        raise HTTPException(
+            status_code=503,
+            detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env",
+        )  # noqa: E501
     try:
         import httpx
+
         account_id = settings.meta_ad_account_id.replace("act_", "")
         r = httpx.get(
             f"https://graph.facebook.com/{settings.meta_api_version}/act_{account_id}/campaigns",
@@ -692,12 +706,19 @@ async def meta_direct_report(
     Requires META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env.
     """
     if not (settings.meta_access_token and settings.meta_ad_account_id):
-        raise HTTPException(status_code=503, detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env")
+        raise HTTPException(
+            status_code=503,
+            detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env",
+        )  # noqa: E501
     ids = [cid.strip() for cid in campaign_ids.split(",") if cid.strip()]
     if not ids:
-        raise HTTPException(status_code=400, detail="campaign_ids must be a comma-separated list of Meta campaign IDs")
+        raise HTTPException(
+            status_code=400,
+            detail="campaign_ids must be a comma-separated list of Meta campaign IDs",
+        )  # noqa: E501
     try:
         import httpx
+
         from ...clients.meta_ads_client import MetaAdsClient
 
         client = MetaAdsClient(
@@ -722,39 +743,50 @@ async def meta_direct_report(
                 campaign_details[cid] = r.json()
 
         # Fetch insights per campaign
-        insight_fields = ["campaign_name", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpm"]
+        insight_fields = [
+            "campaign_name",
+            "spend",
+            "impressions",
+            "reach",
+            "frequency",
+            "clicks",
+            "ctr",
+            "cpm",
+        ]  # noqa: E501
         rows = []
         for cid in ids:
             details = campaign_details.get(cid, {})
             insights = client.get_insights(cid, date_preset=date_preset, fields=insight_fields)
             insight = insights[0] if insights else {}
-            rows.append({
-                "campaign_id":    cid,
-                "campaign_name":  details.get("name") or insight.get("campaign_name", cid),
-                "status":         details.get("effective_status", "UNKNOWN"),
-                "objective":      details.get("objective", ""),
-                "daily_budget":   details.get("daily_budget", ""),
-                "created_time":   details.get("created_time", ""),
-                "spend":          float(insight.get("spend", 0)),
-                "impressions":    int(insight.get("impressions", 0)),
-                "reach":          int(insight.get("reach", 0)),
-                "frequency":      float(insight.get("frequency", 0)),
-                "clicks":         int(insight.get("clicks", 0)),
-                "ctr":            float(insight.get("ctr", 0)),
-                "cpm":            float(insight.get("cpm", 0)),
-            })
+            rows.append(
+                {
+                    "campaign_id": cid,
+                    "campaign_name": details.get("name") or insight.get("campaign_name", cid),
+                    "status": details.get("effective_status", "UNKNOWN"),
+                    "objective": details.get("objective", ""),
+                    "daily_budget": details.get("daily_budget", ""),
+                    "created_time": details.get("created_time", ""),
+                    "spend": float(insight.get("spend", 0)),
+                    "impressions": int(insight.get("impressions", 0)),
+                    "reach": int(insight.get("reach", 0)),
+                    "frequency": float(insight.get("frequency", 0)),
+                    "clicks": int(insight.get("clicks", 0)),
+                    "ctr": float(insight.get("ctr", 0)),
+                    "cpm": float(insight.get("cpm", 0)),
+                }
+            )
 
         summary = {
-            "total_spend":       round(sum(r["spend"] for r in rows), 2),
+            "total_spend": round(sum(r["spend"] for r in rows), 2),
             "total_impressions": sum(r["impressions"] for r in rows),
-            "total_clicks":      sum(r["clicks"] for r in rows),
-            "total_reach":       sum(r["reach"] for r in rows),
+            "total_clicks": sum(r["clicks"] for r in rows),
+            "total_reach": sum(r["reach"] for r in rows),
         }
         return {
             "ad_account_id": settings.meta_ad_account_id,
-            "date_preset":   date_preset,
-            "campaigns":     rows,
-            "summary":       summary,
+            "date_preset": date_preset,
+            "campaigns": rows,
+            "summary": summary,
         }
     except Exception as e:
         raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))
@@ -807,9 +839,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["budget_allocations"] = {
             k: v.model_dump() for k, v in flow.state.budget_allocations.items()
         }
-        job["recommendations"] = [
-            r.model_dump() for r in flow.state.pending_approvals
-        ]
+        job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
 
         if request.auto_approve:
             flow.approve_all()

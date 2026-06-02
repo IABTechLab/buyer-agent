@@ -83,11 +83,7 @@ def test_brief_accepts_strictness_override_dict():
 
 
 def test_brief_accepts_strictness_partial_override():
-    brief = CampaignBrief(
-        **_minimal_brief(
-            audience_strictness={"agentic": "required"}
-        )
-    )
+    brief = CampaignBrief(**_minimal_brief(audience_strictness={"agentic": "required"}))
     s = brief.audience_strictness
     # Overridden field
     assert s.agentic == "required"

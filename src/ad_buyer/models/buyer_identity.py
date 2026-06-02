@@ -3,14 +3,14 @@
 
 """Buyer identity models for tiered pricing access in DSP workflows."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 from .audience_plan import AudiencePlan
 
 
-class AccessTier(str, Enum):
+class AccessTier(StrEnum):
     """Access tier levels for tiered pricing."""
 
     PUBLIC = "public"  # No identity - price ranges only
@@ -19,7 +19,7 @@ class AccessTier(str, Enum):
     ADVERTISER = "advertiser"  # Agency + Advertiser - 15% discount
 
 
-class DealType(str, Enum):
+class DealType(StrEnum):
     """Programmatic deal types."""
 
     PROGRAMMATIC_GUARANTEED = "PG"  # Fixed price, guaranteed impressions

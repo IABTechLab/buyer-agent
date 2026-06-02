@@ -156,5 +156,9 @@ Pricing:
 
 Targeting Available: {targeting_str}
 
-Recommendation: {"Good to book" if avails.delivery_confidence and avails.delivery_confidence >= 80 else "Consider alternatives or reduce volume"}
+Recommendation: {
+            "Good to book"
+            if avails.delivery_confidence and avails.delivery_confidence >= 80
+            else "Consider alternatives or reduce volume"
+        }
 """

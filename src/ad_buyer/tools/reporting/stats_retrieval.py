@@ -109,8 +109,16 @@ Performance:
 Last Updated: {last_updated_str}
 
 Analysis:
-  {"Campaign is performing well." if stats.delivery_rate >= 80 else "Campaign may need optimization."}
-  {"Budget pacing is on track." if abs(stats.delivery_rate - stats.budget_utilization) < 10 else "Consider adjusting pacing."}
+  {
+                "Campaign is performing well."
+                if stats.delivery_rate >= 80
+                else "Campaign may need optimization."
+            }
+  {
+                "Budget pacing is on track."
+                if abs(stats.delivery_rate - stats.budget_utilization) < 10
+                else "Consider adjusting pacing."
+            }
 """
 
         except (httpx.HTTPError, OSError, ValueError) as e:

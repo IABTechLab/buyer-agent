@@ -76,30 +76,68 @@ logger = logging.getLogger(__name__)
 
 # Demographic / intent-driven tokens => prefer Standard primary.
 _DEMOGRAPHIC_TOKENS = {
-    "men", "women", "male", "female",
-    "kids", "children", "parent", "parents",
-    "millennials", "gen z", "gen x", "boomers", "seniors",
-    "household", "households",
-    "intender", "intenders", "in-market", "in market",
-    "demographic", "age", "income",
+    "men",
+    "women",
+    "male",
+    "female",
+    "kids",
+    "children",
+    "parent",
+    "parents",
+    "millennials",
+    "gen z",
+    "gen x",
+    "boomers",
+    "seniors",
+    "household",
+    "households",
+    "intender",
+    "intenders",
+    "in-market",
+    "in market",
+    "demographic",
+    "age",
+    "income",
 }
 
 # Content-adjacent tokens => prefer Contextual primary.
 _CONTEXTUAL_TOKENS = {
-    "content", "adjacent", "alongside", "next to",
-    "premium", "automotive content", "automotive blog",
-    "news", "sports", "lifestyle", "category",
-    "context", "contextual",
+    "content",
+    "adjacent",
+    "alongside",
+    "next to",
+    "premium",
+    "automotive content",
+    "automotive blog",
+    "news",
+    "sports",
+    "lifestyle",
+    "category",
+    "context",
+    "contextual",
 }
 
 # First-party / lookalike tokens => prefer Agentic primary.
 _AGENTIC_TOKENS = {
-    "our converters", "our customers", "our buyers",
-    "lookalike", "look-alike", "look alike",
-    "first-party", "first party", "1p data", "1p audience",
-    "previous campaign", "last campaign", "past campaign",
-    "crm", "advertiser data", "advertiser-supplied",
-    "high-ltv", "high ltv", "ltv lookalike",
+    "our converters",
+    "our customers",
+    "our buyers",
+    "lookalike",
+    "look-alike",
+    "look alike",
+    "first-party",
+    "first party",
+    "1p data",
+    "1p audience",
+    "previous campaign",
+    "last campaign",
+    "past campaign",
+    "crm",
+    "advertiser data",
+    "advertiser-supplied",
+    "high-ltv",
+    "high ltv",
+    "ltv lookalike",
 }
 
 
@@ -162,12 +200,7 @@ class ClassificationResult:
     unmatched_tokens: list[str] = field(default_factory=list)
 
     def is_empty(self) -> bool:
-        return not (
-            self.standard
-            or self.contextual
-            or self.agentic_seeds
-            or self.unmatched_tokens
-        )
+        return not (self.standard or self.contextual or self.agentic_seeds or self.unmatched_tokens)
 
 
 @dataclass
@@ -420,40 +453,55 @@ def pick_primary(
 
     if chosen == "standard" and classification.standard:
         cand = classification.standard[0]
-        return cand.to_ref(source="resolved", confidence=cand.score), "standard", (
-            f"primary=Standard (id={cand.identifier} {cand.name!r}); "
-            "demographic / intent-driven brief"
+        return (
+            cand.to_ref(source="resolved", confidence=cand.score),
+            "standard",
+            (
+                f"primary=Standard (id={cand.identifier} {cand.name!r}); "
+                "demographic / intent-driven brief"
+            ),
         )
 
     if chosen == "contextual" and classification.contextual:
         cand = classification.contextual[0]
-        return cand.to_ref(source="resolved", confidence=cand.score), "contextual", (
-            f"primary=Contextual (id={cand.identifier} {cand.name!r}); "
-            "content-adjacent brief"
+        return (
+            cand.to_ref(source="resolved", confidence=cand.score),
+            "contextual",
+            (f"primary=Contextual (id={cand.identifier} {cand.name!r}); content-adjacent brief"),
         )
 
     if chosen == "agentic" and classification.agentic_seeds:
         # The caller will mint via EmbeddingMintTool; we return None for
         # the ref but signal the choice via the type.
-        return None, "agentic", (
-            f"primary=Agentic (seed={classification.agentic_seeds[0]!r}); "
-            "first-party / lookalike-driven brief"
+        return (
+            None,
+            "agentic",
+            (
+                f"primary=Agentic (seed={classification.agentic_seeds[0]!r}); "
+                "first-party / lookalike-driven brief"
+            ),
         )
 
     # Fallbacks: pick whatever we have.
     if classification.standard:
         cand = classification.standard[0]
-        return cand.to_ref(source="resolved", confidence=cand.score), "standard", (
-            f"primary=Standard (id={cand.identifier}, fallback)"
+        return (
+            cand.to_ref(source="resolved", confidence=cand.score),
+            "standard",
+            (f"primary=Standard (id={cand.identifier}, fallback)"),
         )
     if classification.contextual:
         cand = classification.contextual[0]
-        return cand.to_ref(source="resolved", confidence=cand.score), "contextual", (
-            f"primary=Contextual (id={cand.identifier}, fallback)"
+        return (
+            cand.to_ref(source="resolved", confidence=cand.score),
+            "contextual",
+            (f"primary=Contextual (id={cand.identifier}, fallback)"),
         )
     if classification.agentic_seeds:
-        return None, "agentic", (
-            f"primary=Agentic (seed={classification.agentic_seeds[0]!r}, fallback)"
+        return (
+            None,
+            "agentic",
+            (f"primary=Agentic (seed={classification.agentic_seeds[0]!r}, fallback)"),
         )
 
     return None, "none", "no usable audience signals found"
@@ -584,7 +632,7 @@ def add_extensions(
                 description=seed,
             )
             # We need source=inferred (mint tool emits source=inferred
-                # already, but be defensive in case that ever changes).
+            # already, but be defensive in case that ever changes).
             if ref.source != "inferred":
                 ref = ref.model_copy(update={"source": "inferred"})
             key = (ref.type, ref.identifier)
@@ -616,9 +664,7 @@ def add_extensions(
         break
 
     if not refs:
-        rationale.append(
-            "no extensions added -- no broader candidates available"
-        )
+        rationale.append("no extensions added -- no broader candidates available")
 
     return refs, rationale
 
@@ -685,18 +731,13 @@ def validate_plan(
                 "primary_type": plan_refs.get("primary_type"),
             }
             coverage_tool._run(targeting=targeting)
-            rationale.append(
-                "validation: discovery + coverage estimates ran successfully"
-            )
+            rationale.append("validation: discovery + coverage estimates ran successfully")
         except Exception as exc:  # noqa: BLE001 - tolerate tool flakiness
             rationale.append(
-                f"validation: coverage tool raised {type(exc).__name__}; "
-                "reach estimate skipped"
+                f"validation: coverage tool raised {type(exc).__name__}; reach estimate skipped"
             )
     elif discovery_available:
-        rationale.append(
-            "validation: discovery ran; coverage tool not provided"
-        )
+        rationale.append("validation: discovery ran; coverage tool not provided")
 
     return discovery_available, rationale
 
@@ -761,8 +802,7 @@ def run_audience_reasoning(
     brief_notes = getattr(brief, "notes", None)
     if brief_audience is None and not brief_description and not brief_notes:
         rationale_lines.append(
-            "no target_audience and no advertiser context on brief; "
-            "needs human review"
+            "no target_audience and no advertiser context on brief; needs human review"
         )
         return ReasoningResult(
             plan=None,
@@ -785,8 +825,7 @@ def run_audience_reasoning(
         primary_type = primary_ref.type
         if primary_ref.source == "explicit":
             rationale_lines.append(
-                f"primary=preserved (explicit {primary_type} "
-                f"{primary_ref.identifier})"
+                f"primary=preserved (explicit {primary_type} {primary_ref.identifier})"
             )
         else:
             rationale_lines.append(
@@ -797,8 +836,7 @@ def run_audience_reasoning(
         # No brief plan at all -- compose from classification.
         if classification.is_empty():
             rationale_lines.append(
-                "no audience signals classified from advertiser context; "
-                "needs human review"
+                "no audience signals classified from advertiser context; needs human review"
             )
             return ReasoningResult(
                 plan=None,
@@ -821,8 +859,7 @@ def run_audience_reasoning(
                     )
                     primary_ref = minted
                     rationale_lines.append(
-                        f"primary minted from seed {seed!r} -> "
-                        f"{minted.identifier[:32]}..."
+                        f"primary minted from seed {seed!r} -> {minted.identifier[:32]}..."
                     )
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
@@ -838,22 +875,18 @@ def run_audience_reasoning(
                     primary_ref = cand.to_ref(source="resolved", confidence=cand.score)
                     primary_type = "standard"
                     rationale_lines.append(
-                        f"primary=Standard fallback {cand.identifier} "
-                        "(agentic mint unavailable)"
+                        f"primary=Standard fallback {cand.identifier} (agentic mint unavailable)"
                     )
                 elif classification.contextual:
                     cand = classification.contextual[0]
                     primary_ref = cand.to_ref(source="resolved", confidence=cand.score)
                     primary_type = "contextual"
                     rationale_lines.append(
-                        f"primary=Contextual fallback {cand.identifier} "
-                        "(agentic mint unavailable)"
+                        f"primary=Contextual fallback {cand.identifier} (agentic mint unavailable)"
                     )
 
     if primary_ref is None:
-        rationale_lines.append(
-            "could not compose primary ref; needs human review"
-        )
+        rationale_lines.append("could not compose primary ref; needs human review")
         return ReasoningResult(
             plan=None,
             rationale_lines=rationale_lines,
@@ -879,9 +912,7 @@ def run_audience_reasoning(
 
     # Phases 3 and 4: orient by KPI, then enrich.
     orientation = _kpi_orientation(brief)
-    rationale_lines.append(
-        f"KPI orientation: {orientation} (objective={brief.objective.value})"
-    )
+    rationale_lines.append(f"KPI orientation: {orientation} (objective={brief.objective.value})")
 
     inferred_constraints: list[AudienceRef] = []
     inferred_extensions: list[AudienceRef] = []

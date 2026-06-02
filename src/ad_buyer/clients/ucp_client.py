@@ -37,9 +37,7 @@ logger = logging.getLogger(__name__)
 UCP_CONTENT_TYPE = "application/vnd.ucp.embedding+json; v=1"
 
 # Embedding provenance literal -- mirrors ComplianceContext.embedding_provenance.
-EmbeddingProvenance = Literal[
-    "mock", "local_buyer", "advertiser_supplied", "hosted_external"
-]
+EmbeddingProvenance = Literal["mock", "local_buyer", "advertiser_supplied", "hosted_external"]
 
 # Local model details for "local" / "hybrid" embedding modes.
 # Locked in docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md (E2-1).
@@ -54,10 +52,10 @@ LOCAL_EMBEDDING_MODEL_DIM = 384
 # follow the same convention as the buyer's local model. Re-derive these
 # from `ad_buyer.eval.evaluate_embedding_modes()` whenever the model swaps.
 _SIMILARITY_THRESHOLDS: dict[str, dict[str, float]] = {
-    "mock":               {"strong": 0.85, "moderate": 0.65, "weak": 0.40},
-    "local":              {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
-    "advertiser":         {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
-    "hybrid":             {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "mock": {"strong": 0.85, "moderate": 0.65, "weak": 0.40},
+    "local": {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "advertiser": {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
+    "hybrid": {"strong": 0.70, "moderate": 0.50, "weak": 0.30},
 }
 _DEFAULT_THRESHOLDS = _SIMILARITY_THRESHOLDS["mock"]
 
@@ -68,6 +66,7 @@ def _similarity_thresholds_for_mode() -> dict[str, float]:
     from ..config.settings import settings
 
     return _SIMILARITY_THRESHOLDS.get(settings.embedding_mode, _DEFAULT_THRESHOLDS)
+
 
 # Process-wide cached SentenceTransformer instance. Lazy-loaded on first
 # use to avoid paying ~80MB model download cost at import time.
@@ -88,6 +87,7 @@ def _get_local_embedding_model() -> Any:
         return None
     try:
         from sentence_transformers import SentenceTransformer  # type: ignore
+
         _LOCAL_MODEL = SentenceTransformer(LOCAL_EMBEDDING_MODEL_NAME)
         return _LOCAL_MODEL
     except Exception as exc:  # ImportError, network errors, etc.

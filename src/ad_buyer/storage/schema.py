@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS status_transitions (
 """
 
 STATUS_TRANSITIONS_INDEXES = [
-    "CREATE INDEX IF NOT EXISTS idx_transitions_entity ON status_transitions(entity_type, entity_id);",
+    "CREATE INDEX IF NOT EXISTS idx_transitions_entity ON status_transitions(entity_type, entity_id);",  # noqa: E501
     "CREATE INDEX IF NOT EXISTS idx_transitions_created ON status_transitions(created_at);",
 ]
 
@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS portfolio_metadata (
 
 PORTFOLIO_METADATA_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_portfolio_metadata_deal_id ON portfolio_metadata(deal_id);",
-    "CREATE INDEX IF NOT EXISTS idx_portfolio_metadata_advertiser_id ON portfolio_metadata(advertiser_id);",
+    "CREATE INDEX IF NOT EXISTS idx_portfolio_metadata_advertiser_id ON portfolio_metadata(advertiser_id);",  # noqa: E501
 ]
 
 DEAL_ACTIVATIONS_TABLE = """
@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS deal_activations (
 
 DEAL_ACTIVATIONS_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_deal_activations_deal_id ON deal_activations(deal_id);",
-    "CREATE INDEX IF NOT EXISTS idx_deal_activations_platform_deal ON deal_activations(platform, deal_id);",
+    "CREATE INDEX IF NOT EXISTS idx_deal_activations_platform_deal ON deal_activations(platform, deal_id);",  # noqa: E501
 ]
 
 PERFORMANCE_CACHE_TABLE = """
@@ -335,7 +335,7 @@ CREATE TABLE IF NOT EXISTS pacing_snapshots (
 PACING_SNAPSHOTS_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_pacing_snapshots_campaign_id ON pacing_snapshots(campaign_id);",
     "CREATE INDEX IF NOT EXISTS idx_pacing_snapshots_timestamp ON pacing_snapshots(timestamp);",
-    "CREATE INDEX IF NOT EXISTS idx_pacing_snapshots_campaign_timestamp ON pacing_snapshots(campaign_id, timestamp);",
+    "CREATE INDEX IF NOT EXISTS idx_pacing_snapshots_campaign_timestamp ON pacing_snapshots(campaign_id, timestamp);",  # noqa: E501
 ]
 
 CREATIVE_ASSETS_TABLE = """
@@ -356,7 +356,7 @@ CREATE TABLE IF NOT EXISTS creative_assets (
 CREATIVE_ASSETS_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_creative_assets_campaign_id ON creative_assets(campaign_id);",
     "CREATE INDEX IF NOT EXISTS idx_creative_assets_asset_type ON creative_assets(asset_type);",
-    "CREATE INDEX IF NOT EXISTS idx_creative_assets_validation_status ON creative_assets(validation_status);",
+    "CREATE INDEX IF NOT EXISTS idx_creative_assets_validation_status ON creative_assets(validation_status);",  # noqa: E501
 ]
 
 AD_SERVER_CAMPAIGNS_TABLE = """
@@ -373,8 +373,8 @@ CREATE TABLE IF NOT EXISTS ad_server_campaigns (
 """
 
 AD_SERVER_CAMPAIGNS_INDEXES = [
-    "CREATE INDEX IF NOT EXISTS idx_ad_server_campaigns_campaign_id ON ad_server_campaigns(campaign_id);",
-    "CREATE INDEX IF NOT EXISTS idx_ad_server_campaigns_ad_server ON ad_server_campaigns(ad_server);",
+    "CREATE INDEX IF NOT EXISTS idx_ad_server_campaigns_campaign_id ON ad_server_campaigns(campaign_id);",  # noqa: E501
+    "CREATE INDEX IF NOT EXISTS idx_ad_server_campaigns_ad_server ON ad_server_campaigns(ad_server);",  # noqa: E501
 ]
 
 # -- v4 continued: Approval requests (buyer-2qs) --------------------------
@@ -395,7 +395,7 @@ CREATE TABLE IF NOT EXISTS approval_requests (
 """
 
 APPROVAL_REQUESTS_INDEXES = [
-    "CREATE INDEX IF NOT EXISTS idx_approval_requests_campaign_id ON approval_requests(campaign_id);",
+    "CREATE INDEX IF NOT EXISTS idx_approval_requests_campaign_id ON approval_requests(campaign_id);",  # noqa: E501
     "CREATE INDEX IF NOT EXISTS idx_approval_requests_status ON approval_requests(status);",
     "CREATE INDEX IF NOT EXISTS idx_approval_requests_stage ON approval_requests(stage);",
 ]
@@ -426,7 +426,7 @@ CREATE TABLE IF NOT EXISTS deal_templates (
 DEAL_TEMPLATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_deal_templates_name ON deal_templates(name);",
     "CREATE INDEX IF NOT EXISTS idx_deal_templates_advertiser_id ON deal_templates(advertiser_id);",
-    "CREATE INDEX IF NOT EXISTS idx_deal_templates_deal_type_pref ON deal_templates(deal_type_pref);",
+    "CREATE INDEX IF NOT EXISTS idx_deal_templates_deal_type_pref ON deal_templates(deal_type_pref);",  # noqa: E501
 ]
 
 SUPPLY_PATH_TEMPLATE_TABLE = """
@@ -660,7 +660,7 @@ def migrate_v1_to_v2(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_deals_media_type ON deals(media_type);",
         "CREATE INDEX IF NOT EXISTS idx_deals_deal_type ON deals(deal_type);",
         "CREATE INDEX IF NOT EXISTS idx_deals_seller_domain ON deals(seller_domain);",
-        "CREATE INDEX IF NOT EXISTS idx_deals_inventory_fingerprint ON deals(inventory_fingerprint);",
+        "CREATE INDEX IF NOT EXISTS idx_deals_inventory_fingerprint ON deals(inventory_fingerprint);",  # noqa: E501
     ]
     for idx in v2_deal_indexes:
         cursor.execute(idx)

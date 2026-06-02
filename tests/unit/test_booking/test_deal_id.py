@@ -5,8 +5,6 @@
 
 import re
 
-import pytest
-
 from ad_buyer.booking.deal_id import generate_deal_id
 
 

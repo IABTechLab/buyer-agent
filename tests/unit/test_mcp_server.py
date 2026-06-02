@@ -29,21 +29,25 @@ class TestMCPServerInitialization:
     def test_mcp_server_exists(self):
         """The mcp_server module should be importable."""
         from ad_buyer.interfaces.mcp_server import mcp
+
         assert mcp is not None
 
     def test_mcp_server_is_fastmcp_instance(self):
         """The mcp object should be a FastMCP instance."""
         from ad_buyer.interfaces.mcp_server import mcp
+
         assert isinstance(mcp, FastMCP)
 
     def test_mcp_server_name(self):
         """The MCP server should identify as the buyer agent."""
         from ad_buyer.interfaces.mcp_server import mcp
+
         assert mcp.name == "ad-buyer-agent"
 
     def test_mcp_server_has_instructions(self):
         """The MCP server should have instructions describing the buyer agent."""
         from ad_buyer.interfaces.mcp_server import mcp
+
         assert mcp.instructions is not None
         assert len(mcp.instructions) > 0
 
@@ -54,6 +58,7 @@ class TestMCPMounting:
     def test_mount_mcp_function_exists(self):
         """A mount_mcp function should exist for integrating with FastAPI."""
         from ad_buyer.interfaces.mcp_server import mount_mcp
+
         assert callable(mount_mcp)
 
     def test_mount_mcp_adds_route(self):
@@ -90,7 +95,10 @@ class TestMCPMounting:
                 route_paths.append(route.path)
 
         # Streamable HTTP transport (canonical)
-        assert any("/mcp" == str(p) or (str(p).startswith("/mcp") and not str(p).startswith("/mcp-sse")) for p in route_paths), (
+        assert any(
+            "/mcp" == str(p) or (str(p).startswith("/mcp") and not str(p).startswith("/mcp-sse"))
+            for p in route_paths
+        ), (  # noqa: E501
             f"Expected /mcp (Streamable HTTP) in buyer API app routes, got: {route_paths}"
         )
         # Legacy SSE transport
@@ -110,15 +118,9 @@ class TestMCPTools:
         tools_result = await mcp.list_tools()
         tool_names = [t.name for t in tools_result]
 
-        assert "get_setup_status" in tool_names, (
-            f"get_setup_status not in tools: {tool_names}"
-        )
-        assert "health_check" in tool_names, (
-            f"health_check not in tools: {tool_names}"
-        )
-        assert "get_config" in tool_names, (
-            f"get_config not in tools: {tool_names}"
-        )
+        assert "get_setup_status" in tool_names, f"get_setup_status not in tools: {tool_names}"
+        assert "health_check" in tool_names, f"health_check not in tools: {tool_names}"
+        assert "get_config" in tool_names, f"get_config not in tools: {tool_names}"
 
     @pytest.mark.asyncio
     async def test_foundation_tools_are_present(self):
@@ -429,9 +431,7 @@ class TestPromptRegistration:
         prompt_names = [p.name for p in prompts_result]
 
         for name in self.EXPECTED_PROMPTS:
-            assert name in prompt_names, (
-                f"Prompt '{name}' not registered. Found: {prompt_names}"
-            )
+            assert name in prompt_names, f"Prompt '{name}' not registered. Found: {prompt_names}"
 
     @pytest.mark.asyncio
     async def test_prompt_count(self):
@@ -440,8 +440,7 @@ class TestPromptRegistration:
 
         prompts_result = await mcp.list_prompts()
         assert len(prompts_result) == 10, (
-            f"Expected 10 prompts, got {len(prompts_result)}: "
-            f"{[p.name for p in prompts_result]}"
+            f"Expected 10 prompts, got {len(prompts_result)}: {[p.name for p in prompts_result]}"
         )
 
     @pytest.mark.asyncio
@@ -451,9 +450,7 @@ class TestPromptRegistration:
 
         prompts_result = await mcp.list_prompts()
         for prompt in prompts_result:
-            assert prompt.description, (
-                f"Prompt '{prompt.name}' has no description"
-            )
+            assert prompt.description, f"Prompt '{prompt.name}' has no description"
 
     @pytest.mark.asyncio
     async def test_each_prompt_returns_messages(self):
@@ -463,12 +460,8 @@ class TestPromptRegistration:
         prompts_result = await mcp.list_prompts()
         for prompt in prompts_result:
             result = await mcp.get_prompt(prompt.name)
-            assert result is not None, (
-                f"Prompt '{prompt.name}' returned None"
-            )
-            assert len(result.messages) > 0, (
-                f"Prompt '{prompt.name}' returned no messages"
-            )
+            assert result is not None, f"Prompt '{prompt.name}' returned None"
+            assert len(result.messages) > 0, f"Prompt '{prompt.name}' returned no messages"
 
     @pytest.mark.asyncio
     async def test_each_prompt_has_user_role(self):
@@ -480,6 +473,5 @@ class TestPromptRegistration:
             result = await mcp.get_prompt(prompt.name)
             for msg in result.messages:
                 assert msg.role == "user", (
-                    f"Prompt '{prompt.name}' has role '{msg.role}', "
-                    f"expected 'user'"
+                    f"Prompt '{prompt.name}' has role '{msg.role}', expected 'user'"
                 )

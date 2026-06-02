@@ -16,7 +16,7 @@ giving callers exactly what `datetime.utcnow()` used to return without
 the deprecation warning.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 __all__ = ["utc_now"]
 
@@ -28,4 +28,4 @@ def utc_now() -> datetime:
     comparators / serializers / tests don't have to change.
     """
 
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)

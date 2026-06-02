@@ -609,7 +609,7 @@ class TestPacingEventEmission:
     ) -> None:
         """Should emit PACING_SNAPSHOT_TAKEN event when snapshot is generated."""
         from ad_buyer.events.bus import InMemoryEventBus
-        from ad_buyer.events.models import EventType as ET
+        from ad_buyer.events.models import EventType
 
         event_bus = InMemoryEventBus()
         engine.event_bus = event_bus
@@ -618,7 +618,7 @@ class TestPacingEventEmission:
             "display": {"allocated_budget": 50_000.0, "spend": 25_000.0, "impressions": 1_000_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        engine.generate_snapshot(
             campaign_id="campaign-003",
             total_budget=50_000.0,
             flight_start=campaign_start,
@@ -629,7 +629,7 @@ class TestPacingEventEmission:
         )
 
         # Check that event was emitted
-        events = await event_bus.list_events(event_type=ET.PACING_SNAPSHOT_TAKEN.value)
+        events = await event_bus.list_events(event_type=EventType.PACING_SNAPSHOT_TAKEN.value)
         assert len(events) == 1
         assert events[0].campaign_id == "campaign-003"
 
@@ -643,7 +643,7 @@ class TestPacingEventEmission:
     ) -> None:
         """Should emit PACING_DEVIATION_DETECTED when deviation exceeds threshold."""
         from ad_buyer.events.bus import InMemoryEventBus
-        from ad_buyer.events.models import EventType as ET
+        from ad_buyer.events.models import EventType
 
         event_bus = InMemoryEventBus()
         engine.event_bus = event_bus
@@ -652,7 +652,7 @@ class TestPacingEventEmission:
             "display": {"allocated_budget": 50_000.0, "spend": 15_000.0, "impressions": 500_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        engine.generate_snapshot(
             campaign_id="campaign-004",
             total_budget=50_000.0,
             flight_start=campaign_start,
@@ -662,7 +662,7 @@ class TestPacingEventEmission:
             deal_data=[],
         )
 
-        events = await event_bus.list_events(event_type=ET.PACING_DEVIATION_DETECTED.value)
+        events = await event_bus.list_events(event_type=EventType.PACING_DEVIATION_DETECTED.value)
         assert len(events) >= 1
 
     @pytest.mark.asyncio
@@ -675,7 +675,7 @@ class TestPacingEventEmission:
     ) -> None:
         """Should emit PACING_REALLOCATION_RECOMMENDED when proposing reallocations."""
         from ad_buyer.events.bus import InMemoryEventBus
-        from ad_buyer.events.models import EventType as ET
+        from ad_buyer.events.models import EventType
 
         event_bus = InMemoryEventBus()
         engine.event_bus = event_bus
@@ -685,7 +685,7 @@ class TestPacingEventEmission:
             "ctv": {"allocated_budget": 50_000.0, "spend": 40_000.0, "impressions": 1_000_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        engine.generate_snapshot(
             campaign_id="campaign-005",
             total_budget=100_000.0,
             flight_start=campaign_start,
@@ -695,7 +695,9 @@ class TestPacingEventEmission:
             deal_data=[],
         )
 
-        events = await event_bus.list_events(event_type=ET.PACING_REALLOCATION_RECOMMENDED.value)
+        events = await event_bus.list_events(
+            event_type=EventType.PACING_REALLOCATION_RECOMMENDED.value
+        )  # noqa: E501
         assert len(events) >= 1
 
     @pytest.mark.asyncio
@@ -708,7 +710,7 @@ class TestPacingEventEmission:
     ) -> None:
         """No deviation event when campaign is pacing normally."""
         from ad_buyer.events.bus import InMemoryEventBus
-        from ad_buyer.events.models import EventType as ET
+        from ad_buyer.events.models import EventType
 
         event_bus = InMemoryEventBus()
         engine.event_bus = event_bus
@@ -717,7 +719,7 @@ class TestPacingEventEmission:
             "display": {"allocated_budget": 50_000.0, "spend": 25_000.0, "impressions": 1_000_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        engine.generate_snapshot(
             campaign_id="campaign-006",
             total_budget=50_000.0,
             flight_start=campaign_start,
@@ -727,7 +729,7 @@ class TestPacingEventEmission:
             deal_data=[],
         )
 
-        events = await event_bus.list_events(event_type=ET.PACING_DEVIATION_DETECTED.value)
+        events = await event_bus.list_events(event_type=EventType.PACING_DEVIATION_DETECTED.value)
         assert len(events) == 0
 
 

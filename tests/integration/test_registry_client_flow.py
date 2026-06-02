@@ -45,11 +45,11 @@ class TestRegistryDiscoveryToClientCreation:
             "agents": [card.model_dump() for card in seller_agent_cards],
         }
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.get = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             sellers = await registry.discover_sellers(capabilities_filter=["ctv"])
 
@@ -96,11 +96,11 @@ class TestRegistryDiscoveryToClientCreation:
             call_count += 1
             return mock_response
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.get = mock_get
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             # First call - should hit HTTP
             sellers1 = await registry.discover_sellers(capabilities_filter=["ctv"])
@@ -117,13 +117,13 @@ class TestRegistryDiscoveryToClientCreation:
         """Network errors from registry should return empty, not raise."""
         registry = RegistryClient(registry_url="http://fake-registry.test")
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.get = AsyncMock(
                 side_effect=httpx.ConnectError("Connection refused")
             )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             sellers = await registry.discover_sellers()
 
@@ -146,11 +146,11 @@ class TestRegistryTrustVerification:
             "registry_id": "reg-001",
         }
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.get = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             trust = await registry.verify_agent("http://seller.example.com")
 
@@ -166,11 +166,11 @@ class TestRegistryTrustVerification:
         mock_response = MagicMock()
         mock_response.status_code = 404
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.get = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             trust = await registry.verify_agent("http://unknown-seller.example.com")
 
@@ -256,11 +256,11 @@ class TestRegistryToClientToIdentityFlow:
             "agents": [card.model_dump() for card in seller_agent_cards],
         }
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.get = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             sellers = await registry.discover_sellers()
 
@@ -301,11 +301,11 @@ class TestRegistryToClientToIdentityFlow:
         mock_response = MagicMock()
         mock_response.status_code = 201
 
-        with patch("httpx.AsyncClient") as MockAsyncClient:
+        with patch("httpx.AsyncClient") as mock_async_client:
             mock_client_instance = AsyncMock()
             mock_client_instance.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
 
             success = await registry.register_buyer(buyer_card)
 

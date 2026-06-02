@@ -4,13 +4,13 @@
 """Pydantic models for IAB OpenDirect 2.1 resources."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class RateType(str, Enum):
+class RateType(StrEnum):
     """Rate type for pricing."""
 
     CPM = "CPM"
@@ -20,7 +20,7 @@ class RateType(str, Enum):
     FLAT_RATE = "FlatRate"
 
 
-class DeliveryType(str, Enum):
+class DeliveryType(StrEnum):
     """Delivery type for products."""
 
     EXCLUSIVE = "Exclusive"
@@ -28,7 +28,7 @@ class DeliveryType(str, Enum):
     PMP = "PMP"
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     """Order status states."""
 
     PENDING = "PENDING"
@@ -36,7 +36,7 @@ class OrderStatus(str, Enum):
     REJECTED = "REJECTED"
 
 
-class LineBookingStatus(str, Enum):
+class LineBookingStatus(StrEnum):
     """Line booking status states."""
 
     DRAFT = "Draft"

@@ -14,15 +14,13 @@ bead: buyer-sozw
 from __future__ import annotations
 
 import json
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.storage.deal_store import DealStore
 from ad_buyer.tools.deal_library.ssp_connector_base import SSPFetchResult
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,14 +246,12 @@ class TestImportDealsSSP:
             ],
         )
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.PubMaticConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
             instance.import_source = "PUBMATIC"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("import_deals_ssp", {"ssp_name": "pubmatic"})
             data = json.loads(_extract_text(result))
@@ -296,14 +292,12 @@ class TestImportDealsSSP:
             ],
         )
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.MagniteConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.MagniteConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
             instance.import_source = "MAGNITE"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("import_deals_ssp", {"ssp_name": "magnite"})
             data = json.loads(_extract_text(result))
@@ -330,20 +324,26 @@ class TestImportDealsSSP:
             deals=[],
         )
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.PubMaticConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
             instance.import_source = "PUBMATIC"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("import_deals_ssp", {"ssp_name": "pubmatic"})
             data = json.loads(_extract_text(result))
 
         # Must have same structure as import_deals_csv
-        for field in ("total_rows", "successful", "failed", "skipped", "errors", "deal_ids", "timestamp"):
+        for field in (
+            "total_rows",
+            "successful",
+            "failed",
+            "skipped",
+            "errors",
+            "deal_ids",
+            "timestamp",
+        ):  # noqa: E501
             assert field in data, f"Missing field: {field}"
 
     @pytest.mark.asyncio
@@ -357,14 +357,12 @@ class TestImportDealsSSP:
 
         fake_result = SSPFetchResult(ssp_name="PubMatic", total_fetched=0, successful=0, deals=[])
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.PubMaticConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
             instance.import_source = "PUBMATIC"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("import_deals_ssp", {"ssp_name": "PubMatic"})
             data = json.loads(_extract_text(result))
@@ -414,12 +412,12 @@ class TestImportDealsSSP:
             ],
         )
 
-        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
             instance.import_source = "PUBMATIC"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("import_deals_ssp", {"ssp_name": "pubmatic"})
             data = json.loads(_extract_text(result))
@@ -458,12 +456,12 @@ class TestSSPConnectionTest:
         monkeypatch.setenv("PUBMATIC_API_TOKEN", "test-token")
         monkeypatch.setenv("PUBMATIC_SEAT_ID", "test-seat")
 
-        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.test_connection.return_value = True
             instance.ssp_name = "PubMatic"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("test_ssp_connection", {"ssp_name": "pubmatic"})
             data = json.loads(_extract_text(result))
@@ -477,12 +475,12 @@ class TestSSPConnectionTest:
         monkeypatch.setenv("PUBMATIC_API_TOKEN", "bad-token")
         monkeypatch.setenv("PUBMATIC_SEAT_ID", "bad-seat")
 
-        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.test_connection.return_value = False
             instance.ssp_name = "PubMatic"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("test_ssp_connection", {"ssp_name": "pubmatic"})
             data = json.loads(_extract_text(result))
@@ -496,12 +494,12 @@ class TestSSPConnectionTest:
         monkeypatch.setenv("MAGNITE_SECRET_KEY", "test-secret")
         monkeypatch.setenv("MAGNITE_SEAT_ID", "test-seat")
 
-        with patch("ad_buyer.interfaces.mcp_server.MagniteConnector") as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.MagniteConnector") as mock_connector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.test_connection.return_value = True
             instance.ssp_name = "Magnite"
-            MockConnector.return_value = instance
+            mock_connector.return_value = instance
 
             result = await mcp.call_tool("test_ssp_connection", {"ssp_name": "magnite"})
             data = json.loads(_extract_text(result))

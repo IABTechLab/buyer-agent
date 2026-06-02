@@ -4,7 +4,7 @@
 """Flow state models for workflow persistence."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from ..time_utils import utc_now
 
 
-class ExecutionStatus(str, Enum):
+class ExecutionStatus(StrEnum):
     """Execution status for the booking flow."""
 
     INITIALIZED = "initialized"
