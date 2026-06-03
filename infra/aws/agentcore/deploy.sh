@@ -127,6 +127,9 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   # from its template with our HTTP entrypoint.
   _ROOT_DOCKERFILE="${REPO_ROOT}/Dockerfile"
   _DOCKERFILE_HIDDEN=false
+  # Trap to restore Dockerfile on any exit (success or failure)
+  restore_dockerfile() { [[ "${_DOCKERFILE_HIDDEN}" == "true" ]] && mv "${_ROOT_DOCKERFILE}.community-bak" "${_ROOT_DOCKERFILE}" 2>/dev/null; }
+  trap restore_dockerfile EXIT
   if [[ -f "${_ROOT_DOCKERFILE}" ]]; then
     echo "  ⚠️  Root Dockerfile detected — hiding during deploy (toolkit would override entrypoint)"
     mv "${_ROOT_DOCKERFILE}" "${_ROOT_DOCKERFILE}.community-bak"
@@ -167,12 +170,6 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     --env "CREW_MEMORY_ENABLED=true" \
     --env "MEMORY_LLM_MODEL=bedrock/us.amazon.nova-lite-v1:0" \
     --auto-update-on-conflict
-
-  # ── Restore root Dockerfile ─────────────────────────────────────────
-  if [[ "${_DOCKERFILE_HIDDEN}" == "true" ]]; then
-    mv "${_ROOT_DOCKERFILE}.community-bak" "${_ROOT_DOCKERFILE}"
-    echo "  ✅ Restored root Dockerfile"
-  fi
 
   echo ""
   echo "✅ Deploy complete"

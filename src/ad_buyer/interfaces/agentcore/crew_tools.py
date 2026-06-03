@@ -118,7 +118,7 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
         brief["objectives"] = [brief["objectives"]]
 
     # Ensure budget is positive
-    if not brief.get("budget") or brief["budget"] <= 0:
+    if not brief.get("budget") or float(brief.get("budget", 0)) <= 0:
         brief["budget"] = 100000
 
     logger.info("Campaign brief: %s", json.dumps(brief, default=str))

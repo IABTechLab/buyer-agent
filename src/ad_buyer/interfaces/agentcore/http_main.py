@@ -38,7 +38,6 @@ import asyncio
 import json
 import logging
 import os
-import re
 import sys
 
 # Add the src directory to Python path so ad_buyer is importable
@@ -196,58 +195,6 @@ def _get_routing_mode(payload: dict) -> str:
 # Structured output formatting
 # ---------------------------------------------------------------------------
 
-_DEAL_ID_PATTERN = re.compile(r"DEAL-[\w-]+", re.IGNORECASE)
-_CPM_PATTERN = re.compile(r"\$?([\d]+(?:\.[\d]{1,2})?)\s*(?:CPM|cpm)", re.IGNORECASE)
-_BUDGET_PATTERN = re.compile(r"\$?([\d,]+(?:\.[\d]{1,2})?)\s*(?:budget|total)", re.IGNORECASE)
-
-
-def _format_crew_output(crew_output) -> dict:
-    """Parse CrewOutput into a JSON-serializable dict with visualization tags."""
-    raw_text = getattr(crew_output, "raw", "") or ""
-
-    structured_data = None
-    if getattr(crew_output, "json_dict", None):
-        structured_data = crew_output.json_dict
-    elif getattr(crew_output, "pydantic", None):
-        try:
-            structured_data = crew_output.pydantic.model_dump()
-        except Exception:
-            pass
-
-    deal_ids = _DEAL_ID_PATTERN.findall(raw_text)
-    cpm_values = _CPM_PATTERN.findall(raw_text)
-    budget_values = _BUDGET_PATTERN.findall(raw_text)
-
-    metadata = {
-        "type": "buyer_response",
-        "routing_mode": "crew",
-    }
-
-    viz_data = {}
-    if deal_ids:
-        viz_data["deal_ids"] = deal_ids
-        metadata["deal_ids"] = deal_ids
-    if cpm_values:
-        viz_data["cpm_values"] = [float(v) for v in cpm_values]
-    if budget_values:
-        viz_data["budget_values"] = [v.replace(",", "") for v in budget_values]
-    if structured_data:
-        viz_data["structured_output"] = structured_data
-
-    response_text = raw_text
-    if viz_data:
-        viz_json = json.dumps(viz_data, default=str)
-        response_text = (
-            f"{raw_text}\n\n"
-            f"<visualization-data>{viz_json}</visualization-data>"
-        )
-
-    return {
-        "response": response_text,
-        "metadata": metadata,
-    }
-
-
 # ---------------------------------------------------------------------------
 # Crew routing path — DealBookingFlow campaign planning
 # ---------------------------------------------------------------------------
@@ -354,7 +301,7 @@ async def _handle_invocation(payload: dict):
     session_id = (
         payload.get("session_id")
         or payload.get("runtimeSessionId")
-        or payload.get("session_metadata", {}).get("session_id") if isinstance(payload.get("session_metadata"), dict) else None
+        or (payload.get("session_metadata") or {}).get("session_id")
     )
     actor_id = payload.get("agent_name") or "buyer-agent"
 

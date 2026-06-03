@@ -170,7 +170,7 @@ def _sanitize_tool_blocks(messages: list) -> list:
             if result_ids:
                 # Check if previous message (in fixed list) has matching toolUse
                 prev_msg = fixed[-1] if fixed else None
-                matched = False
+                use_ids = set()
 
                 if (
                     prev_msg
@@ -179,22 +179,25 @@ def _sanitize_tool_blocks(messages: list) -> list:
                 ):
                     prev_content = prev_msg.get("content", [])
                     if isinstance(prev_content, list):
-                        use_ids = set()
                         for block in prev_content:
                             if isinstance(block, dict) and "toolUse" in block:
                                 tu = block["toolUse"]
                                 if isinstance(tu, dict) and "toolUseId" in tu:
                                     use_ids.add(tu["toolUseId"])
-                        matched = result_ids.issubset(use_ids)
 
-                if not matched:
-                    # Strip toolResult blocks, keep text blocks
-                    text_blocks = [
+                if not result_ids.issubset(use_ids):
+                    # Only strip toolResult blocks whose toolUseId is NOT in use_ids
+                    kept_blocks = [
                         b for b in content
-                        if isinstance(b, dict) and "text" in b
+                        if not (
+                            isinstance(b, dict)
+                            and "toolResult" in b
+                            and isinstance(b["toolResult"], dict)
+                            and b["toolResult"].get("toolUseId") not in use_ids
+                        )
                     ]
-                    if text_blocks:
-                        fixed.append({"role": "user", "content": text_blocks})
+                    if kept_blocks:
+                        fixed.append({"role": "user", "content": kept_blocks})
                     i += 1
                     continue
 

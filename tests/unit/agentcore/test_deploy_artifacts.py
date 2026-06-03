@@ -1,10 +1,9 @@
 """Tests for buyer agent AgentCore CLI deployment artifacts and campaign briefs.
 
 Validates:
-- http_entrypoint.py follows BedrockAgentCoreApp pattern
+- http_main.py follows BedrockAgentCoreApp pattern
 - requirements.txt contains bedrock-agentcore
 - deploy.sh exists and is executable
-- main.yaml is unchanged (ECS-only, no AgentCore conditions)
 - Campaign briefs contain required fields
 
 Validates: Requirements 2.1, 2.2, 8.4
@@ -33,7 +32,7 @@ DATA_DIR = REPO_ROOT / "data"
 
 
 class TestAgentCoreEntrypoint:
-    """Validate http_entrypoint.py follows BedrockAgentCoreApp pattern."""
+    """Validate http_main.py follows BedrockAgentCoreApp pattern."""
 
     def test_entrypoint_exists(self):
         assert ENTRYPOINT.exists()

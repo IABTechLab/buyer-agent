@@ -36,7 +36,6 @@ sys.modules.setdefault("bedrock_agentcore.runtime", _mock_agentcore)
 from ad_buyer.interfaces.agentcore.http_main import (
     _DEFAULT_ROUTING_MODE,
     _VALID_ROUTING_MODES,
-    _format_crew_output,
     _get_routing_mode,
     _handle_crew_invocation,
     _handle_invocation,
@@ -142,52 +141,6 @@ class TestHandleInvocationRouting:
 
 # ---------------------------------------------------------------------------
 # _format_crew_output tests
-# ---------------------------------------------------------------------------
-
-
-class TestFormatCrewOutput:
-    """Tests for the _format_crew_output function."""
-
-    def test_plain_text_output(self):
-        mock_output = MagicMock()
-        mock_output.raw = "Here is the campaign plan."
-        mock_output.json_dict = None
-        mock_output.pydantic = None
-
-        result = _format_crew_output(mock_output)
-        assert result["response"] == "Here is the campaign plan."
-        assert result["metadata"]["type"] == "buyer_response"
-
-    def test_deal_id_extraction(self):
-        mock_output = MagicMock()
-        mock_output.raw = "Booked DEAL-CTV-001 and DEAL-DISPLAY-002"
-        mock_output.json_dict = None
-        mock_output.pydantic = None
-
-        result = _format_crew_output(mock_output)
-        assert "DEAL-CTV-001" in result["metadata"]["deal_ids"]
-
-    def test_budget_extraction(self):
-        mock_output = MagicMock()
-        mock_output.raw = "Total campaign $500,000 budget allocated"
-        mock_output.json_dict = None
-        mock_output.pydantic = None
-
-        result = _format_crew_output(mock_output)
-        assert "<visualization-data>" in result["response"]
-
-    def test_empty_raw_text(self):
-        mock_output = MagicMock()
-        mock_output.raw = ""
-        mock_output.json_dict = None
-        mock_output.pydantic = None
-
-        result = _format_crew_output(mock_output)
-        assert result["response"] == ""
-
-
-# ---------------------------------------------------------------------------
-# _handle_crew_invocation tests
 # ---------------------------------------------------------------------------
 
 
