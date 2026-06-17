@@ -47,7 +47,7 @@ substitutions:
 
   # --- LLM Model Configuration ---
   _DEFAULT_LLM_MODEL: "anthropic/claude-sonnet-4-5-20250929"  # Default LLM model
-  _MANAGER_LLM_MODEL: "anthropic/claude-opus-4-20250514"      # Manager LLM model
+  _MANAGER_LLM_MODEL: "anthropic/claude-sonnet-4-5-20250929"      # Manager LLM model
   _LLM_TEMPERATURE: "0.3"                           # LLM temperature
   _LLM_MAX_TOKENS: "4096"                           # Max tokens per LLM request
 
