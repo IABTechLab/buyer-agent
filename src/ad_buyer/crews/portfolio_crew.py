@@ -40,7 +40,7 @@ def create_portfolio_crew(
     performance_agent = create_performance_agent()
 
     # Build channel constraint section from brief
-    requested_channels = [c.lower() for c in campaign_brief.get("channels", []) if c.strip()]
+    requested_channels = [c.lower() for c in (campaign_brief.get("channels") or []) if c.strip()]
     total_budget = campaign_brief.get("budget", 0)
 
     if requested_channels:

@@ -3,6 +3,7 @@
 
 """FastAPI server for the Ad Buyer System."""
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -13,7 +14,7 @@ from typing import Any
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
@@ -25,6 +26,41 @@ from ...storage.order_store import OrderStore
 from ...time_utils import utc_now
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Event streaming state (shared across SSE connections)
+# ---------------------------------------------------------------------------
+_event_stream_clients: set[asyncio.Queue] = set()
+_main_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _broadcast_event(payload: dict) -> None:
+    """Thread-safe broadcast to all connected /events/stream clients.
+
+    Safe to call from any thread (CrewAI worker threads or the main loop).
+    """
+    if _main_loop is None:
+        return
+    for q in list(_event_stream_clients):
+        try:
+            _main_loop.call_soon_threadsafe(q.put_nowait, payload)
+        except Exception:
+            pass
+
+
+def _on_bus_event(event: Any) -> None:
+    """Layer A: bridge buyer EventBus wildcard events to the SSE stream."""
+    try:
+        _broadcast_event({
+            "layer": "a2a",
+            "category": "booking_event",
+            "type": event.event_type.value,
+            "ts": event.timestamp.isoformat() if hasattr(event, "timestamp") else "",
+            "summary": event.event_type.value.replace(".", " ").title(),
+            "detail": event.model_dump(mode="json"),
+        })
+    except Exception:
+        logger.debug("_on_bus_event serialisation error", exc_info=True)
 
 
 def _current_settings():
@@ -77,6 +113,20 @@ mount_mcp(app)
 
 @asynccontextmanager
 async def lifespan(application):
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+
+    # Layer A: subscribe wildcard on the buyer EventBus so all booking/A2A
+    # events are forwarded to the /events/stream SSE endpoint.
+    from ...events.bus import get_event_bus
+    bus = await get_event_bus()
+    await bus.subscribe("*", _on_bus_event)
+
+    # Layer B: CrewAI execution trace (flow steps, crews, agents, tasks, tools,
+    # LLM calls) — same data that verbose=True prints to the terminal.
+    from ...events.crewai_trace_listener import CrewAITraceListener
+    CrewAITraceListener(sink=_broadcast_event)
+
     store = _get_order_store()
     if store is not None:
         application.include_router(_create_order_router(store))
@@ -792,7 +842,7 @@ async def meta_direct_report(
         raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))
 
 
-@app.get("/events/{event_id}", tags=["Events"])
+# @app.get("/events/{event_id}", tags=["Events"])  # moved below /events/stream to fix route order
 async def get_event(event_id: str) -> dict[str, Any]:
     """Retrieve a single event by ID."""
     from ...events.bus import get_event_bus
@@ -802,6 +852,54 @@ async def get_event(event_id: str) -> dict[str, Any]:
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     return event.model_dump(mode="json")
+
+
+@app.get("/events/stream", tags=["Events"])
+async def stream_events(request: Request) -> StreamingResponse:
+    """Server-Sent Events stream of all buyer-agent signals.
+
+    Merges two layers:
+    - Layer A: booking/A2A events from the buyer EventBus
+      (campaign.booking_started, budget.allocated, deal.booked, …)
+    - Layer B: CrewAI execution trace — flow steps, crew kickoffs,
+      agent reasoning, tool calls, LLM calls (same data verbose=True prints)
+
+    Each SSE message is a JSON object matching the playground unified schema:
+      { layer, category, type, ts, summary, detail }
+
+    A keepalive comment (": keepalive") is sent every 25 s when idle.
+    """
+    queue: asyncio.Queue = asyncio.Queue()
+    _event_stream_clients.add(queue)
+
+    async def generator():
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(queue.get(), timeout=25.0)
+                    yield f"data: {json.dumps(item)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _event_stream_clients.discard(queue)
+
+    return StreamingResponse(
+        generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/events/{event_id}", tags=["Events"])
+async def get_event_by_id(event_id: str) -> dict[str, Any]:
+    """Retrieve a single event by ID."""
+    return await get_event(event_id)
 
 
 async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
@@ -826,7 +924,11 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        flow.kickoff()
+        await asyncio.to_thread(flow.kickoff)
+
+        # Propagate any errors the flow recorded internally (e.g. crew failures).
+        if flow.state.errors:
+            job["errors"].extend(flow.state.errors)
 
         # If consolidate_recommendations didn't fire (CrewAI or_() limitation), collect manually.
         if not flow.state.pending_approvals:
@@ -841,14 +943,22 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         }
         job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
 
-        if request.auto_approve:
+        if not flow.state.pending_approvals:
+            # Flow produced no recommendations — treat as failure so UI can surface the reason.
+            job["status"] = "failed"
+            if not job["errors"]:
+                job["errors"].append(
+                    "Flow completed with no recommendations. "
+                    "Budget allocation or channel research may have failed — check agent logs."
+                )
+        elif request.auto_approve:
             flow.approve_all()
             job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
             job["status"] = "completed"
         else:
             job["status"] = "awaiting_approval"
 
-        job["progress"] = 1.0 if job["status"] == "completed" else 0.9
+        job["progress"] = 1.0 if job["status"] in ("completed", "failed") else 0.9
         job["updated_at"] = utc_now().isoformat()
         _persist_job(job_id, job)
 

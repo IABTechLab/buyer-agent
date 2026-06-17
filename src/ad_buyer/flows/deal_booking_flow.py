@@ -317,7 +317,7 @@ class DealBookingFlow(Flow[BookingState]):
             # Fallback: if brief specifies channels and LLM allocated to wrong ones,
             # filter to only the requested channels and rescale budgets proportionally.
             requested = [
-                c.lower() for c in self.state.campaign_brief.get("channels", []) if c.strip()
+                c.lower() for c in (self.state.campaign_brief.get("channels") or []) if c.strip()
             ]
             if requested:
                 filtered = {
