@@ -31,13 +31,18 @@ substitutions:
   _API_KEY: ""                                      # Optional — Inbound API key for authenticating requests
 
   # --- IAB Server Configuration ---
-  _IAB_SERVER_URL: "http://localhost:8001"          # IAB agentic-direct server URL
+  _IAB_SERVER_URL: "https://agentic-direct-server-hwgrypmndq-uk.a.run.app"  # IAB agentic-direct server URL (matches .env)
 
   # --- Seller Agent Endpoints ---
   _SELLER_ENDPOINTS: ""                             # Comma-separated list of seller agent MCP/A2A URLs
 
   # --- OpenDirect Server Configuration ---
-  _OPENDIRECT_BASE_URL: "https://agentic-direct-server-hwgrypmndq-uk.a.run.app"  # IAB Tech Lab OpenDirect 2.1 server
+  # This is the OpenDirectClient target for branding/ctv product research
+  # (ProductSearchTool / AvailsCheckTool). Must point at an actual seller
+  # agent implementing GET /products — the generic agentic-direct-server
+  # reference URL does NOT implement /products and silently zeroes out
+  # branding/ctv recommendations (errors are swallowed, not raised).
+  _OPENDIRECT_BASE_URL: "https://seller-agent-230802882137.us-east4.run.app"  # Our seller-agent
   _OPENDIRECT_API_KEY: ""                           # Optional — API key for OpenDirect server
   _OPENDIRECT_TOKEN: ""                             # Optional — Auth token for OpenDirect server
 
