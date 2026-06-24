@@ -448,4 +448,10 @@ def init() -> None:
 
 
 if __name__ == "__main__":
-    app()
+    import os
+
+    try:
+        app()
+    except SystemExit as e:
+        os._exit(e.code if isinstance(e.code, int) else 0)
+    os._exit(0)
