@@ -10,22 +10,19 @@ Verifies that:
 - UI payload auto-routing works
 """
 
-import asyncio
-import json
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 # We need to mock bedrock_agentcore before importing the entrypoint,
 # since it's imported at module level.
 import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Mock bedrock_agentcore — only available in AgentCore container.
 # NOTE: This mock persists in sys.modules for the pytest session.
 # Run agentcore tests separately if community tests fail:
 #   pytest tests/unit/agentcore/ -v
-from unittest.mock import MagicMock
 _mock_agentcore = MagicMock()
 _mock_app = MagicMock()
 _mock_app.entrypoint = lambda fn: fn
@@ -33,14 +30,13 @@ _mock_agentcore.BedrockAgentCoreApp.return_value = _mock_app
 sys.modules.setdefault("bedrock_agentcore", MagicMock())
 sys.modules.setdefault("bedrock_agentcore.runtime", _mock_agentcore)
 
-from ad_buyer.interfaces.agentcore.http_main import (
+from ad_buyer.interfaces.agentcore.http_main import (  # noqa: E402
     _DEFAULT_ROUTING_MODE,
     _VALID_ROUTING_MODES,
     _get_routing_mode,
     _handle_crew_invocation,
     _handle_invocation,
 )
-
 
 # ---------------------------------------------------------------------------
 # _get_routing_mode tests
@@ -104,25 +100,17 @@ class TestHandleInvocationRouting:
     @pytest.mark.asyncio
     async def test_chat_mode_uses_chat_handler(self):
         """Chat mode should route through _handle_chat_invocation."""
-        with patch(
-            "ad_buyer.interfaces.agentcore.http_main._handle_chat_invocation"
-        ) as mock_chat:
+        with patch("ad_buyer.interfaces.agentcore.http_main._handle_chat_invocation") as mock_chat:
             mock_chat.return_value = {"response": "test"}
-            result = await _handle_invocation(
-                {"prompt": "hello", "routing_mode": "chat"}
-            )
+            await _handle_invocation({"prompt": "hello", "routing_mode": "chat"})
             mock_chat.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_crew_mode_uses_crew_handler(self):
         """Crew mode should route through _handle_crew_invocation."""
-        with patch(
-            "ad_buyer.interfaces.agentcore.http_main._handle_crew_invocation"
-        ) as mock_crew:
+        with patch("ad_buyer.interfaces.agentcore.http_main._handle_crew_invocation") as mock_crew:
             mock_crew.return_value = {"response": "test"}
-            result = await _handle_invocation(
-                {"prompt": "plan campaign", "routing_mode": "crew"}
-            )
+            await _handle_invocation({"prompt": "plan campaign", "routing_mode": "crew"})
             mock_crew.assert_called_once()
 
     @pytest.mark.asyncio
@@ -133,7 +121,7 @@ class TestHandleInvocationRouting:
                 "ad_buyer.interfaces.agentcore.http_main._handle_crew_invocation"
             ) as mock_crew:
                 mock_crew.return_value = {"response": "test"}
-                result = await _handle_invocation(
+                await _handle_invocation(
                     {"prompt": "plan campaign", "agent_name": "AAMPBuyerCrewAgent"}
                 )
                 mock_crew.assert_called_once()
@@ -178,9 +166,7 @@ class TestHandleCrewInvocation:
             "ad_buyer.interfaces.agentcore.crew_tools.run_campaign_plan",
             side_effect=Exception("Flow failed"),
         ):
-            result = await _handle_crew_invocation(
-                {"prompt": "Plan a campaign"}
-            )
+            result = await _handle_crew_invocation({"prompt": "Plan a campaign"})
             assert "error" in result
 
 

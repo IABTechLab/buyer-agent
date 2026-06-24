@@ -58,21 +58,27 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 # Apply CrewAI patches BEFORE any CrewAI imports
 try:
     from patches.crewai_bedrock_fix import apply_patches as apply_bedrock_patches
+
     apply_bedrock_patches()
 except ImportError as _ie:
-    logging.getLogger(__name__).warning("crewai_bedrock_fix not found: %s (repo_root=%s)", _ie, _repo_root)
+    logging.getLogger(__name__).warning(
+        "crewai_bedrock_fix not found: %s (repo_root=%s)", _ie, _repo_root
+    )
 except Exception as _exc:
     logging.getLogger(__name__).warning("crewai_bedrock_fix patch failed: %s", _exc)
 
 try:
     from patches.crewai_agentcore_memory import apply_patches as apply_memory_patches
+
     apply_memory_patches()
 except ImportError as _ie:
-    logging.getLogger(__name__).warning("crewai_agentcore_memory not found: %s (repo_root=%s)", _ie, _repo_root)
+    logging.getLogger(__name__).warning(
+        "crewai_agentcore_memory not found: %s (repo_root=%s)", _ie, _repo_root
+    )
 except Exception as _exc:
     logging.getLogger(__name__).warning("crewai_agentcore_memory patch failed: %s", _exc)
 
-from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from bedrock_agentcore.runtime import BedrockAgentCoreApp  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -128,9 +134,7 @@ def _start_fastapi_background():
         try:
             import httpx
 
-            resp = httpx.get(
-                f"http://localhost:{_INTERNAL_PORT}/health", timeout=1.0
-            )
+            resp = httpx.get(f"http://localhost:{_INTERNAL_PORT}/health", timeout=1.0)
             if resp.status_code == 200:
                 logger.info(
                     "FastAPI background server ready on port %d",
@@ -141,9 +145,7 @@ def _start_fastapi_background():
         except Exception:
             time.sleep(0.5)
 
-    logger.error(
-        "FastAPI failed to start on port %d within 15s", _INTERNAL_PORT
-    )
+    logger.error("FastAPI failed to start on port %d within 15s", _INTERNAL_PORT)
     raise RuntimeError(f"FastAPI background server failed to start on port {_INTERNAL_PORT}")
 
 
@@ -159,6 +161,7 @@ def _get_chat():
     if _chat is None:
         try:
             from ad_buyer.interfaces.chat.main import ChatInterface
+
             _chat = ChatInterface()
             logger.info("Buyer ChatInterface ready")
         except Exception as exc:
@@ -180,10 +183,7 @@ def _get_routing_mode(payload: dict) -> str:
     Priority: payload["routing_mode"] > ROUTING_MODE env var > default ("crew").
     Invalid values fall back to default for backward compatibility.
     """
-    mode = (
-        payload.get("routing_mode")
-        or os.environ.get("ROUTING_MODE", _DEFAULT_ROUTING_MODE)
-    )
+    mode = payload.get("routing_mode") or os.environ.get("ROUTING_MODE", _DEFAULT_ROUTING_MODE)
     mode = str(mode).strip().lower()
     if mode not in _VALID_ROUTING_MODES:
         logger.warning("Invalid routing mode %r, falling back to %r", mode, _DEFAULT_ROUTING_MODE)
@@ -199,6 +199,7 @@ def _get_routing_mode(payload: dict) -> str:
 # Crew routing path — DealBookingFlow campaign planning
 # ---------------------------------------------------------------------------
 
+
 async def _handle_crew_invocation(payload: dict) -> dict:
     """Handle a crew-mode invocation via DealBookingFlow.
 
@@ -210,11 +211,7 @@ async def _handle_crew_invocation(payload: dict) -> dict:
     All seller interactions (inventory, pricing, deals) are handled by the
     seller runtime separately.
     """
-    prompt = (
-        payload.get("prompt")
-        or payload.get("message")
-        or payload.get("input", "")
-    )
+    prompt = payload.get("prompt") or payload.get("message") or payload.get("input", "")
     if not prompt:
         return {"error": "Missing 'prompt', 'message', or 'input' field"}
 
@@ -222,13 +219,12 @@ async def _handle_crew_invocation(payload: dict) -> dict:
 
     try:
         import concurrent.futures
+
         from .crew_tools import run_campaign_plan
 
         loop = asyncio.get_event_loop()
         with concurrent.futures.ThreadPoolExecutor() as pool:
-            result = await loop.run_in_executor(
-                pool, run_campaign_plan, prompt, None
-            )
+            result = await loop.run_in_executor(pool, run_campaign_plan, prompt, None)
 
         # Return structured plan data as JSON
         response_text = json.dumps(result, indent=2, default=str)
@@ -251,13 +247,10 @@ async def _handle_crew_invocation(payload: dict) -> dict:
 # Chat routing path (fallback)
 # ---------------------------------------------------------------------------
 
+
 def _handle_chat_invocation(payload: dict) -> dict:
     """Handle a chat-mode invocation via ChatInterface."""
-    prompt = (
-        payload.get("prompt")
-        or payload.get("message")
-        or payload.get("input", "")
-    )
+    prompt = payload.get("prompt") or payload.get("message") or payload.get("input", "")
     if not prompt:
         return {"error": "Missing 'prompt', 'message', or 'input' field"}
 
@@ -289,6 +282,7 @@ def _handle_chat_invocation(payload: dict) -> dict:
 # Main handler
 # ---------------------------------------------------------------------------
 
+
 async def _handle_invocation(payload: dict):
     """Async handler — routes to crew (DealBookingFlow) or chat based on mode.
 
@@ -308,6 +302,7 @@ async def _handle_invocation(payload: dict):
     # Update memory patch with session context (idempotent if already patched)
     try:
         from patches.crewai_agentcore_memory import apply_patches as apply_memory_patches
+
         apply_memory_patches(session_id=session_id, actor_id=actor_id)
     except ImportError:
         pass
@@ -315,7 +310,11 @@ async def _handle_invocation(payload: dict):
     # UI sends payloads with agent_name/memory_id but no routing_mode.
     # Default to crew for UI calls.
     if routing_mode == "chat" and not payload.get("routing_mode"):
-        if payload.get("agent_name") or payload.get("memory_id") or payload.get("direct_mention_target"):
+        if (
+            payload.get("agent_name")
+            or payload.get("memory_id")
+            or payload.get("direct_mention_target")
+        ):
             routing_mode = "crew"
             logger.info("Auto-routing to crew mode (UI payload detected)")
 
@@ -336,6 +335,7 @@ def invoke(payload, context):
         return asyncio.run(_handle_invocation(payload))
     except RuntimeError:
         import concurrent.futures
+
         with concurrent.futures.ThreadPoolExecutor() as pool:
             future = pool.submit(asyncio.run, _handle_invocation(payload))
             return future.result(timeout=120)

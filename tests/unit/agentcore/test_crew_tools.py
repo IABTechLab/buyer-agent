@@ -6,12 +6,8 @@ Validates:
 - Brief normalization (string audience → dict, string objectives → list)
 """
 
-import json
-import os
 import sys
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 # Mock bedrock_agentcore — only available in AgentCore container.
 _mock_agentcore = MagicMock()
@@ -21,7 +17,7 @@ _mock_agentcore.BedrockAgentCoreApp.return_value = _mock_app
 sys.modules.setdefault("bedrock_agentcore", MagicMock())
 sys.modules.setdefault("bedrock_agentcore.runtime", _mock_agentcore)
 
-from ad_buyer.interfaces.agentcore.crew_tools import run_campaign_plan
+from ad_buyer.interfaces.agentcore.crew_tools import run_campaign_plan  # noqa: E402
 
 
 class TestRunCampaignPlan:

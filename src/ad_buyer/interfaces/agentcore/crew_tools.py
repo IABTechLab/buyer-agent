@@ -20,9 +20,8 @@ the community-maintained agent/crew code.
 import json
 import logging
 import os
-from typing import Any
-
 import re
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,31 +37,32 @@ def _parse_brief_from_prompt(prompt: str) -> dict:
     This is input parsing, not decision-making — same as parsing a JSON
     payload. The LLM inside PortfolioCrew does the actual planning.
     """
-    lower = prompt.lower()
 
     # Budget
     budget = 100000
-    m = re.search(r'\$\s*([\d,]+)\s*K\b', prompt, re.IGNORECASE)
+    m = re.search(r"\$\s*([\d,]+)\s*K\b", prompt, re.IGNORECASE)
     if m:
         budget = float(m.group(1).replace(",", "")) * 1000
     else:
-        m = re.search(r'\$\s*([\d,]+(?:\.\d+)?)\s*M\b', prompt, re.IGNORECASE)
+        m = re.search(r"\$\s*([\d,]+(?:\.\d+)?)\s*M\b", prompt, re.IGNORECASE)
         if m:
             budget = float(m.group(1).replace(",", "")) * 1_000_000
 
     # Quarter → dates
     start_date, end_date = "2026-10-01", "2026-12-31"
     quarter_map = {
-        "q1": ("2026-01-01", "2026-03-31"), "q2": ("2026-04-01", "2026-06-30"),
-        "q3": ("2026-07-01", "2026-09-30"), "q4": ("2026-10-01", "2026-12-31"),
+        "q1": ("2026-01-01", "2026-03-31"),
+        "q2": ("2026-04-01", "2026-06-30"),
+        "q3": ("2026-07-01", "2026-09-30"),
+        "q4": ("2026-10-01", "2026-12-31"),
     }
-    qm = re.search(r'\b(Q[1-4])\b', prompt, re.IGNORECASE)
+    qm = re.search(r"\b(Q[1-4])\b", prompt, re.IGNORECASE)
     if qm:
         start_date, end_date = quarter_map.get(qm.group(1).lower(), (start_date, end_date))
 
     # Audience
     audience = "general"
-    am = re.search(r'targeting\s+(.+?)(?:\.|,|$)', prompt, re.IGNORECASE)
+    am = re.search(r"targeting\s+(.+?)(?:\.|,|$)", prompt, re.IGNORECASE)
     if am:
         audience = am.group(1).strip()
 
@@ -102,6 +102,7 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
         "bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
     )
     from ad_buyer.config.settings import settings as buyer_settings
+
     buyer_settings.manager_llm_model = bedrock_model
     buyer_settings.default_llm_model = bedrock_model
 

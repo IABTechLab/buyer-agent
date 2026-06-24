@@ -9,8 +9,8 @@ Run:
 
 import os
 import sys
-import types
 import threading
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -32,6 +32,7 @@ def reset_patch_state():
     # Save original Memory.__init__ before any patching
     try:
         from crewai.memory.unified_memory import Memory
+
         original_init = Memory.__init__
     except ImportError:
         original_init = None
@@ -52,6 +53,7 @@ def reset_patch_state():
     if original_init is not None:
         try:
             from crewai.memory.unified_memory import Memory
+
             Memory.__init__ = original_init
         except ImportError:
             pass
@@ -66,10 +68,13 @@ def mock_memory_client():
     mock_client_class.return_value = mock_client_instance
     mock_module.MemoryClient = mock_client_class
 
-    with patch.dict(sys.modules, {
-        "bedrock_agentcore": types.ModuleType("bedrock_agentcore"),
-        "bedrock_agentcore.memory": mock_module,
-    }):
+    with patch.dict(
+        sys.modules,
+        {
+            "bedrock_agentcore": types.ModuleType("bedrock_agentcore"),
+            "bedrock_agentcore.memory": mock_module,
+        },
+    ):
         yield mock_client_instance
 
 
@@ -96,16 +101,18 @@ class TestApplyPatches:
 
     def test_noop_without_env_var(self, env_without_memory_id):
         """Patch is a no-op when BEDROCK_AGENTCORE_MEMORY_ID is not set."""
-        from patches.crewai_agentcore_memory import apply_patches, _patched
+        from patches.crewai_agentcore_memory import _patched, apply_patches
+
         apply_patches()
-        from patches.crewai_agentcore_memory import _patched
         assert _patched is False
 
     def test_activates_with_env_var(self, env_with_memory_id, mock_memory_client):
         """Patch activates when BEDROCK_AGENTCORE_MEMORY_ID is set."""
         from patches.crewai_agentcore_memory import apply_patches
+
         apply_patches(session_id="sess-001", actor_id="buyer-agent")
-        from patches.crewai_agentcore_memory import _patched, _memory_id, _actor_id, _session_id
+        from patches.crewai_agentcore_memory import _actor_id, _memory_id, _patched, _session_id
+
         assert _patched is True
         assert _memory_id == "test-mem-abc123"
         assert _actor_id == "buyer-agent"
@@ -114,25 +121,31 @@ class TestApplyPatches:
     def test_idempotent(self, env_with_memory_id, mock_memory_client):
         """Calling apply_patches() twice doesn't double-patch."""
         from patches.crewai_agentcore_memory import apply_patches
+
         apply_patches(session_id="sess-001", actor_id="buyer-agent")
         apply_patches(session_id="sess-002", actor_id="buyer-agent")
         from patches.crewai_agentcore_memory import _session_id
+
         # Session updated on second call
         assert _session_id == "sess-002"
 
     def test_session_id_truncated_to_100(self, env_with_memory_id, mock_memory_client):
         """Session ID is truncated to 100 chars (AgentCore limit)."""
         from patches.crewai_agentcore_memory import apply_patches
+
         long_session = "x" * 200
         apply_patches(session_id=long_session, actor_id="buyer-agent")
         from patches.crewai_agentcore_memory import _session_id
+
         assert len(_session_id) == 100
 
     def test_defaults_actor_id(self, env_with_memory_id, mock_memory_client):
         """Actor ID defaults to 'buyer-agent' when not provided."""
         from patches.crewai_agentcore_memory import apply_patches
+
         apply_patches()
         from patches.crewai_agentcore_memory import _actor_id
+
         assert _actor_id == "buyer-agent"
 
 
@@ -147,7 +160,8 @@ class TestAgentCoreStorageBackend:
     @pytest.fixture(autouse=True)
     def setup_backend(self, env_with_memory_id, mock_memory_client):
         """Activate the patch and get a backend instance."""
-        from patches.crewai_agentcore_memory import apply_patches, AgentCoreStorageBackend
+        from patches.crewai_agentcore_memory import AgentCoreStorageBackend, apply_patches
+
         apply_patches(session_id="test-session", actor_id="test-actor")
         self.backend = AgentCoreStorageBackend()
         self.mock_client = mock_memory_client
@@ -160,6 +174,7 @@ class TestAgentCoreStorageBackend:
     def test_save_calls_create_event(self):
         """save() calls memory_client.create_event with correct format."""
         from patches.crewai_agentcore_memory import _SimpleRecord
+
         record = _SimpleRecord(content="Campaign allocated 60% to CTV")
         self.backend.save([record])
 
@@ -173,6 +188,7 @@ class TestAgentCoreStorageBackend:
     def test_save_skips_short_content(self):
         """save() skips records with content shorter than 3 chars."""
         from patches.crewai_agentcore_memory import _SimpleRecord
+
         record = _SimpleRecord(content="ab")
         self.backend.save([record])
         self.mock_client.create_event.assert_not_called()
@@ -180,6 +196,7 @@ class TestAgentCoreStorageBackend:
     def test_save_skips_tool_content(self):
         """save() skips records containing toolUse/toolResult."""
         from patches.crewai_agentcore_memory import _SimpleRecord
+
         record = _SimpleRecord(content="toolUse block with some data")
         self.backend.save([record])
         self.mock_client.create_event.assert_not_called()
@@ -187,6 +204,7 @@ class TestAgentCoreStorageBackend:
     def test_save_truncates_to_9000(self):
         """save() truncates content to 9000 chars."""
         from patches.crewai_agentcore_memory import _SimpleRecord
+
         record = _SimpleRecord(content="x" * 10000)
         self.backend.save([record])
 
@@ -197,6 +215,7 @@ class TestAgentCoreStorageBackend:
     def test_save_graceful_on_api_error(self):
         """save() logs warning but doesn't crash on API errors."""
         from patches.crewai_agentcore_memory import _SimpleRecord
+
         self.mock_client.create_event.side_effect = Exception("API error")
         record = _SimpleRecord(content="Some valid content here")
         # Should not raise
@@ -264,36 +283,42 @@ class TestMemoryIntegration:
     def setup_patch(self, env_with_memory_id, mock_memory_client):
         """Activate the patch with mocked memory client."""
         from patches.crewai_agentcore_memory import apply_patches
+
         apply_patches(session_id="test-session", actor_id="test-actor")
         self.mock_client = mock_memory_client
 
     def test_memory_creates_with_agentcore_backend(self):
         """Memory() uses AgentCoreStorageBackend after patch."""
         from crewai.memory.unified_memory import Memory
+
         mem = Memory()
         assert type(mem._storage).__name__ == "AgentCoreStorageBackend"
 
     def test_memory_has_pending_lock(self):
         """Memory object has _pending_lock (required by CrewAI internals)."""
         from crewai.memory.unified_memory import Memory
+
         mem = Memory()
         assert hasattr(mem, "_pending_lock")
 
     def test_memory_has_save_pool(self):
         """Memory object has _save_pool (required by CrewAI internals)."""
         from crewai.memory.unified_memory import Memory
+
         mem = Memory()
         assert hasattr(mem, "_save_pool")
 
     def test_memory_drain_writes(self):
         """drain_writes() doesn't crash."""
         from crewai.memory.unified_memory import Memory
+
         mem = Memory()
         mem.drain_writes()
 
     def test_crew_with_memory_true(self):
         """Crew(memory=True) doesn't crash and uses AgentCore backend."""
-        from crewai import Crew, Agent, Task
+        from crewai import Agent, Crew, Task
+
         agent = Agent(
             role="Test Agent",
             goal="Test",
@@ -317,6 +342,7 @@ class TestNoOpEmbedder:
     def test_returns_correct_dimensions(self):
         """embed() returns vectors of length 384."""
         from patches.crewai_agentcore_memory import _NoOpEmbedder
+
         embedder = _NoOpEmbedder()
         results = embedder.embed(["hello", "world"])
         assert len(results) == 2
@@ -326,6 +352,7 @@ class TestNoOpEmbedder:
     def test_callable_interface(self):
         """Embedder supports __call__ interface."""
         from patches.crewai_agentcore_memory import _NoOpEmbedder
+
         embedder = _NoOpEmbedder()
         results = embedder(["test"])
         assert len(results) == 1

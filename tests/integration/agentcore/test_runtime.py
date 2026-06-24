@@ -25,7 +25,6 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import pytest
 
@@ -41,7 +40,7 @@ logger = logging.getLogger(__name__)
 class RuntimeConfig:
     arn: str
     region: str
-    profile: Optional[str]
+    profile: str | None
     agent_name: str
 
 
@@ -58,6 +57,7 @@ def runtime_config(request) -> RuntimeConfig:
         if yaml_path.exists():
             try:
                 import yaml
+
                 with open(yaml_path) as f:
                     cfg = yaml.safe_load(f)
                 agents = cfg.get("agents", {})
@@ -104,17 +104,29 @@ def invoke_runtime(
             )
             output = result.stdout + result.stderr
 
-            if re.search(r"initialization time exceeded|32010|RuntimeClientError", output, re.IGNORECASE):
+            if re.search(
+                r"initialization time exceeded|32010|RuntimeClientError", output, re.IGNORECASE
+            ):
                 if attempt < max_retries:
                     logger.warning("Cold start timeout (attempt %d/%d)", attempt, max_retries)
                     time.sleep(retry_wait)
                     continue
-                return {"response": "", "raw": output, "success": False, "error": "Cold start timeout"}
+                return {
+                    "response": "",
+                    "raw": output,
+                    "success": False,
+                    "error": "Cold start timeout",
+                }
 
             response_text = _extract_response(output)
 
             if re.search(r'"error":|"exception":|Invocation failed', output, re.IGNORECASE):
-                return {"response": response_text, "raw": output, "success": False, "error": response_text}
+                return {
+                    "response": response_text,
+                    "raw": output,
+                    "success": False,
+                    "error": response_text,
+                }
 
             return {"response": response_text, "raw": output, "success": True, "error": ""}
 
@@ -152,9 +164,9 @@ class TestChatMode:
         result = invoke_runtime(runtime_config, {"prompt": "What can you help me with?"})
         assert result["success"], f"Invoke failed: {result['error']}"
         response = result["response"].lower()
-        assert any(
-            kw in response for kw in ["campaign", "plan", "budget", "buyer", "help"]
-        ), f"Response doesn't mention capabilities: {result['response'][:200]}"
+        assert any(kw in response for kw in ["campaign", "plan", "budget", "buyer", "help"]), (
+            f"Response doesn't mention capabilities: {result['response'][:200]}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -171,7 +183,10 @@ class TestCrewPlanCampaign:
         result = invoke_runtime(
             runtime_config,
             {
-                "prompt": "Plan a $500K Q4 automotive campaign across CTV and digital video targeting adults 25-54",
+                "prompt": (
+                    "Plan a $500K Q4 automotive campaign across CTV and digital"
+                    " video targeting adults 25-54"
+                ),
                 "routing_mode": "crew",
             },
         )
@@ -208,6 +223,6 @@ class TestCrewPlanCampaign:
         assert result["success"], f"Invoke failed: {result['error']}"
         # The raw output should contain campaign plan indicators
         response = result["response"]
-        assert any(
-            kw in response.lower() for kw in ["budget", "campaign", "plan", "allocation"]
-        ), f"No plan data: {response[:300]}"
+        assert any(kw in response.lower() for kw in ["budget", "campaign", "plan", "allocation"]), (
+            f"No plan data: {response[:300]}"
+        )

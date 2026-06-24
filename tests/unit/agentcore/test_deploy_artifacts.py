@@ -116,7 +116,9 @@ class TestDeployScript:
     def test_help_flag(self):
         result = __import__("subprocess").run(
             ["bash", str(AGENTCORE_DIR / "deploy.sh"), "--help"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         assert result.returncode == 0
         assert "Usage:" in result.stdout
@@ -134,6 +136,7 @@ class TestMainTemplateECSOnly:
     def load_template(self):
         def _cfn_loader():
             loader = yaml.SafeLoader
+
             def _multi_constructor(loader, tag_suffix, node):
                 if isinstance(node, yaml.ScalarNode):
                     return loader.construct_scalar(node)
@@ -141,6 +144,7 @@ class TestMainTemplateECSOnly:
                     return loader.construct_sequence(node)
                 elif isinstance(node, yaml.MappingNode):
                     return loader.construct_mapping(node)
+
             loader.add_multi_constructor("!", _multi_constructor)
             return loader
 
@@ -178,9 +182,18 @@ class TestCampaignBriefs:
         assert len(self.briefs) == 3
 
     def test_briefs_have_required_fields(self):
-        required = ["id", "vertical", "brand", "budget", "channels",
-                     "target_audience", "target_cpm", "max_cpm",
-                     "preferred_package", "flight_dates"]
+        required = [
+            "id",
+            "vertical",
+            "brand",
+            "budget",
+            "channels",
+            "target_audience",
+            "target_cpm",
+            "max_cpm",
+            "preferred_package",
+            "flight_dates",
+        ]
         for brief in self.briefs:
             for field in required:
                 assert field in brief, f"Brief {brief.get('id', '?')} missing: {field}"
