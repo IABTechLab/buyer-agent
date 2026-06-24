@@ -95,7 +95,7 @@ def create_audience_planner_agent(
         not fill in CPMs from market knowledge or training data.""",
         verbose=verbose,
         allow_delegation=False,  # Makes final audience decisions
-        memory=True,
+        memory=settings.crew_memory_enabled,
         llm=llm,
         tools=tools or [],
     )

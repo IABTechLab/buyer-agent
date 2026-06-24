@@ -36,12 +36,22 @@ from ad_buyer.agents.level3.audience_planner_agent import create_audience_planne
 from ad_buyer.agents.level3.execution_agent import create_execution_agent
 from ad_buyer.agents.level3.reporting_agent import create_reporting_agent
 from ad_buyer.agents.level3.research_agent import create_research_agent
+from ad_buyer.config.settings import settings
 from ad_buyer.crews.channel_crews import (
     _create_audience_tools,
     _create_execution_tools,
     _create_research_tools,
     _format_audience_context,
 )
+
+
+# Per ar-i84f: agent constructors now honor settings.crew_memory_enabled
+# instead of hard-coding memory=True. Force the flag on for this test module
+# so memory-related assertions don't depend on ambient .env state.
+@pytest.fixture(autouse=True)
+def _force_memory_enabled(monkeypatch):
+    monkeypatch.setattr(settings, "crew_memory_enabled", True)
+
 
 # ---------------------------------------------------------------------------
 # Helper: create valid BaseTool instances for injection tests
@@ -603,6 +613,19 @@ class TestHierarchyInvariants:
         for factory in all_factories:
             agent = factory(verbose=False)
             assert agent.memory, f"{agent.role} should have memory"
+
+    def test_all_agents_honor_crew_memory_enabled_false(self, monkeypatch):
+        """ar-i84f regression: when settings.crew_memory_enabled is False,
+        every agent must construct WITHOUT memory (no chromadb / OpenAI
+        embedder dependency). Prior to the fix this assertion failed
+        because memory=True was hardcoded in every agent constructor."""
+        monkeypatch.setattr(settings, "crew_memory_enabled", False)
+        all_factories = self.L1_FACTORIES + self.L2_FACTORIES + self.L3_FACTORIES
+        for factory in all_factories:
+            agent = factory(verbose=False)
+            assert not agent.memory, (
+                f"{agent.role} should NOT have memory when crew_memory_enabled=False"
+            )
 
     def test_all_agents_have_non_empty_role(self):
         """Every agent must have a meaningful role string."""

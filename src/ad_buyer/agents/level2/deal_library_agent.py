@@ -99,5 +99,5 @@ not fill in CPMs from market knowledge or training data.""",
         tools=tools or [],
         allow_delegation=True,
         verbose=verbose,
-        memory=True,
+        memory=settings.crew_memory_enabled,
     )
