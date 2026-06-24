@@ -573,6 +573,11 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["progress"] = 0.2
         _result = flow.kickoff()
 
+        # Propagate any errors captured by flow steps into the job response so
+        # the client can see what went wrong instead of silent-success (ar-jbod).
+        if flow.state.errors:
+            job["errors"].extend(flow.state.errors)
+
         job["progress"] = 0.8
         job["budget_allocations"] = {
             k: v.model_dump() for k, v in flow.state.budget_allocations.items()
