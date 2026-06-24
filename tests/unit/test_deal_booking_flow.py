@@ -389,7 +389,7 @@ class TestExtractJsonBlock:
     def test_json_embedded_in_text(self, flow_with_brief):
         """JSON embedded in surrounding text is extracted."""
         text = (
-            'Here is my analysis:\n'
+            "Here is my analysis:\n"
             '{"branding": {"budget": 50000, "percentage": 50, "rationale": "Test"}}\nDone.'
         )
 
@@ -458,13 +458,9 @@ class TestAllocateBudget:
 
         pyd = BudgetAllocationOutput(
             branding=_ChannelAllocationOut(budget=40000, percentage=40, rationale="Awareness"),
-            performance=_ChannelAllocationOut(
-                budget=30000, percentage=30, rationale="Conversions"
-            ),
+            performance=_ChannelAllocationOut(budget=30000, percentage=30, rationale="Conversions"),
             ctv=_ChannelAllocationOut(budget=20000, percentage=20, rationale="Video reach"),
-            mobile_app=_ChannelAllocationOut(
-                budget=10000, percentage=10, rationale="App installs"
-            ),
+            mobile_app=_ChannelAllocationOut(budget=10000, percentage=10, rationale="App installs"),
         )
         crew_output = SimpleNamespace(
             tasks_output=[SimpleNamespace(pydantic=pyd, json_dict=None, raw="")],
