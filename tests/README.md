@@ -44,7 +44,7 @@ PYTHONPATH=src venv/bin/pytest tests/unit/test_audience_planner_wiring.py::TestE
 - **`PYTHONPATH=src`** is required because the buyer ships its package as `src/ad_buyer/`. Running pytest without it triggers `ModuleNotFoundError`.
 - **Worktrees**: when running in a `.worktrees/<name>/` checkout, `ln -sf ../../venv venv` lets the worktree share the main repo's venv.
 - **Audience-extension cross-repo tests** (e.g. `test_path_a_audience_e2e.py::test_cross_repo_audience_plan_json_round_trip`) need the seller worktree's `src/` on the path. The test discovers it from the buyer worktree name, but you can override with `AD_SELLER_SRC_PATH=/abs/path/to/ad_seller_system/src`.
-- **CrewAI agents need `ANTHROPIC_API_KEY`**. Tests `os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")` at module top to keep CI green without a real key.
+- **CrewAI agents need `LLM_API_KEY`**. Tests `os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")` at module top to keep CI green without a real key.
 - **`EMBEDDING_MODE` env var** controls embedding behavior. CI defaults to `mock`; `hybrid` is the runtime default.
 
 ## Audit / regression guards
@@ -92,6 +92,6 @@ If you discover a new flake:
 
 1. Pick the right tier (unit unless you genuinely need cross-module setup).
 2. Mirror existing patterns — copy a small file as a template.
-3. Set `os.environ.setdefault("ANTHROPIC_API_KEY", ...)` if you import any agent code.
+3. Set `os.environ.setdefault("LLM_API_KEY", ...)` if you import any agent code.
 4. If you're testing a tool, lean on the `BaseTool` regression guards above.
 5. Run `pytest tests/<your-new-file>.py -v` then the full suite before committing.

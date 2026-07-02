@@ -28,13 +28,13 @@ Create a `.env` file in the project root with your LLM API key:
 
 ```dotenv
 # Minimum — just set your LLM provider key
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 ```
 
 ??? note "Full configuration options"
     ```dotenv
     # LLM — set the API key for your chosen provider
-    ANTHROPIC_API_KEY=sk-ant-...              # For Anthropic (default)
+    LLM_API_KEY=...                           # For Anthropic (default)
     # OPENAI_API_KEY=sk-xxxxx                 # For OpenAI / Azure
     # COHERE_API_KEY=xxxxx                    # For Cohere
 

@@ -33,7 +33,7 @@ The app container reads from `../../.env` (project root). Key settings:
 
 ```bash
 DATABASE_URL=sqlite:///./data/ad_buyer.db
-ANTHROPIC_API_KEY=sk-ant-...           # Or your chosen LLM provider key
+LLM_API_KEY=...                        # Or your chosen LLM provider key
 SELLER_ENDPOINTS=http://seller:8000    # Seller agent URL(s)
 ```
 
@@ -77,7 +77,7 @@ aws cloudformation create-stack \
   --template-url https://your-bucket.s3.amazonaws.com/cf-templates/main.yaml \
   --parameters \
     ParameterKey=Environment,ParameterValue=production \
-    ParameterKey=AnthropicApiKeySSMParam,ParameterValue=/ad-buyer/anthropic-api-key \
+    ParameterKey=LlmApiKeySSMParam,ParameterValue=/ad-buyer/llm-api-key \
     ParameterKey=ContainerImage,ParameterValue=123456789.dkr.ecr.us-east-1.amazonaws.com/ad-buyer:latest \
   --capabilities CAPABILITY_NAMED_IAM
 ```

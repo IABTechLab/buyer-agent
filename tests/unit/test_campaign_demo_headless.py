@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 
 def _run_module(args: list[str]) -> subprocess.CompletedProcess:

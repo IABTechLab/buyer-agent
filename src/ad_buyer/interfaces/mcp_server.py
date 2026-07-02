@@ -247,7 +247,7 @@ def get_setup_status() -> str:
     checks["api_key_configured"] = bool(settings.api_key)
 
     # Check LLM configuration
-    checks["llm_configured"] = bool(settings.anthropic_api_key)
+    checks["llm_configured"] = bool(settings.llm_api_key)
 
     # Overall setup completeness
     # Minimum required: seller endpoints + database

@@ -10,7 +10,7 @@ import inspect
 import os
 import pkgutil
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 from crewai.tools import BaseTool

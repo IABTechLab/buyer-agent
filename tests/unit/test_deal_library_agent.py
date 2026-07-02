@@ -8,7 +8,7 @@ import os
 from crewai.tools import BaseTool
 
 # Set a dummy API key for tests (agents validate on creation)
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 from ad_buyer.agents.level2 import create_deal_library_agent as imported_from_package
 from ad_buyer.agents.level2.deal_library_agent import create_deal_library_agent

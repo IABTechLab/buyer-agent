@@ -141,7 +141,7 @@ async def test_get_config():
     assert not err, f"get_config error: {data}"
     assert "environment" in data
     assert "database_url" in data
-    assert "anthropic_api_key" not in str(data), "API key must not be exposed"
+    assert "llm_api_key" not in str(data), "API key must not be exposed"
 
 
 # ---------------------------------------------------------------------------

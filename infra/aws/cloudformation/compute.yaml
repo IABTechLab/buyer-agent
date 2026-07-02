@@ -44,10 +44,10 @@ Parameters:
     Type: String
     Description: ARN of an ACM certificate for the HTTPS listener.
 
-  AnthropicApiKeyParameter:
+  LlmApiKeyParameter:
     Type: String
-    Default: /ad-buyer-system/anthropic-api-key
-    Description: SSM SecureString parameter name for the Anthropic API key.
+    Default: /ad-buyer-system/llm-api-key
+    Description: SSM SecureString parameter name for the LLM provider API key.
 
   RedisEndpoint:
     Type: String
@@ -171,7 +171,7 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParameter
                 Resource:
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AnthropicApiKeyParameter}"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${LlmApiKeyParameter}"
       Tags:
         - Key: Project
           Value: ad-buyer-system
@@ -262,8 +262,8 @@ Resources:
             - Name: ENVIRONMENT
               Value: !Ref Environment
           Secrets:
-            - Name: ANTHROPIC_API_KEY
-              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${AnthropicApiKeyParameter}"
+            - Name: LLM_API_KEY
+              ValueFrom: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${LlmApiKeyParameter}"
           LogConfiguration:
             LogDriver: awslogs
             Options:

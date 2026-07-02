@@ -30,7 +30,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 # Stub Anthropic key BEFORE any ad_buyer.crews / agents imports (mirrors
 # pattern in test_audience_planner_wiring.py).
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 

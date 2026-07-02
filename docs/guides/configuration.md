@@ -12,7 +12,7 @@ Create a `.env` file in the project root:
 
 ```bash
 # Required
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 
 # Seller communication
 SELLER_ENDPOINTS=http://localhost:8000
@@ -41,7 +41,7 @@ print(settings.get_seller_endpoints())
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ANTHROPIC_API_KEY` | `str` | `""` | Anthropic API key for Claude models. Required for agent functionality. |
+| `LLM_API_KEY` | `str` | `""` | API key for your LLM provider (any provider). Required for agent functionality. |
 | `API_KEY` | `str` | `""` | Inbound API key for authenticating requests to this service. When empty, authentication is disabled (development mode). |
 
 !!! warning "Development mode"
@@ -90,6 +90,9 @@ Models are specified in `provider/model-name` format using CrewAI's native provi
 DEFAULT_LLM_MODEL=openai/gpt-4o
 MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
 ```
+
+!!! tip "Free and local models via `LLM_API_BASE_URL`"
+    OpenAI-compatible endpoints work by pointing `LLM_API_BASE_URL` at the provider. For example, NVIDIA NIM offers free hosted models (`LLM_API_BASE_URL=https://integrate.api.nvidia.com/v1`), and a local [Ollama](https://ollama.com) server works with `LLM_API_BASE_URL=http://localhost:11434/v1`. Set `LLM_API_KEY` and the matching `DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` for the provider.
 
 **Agent temperature overrides:**
 
@@ -213,7 +216,7 @@ settings = get_settings()
 
 # Or create a fresh instance (useful for testing)
 test_settings = Settings(
-    anthropic_api_key="test-key",
+    llm_api_key="test-key",
     database_url="sqlite:///./test.db",
     environment="testing",
 )
@@ -246,7 +249,7 @@ project-root/
 ### Development (Minimal)
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 ```
 
 Everything else uses defaults: local SQLite database, localhost seller, Sonnet for agents, Opus for manager, verbose logging enabled.
@@ -254,7 +257,7 @@ Everything else uses defaults: local SQLite database, localhost seller, Sonnet f
 ### Production
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 API_KEY=your-service-api-key
 
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
@@ -274,7 +277,7 @@ LOG_LEVEL=WARNING
 ### Testing
 
 ```bash
-ANTHROPIC_API_KEY=test-key
+LLM_API_KEY=test-key
 API_KEY=test-api-key
 DATABASE_URL=sqlite:///./test_ad_buyer.db
 ENVIRONMENT=testing

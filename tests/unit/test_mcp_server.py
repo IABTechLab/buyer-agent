@@ -342,7 +342,7 @@ class TestGetConfig:
         data = json.loads(text)
 
         # Must not contain actual API key field names
-        assert "anthropic_api_key" not in data
+        assert "llm_api_key" not in data
         assert "api_key" not in data
         assert "opendirect_token" not in data
         assert "opendirect_api_key" not in data

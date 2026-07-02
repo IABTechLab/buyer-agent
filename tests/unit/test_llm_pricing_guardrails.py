@@ -13,7 +13,7 @@ channel_crews expected_output template allows null CPM.
 import os
 
 # Set a dummy API key for tests (agents validate on creation)
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 

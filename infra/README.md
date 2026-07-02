@@ -64,9 +64,9 @@ infra/
 Before deploying, create the following SSM SecureString parameters:
 
 ```bash
-# Anthropic API key (used by the buyer agent)
+# LLM provider API key (used by the buyer agent)
 aws ssm put-parameter \
-  --name "/ad-buyer-system/anthropic-api-key" \
+  --name "/ad-buyer-system/llm-api-key" \
   --type SecureString \
   --value "sk-ant-..."
 ```
@@ -154,7 +154,7 @@ settings. The `production` environment should require manual approval.
 | `STORAGE_TYPE` | Storage backend: `redis`, `sqlite`, or `hybrid` | `redis` in prod |
 | `DATABASE_URL` | SQLite connection string | `sqlite:///./data/ad_buyer.db` |
 | `REDIS_URL` | Redis connection string | Set by IaC |
-| `ANTHROPIC_API_KEY` | Anthropic API key (injected from SSM) | - |
+| `LLM_API_KEY` | LLM provider API key (injected from SSM) | - |
 | `ENVIRONMENT` | Deployment environment name | Set by IaC |
 
 ## Cost Estimates (us-east-1)

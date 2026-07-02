@@ -8,7 +8,7 @@ Set up the buyer agent infrastructure, connect to seller agents and SSPs, and ge
 - Docker (for deployment)
 - Seller agent URLs (at least one seller must be reachable)
 - SSP API keys (optional: PubMatic, Magnite, Index Exchange)
-- Anthropic API key
+- LLM provider API key
 
 ## Step 1: Deploy the Buyer Agent
 
@@ -29,7 +29,7 @@ Create a `.env` file:
 
 ```env
 # Required
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 
 # Buyer Identity
 IAB_SERVER_URL=http://localhost:8001

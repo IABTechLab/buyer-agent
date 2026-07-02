@@ -129,7 +129,7 @@ resource "aws_iam_role_policy_attachment" "execution_managed" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Allow fetching the Anthropic API key from SSM Parameter Store
+# Allow fetching the LLM provider API key from SSM Parameter Store
 data "aws_iam_policy_document" "execution_ssm" {
   statement {
     effect = "Allow"
@@ -138,7 +138,7 @@ data "aws_iam_policy_document" "execution_ssm" {
       "ssm:GetParameter",
     ]
     resources = [
-      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.environment}/ad-buyer/ANTHROPIC_API_KEY",
+      "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.environment}/ad-buyer/LLM_API_KEY",
     ]
   }
 }
@@ -264,8 +264,8 @@ resource "aws_ecs_task_definition" "this" {
 
       secrets = [
         {
-          name      = "ANTHROPIC_API_KEY"
-          valueFrom = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.environment}/ad-buyer/ANTHROPIC_API_KEY"
+          name      = "LLM_API_KEY"
+          valueFrom = "arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${var.environment}/ad-buyer/LLM_API_KEY"
         },
       ]
 

@@ -33,7 +33,7 @@ from unittest.mock import AsyncMock, MagicMock
 # at module-load time so the CrewAI Agent factories (which instantiate an
 # LLM eagerly in __init__) work in unit tests that never make a network
 # call. This must run BEFORE any ad_buyer imports that touch crewai.
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 

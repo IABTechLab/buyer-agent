@@ -16,9 +16,6 @@ _ENV_FILE = find_dotenv(usecwd=True)
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
-    # API Keys
-    anthropic_api_key: str = ""
-
     # Inbound API key for authenticating requests to this service.
     # When empty/not set, authentication is disabled (development mode).
     api_key: str = ""
@@ -62,10 +59,16 @@ class Settings(BaseSettings):
         return [url.strip() for url in self.seller_endpoints.split(",") if url.strip()]
 
     # LLM Settings
+    # Provider is selected by the model prefix ("<provider>/<model>"). One
+    # llm_api_key serves whichever provider is chosen. Set llm_api_base_url for
+    # OpenAI-compatible endpoints (NVIDIA NIM, Ollama, vLLM, ...).
     default_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
     manager_llm_model: str = "anthropic/claude-opus-4-20250514"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
+    llm_api_key: str = ""
+    llm_api_base_url: str | None = None
+    llm_api_version: str | None = None
 
     # Database / Storage Configuration
     database_url: str = "sqlite:///./ad_buyer.db"

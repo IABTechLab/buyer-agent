@@ -35,7 +35,7 @@ class TestSettingsToClientConfiguration:
         settings = Settings.model_construct(
             seller_endpoints="http://seller1.test,http://seller2.test, http://seller3.test ",
             api_key="",
-            anthropic_api_key="",
+            llm_api_key="",
             iab_server_url="http://localhost:8001",
             opendirect_base_url="http://localhost:3000/api/v2.1",
             opendirect_token=None,
@@ -64,7 +64,7 @@ class TestSettingsToClientConfiguration:
         settings = Settings.model_construct(
             seller_endpoints="",
             api_key="",
-            anthropic_api_key="",
+            llm_api_key="",
             iab_server_url="http://localhost:8001",
             opendirect_base_url="http://localhost:3000/api/v2.1",
             opendirect_token=None,
@@ -90,7 +90,7 @@ class TestSettingsToClientConfiguration:
         settings = Settings.model_construct(
             cors_allowed_origins="http://localhost:3000,http://localhost:8080",
             api_key="",
-            anthropic_api_key="",
+            llm_api_key="",
             iab_server_url="http://localhost:8001",
             seller_endpoints="",
             opendirect_base_url="http://localhost:3000/api/v2.1",

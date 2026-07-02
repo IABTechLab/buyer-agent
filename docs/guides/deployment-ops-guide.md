@@ -58,14 +58,14 @@ cp .env.example .env
 Minimum required settings:
 
 ```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 ```
 
 Full development configuration:
 
 ```dotenv
 # LLM provider (Anthropic default; install crewai[openai] etc. for others)
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 
 # Inbound API key for this service (leave empty to disable auth in dev)
 API_KEY=
@@ -111,7 +111,7 @@ curl http://localhost:8001/health
 ### Running Tests
 
 ```bash
-ANTHROPIC_API_KEY=test pytest tests/ -v
+LLM_API_KEY=test pytest tests/ -v
 ```
 
 Run with coverage:
@@ -158,7 +158,7 @@ curl http://localhost:8001/health
 The Docker Compose file reads from `../../.env` (the project root) via `env_file`. Set at minimum:
 
 ```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 ```
 
 The `DATABASE_URL` is overridden inside `docker-compose.yml` to point at the container-local path:
@@ -251,7 +251,7 @@ The buyer agent runs on **ECS Fargate** with **EFS-backed SQLite persistence**. 
 | Storage | EFS (Elastic File System) | SQLite file mounted at `/app/data` |
 | Networking | VPC, public + private subnets | 2 AZs |
 | Load balancer | Application Load Balancer | HTTPS with ACM cert, HTTP → HTTPS redirect |
-| Secrets | SSM Parameter Store (SecureString) | Anthropic API key |
+| Secrets | SSM Parameter Store (SecureString) | LLM provider API key |
 | Logging | CloudWatch Logs | 30-day retention by default |
 
 !!! warning "Single-task constraint with SQLite"
@@ -275,12 +275,12 @@ infra/aws/cloudformation/
 └── compute.yaml    # ECS Fargate, ALB, EFS, CloudWatch, IAM roles
 ```
 
-**Step 1 — Store your Anthropic API key in SSM:**
+**Step 1 — Store your LLM provider API key in SSM:**
 
 ```bash
 aws ssm put-parameter \
-  --name /ad-buyer-system/anthropic-api-key \
-  --value "sk-ant-..." \
+  --name /ad-buyer-system/llm-api-key \
+  --value "..." \
   --type SecureString \
   --region us-east-1
 ```
@@ -303,7 +303,7 @@ aws cloudformation create-stack \
     ParameterKey=TemplatesBucketName,ParameterValue=your-bucket \
     ParameterKey=ContainerImage,ParameterValue=123456789.dkr.ecr.us-east-1.amazonaws.com/ad-buyer:latest \
     ParameterKey=CertificateArn,ParameterValue=arn:aws:acm:us-east-1:123456789:certificate/... \
-    ParameterKey=AnthropicApiKeyParameter,ParameterValue=/ad-buyer-system/anthropic-api-key \
+    ParameterKey=LlmApiKeyParameter,ParameterValue=/ad-buyer-system/llm-api-key \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-1
 ```
@@ -329,7 +329,7 @@ aws cloudformation update-stack \
     ParameterKey=Environment,UsePreviousValue=true \
     ParameterKey=TemplatesBucketName,UsePreviousValue=true \
     ParameterKey=CertificateArn,UsePreviousValue=true \
-    ParameterKey=AnthropicApiKeyParameter,UsePreviousValue=true \
+    ParameterKey=LlmApiKeyParameter,UsePreviousValue=true \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-1
 ```
@@ -418,7 +418,7 @@ All settings are loaded from environment variables or a `.env` file via `pydanti
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | `""` | Anthropic API key for Claude models. Required for all agent functionality. |
+| `LLM_API_KEY` | Yes | `""` | API key for your LLM provider (any provider). Required for all agent functionality. |
 | `API_KEY` | No | `""` | Inbound API key for authenticating requests to this service. When empty, authentication is disabled (development mode). Set a value in production. |
 
 Authentication is enforced via the `X-API-Key` header. Public paths (`/health`, `/docs`, `/openapi.json`, `/redoc`) are always unauthenticated.
@@ -493,13 +493,13 @@ REDIS_URL=redis://cache.example.com:6379/0
 **Minimal local development:**
 
 ```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 ```
 
 **Full production:**
 
 ```dotenv
-ANTHROPIC_API_KEY=sk-ant-...
+LLM_API_KEY=...
 API_KEY=your-service-api-key
 
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
@@ -520,7 +520,7 @@ LOG_LEVEL=WARNING
 **Testing:**
 
 ```dotenv
-ANTHROPIC_API_KEY=test-key
+LLM_API_KEY=test-key
 API_KEY=test-api-key
 DATABASE_URL=sqlite:///./test_ad_buyer.db
 ENVIRONMENT=testing
@@ -531,7 +531,7 @@ CREW_MAX_ITERATIONS=5
 
 ### AWS Secrets Management
 
-In AWS deployments, the Anthropic API key is stored in SSM Parameter Store as a SecureString and injected into the container as an environment variable at runtime. The ECS task execution role is granted `ssm:GetParameter` on the specific parameter ARN.
+In AWS deployments, the LLM provider API key is stored in SSM Parameter Store as a SecureString and injected into the container as an environment variable at runtime. The ECS task execution role is granted `ssm:GetParameter` on the specific parameter ARN.
 
 To add additional secrets (seller API keys, service credentials):
 
@@ -932,8 +932,8 @@ Common cause: EFS mount targets are not yet available in the subnets. Wait a few
 **Check 1 — API key validity:**
 
 ```bash
-# Test the Anthropic API key directly
-curl -H "x-api-key: $ANTHROPIC_API_KEY" \
+# Test the LLM provider API key directly (Anthropic example)
+curl -H "x-api-key: $LLM_API_KEY" \
      -H "anthropic-version: 2023-06-01" \
      https://api.anthropic.com/v1/models | jq '.models[0]'
 ```

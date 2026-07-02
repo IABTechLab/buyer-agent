@@ -183,7 +183,7 @@ The buyer server is not running or crashed. Start it with:
 uvicorn ad_buyer.interfaces.api.main:app --reload --port 8001
 ```
 
-If it fails to start, check that your `.env` has a valid `ANTHROPIC_API_KEY` and that all dependencies are installed (`pip install -e .`).
+If it fails to start, check that your `.env` has a valid `LLM_API_KEY` and that all dependencies are installed (`pip install -e .`).
 
 ### Tools appear but calls return errors
 

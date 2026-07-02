@@ -12,12 +12,13 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
-from crewai import LLM, Agent, Crew, Task
+from crewai import Agent, Crew, Task
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ...clients.mcp_client import SimpleMCPClient
 from ...config.settings import settings
+from ...llm import get_llm
 
 
 class ConversationMessage:
@@ -519,10 +520,7 @@ Don't just explain how to do it, actually execute the booking.
 
 Be conversational but professional. Ask clarifying questions when needed.
 Provide specific, actionable recommendations based on user requirements.""",
-            llm=LLM(
-                model=settings.default_llm_model,
-                temperature=0.7,
-            ),
+            llm=get_llm(temperature=0.7),
             tools=self._tools,
             verbose=False,
             memory=True,

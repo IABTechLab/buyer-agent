@@ -50,7 +50,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # Stub the Anthropic key BEFORE any ad_buyer.crews / agents imports.
 # CrewAI Agent factories instantiate an LLM eagerly in __init__ and we
 # never make a network call here. Mirrors the pattern used in unit tests.
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-path-b-e2e")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-path-b-e2e")
 
 import pytest
 

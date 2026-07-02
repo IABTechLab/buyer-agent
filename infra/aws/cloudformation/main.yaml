@@ -31,10 +31,10 @@ Parameters:
     Type: String
     Description: ARN of an ACM certificate for the HTTPS listener.
 
-  AnthropicApiKeyParameter:
+  LlmApiKeyParameter:
     Type: String
-    Default: /ad-buyer-system/anthropic-api-key
-    Description: SSM SecureString parameter name holding the Anthropic API key.
+    Default: /ad-buyer-system/llm-api-key
+    Description: SSM SecureString parameter name holding the LLM provider API key.
 
   RedisNodeType:
     Type: String
@@ -96,7 +96,7 @@ Resources:
         RedisPort: !GetAtt StorageStack.Outputs.RedisPort
         ContainerImage: !Ref ContainerImage
         CertificateArn: !Ref CertificateArn
-        AnthropicApiKeyParameter: !Ref AnthropicApiKeyParameter
+        LlmApiKeyParameter: !Ref LlmApiKeyParameter
       Tags:
         - Key: Project
           Value: ad-buyer-system

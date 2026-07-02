@@ -10,7 +10,7 @@ Tests written first (TDD) per bead buyer-6io.
 import os
 
 # Set a dummy API key for tests (agents validate on creation)
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 from ad_buyer.agents.level2.linear_tv_agent import create_linear_tv_agent
 

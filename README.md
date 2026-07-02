@@ -144,7 +144,7 @@ Key settings:
 
 ```bash
 # LLM — set the API key for your chosen provider
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxx        # For Anthropic (default)
+LLM_API_KEY=...        # Credential for your chosen LLM provider
 # OPENAI_API_KEY=sk-xxxxx                   # For OpenAI / Azure
 # COHERE_API_KEY=xxxxx                      # For Cohere
 
@@ -228,7 +228,7 @@ docker compose up
 pip install -e ".[dev]"
 
 # Run tests
-ANTHROPIC_API_KEY=test pytest tests/ -v
+LLM_API_KEY=test pytest tests/ -v
 
 # Lint
 ruff check src/

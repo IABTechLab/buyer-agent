@@ -24,7 +24,7 @@ def _make_settings(api_key: str = "") -> Settings:
     """Create a Settings instance for testing."""
     return Settings.model_construct(
         api_key=api_key,
-        anthropic_api_key="",
+        llm_api_key="",
         iab_server_url="http://localhost:8001",
         seller_endpoints="",
         opendirect_base_url="http://localhost:3000/api/v2.1",

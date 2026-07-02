@@ -32,9 +32,10 @@ these heuristics (from the strategic plan, Section 5.4):
 
 from typing import Any
 
-from crewai import LLM, Agent
+from crewai import Agent
 
 from ...config.settings import settings
+from ...llm import get_llm
 
 
 def create_deal_library_agent(
@@ -92,10 +93,7 @@ CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
 explicitly provided by sellers through quotes or media kits. If no pricing is
 available from the seller, state clearly that pricing requires negotiation. Do
 not fill in CPMs from market knowledge or training data.""",
-        llm=LLM(
-            model=settings.default_llm_model,
-            temperature=0.3,
-        ),
+        llm=get_llm(temperature=0.3),
         tools=tools or [],
         allow_delegation=True,
         verbose=verbose,

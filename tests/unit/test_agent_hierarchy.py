@@ -21,7 +21,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 # Set a dummy API key for tests (agents validate on creation)
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 from crewai import Agent
 from crewai.tools import BaseTool

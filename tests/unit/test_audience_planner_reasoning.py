@@ -31,7 +31,7 @@ from typing import Any
 
 # CrewAI Agent factories instantiate an LLM eagerly; stub the API key
 # at import time so tests that touch the agent shell work offline.
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 

@@ -6,7 +6,7 @@
 import os
 
 # Set a dummy API key for tests (agents validate on creation)
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent

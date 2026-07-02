@@ -63,7 +63,7 @@ class TestCORSConfiguration:
     def test_settings_default_cors_origins(self):
         """Default CORS origins should be wildcard for MCP server (auth lives in API keys)."""
         s = Settings(
-            anthropic_api_key="test",
+            llm_api_key="test",
             _env_file=None,
         )
         origins = s.get_cors_origins()
@@ -73,7 +73,7 @@ class TestCORSConfiguration:
     def test_settings_custom_cors_origins(self):
         """CORS origins should be configurable."""
         s = Settings(
-            anthropic_api_key="test",
+            llm_api_key="test",
             cors_allowed_origins="https://app.example.com,https://admin.example.com",
             _env_file=None,
         )

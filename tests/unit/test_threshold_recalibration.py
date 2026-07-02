@@ -3,7 +3,7 @@
 import os
 import sys
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 from unittest.mock import patch
 

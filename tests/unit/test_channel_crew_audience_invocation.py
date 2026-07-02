@@ -33,7 +33,7 @@ from unittest.mock import MagicMock
 # Stub the Anthropic key at module-load time -- CrewAI Agent factories
 # instantiate an LLM eagerly in __init__ and we never make a network
 # call in unit tests.
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 

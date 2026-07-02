@@ -6,7 +6,7 @@ all-MiniLM-L6-v2 local + advertiser-supplied + mock fallback hybrid).
 
 import os
 
-os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
+os.environ.setdefault("LLM_API_KEY", "test-key-for-unit-tests")
 
 from unittest.mock import patch
 
