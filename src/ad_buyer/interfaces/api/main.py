@@ -23,6 +23,7 @@ from ...flows.deal_booking_flow import DealBookingFlow
 from ...storage import DealStore
 from ...storage.order_store import OrderStore
 from ...time_utils import utc_now
+from .console import install_agent_console
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,7 @@ from ..mcp_server import mcp as _mcp_server  # noqa: E402
 from ..mcp_server import mount_mcp  # noqa: E402
 
 mount_mcp(app)
+install_agent_console(app)
 
 
 @asynccontextmanager
@@ -125,7 +127,14 @@ def _mount_order_router() -> None:
 _mount_order_router()
 
 # Paths that never require authentication
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+_PUBLIC_PATHS = {
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/console",
+    "/console/openapi-client.js",
+}
 
 
 @app.middleware("http")
