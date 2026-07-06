@@ -79,7 +79,7 @@ class Product(BaseModel):
 
     id: str | None = None
     publisher_id: str = Field(..., alias="publisherId")
-    name: str = Field(..., max_length=38)
+    name: str = Field(..., max_length=100)
     description: str | None = None
     currency: str = Field(default="USD", description="ISO-4217 currency code")
     base_price: float = Field(..., alias="basePrice", ge=0)

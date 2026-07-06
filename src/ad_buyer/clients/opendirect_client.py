@@ -4,6 +4,7 @@
 """HTTP client for IAB OpenDirect 2.1 API."""
 
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -53,6 +54,52 @@ class OpenDirectClient:
             headers["X-API-Key"] = api_key
         return headers
 
+    def _default_publisher_id(self) -> str:
+        """Return a stable publisher id for seller payloads without OpenDirect metadata."""
+        host = urlparse(self.base_url).netloc or urlparse(f"https://{self.base_url}").netloc
+        return host or "unknown-publisher"
+
+    def _normalize_product_payload(self, product: dict[str, Any]) -> dict[str, Any]:
+        """Normalize deployed seller-agent product JSON to the buyer OpenDirect model shape."""
+        normalized = dict(product)
+
+        if "id" not in normalized and "product_id" in normalized:
+            normalized["id"] = normalized["product_id"]
+        if "publisherId" not in normalized:
+            normalized["publisherId"] = (
+                normalized.get("publisher_id")
+                or normalized.get("publisher")
+                or self._default_publisher_id()
+            )
+        if "basePrice" not in normalized and "base_cpm" in normalized:
+            normalized["basePrice"] = normalized["base_cpm"]
+        if "rateType" not in normalized:
+            normalized["rateType"] = normalized.get("rate_type") or "CPM"
+        if "deliveryType" not in normalized:
+            deal_types = {
+                str(deal_type).replace("_", "").replace("-", "").lower()
+                for deal_type in normalized.get("deal_types", [])
+            }
+            normalized["deliveryType"] = (
+                "Guaranteed" if "programmaticguaranteed" in deal_types else "PMP"
+            )
+        normalized.setdefault("currency", "USD")
+
+        if "ext" not in normalized:
+            normalized["ext"] = {}
+        if isinstance(normalized["ext"], dict):
+            normalized["ext"].setdefault("source", "seller-agent")
+            normalized["ext"].setdefault("raw_product", product)
+
+        return normalized
+
+    def _parse_products(self, data: Any) -> list[Product]:
+        products = data.get("products", data) if isinstance(data, dict) else data
+        return [
+            Product.model_validate(self._normalize_product_payload(p) if isinstance(p, dict) else p)
+            for p in products
+        ]
+
     # -------------------------------------------------------------------------
     # Products
     # -------------------------------------------------------------------------
@@ -71,9 +118,7 @@ class OpenDirectClient:
         params = {"$skip": skip, "$top": top, **filters}
         response = await self._client.get("/products", params=params)
         response.raise_for_status()
-        data = response.json()
-        products = data.get("products", data) if isinstance(data, dict) else data
-        return [Product.model_validate(p) for p in products]
+        return self._parse_products(response.json())
 
     async def get_product(self, product_id: str) -> Product:
         """Get a single product by ID.
@@ -86,7 +131,10 @@ class OpenDirectClient:
         """
         response = await self._client.get(f"/products/{product_id}")
         response.raise_for_status()
-        return Product.model_validate(response.json())
+        data = response.json()
+        return Product.model_validate(
+            self._normalize_product_payload(data) if isinstance(data, dict) else data
+        )
 
     async def search_products(self, filters: dict[str, Any]) -> list[Product]:
         """Search products with filters.
@@ -98,10 +146,13 @@ class OpenDirectClient:
             List of matching Product objects
         """
         response = await self._client.post("/products/search", json=filters)
-        response.raise_for_status()
-        data = response.json()
-        products = data.get("products", data) if isinstance(data, dict) else data
-        return [Product.model_validate(p) for p in products]
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 405:
+                raise
+            return await self.list_products()
+        return self._parse_products(response.json())
 
     async def check_avails(self, request: AvailsRequest) -> AvailsResponse:
         """Check availability and pricing for a product.
