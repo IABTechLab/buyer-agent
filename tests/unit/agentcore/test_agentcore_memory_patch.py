@@ -18,6 +18,13 @@ import pytest
 # Ensure patches/ is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
+try:
+    import crewai.llms.providers.bedrock.completion  # noqa: F401
+
+    _bedrock_available = True
+except ImportError:
+    _bedrock_available = False
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -315,6 +322,7 @@ class TestMemoryIntegration:
         mem = Memory()
         mem.drain_writes()
 
+    @pytest.mark.skipif(not _bedrock_available, reason="crewai[bedrock] not installed")
     def test_crew_with_memory_true(self):
         """Crew(memory=True) doesn't crash and uses AgentCore backend."""
         from crewai import Agent, Crew, Task
