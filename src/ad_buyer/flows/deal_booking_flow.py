@@ -61,20 +61,13 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
-            **state_kwargs: Initial state field values for the underlying
-                ``BookingState``.  CrewAI >=1.14 made ``Flow`` a Pydantic
-                model and removed the legacy ``state`` setter, so initial
-                state is now supplied via the ``initial_state=`` field on
-                ``Flow.__init__`` rather than as ad-hoc keyword arguments.
+            **state_kwargs: Initial state field values forwarded to the
+                underlying ``BookingState`` via CrewAI's ``_initialize_state``.
+                CrewAI >=1.14 accepts state field kwargs directly on
+                ``Flow.__init__`` and applies them after creating the default
+                state — pass fields by name (e.g. ``campaign_brief=...``).
         """
-        if state_kwargs:
-            # CrewAI >=1.14 expects ``initial_state`` to be the typed
-            # state model instance (or None), not a loose dict.  Build a
-            # ``BookingState`` from the supplied kwargs so callers can
-            # keep passing fields by name (e.g. ``campaign_brief=...``).
-            super().__init__(initial_state=BookingState(**state_kwargs))
-        else:
-            super().__init__()
+        super().__init__(**state_kwargs)
         self._client = client
         self._store = store
 

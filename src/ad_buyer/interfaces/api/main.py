@@ -569,9 +569,7 @@ async def get_campaign_report(
         return {"job_id": job_id, "message": "No booked lines to report on", "reports": []}
 
     meta_campaign_ids = [
-        b["order_id"]
-        for b in booked_lines
-        if b.get("channel") in ("social", "meta")
+        b["order_id"] for b in booked_lines if b.get("channel") in ("social", "meta")
     ]
     seller_lines = [
         b
@@ -586,19 +584,25 @@ async def get_campaign_report(
             from ...tools.reporting.meta_reporting import MetaReportingTool
 
             tool = MetaReportingTool()
-            reports.append({
-                "source": "Meta",
-                "campaign_ids": meta_campaign_ids,
-                "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
-            })
+            reports.append(
+                {
+                    "source": "Meta",
+                    "campaign_ids": meta_campaign_ids,
+                    "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
+                }
+            )
         except Exception as e:
             reports.append({"source": "Meta", "campaign_ids": meta_campaign_ids, "error": str(e)})
     elif meta_campaign_ids:
-        reports.append({
-            "source": "Meta",
-            "campaign_ids": meta_campaign_ids,
-            "message": "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID",
-        })
+        reports.append(
+            {
+                "source": "Meta",
+                "campaign_ids": meta_campaign_ids,
+                "message": (
+                    "Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID"
+                ),
+            }
+        )
 
     if seller_lines:
         import httpx
@@ -613,22 +617,28 @@ async def get_campaign_report(
                     timeout=30,
                 )
                 r.raise_for_status()
-                seller_reports.append({
-                    "deal_id": deal_id,
-                    "channel": b.get("channel"),
-                    "performance": r.json(),
-                })
+                seller_reports.append(
+                    {
+                        "deal_id": deal_id,
+                        "channel": b.get("channel"),
+                        "performance": r.json(),
+                    }
+                )
             except Exception as e:
-                seller_reports.append({
-                    "deal_id": deal_id,
-                    "channel": b.get("channel"),
-                    "error": str(e),
-                })
-        reports.append({
-            "source": "Seller",
-            "seller_url": seller_url,
-            "deals": seller_reports,
-        })
+                seller_reports.append(
+                    {
+                        "deal_id": deal_id,
+                        "channel": b.get("channel"),
+                        "error": str(e),
+                    }
+                )
+        reports.append(
+            {
+                "source": "Seller",
+                "seller_url": seller_url,
+                "deals": seller_reports,
+            }
+        )
 
     return {
         "job_id": job_id,
@@ -654,9 +664,13 @@ async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
     Requires META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env.
     """
     if not (settings.meta_access_token and settings.meta_ad_account_id):
-        raise HTTPException(status_code=503, detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env")
+        raise HTTPException(
+            status_code=503,
+            detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env",
+        )
     try:
         import httpx
+
         account_id = settings.meta_ad_account_id.replace("act_", "")
         r = httpx.get(
             f"https://graph.facebook.com/{settings.meta_api_version}/act_{account_id}/campaigns",
@@ -694,12 +708,19 @@ async def meta_direct_report(
     Requires META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env.
     """
     if not (settings.meta_access_token and settings.meta_ad_account_id):
-        raise HTTPException(status_code=503, detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env")
+        raise HTTPException(
+            status_code=503,
+            detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env",
+        )
     ids = [cid.strip() for cid in campaign_ids.split(",") if cid.strip()]
     if not ids:
-        raise HTTPException(status_code=400, detail="campaign_ids must be a comma-separated list of Meta campaign IDs")
+        raise HTTPException(
+            status_code=400,
+            detail="campaign_ids must be a comma-separated list of Meta campaign IDs",
+        )
     try:
         import httpx
+
         from ...clients.meta_ads_client import MetaAdsClient
 
         client = MetaAdsClient(
@@ -724,39 +745,50 @@ async def meta_direct_report(
                 campaign_details[cid] = r.json()
 
         # Fetch insights per campaign
-        insight_fields = ["campaign_name", "spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpm"]
+        insight_fields = [
+            "campaign_name",
+            "spend",
+            "impressions",
+            "reach",
+            "frequency",
+            "clicks",
+            "ctr",
+            "cpm",
+        ]
         rows = []
         for cid in ids:
             details = campaign_details.get(cid, {})
             insights = client.get_insights(cid, date_preset=date_preset, fields=insight_fields)
             insight = insights[0] if insights else {}
-            rows.append({
-                "campaign_id":    cid,
-                "campaign_name":  details.get("name") or insight.get("campaign_name", cid),
-                "status":         details.get("effective_status", "UNKNOWN"),
-                "objective":      details.get("objective", ""),
-                "daily_budget":   details.get("daily_budget", ""),
-                "created_time":   details.get("created_time", ""),
-                "spend":          float(insight.get("spend", 0)),
-                "impressions":    int(insight.get("impressions", 0)),
-                "reach":          int(insight.get("reach", 0)),
-                "frequency":      float(insight.get("frequency", 0)),
-                "clicks":         int(insight.get("clicks", 0)),
-                "ctr":            float(insight.get("ctr", 0)),
-                "cpm":            float(insight.get("cpm", 0)),
-            })
+            rows.append(
+                {
+                    "campaign_id": cid,
+                    "campaign_name": details.get("name") or insight.get("campaign_name", cid),
+                    "status": details.get("effective_status", "UNKNOWN"),
+                    "objective": details.get("objective", ""),
+                    "daily_budget": details.get("daily_budget", ""),
+                    "created_time": details.get("created_time", ""),
+                    "spend": float(insight.get("spend", 0)),
+                    "impressions": int(insight.get("impressions", 0)),
+                    "reach": int(insight.get("reach", 0)),
+                    "frequency": float(insight.get("frequency", 0)),
+                    "clicks": int(insight.get("clicks", 0)),
+                    "ctr": float(insight.get("ctr", 0)),
+                    "cpm": float(insight.get("cpm", 0)),
+                }
+            )
 
         summary = {
-            "total_spend":       round(sum(r["spend"] for r in rows), 2),
+            "total_spend": round(sum(r["spend"] for r in rows), 2),
             "total_impressions": sum(r["impressions"] for r in rows),
-            "total_clicks":      sum(r["clicks"] for r in rows),
-            "total_reach":       sum(r["reach"] for r in rows),
+            "total_clicks": sum(r["clicks"] for r in rows),
+            "total_reach": sum(r["reach"] for r in rows),
         }
         return {
             "ad_account_id": settings.meta_ad_account_id,
-            "date_preset":   date_preset,
-            "campaigns":     rows,
-            "summary":       summary,
+            "date_preset": date_preset,
+            "campaigns": rows,
+            "summary": summary,
         }
     except Exception as e:
         raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))

@@ -666,7 +666,7 @@ _CHANNEL_FACTORIES = {
     "mobile_app": create_mobile_crew,  # alias used by deal_booking_flow
     "performance": create_performance_crew,
     "social": create_social_crew,
-    "meta": create_social_crew,        # alias
+    "meta": create_social_crew,  # alias
 }
 
 

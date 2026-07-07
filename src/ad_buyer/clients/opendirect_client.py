@@ -274,9 +274,7 @@ class OpenDirectClient:
             Line object
         """
         async with self._make_client() as http:
-            response = await http.get(
-                f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}"
-            )
+            response = await http.get(f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}")
             response.raise_for_status()
         return Line.model_validate(response.json())
 
@@ -416,9 +414,7 @@ class OpenDirectClient:
             response.raise_for_status()
         return Creative.model_validate(response.json())
 
-    async def list_creatives(
-        self, account_id: str, skip: int = 0, top: int = 50
-    ) -> list[Creative]:
+    async def list_creatives(self, account_id: str, skip: int = 0, top: int = 50) -> list[Creative]:
         """List creatives for an account.
 
         Args:

@@ -760,7 +760,7 @@ class TestParseRecommendations:
     def test_json_in_surrounding_text(self, flow):
         """JSON array embedded in text is still parsed."""
         text = (
-            'Recommendations:\n'
+            "Recommendations:\n"
             '[{"product_id": "x", "product_name": "Test", "publisher": "P",'
             ' "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'
         )
