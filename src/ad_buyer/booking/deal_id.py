@@ -13,7 +13,7 @@ a secrets-based token seeded with the product ID, identity, and timestamp.
 """
 
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 def generate_deal_id(

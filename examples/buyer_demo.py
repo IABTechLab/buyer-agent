@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
+# ruff: noqa: E741  (single-char "l" used as line variable in example code)
 
 """Buyer Agent Demo - Multi-Seller Interactive Demo
 
@@ -25,12 +26,11 @@ Usage:
 
 import asyncio
 import json
+import os
 import sys
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass, field
-from typing import Optional, Any, List, Dict
-import os
 
 # Clear proxy for local connections
 for var in ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']:
@@ -38,12 +38,12 @@ for var in ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy
 
 # Rich console for beautiful output
 try:
+    from rich import print as rprint  # noqa: F401
     from rich.console import Console
     from rich.panel import Panel
-    from rich.table import Table
-    from rich.prompt import Prompt, Confirm
+    from rich.prompt import Confirm, Prompt  # noqa: F401
     from rich.syntax import Syntax
-    from rich import print as rprint
+    from rich.table import Table
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -60,7 +60,7 @@ except ImportError:
 
 # PDF parsing
 try:
-    import pdfplumber
+    import pdfplumber  # noqa: F401
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
@@ -117,7 +117,7 @@ class AudienceSpec:
 
     # IAB Audience Taxonomy 1.1 Segment IDs (Interest-based)
     # Format: "segment_id" - Tier 1 | Tier 2 | Tier 3
-    interest_segments: List[str] = field(default_factory=lambda: [
+    interest_segments: list[str] = field(default_factory=lambda: [
         "720",   # Interest | Travel | Adventure Travel
         "725",   # Interest | Travel | Camping
         "661",   # Interest | Sports | Skiing
@@ -133,7 +133,7 @@ class AudienceSpec:
     ])
 
     # In-Market Segments (Purchase Intent*)
-    in_market_segments: List[str] = field(default_factory=lambda: [
+    in_market_segments: list[str] = field(default_factory=lambda: [
         "805",   # Purchase Intent* | Automotive Ownership
         "806",   # Purchase Intent* | Automotive Ownership | New Vehicles
         "810",   # Purchase Intent* | Automotive Ownership | New Vehicles | SUV
@@ -143,7 +143,7 @@ class AudienceSpec:
     ])
 
     # Life Event / Family Segments
-    life_event_segments: List[str] = field(default_factory=lambda: [
+    life_event_segments: list[str] = field(default_factory=lambda: [
         "591",   # Interest | Real Estate | Real Estate Buying and Selling
         "587",   # Interest | Real Estate | Houses
         "350",   # Interest | Family and Relationships | Parenting
@@ -152,7 +152,7 @@ class AudienceSpec:
     ])
 
     # Behavioral / Lifestyle Segments
-    behavioral_segments: List[str] = field(default_factory=lambda: [
+    behavioral_segments: list[str] = field(default_factory=lambda: [
         "415",   # Interest | Healthy Living | Wellness
         "697",   # Interest | Technology & Computing | Internet of Things
         "688",   # Interest | Technology & Computing | Artificial Intelligence
@@ -160,7 +160,7 @@ class AudienceSpec:
     ])
 
     # Competitive Conquest (Custom Segments - not in IAB taxonomy)
-    conquest_segments: List[str] = field(default_factory=lambda: [
+    conquest_segments: list[str] = field(default_factory=lambda: [
         "CUST-AUTO-TESLA-Y",        # Tesla Model Y Owners/Intenders
         "CUST-AUTO-FORD-MACHE",     # Ford Mustang Mach-E
         "CUST-AUTO-BMW-IX",         # BMW iX
@@ -169,13 +169,13 @@ class AudienceSpec:
     ])
 
     # First-Party Data (Rivian CRM - not in IAB taxonomy)
-    first_party_segments: List[str] = field(default_factory=lambda: [
+    first_party_segments: list[str] = field(default_factory=lambda: [
         "1P-RIVIAN-NEWSLETTER",     # Rivian newsletter subscribers
         "1P-RIVIAN-CONFIGURATOR",   # Visited R2 configurator
         "1P-RIVIAN-R1-OWNERS",      # Existing R1T/R1S owners
     ])
 
-    def get_all_segments(self) -> List[str]:
+    def get_all_segments(self) -> list[str]:
         """Return all audience segments combined."""
         return (
             self.interest_segments +
@@ -186,7 +186,7 @@ class AudienceSpec:
             self.first_party_segments
         )
 
-    def get_iab_taxonomy_object(self) -> Dict:
+    def get_iab_taxonomy_object(self) -> dict:
         """Return IAB Audience Taxonomy 1.1 compliant object."""
         return {
             "version": "1.1",
@@ -240,9 +240,9 @@ class LineItem:
     price: float
     budget: float
     status: str = "pending"
-    deal_id: Optional[str] = None
-    gam_order_id: Optional[str] = None
-    dsp_campaign_id: Optional[str] = None
+    deal_id: str | None = None
+    gam_order_id: str | None = None
+    dsp_campaign_id: str | None = None
 
 
 @dataclass
@@ -252,12 +252,12 @@ class ExecutionPlan:
     advertiser: str
     agency: str
     total_budget: float
-    lines: List[LineItem] = field(default_factory=list)
+    lines: list[LineItem] = field(default_factory=list)
 
     def add_line(self, line: LineItem):
         self.lines.append(line)
 
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> dict:
         pg_lines = [l for l in self.lines if l.deal_type == "programmatic_guaranteed"]
         pmp_lines = [l for l in self.lines if l.deal_type == "private_marketplace"]
         perf_lines = [l for l in self.lines if l.channel == "display"]
@@ -309,7 +309,7 @@ class SellerClient:
         try:
             response = await self.client.get(f"{self.base_url}/health")
             return response.status_code == 200
-        except:
+        except:  # noqa: E722
             return False
 
 
@@ -397,7 +397,7 @@ def print_adcom_json(data: dict, title: str, standard: str = "AdCOM 1.0"):
 # Demo Workflow
 # =============================================================================
 
-async def run_demo(pdf_path: Optional[str] = None):
+async def run_demo(pdf_path: str | None = None):
     """Run the complete buyer agent demo."""
 
     print_header("RIVIAN R2 CAMPAIGN - BUYER AGENT DEMO")
@@ -439,12 +439,12 @@ async def run_demo(pdf_path: Optional[str] = None):
                 f"[bold]Total Budget:[/bold] ${brief.total_budget:,.2f}\n"
                 f"[bold]Flight:[/bold] {brief.start_date} to {brief.end_date}\n\n"
                 f"[bold]Budget Breakdown:[/bold]\n"
-                f"  • CTV Brand: ${brief.ctv_budget:,.2f} ({brief.ctv_reach_target:,} HH reach @ {brief.ctv_frequency}x freq)\n"
-                f"  • Performance: ${brief.performance_budget:,.2f} ({brief.performance_impressions:,} impressions)\n"
-                f"  • Mobile App: ${brief.mobile_budget:,.2f} ({brief.mobile_installs:,} installs)\n\n"
+                f"  • CTV Brand: ${brief.ctv_budget:,.2f} ({brief.ctv_reach_target:,} HH reach @ {brief.ctv_frequency}x freq)\n"  # noqa: E501
+                f"  • Performance: ${brief.performance_budget:,.2f} ({brief.performance_impressions:,} impressions)\n"  # noqa: E501
+                f"  • Mobile App: ${brief.mobile_budget:,.2f} ({brief.mobile_installs:,} installs)\n\n"  # noqa: E501
                 f"[bold]Target Audience:[/bold]\n"
-                f"  • Demographics: Ages {brief.audience.age_range[0]}-{brief.audience.age_range[1]}, HHI ${brief.audience.hhi_min:,}+\n"
-                f"  • Segments: {len(brief.audience.get_all_segments())} IAB Taxonomy segments loaded",
+                f"  • Demographics: Ages {brief.audience.age_range[0]}-{brief.audience.age_range[1]}, HHI ${brief.audience.hhi_min:,}+\n"  # noqa: E501
+                f"  • Segments: {len(brief.audience.get_all_segments())} IAB Taxonomy segments loaded",  # noqa: E501
                 title="[bold cyan]Parsed Media Brief[/bold cyan]",
                 style="cyan"
             ))
@@ -516,8 +516,8 @@ async def run_demo(pdf_path: Optional[str] = None):
             "source": "github.com/InteractiveAdvertisingBureau/Taxonomies",
             "demographics": {
                 "age": {
-                    "primary": {"min": brief.audience.age_range[0], "max": brief.audience.age_range[1]},
-                    "secondary": {"min": brief.audience.age_range_secondary[0], "max": brief.audience.age_range_secondary[1]}
+                    "primary": {"min": brief.audience.age_range[0], "max": brief.audience.age_range[1]},  # noqa: E501
+                    "secondary": {"min": brief.audience.age_range_secondary[0], "max": brief.audience.age_range_secondary[1]}  # noqa: E501
                 },
                 "income": {
                     "hhi_min": brief.audience.hhi_min,
@@ -541,18 +541,18 @@ async def run_demo(pdf_path: Optional[str] = None):
                 ],
                 "purchase_intent": [
                     {"id": "806", "name": "Purchase Intent* | Automotive Ownership | New Vehicles"},
-                    {"id": "810", "name": "Purchase Intent* | Automotive Ownership | New Vehicles | SUV"},
-                    {"id": "814", "name": "Purchase Intent* | Automotive Ownership | New Vehicles | Crossover"}
+                    {"id": "810", "name": "Purchase Intent* | Automotive Ownership | New Vehicles | SUV"},  # noqa: E501
+                    {"id": "814", "name": "Purchase Intent* | Automotive Ownership | New Vehicles | Crossover"}  # noqa: E501
                 ],
                 "lifestyle": [
-                    {"id": "591", "name": "Interest | Real Estate | Real Estate Buying and Selling"},
+                    {"id": "591", "name": "Interest | Real Estate | Real Estate Buying and Selling"},  # noqa: E501
                     {"id": "350", "name": "Interest | Family and Relationships | Parenting"},
                     {"id": "406", "name": "Interest | Healthy Living"}
                 ],
                 "technology": [
                     {"id": "697", "name": "Interest | Technology & Computing | Internet of Things"},
-                    {"id": "688", "name": "Interest | Technology & Computing | Artificial Intelligence"},
-                    {"id": "703", "name": "Interest | Technology & Computing | Consumer Electronics"}
+                    {"id": "688", "name": "Interest | Technology & Computing | Artificial Intelligence"},  # noqa: E501
+                    {"id": "703", "name": "Interest | Technology & Computing | Consumer Electronics"}  # noqa: E501
                 ]
             }
         }
@@ -574,7 +574,7 @@ async def run_demo(pdf_path: Optional[str] = None):
             },
             "context": {
                 "keywords": ["electric vehicle", "SUV", "adventure", "outdoor", "sustainable"],
-                "content_categories": ["253", "720", "406"],  # Green Vehicles, Adventure Travel, Healthy Living
+                "content_categories": ["253", "720", "406"],  # Green Vehicles, Adventure Travel, Healthy Living  # noqa: E501
                 "language": "en",
                 "geography": "US",
                 "device": ["ctv", "mobile", "desktop"]
@@ -686,7 +686,7 @@ async def run_demo(pdf_path: Optional[str] = None):
             result = await dsp.call_tool("get_pricing", {
                 "product_id": product["id"],
                 "buyer_tier": identity.get_access_tier(),
-                "volume": brief.performance_impressions if product["channel"] == "display" else brief.mobile_installs
+                "volume": brief.performance_impressions if product["channel"] == "display" else brief.mobile_installs  # noqa: E501
             })
             if result.get("success"):
                 dsp_pricing.append({
@@ -807,7 +807,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                 "ttl_seconds": 3600
             }
         }
-        print_adcom_json(ucp_inventory_embedding, "Inventory Embedding (Publisher Response)", "UCP 1.0")
+        print_adcom_json(ucp_inventory_embedding, "Inventory Embedding (Publisher Response)", "UCP 1.0")  # noqa: E501
 
         # Show UCP Audience Validation Result
         ucp_validation_result = {
@@ -846,7 +846,7 @@ async def run_demo(pdf_path: Optional[str] = None):
         }
         print_adcom_json(ucp_validation_result, "Audience Validation Result", "UCP 1.0")
 
-        print_success(f"UCP match score: {ucp_validation_result['ucp_similarity_score']:.2f} - Targeting compatible")
+        print_success(f"UCP match score: {ucp_validation_result['ucp_similarity_score']:.2f} - Targeting compatible")  # noqa: E501
 
         # =====================================================================
         # STEP 2: Generate Execution Plan
@@ -962,7 +962,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                 f"  Lines: {summary['pmp_lines']} | Budget: ${summary['pmp_budget']:,.2f}\n"
                 f"  → Gets Deal ID from Publisher, attaches to DSP campaign\n\n"
                 f"[bold yellow]Performance Display (DSP Direct):[/bold yellow]\n"
-                f"  Lines: {summary['performance_lines']} | Budget: ${summary['performance_budget']:,.2f}\n\n"
+                f"  Lines: {summary['performance_lines']} | Budget: ${summary['performance_budget']:,.2f}\n\n"  # noqa: E501
                 f"[bold green]Mobile App (DSP Direct):[/bold green]\n"
                 f"  Lines: {summary['mobile_lines']} | Budget: ${summary['mobile_budget']:,.2f}\n\n"
                 f"[bold]Total Budget:[/bold] ${summary['total_budget']:,.2f}",
@@ -990,7 +990,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                 )
             console.print(table)
 
-        print_success(f"Execution plan ready: {len(plan.lines)} lines, ${summary['total_budget']:,.2f} total")
+        print_success(f"Execution plan ready: {len(plan.lines)} lines, ${summary['total_budget']:,.2f} total")  # noqa: E501
 
         # =====================================================================
         # STEP 3: User Approval
@@ -1085,7 +1085,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                     "name": line.line_name,
                     "orderid": line.gam_order_id,  # References parent Order
                     "productid": line.product_id,
-                    "bookingstatus": "Booked",  # Draft, PendingReservation, Reserved, PendingBooking, Booked, InFlight, Finished
+                    "bookingstatus": "Booked",  # Draft, PendingReservation, Reserved, PendingBooking, Booked, InFlight, Finished  # noqa: E501
                     "startdate": brief.start_date,
                     "enddate": brief.end_date,
                     "ratetype": "CPM",  # CPM, CPMV, CPC, CPD, FlatRate
@@ -1095,15 +1095,15 @@ async def run_demo(pdf_path: Optional[str] = None):
                     "frequencycount": 3,
                     "frequencyinterval": "Day",  # Day, Month, Week, Hour, LineDuration
                     "targeting": [  # Array of AdCOM Segment objects
-                        {"id": seg, "name": f"IAB Audience Taxonomy 1.1 Segment", "value": "1"}
-                        for seg in (brief.audience.interest_segments[:3] + brief.audience.in_market_segments[:2])
+                        {"id": seg, "name": "IAB Audience Taxonomy 1.1 Segment", "value": "1"}
+                        for seg in (brief.audience.interest_segments[:3] + brief.audience.in_market_segments[:2])  # noqa: E501
                     ],
                     "ext": {
                         "ucp": {
                             "enabled": True,
                             "match_threshold": 0.7,
                             "demographics": {
-                                "age": f"{brief.audience.age_range[0]}-{brief.audience.age_range[1]}",
+                                "age": f"{brief.audience.age_range[0]}-{brief.audience.age_range[1]}",  # noqa: E501
                                 "hhi": f"${brief.audience.hhi_min:,}+"
                             }
                         }
@@ -1267,7 +1267,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                             "conquest": brief.audience.conquest_segments[:3]
                         },
                         "demographics": {
-                            "age_range": f"{brief.audience.age_range[0]}-{brief.audience.age_range[1]}",
+                            "age_range": f"{brief.audience.age_range[0]}-{brief.audience.age_range[1]}",  # noqa: E501
                             "hhi_min": brief.audience.hhi_min
                         },
                         "geo": {"country": ["USA"], "dma_tier": "1_2"},
@@ -1283,7 +1283,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                     },
                     "status": "ACTIVE"
                 }
-                print_adcom_json(adcom_campaign, "DSP Campaign (Performance)", "DSP + OpenDirect 2.1")
+                print_adcom_json(adcom_campaign, "DSP Campaign (Performance)", "DSP + OpenDirect 2.1")  # noqa: E501
             else:
                 print_error(f"Failed: {result.get('error')}")
 
@@ -1357,7 +1357,7 @@ async def run_demo(pdf_path: Optional[str] = None):
                     },
                     "status": "ACTIVE"
                 }
-                print_adcom_json(adcom_mobile, "DSP Campaign (Mobile App Install)", "DSP + OpenDirect 2.1")
+                print_adcom_json(adcom_mobile, "DSP Campaign (Mobile App Install)", "DSP + OpenDirect 2.1")  # noqa: E501
             else:
                 print_error(f"Failed: {result.get('error')}")
 
@@ -1395,9 +1395,9 @@ async def run_demo(pdf_path: Optional[str] = None):
                 f"[bold]Campaign:[/bold] {plan.campaign_name}\n"
                 f"[bold]Lines Executed:[/bold] {booked}/{len(plan.lines)}\n"
                 f"[bold]Total Budget Committed:[/bold] ${total_budget:,.2f}\n\n"
-                f"[bold cyan]GAM Orders:[/bold cyan] {len([l for l in plan.lines if l.gam_order_id])}\n"
-                f"[bold magenta]PMP Deals:[/bold magenta] {len([l for l in plan.lines if l.deal_id])}\n"
-                f"[bold yellow]DSP Campaigns:[/bold yellow] {len([l for l in plan.lines if l.dsp_campaign_id])}",
+                f"[bold cyan]GAM Orders:[/bold cyan] {len([l for l in plan.lines if l.gam_order_id])}\n"  # noqa: E501
+                f"[bold magenta]PMP Deals:[/bold magenta] {len([l for l in plan.lines if l.deal_id])}\n"  # noqa: E501
+                f"[bold yellow]DSP Campaigns:[/bold yellow] {len([l for l in plan.lines if l.dsp_campaign_id])}",  # noqa: E501
                 title="[bold green]Campaign Booking Complete[/bold green]",
                 style="green"
             ))

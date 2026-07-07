@@ -8,7 +8,6 @@ skip/complete logic, auto-detection, and MCP tool integration.
 """
 
 import json
-from datetime import datetime, timezone
 from unittest.mock import patch
 
 import pytest
@@ -17,10 +16,8 @@ from ad_buyer.services.setup_wizard import (
     SetupWizard,
     WizardPhase,
     WizardState,
-    WizardStep,
     WizardStepStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # Wizard Initialization
@@ -322,9 +319,7 @@ class TestAutoDetection:
     def test_detect_step_1_when_api_key_set(self):
         """Step 1 should auto-detect as done when API key is configured."""
         wizard = SetupWizard()
-        with patch(
-            "ad_buyer.services.setup_wizard._get_settings"
-        ) as mock_settings:
+        with patch("ad_buyer.services.setup_wizard._get_settings") as mock_settings:
             mock_settings.return_value.api_key = "test-key-123"
             mock_settings.return_value.database_url = "sqlite:///./ad_buyer.db"
             mock_settings.return_value.environment = "development"
@@ -335,9 +330,7 @@ class TestAutoDetection:
     def test_detect_step_1_not_detected_when_no_key(self):
         """Step 1 should not auto-detect without API key."""
         wizard = SetupWizard()
-        with patch(
-            "ad_buyer.services.setup_wizard._get_settings"
-        ) as mock_settings:
+        with patch("ad_buyer.services.setup_wizard._get_settings") as mock_settings:
             mock_settings.return_value.api_key = ""
             mock_settings.return_value.database_url = "sqlite:///./ad_buyer.db"
             mock_settings.return_value.environment = "development"
@@ -350,9 +343,7 @@ class TestAutoDetection:
     def test_detect_step_2_when_sellers_configured(self):
         """Step 2 should auto-detect when seller endpoints are configured."""
         wizard = SetupWizard()
-        with patch(
-            "ad_buyer.services.setup_wizard._get_settings"
-        ) as mock_settings:
+        with patch("ad_buyer.services.setup_wizard._get_settings") as mock_settings:
             mock_settings.return_value.api_key = ""
             mock_settings.return_value.database_url = "sqlite:///./ad_buyer.db"
             mock_settings.return_value.environment = "development"
@@ -368,9 +359,7 @@ class TestAutoDetection:
         """Auto-detection should not override a manually completed step."""
         wizard = SetupWizard()
         wizard.complete_step(1, {"deployment_target": "local"})
-        with patch(
-            "ad_buyer.services.setup_wizard._get_settings"
-        ) as mock_settings:
+        with patch("ad_buyer.services.setup_wizard._get_settings") as mock_settings:
             mock_settings.return_value.api_key = "test-key"
             mock_settings.return_value.database_url = "sqlite:///./ad_buyer.db"
             mock_settings.return_value.environment = "development"
@@ -411,9 +400,7 @@ class TestWizardStateTracking:
     def test_progress_includes_auto_detected(self):
         """Auto-detected steps count toward progress."""
         wizard = SetupWizard()
-        with patch(
-            "ad_buyer.services.setup_wizard._get_settings"
-        ) as mock_settings:
+        with patch("ad_buyer.services.setup_wizard._get_settings") as mock_settings:
             mock_settings.return_value.api_key = "test-key"
             mock_settings.return_value.database_url = "sqlite:///./ad_buyer.db"
             mock_settings.return_value.environment = "development"
@@ -490,9 +477,7 @@ class TestRunWizard:
     def test_run_wizard_auto_detects(self):
         """run_wizard should auto-detect completed steps first."""
         wizard = SetupWizard()
-        with patch(
-            "ad_buyer.services.setup_wizard._get_settings"
-        ) as mock_settings:
+        with patch("ad_buyer.services.setup_wizard._get_settings") as mock_settings:
             mock_settings.return_value.api_key = "test-key"
             mock_settings.return_value.database_url = "sqlite:///./ad_buyer.db"
             mock_settings.return_value.environment = "development"

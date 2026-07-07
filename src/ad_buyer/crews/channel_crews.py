@@ -328,11 +328,12 @@ Provide ranked recommendations with rationale.
         "publisher": "...",
         "format": "...",
         "impressions": X,
-        "cpm": Y,
-        "cost": Z,
+        "cpm": Y or null,
+        "cost": Z or null,
         "rationale": "..."
     }
-]""",
+]
+Note: cpm must be null if no seller pricing was provided. NEVER estimate CPM.""",
     recommendation_task_description="""
 Review the research findings and select the best inventory for this branding campaign.
 
@@ -714,9 +715,7 @@ def kickoff_channel_crew_with_audience(
     factory = _CHANNEL_FACTORIES.get(channel)
     if factory is None:
         valid = sorted(_CHANNEL_FACTORIES.keys())
-        raise ValueError(
-            f"Unknown channel {channel!r}; expected one of {valid}"
-        )
+        raise ValueError(f"Unknown channel {channel!r}; expected one of {valid}")
 
     # If the caller passed a CampaignBrief but no plan, run the planner
     # step inline. The import is local because the planner module pulls

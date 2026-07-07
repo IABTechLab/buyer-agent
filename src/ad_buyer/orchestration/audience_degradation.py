@@ -44,7 +44,8 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import Any, Iterable, Literal
+from collections.abc import Iterable
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -187,9 +188,7 @@ class SellerAudienceCapabilities(BaseModel):
             supports_constraints=False,
             supports_extensions=False,
             supports_exclusions=False,
-            max_refs_per_role=_MaxRefsPerRole(
-                primary=1, constraints=0, extensions=0, exclusions=0
-            ),
+            max_refs_per_role=_MaxRefsPerRole(primary=1, constraints=0, extensions=0, exclusions=0),
         )
 
 
@@ -345,8 +344,7 @@ def _trim_to_max(
             DegradationLogEntry(
                 path=f"{role}[{idx}]",
                 reason=(
-                    f"max_refs_per_role.{role}={max_for_role} exceeded "
-                    f"(plan had {len(refs)} refs)"
+                    f"max_refs_per_role.{role}={max_for_role} exceeded (plan had {len(refs)} refs)"
                 ),
                 original_ref=_ref_dump(ref),
                 action="dropped",
@@ -400,9 +398,7 @@ def degrade_plan_for_seller(
     # Agentic primary is a special case: dropping it leaves the plan with no
     # primary at all, which is fatal.
     primary = plan.primary
-    primary_kept = _filter_refs(
-        [primary], role="primary", capabilities=capabilities, log=log
-    )
+    primary_kept = _filter_refs([primary], role="primary", capabilities=capabilities, log=log)
     if not primary_kept:
         # The most recent log entry describes why the primary was dropped.
         last_reason = log[-1].reason if log else "primary ref unsupported"
@@ -417,9 +413,7 @@ def degrade_plan_for_seller(
     # ---- constraints ----
     if plan.constraints:
         if not capabilities.supports_constraints:
-            constraints = _drop_role_unsupported(
-                plan.constraints, role="constraints", log=log
-            )
+            constraints = _drop_role_unsupported(plan.constraints, role="constraints", log=log)
         else:
             constraints = _filter_refs(
                 plan.constraints,
@@ -439,9 +433,7 @@ def degrade_plan_for_seller(
     # ---- extensions ----
     if plan.extensions:
         if not capabilities.supports_extensions:
-            extensions = _drop_role_unsupported(
-                plan.extensions, role="extensions", log=log
-            )
+            extensions = _drop_role_unsupported(plan.extensions, role="extensions", log=log)
         else:
             extensions = _filter_refs(
                 plan.extensions,
@@ -461,9 +453,7 @@ def degrade_plan_for_seller(
     # ---- exclusions ----
     if plan.exclusions:
         if not capabilities.supports_exclusions:
-            exclusions = _drop_role_unsupported(
-                plan.exclusions, role="exclusions", log=log
-            )
+            exclusions = _drop_role_unsupported(plan.exclusions, role="exclusions", log=log)
         else:
             exclusions = _filter_refs(
                 plan.exclusions,
@@ -533,10 +523,7 @@ def synthesize_capabilities_from_unsupported(
         A `SellerAudienceCapabilities` with the relevant flags toggled off.
     """
 
-    caps = (
-        base.model_copy(deep=True) if base is not None
-        else SellerAudienceCapabilities()
-    )
+    caps = base.model_copy(deep=True) if base is not None else SellerAudienceCapabilities()
 
     for entry in unsupported:
         path = (entry.get("path") or "").strip()

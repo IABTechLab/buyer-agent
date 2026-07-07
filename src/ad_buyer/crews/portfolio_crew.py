@@ -6,6 +6,7 @@
 from typing import Any
 
 from crewai import Crew, Process, Task
+from pydantic import BaseModel, Field
 
 from ..agents.level1.portfolio_manager import create_portfolio_manager
 from ..agents.level2.branding_agent import create_branding_agent
@@ -14,6 +15,28 @@ from ..agents.level2.mobile_app_agent import create_mobile_app_agent
 from ..agents.level2.performance_agent import create_performance_agent
 from ..clients.opendirect_client import OpenDirectClient
 from ..config.settings import settings
+
+
+class _ChannelAllocationOut(BaseModel):
+    """Single-channel allocation field shape produced by the portfolio crew."""
+
+    budget: float = Field(default=0.0, ge=0)
+    percentage: float = Field(default=0.0, ge=0, le=100)
+    rationale: str = ""
+
+
+class BudgetAllocationOutput(BaseModel):
+    """Structured output for the budget allocation task.
+
+    Forcing crewai to emit this via ``output_pydantic`` makes the result
+    type-safe and removes the need for fragile string-based JSON extraction
+    in ``DealBookingFlow._parse_allocations``.
+    """
+
+    branding: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
+    mobile_app: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
+    ctv: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
+    performance: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
 
 
 def create_portfolio_crew(
@@ -90,6 +113,7 @@ for each channel's allocation. Percentages must sum to 100.
 {expected_output_example}
 }}""",
         agent=portfolio_manager,
+        output_pydantic=BudgetAllocationOutput,
     )
 
     # Legacy: channel_coordination_task was the final task, so kickoff() returned

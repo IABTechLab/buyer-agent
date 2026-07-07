@@ -61,12 +61,20 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
-            **state_kwargs: Initial state field values forwarded to
-                ``Flow.__init__``.  CrewAI 1.10.1 removed the ``state``
-                setter; callers must supply initial state here rather than
-                assigning to ``flow.state`` after construction.
+            **state_kwargs: Initial state field values for the underlying
+                ``BookingState``.  CrewAI >=1.14 made ``Flow`` a Pydantic
+                model and removed the legacy ``state`` setter, so initial
+                state is now supplied via the ``initial_state=`` field on
+                ``Flow.__init__`` rather than as ad-hoc keyword arguments.
         """
-        super().__init__(**state_kwargs)
+        if state_kwargs:
+            # CrewAI >=1.14 expects ``initial_state`` to be the typed
+            # state model instance (or None), not a loose dict.  Build a
+            # ``BookingState`` from the supplied kwargs so callers can
+            # keep passing fields by name (e.g. ``campaign_brief=...``).
+            super().__init__(initial_state=BookingState(**state_kwargs))
+        else:
+            super().__init__()
         self._client = client
         self._store = store
 
@@ -307,12 +315,12 @@ class DealBookingFlow(Flow[BookingState]):
 
             result = portfolio_crew.kickoff()
 
-            # Parse allocation result
-            # The result should be a JSON string with allocations
-            result_str = str(result)
-
-            # Try to extract JSON from the result
-            allocations = self._parse_allocations(result_str)
+            # The portfolio crew has two tasks; only the first
+            # (budget_allocation_task) carries the allocation output. The crew's
+            # top-level ``raw`` reflects the LAST task (channel coordination)
+            # which has a different schema and would silently produce zero
+            # allocations if used directly.
+            allocations = self._extract_allocations(result)
 
             # Fallback: if brief specifies channels and LLM allocated to wrong ones,
             # filter to only the requested channels and rescale budgets proportionally.
@@ -373,36 +381,78 @@ class DealBookingFlow(Flow[BookingState]):
             self.state.execution_status = ExecutionStatus.FAILED
             return {"status": "failed", "error": str(e)}
 
-    def _parse_allocations(self, result_str: str) -> dict[str, Any]:
-        """Parse allocation JSON from crew result."""
-        # Try to find JSON in the result
-        try:
-            # Look for JSON block
-            start_idx = result_str.find("{")
-            end_idx = result_str.rfind("}") + 1
-            if start_idx >= 0 and end_idx > start_idx:
-                json_str = result_str[start_idx:end_idx]
-                return json.loads(json_str)
-        except json.JSONDecodeError:
-            pass
+    def _extract_allocations(self, result: Any) -> dict[str, Any]:
+        """Pull the budget allocation from a portfolio_crew kickoff result.
 
-        # Default allocations if parsing fails
+        Prefers the typed ``output_pydantic`` on the first task. Falls back
+        to ``json_dict`` on the first task. Final fallback is a default split.
+
+        Note: the crew has two tasks (budget allocation, channel coordination).
+        The crew's top-level ``raw``/``str()`` carries the LAST task's output,
+        which has the wrong schema. We must read ``tasks_output[0]`` directly.
+        """
+        first_task = None
+        if getattr(result, "tasks_output", None):
+            first_task = result.tasks_output[0]
+
+        if first_task is not None:
+            # Typed pydantic output is the authoritative source.
+            pyd = getattr(first_task, "pydantic", None)
+            if pyd is not None and hasattr(pyd, "model_dump"):
+                dumped = pyd.model_dump()
+                if any(c.get("budget", 0) > 0 for c in dumped.values()):
+                    return dumped
+
+            # If output_pydantic didn't capture for some reason, try json_dict.
+            json_dict = getattr(first_task, "json_dict", None)
+            if isinstance(json_dict, dict) and any(
+                c.get("budget", 0) > 0 for c in json_dict.values() if isinstance(c, dict)
+            ):
+                return json_dict
+
+            # Last resort: extract JSON block from the first task's raw text.
+            raw = getattr(first_task, "raw", "") or ""
+            parsed = self._extract_json_block(str(raw))
+            if parsed is not None:
+                return parsed
+
+        self.state.errors.append(
+            "Budget allocation: could not extract typed output from portfolio crew; "
+            "falling back to default split."
+        )
+        return self._default_allocations()
+
+    @staticmethod
+    def _extract_json_block(text: str) -> dict[str, Any] | None:
+        """Find and parse the first ``{...}`` block in text. Returns None on failure."""
+        start_idx = text.find("{")
+        end_idx = text.rfind("}") + 1
+        if start_idx < 0 or end_idx <= start_idx:
+            return None
+        try:
+            parsed = json.loads(text[start_idx:end_idx])
+            return parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            return None
+
+    def _default_allocations(self) -> dict[str, Any]:
+        """Default channel split used when the portfolio crew output is unusable."""
         total_budget = self.state.campaign_brief.get("budget", 0)
         return {
             "branding": {
                 "budget": total_budget * 0.4,
                 "percentage": 40,
-                "rationale": "Default allocation",
+                "rationale": "Default allocation (portfolio crew output unparseable)",
             },
             "performance": {
                 "budget": total_budget * 0.4,
                 "percentage": 40,
-                "rationale": "Default allocation",
+                "rationale": "Default allocation (portfolio crew output unparseable)",
             },
             "ctv": {
                 "budget": total_budget * 0.2,
                 "percentage": 20,
-                "rationale": "Default allocation",
+                "rationale": "Default allocation (portfolio crew output unparseable)",
             },
             "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not allocated"},
         }

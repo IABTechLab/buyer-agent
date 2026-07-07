@@ -448,10 +448,10 @@ class BudgetPacingEngine:
                         reason=(
                             f"{source.channel} underpacing "
                             f"(spend: ${source.spend:,.0f} vs "
-                            f"expected: ${expected_spend * (source.allocated_budget / total_budget):,.0f}), "
+                            f"expected: ${expected_spend * (source.allocated_budget / total_budget):,.0f}), "  # noqa: E501
                             f"{target.channel} overpacing "
                             f"(spend: ${target.spend:,.0f} vs "
-                            f"expected: ${expected_spend * (target.allocated_budget / total_budget):,.0f})"
+                            f"expected: ${expected_spend * (target.allocated_budget / total_budget):,.0f})"  # noqa: E501
                         ),
                     )
                 )

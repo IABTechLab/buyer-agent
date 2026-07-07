@@ -262,10 +262,7 @@ def validate_ref(ref: AudienceRef) -> ValidationResult:
     if entry is None:
         return ValidationResult(
             valid=False,
-            reason=(
-                f"identifier {ref.identifier!r} not found in "
-                f"{ref.taxonomy} v{ref.version}"
-            ),
+            reason=(f"identifier {ref.identifier!r} not found in {ref.taxonomy} v{ref.version}"),
         )
     if ref.type == "agentic":
         # Agentic loader returns a stub, not a real validation.

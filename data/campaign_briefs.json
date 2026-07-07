@@ -1,0 +1,38 @@
+[
+  {
+    "id": "BRIEF-AUTO-SPORTS",
+    "vertical": "automotive",
+    "brand": "Luxury Auto Brand",
+    "budget": 500000,
+    "channels": ["ctv", "linear"],
+    "target_audience": "Sports enthusiasts 25-54, household income $100K+",
+    "target_cpm": 35,
+    "max_cpm": 45,
+    "preferred_package": "Max Premium Sports Bundle",
+    "flight_dates": "2026-09-01 to 2026-12-31"
+  },
+  {
+    "id": "BRIEF-RETAIL-NEWS",
+    "vertical": "retail",
+    "brand": "National Retail Chain",
+    "budget": 250000,
+    "channels": ["linear", "digital_video", "display"],
+    "target_audience": "News-engaged adults 25-64, in-market shoppers",
+    "target_cpm": 18,
+    "max_cpm": 28,
+    "preferred_package": "CNN News Reach Package",
+    "flight_dates": "2026-11-01 to 2026-12-31"
+  },
+  {
+    "id": "BRIEF-ENT-STREAMING",
+    "vertical": "entertainment",
+    "brand": "Streaming Service Competitor",
+    "budget": 350000,
+    "channels": ["ctv", "audio"],
+    "target_audience": "Streaming-first households 18-49, entertainment seekers",
+    "target_cpm": 30,
+    "max_cpm": 42,
+    "preferred_package": "Entertainment Upfront Package",
+    "flight_dates": "2026-06-01 to 2026-08-31"
+  }
+]

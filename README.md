@@ -118,6 +118,12 @@ Reveal buyer identity progressively to unlock better pricing from sellers:
 
 → [Authentication Guide](https://iabtechlab.github.io/buyer-agent/api/authentication/)
 
+### Vendor Approval Gating (optional)
+
+Plug in an [IAB Diligence Platform](https://safeguardprivacy.com) tenant to keep unapproved sellers out of the buyer-agent workflow. Consults the `iabBuyerAgentApproval` flag via SGP's integration API. When `SGP_ENFORCE=true`, `DiscoverInventoryTool` filters NOT APPROVED vendors out of search results before the agent ever sees them, and `RequestDealTool` enforces the same check as a safety net at Deal ID time. With enforcement off, products are annotated APPROVED / NOT APPROVED / UNKNOWN but never filtered. Off by default — inert when `SGP_API_KEY` is empty.
+
+→ [IAB Diligence Platform Approval](https://iabtechlab.github.io/buyer-agent/integration/iab-diligence-platform/)
+
 ## Quick Start
 
 ### Install

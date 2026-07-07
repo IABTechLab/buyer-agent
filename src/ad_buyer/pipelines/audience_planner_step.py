@@ -177,8 +177,7 @@ def run_audience_planner_step(
 
     if reasoning.plan is None:
         logger.warning(
-            "audience_planner_step: reasoning produced no plan; "
-            "rationale=%s",
+            "audience_planner_step: reasoning produced no plan; rationale=%s",
             " | ".join(reasoning.rationale_lines),
         )
     else:

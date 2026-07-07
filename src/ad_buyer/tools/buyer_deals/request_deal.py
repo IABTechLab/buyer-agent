@@ -3,7 +3,8 @@
 
 """Deal ID request tool for buyer deal workflows."""
 
-from datetime import datetime, timedelta, timezone
+import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from crewai.tools import BaseTool
@@ -12,15 +13,20 @@ from pydantic import BaseModel, Field
 from ...async_utils import run_async
 from ...booking.deal_id import generate_deal_id
 from ...booking.pricing import PricingCalculator
+from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
 from ...clients.unified_client import UnifiedClient
 from ...models.audience_plan import AudiencePlan
 from ...models.buyer_identity import (
-    AccessTier,
     BuyerContext,
     DealRequest,
     DealResponse,
     DealType,
 )
+from ...models.sgp import ApprovalRecord
+
+logger = logging.getLogger(__name__)
+
+_VALID_UNKNOWN_POLICIES = {"block", "warn", "allow"}
 
 
 class RequestDealInput(BaseModel):
@@ -32,7 +38,7 @@ class RequestDealInput(BaseModel):
     )
     deal_type: str = Field(
         default="PD",
-        description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",
+        description="Deal type: 'PG' (Programmatic Guaranteed), 'PD' (Preferred Deal), 'PA' (Private Auction)",  # noqa: E501
     )
     impressions: int | None = Field(
         default=None,
@@ -94,11 +100,17 @@ Returns:
     args_schema: type[BaseModel] = RequestDealInput
     _client: UnifiedClient
     _buyer_context: BuyerContext
+    _sgp_client: SGPClient | None
+    _sgp_enforce: bool
+    _sgp_unknown_policy: str
 
     def __init__(
         self,
         client: UnifiedClient,
         buyer_context: BuyerContext,
+        sgp_client: SGPClient | None = None,
+        sgp_enforce: bool = False,
+        sgp_unknown_policy: str = "block",
         **kwargs: Any,
     ):
         """Initialize with unified client and buyer context.
@@ -106,10 +118,26 @@ Returns:
         Args:
             client: UnifiedClient for seller communication
             buyer_context: BuyerContext with identity for tiered access
+            sgp_client: Optional IAB Diligence Platform client. When provided
+                and ``sgp_enforce`` is True, the seller's IAB buyer-agent
+                approval is verified before a Deal ID is generated.
+            sgp_enforce: When True, block the deal request unless SGP
+                returns ``iabBuyerAgentApproval=true`` for the seller.
+            sgp_unknown_policy: How to treat vendors absent from the
+                buyer's SGP portfolio (HTTP 404). One of ``block``,
+                ``warn``, ``allow``.
         """
         super().__init__(**kwargs)
         self._client = client
         self._buyer_context = buyer_context
+        self._sgp_client = sgp_client
+        self._sgp_enforce = sgp_enforce
+        if sgp_unknown_policy not in _VALID_UNKNOWN_POLICIES:
+            raise ValueError(
+                f"Invalid sgp_unknown_policy '{sgp_unknown_policy}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_UNKNOWN_POLICIES))}"
+            )
+        self._sgp_unknown_policy = sgp_unknown_policy
 
     def _run(
         self,
@@ -193,6 +221,11 @@ Returns:
             self._last_deal_request = deal_request_payload
             self._last_audience_plan = audience_plan
 
+            # IAB Diligence Platform approval gate — must pass before a Deal ID is issued.
+            gate_error, approval_banner = await self._check_sgp_approval(product)
+            if gate_error:
+                return gate_error
+
             # Calculate pricing
             deal_response = self._create_deal_response(
                 product=product,
@@ -204,10 +237,99 @@ Returns:
                 audience_plan=audience_plan,
             )
 
-            return self._format_deal_response(deal_response, audience_plan)
+            if deal_response is None:
+                product_name = product.get("name", product_id)
+                return (
+                    f"Error: No pricing available for product '{product_name}' "
+                    f"(ID: {product_id}). Seller has not provided a CPM. "
+                    "Negotiation required before deal creation."
+                )
+
+            formatted = self._format_deal_response(deal_response, audience_plan)
+            if approval_banner:
+                formatted = f"{approval_banner}\n{formatted}"
+            return formatted
 
         except (OSError, ValueError, RuntimeError) as e:
             return f"Error requesting deal: {e}"
+
+    async def _check_sgp_approval(self, product: dict) -> tuple[str | None, str | None]:
+        """Gate a deal request against IAB Diligence Platform approval.
+
+        Returns ``(error_message, banner)``:
+          * ``error_message`` is non-None when the deal must be refused.
+          * ``banner`` is a one-line note prepended to a successful deal
+            response (e.g. "warn" policy, unknown vendor proceeding).
+
+        When ``sgp_client`` is None or ``sgp_enforce`` is False, the gate
+        is skipped entirely.
+        """
+        if self._sgp_client is None or not self._sgp_enforce:
+            return None, None
+
+        raw_domain = extract_product_domain(product)
+        if not raw_domain:
+            return (
+                "Deal blocked: cannot determine seller domain for IAB "
+                "Diligence Platform approval check. Add a seller_url / "
+                "publisher_domain field to the product, or disable SGP_ENFORCE.",
+                None,
+            )
+
+        domain = self._sgp_client.normalize_domain(raw_domain) or raw_domain
+
+        try:
+            approvals = await self._sgp_client.check_approvals([raw_domain])
+        except SGPClientError as exc:
+            logger.warning(
+                "IAB Diligence Platform lookup failed for %s during deal request",
+                domain,
+                exc_info=True,
+            )
+            # Fail closed — enforcement is on, so we must not issue a Deal ID
+            # when the privacy gate cannot be evaluated.
+            return (
+                f"Deal blocked: IAB Diligence Platform lookup failed for {domain} "
+                f"({exc}). Retry once the SGP service is reachable.",
+                None,
+            )
+
+        record: ApprovalRecord | None = approvals.get(domain)
+
+        if record is None:
+            if self._sgp_unknown_policy == "allow":
+                return None, f"SGP: {domain} not in SGP portfolio — allowed by policy."
+            if self._sgp_unknown_policy == "warn":
+                return None, (
+                    f"SGP WARNING: {domain} is not in your SGP portfolio. "
+                    f"Onboard and approve this vendor in IAB Diligence Platform "
+                    f"to suppress this warning."
+                )
+            return (
+                f"Deal blocked: {domain} is not in your IAB Diligence Platform "
+                f"portfolio. Onboard and approve the vendor in SGP before "
+                f"requesting a Deal ID.",
+                None,
+            )
+
+        if not record.iab_buyer_agent_approval:
+            return (
+                f"Deal blocked: {record.company_name or domain} does not carry "
+                f"the IAB buyer-agent approval flag in IAB Diligence Platform. "
+                f"Update the vendor's approval in SGP and retry.",
+                None,
+            )
+
+        approved_at = (
+            record.iab_buyer_agent_approved_at.isoformat()
+            if record.iab_buyer_agent_approved_at
+            else "date unknown"
+        )
+        banner = (
+            f"SGP: ✓ {record.company_name or domain} approved for IAB "
+            f"buyer-agent purchases (since {approved_at})."
+        )
+        return None, banner
 
     def _create_deal_response(
         self,
@@ -218,18 +340,20 @@ Returns:
         flight_end: str | None,
         target_cpm: float | None,
         audience_plan: AudiencePlan | None = None,
-    ) -> DealResponse:
+    ) -> DealResponse | None:
         """Create a deal response with calculated pricing.
 
         Uses the centralized PricingCalculator and deal ID generator
         from ad_buyer.booking to avoid duplicated logic.
+
+        Returns None when the product has no valid pricing available.
         """
         tier = self._buyer_context.identity.get_access_tier()
         discount = self._buyer_context.identity.get_discount_percentage()
-        base_price = product.get("basePrice", product.get("price", 20.0))
+        base_price = product.get("basePrice", product.get("price"))
 
         if not isinstance(base_price, (int, float)):
-            base_price = 20.0
+            return None
 
         calculator = PricingCalculator()
         pricing = calculator.calculate(
@@ -248,7 +372,7 @@ Returns:
             identity_seed=identity.agency_id or identity.seat_id or "public",
         )
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not flight_start:
             flight_start = now.strftime("%Y-%m-%d")
         if not flight_end:
@@ -347,9 +471,7 @@ Returns:
         # the human reviewer (and audit trail) a stable handle linking
         # buyer state to seller-side records (proposal §5.1 step 2).
         if audience_plan is not None:
-            output_lines.append(
-                f"Audience Plan ID: {audience_plan.audience_plan_id}"
-            )
+            output_lines.append(f"Audience Plan ID: {audience_plan.audience_plan_id}")
 
         output_lines.extend(
             [

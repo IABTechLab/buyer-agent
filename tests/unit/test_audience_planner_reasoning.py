@@ -35,18 +35,11 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
 import pytest
 
-from ad_buyer.models.audience_plan import (
-    AudiencePlan,
-    AudienceRef,
-    AudienceStrictness,
-    ComplianceContext,
-)
 from ad_buyer.models.campaign_brief import (
     CampaignBrief,
     parse_campaign_brief,
 )
 from ad_buyer.pipelines.audience_planner_reasoning import (
-    ReasoningResult,
     classify_intent,
     pick_primary,
     run_audience_reasoning,
@@ -57,7 +50,6 @@ from ad_buyer.tools.audience import (
     CoverageEstimationTool,
     EmbeddingMintTool,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -162,8 +154,7 @@ class TestContextualBrief:
     def test_content_adjacent_description_biases_contextual(self):
         brief = _make_brief(
             description=(
-                "ads next to automotive content on premium news sites; "
-                "contextual-led campaign"
+                "ads next to automotive content on premium news sites; contextual-led campaign"
             ),
         )
         # No usable taxonomy candidates resolve from prose alone -- but
@@ -210,13 +201,10 @@ class TestFirstPartyBrief:
     def test_first_party_description_mints_agentic_primary(self, mint_tool):
         brief = _make_brief(
             description=(
-                "lookalike of our converters from last campaign; "
-                "advertiser first-party data"
+                "lookalike of our converters from last campaign; advertiser first-party data"
             ),
         )
-        result = run_audience_reasoning(
-            brief, embedding_mint_tool=mint_tool
-        )
+        result = run_audience_reasoning(brief, embedding_mint_tool=mint_tool)
 
         assert result.plan is not None, " | ".join(result.rationale_lines)
         assert result.plan.primary.type == "agentic"
@@ -258,9 +246,7 @@ class TestMixedSignalBrief:
                 "campaign; show alongside automotive content"
             ),
         )
-        result = run_audience_reasoning(
-            brief, embedding_mint_tool=mint_tool
-        )
+        result = run_audience_reasoning(brief, embedding_mint_tool=mint_tool)
 
         # The strong "lookalike of our converters" phrase counts as
         # 2 agentic phrases (lookalike + our converters), beating
@@ -272,8 +258,7 @@ class TestMixedSignalBrief:
     def test_mixed_brief_demographic_dominant(self):
         brief = _make_brief(
             description=(
-                "women, men, parents, kids, household income brief; "
-                "no first-party data this time"
+                "women, men, parents, kids, household income brief; no first-party data this time"
             ),
         )
         # Many demographic phrases, no agentic, no contextual. With no
@@ -306,10 +291,7 @@ class TestExplicitPlanPrecisionAddsConstraints:
         brief_dict = _base_brief_dict(
             objective="CONVERSION",
             kpis=[{"metric": "ROAS", "target_value": 3.0}],
-            description=(
-                "Auto intenders; show on automotive content. "
-                "ROAS-driven optimization."
-            ),
+            description=("Auto intenders; show on automotive content. ROAS-driven optimization."),
             target_audience={
                 "primary": {
                     "type": "standard",
@@ -352,17 +334,14 @@ class TestExplicitPlanPrecisionAddsConstraints:
 class TestExplicitPlanReachAddsExtensions:
     """Explicit primary preserved; reach KPI -> inferred extensions."""
 
-    def test_explicit_primary_with_reach_objective_adds_agentic_extension(
-        self, mint_tool
-    ):
+    def test_explicit_primary_with_reach_objective_adds_agentic_extension(self, mint_tool):
         # REACH objective signals the reach branch; the planner mints an
         # Agentic extension from a "lookalike" seed in the description.
         brief_dict = _base_brief_dict(
             objective="REACH",
             kpis=[{"metric": "CPM", "target_value": 12.0}],
             description=(
-                "Big-reach awareness push; lookalike of our converters "
-                "for additional scale."
+                "Big-reach awareness push; lookalike of our converters for additional scale."
             ),
             target_audience={
                 "primary": {
@@ -376,9 +355,7 @@ class TestExplicitPlanReachAddsExtensions:
         )
         brief = parse_campaign_brief(brief_dict)
         # Inject the mint tool so the planner can produce an agentic ext.
-        result = run_audience_reasoning(
-            brief, embedding_mint_tool=mint_tool
-        )
+        result = run_audience_reasoning(brief, embedding_mint_tool=mint_tool)
 
         assert result.plan is not None
         assert result.plan.primary.identifier == "243"
@@ -392,9 +369,7 @@ class TestExplicitPlanReachAddsExtensions:
         # mint tool wired in and "lookalike" / "our converters" in the
         # description, the extension is Agentic.
         assert len(result.plan.extensions) >= 1
-        agentic_exts = [
-            e for e in result.plan.extensions if e.type == "agentic"
-        ]
+        agentic_exts = [e for e in result.plan.extensions if e.type == "agentic"]
         assert len(agentic_exts) >= 1
         # Inferred provenance is the mark of agent-added refs.
         assert agentic_exts[0].source == "inferred"

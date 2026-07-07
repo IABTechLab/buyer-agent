@@ -36,7 +36,6 @@ from ad_buyer.orchestration.multi_seller import (
     MultiSellerOrchestrator,
 )
 
-
 # ---------------------------------------------------------------------------
 # Test helpers
 # ---------------------------------------------------------------------------
@@ -263,16 +262,12 @@ class TestRetryOnAudiencePlanUnsupported:
         assert any("extensions" in e.path for e in log)
 
     @pytest.mark.asyncio
-    async def test_retry_succeeds_clean_first_try_no_log(
-        self, orchestrator, deals_client_factory
-    ):
+    async def test_retry_succeeds_clean_first_try_no_log(self, orchestrator, deals_client_factory):
         """When the first booking succeeds, no retry, no degradation log."""
 
         seller_url = "http://seller-a.example.com"
         client = deals_client_factory(seller_url)
-        client.book_deal.return_value = _make_deal_response(
-            deal_id="deal-1", quote_id="q-1"
-        )
+        client.book_deal.return_value = _make_deal_response(deal_id="deal-1", quote_id="q-1")
 
         selection = await orchestrator.select_and_book(
             ranked_quotes=[_ranked_quote()],
@@ -326,10 +321,7 @@ class TestRetryFails:
         assert selection.booked_deals == []
         assert "seller-a" in selection.incompatible_sellers
         assert len(selection.failed_bookings) == 1
-        assert (
-            selection.failed_bookings[0]["error_code"]
-            == "audience_plan_unsupported"
-        )
+        assert selection.failed_bookings[0]["error_code"] == "audience_plan_unsupported"
         assert selection.failed_bookings[0]["seller_id"] == "seller-a"
 
     @pytest.mark.asyncio
@@ -535,10 +527,7 @@ class TestDealsClientErrorParsing:
 
         from ad_buyer.clients.deals_client import DealsClient
 
-        body = (
-            b'{"error": "product_not_found", '
-            b'"detail": "Product bad-id does not exist"}'
-        )
+        body = b'{"error": "product_not_found", "detail": "Product bad-id does not exist"}'
         response = httpx.Response(
             status_code=404,
             content=body,

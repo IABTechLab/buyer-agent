@@ -24,15 +24,14 @@ from unittest.mock import patch
 from ad_buyer.clients.ucp_client import UCPClient
 from ad_buyer.config.settings import settings
 
-
 # Fixed corpus of audience briefs covering each of the 3 audience types and
 # semantically related pairs (so distinctiveness has signal).
 EMBEDDING_EVAL_FIXTURES: list[dict[str, Any]] = [
     {"name": "auto_intenders", "interest": "auto", "age": "25-54", "income": "high"},
-    {"name": "auto_owners",    "interest": "auto", "age": "35-65", "income": "high"},
-    {"name": "sports_fans",    "interest": "sports", "age": "18-44"},
-    {"name": "news_readers",   "interest": "news",   "age": "35-65"},
-    {"name": "young_gamers",   "interest": "gaming", "age": "18-24"},
+    {"name": "auto_owners", "interest": "auto", "age": "35-65", "income": "high"},
+    {"name": "sports_fans", "interest": "sports", "age": "18-44"},
+    {"name": "news_readers", "interest": "news", "age": "35-65"},
+    {"name": "young_gamers", "interest": "gaming", "age": "18-24"},
 ]
 
 
@@ -42,10 +41,10 @@ class PerModeMetrics:
 
     mode: str
     n_fixtures: int
-    deterministic: bool          # repeat-call returns same vector for each fixture
-    dimension: int               # all fixtures produce the same dim
-    distinctiveness: float       # mean pairwise cosine distance across fixtures
-    provenance: str              # provenance reported by the client
+    deterministic: bool  # repeat-call returns same vector for each fixture
+    dimension: int  # all fixtures produce the same dim
+    distinctiveness: float  # mean pairwise cosine distance across fixtures
+    provenance: str  # provenance reported by the client
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -96,17 +95,11 @@ def _eval_single_mode(
     client = UCPClient()
     with patch.object(settings, "embedding_mode", mode):
         # First pass: gather vectors
-        first = [
-            client.create_query_embedding_with_provenance(f) for f in fixtures
-        ]
+        first = [client.create_query_embedding_with_provenance(f) for f in fixtures]
         # Second pass: gather again to check determinism
-        second = [
-            client.create_query_embedding_with_provenance(f) for f in fixtures
-        ]
+        second = [client.create_query_embedding_with_provenance(f) for f in fixtures]
 
-    deterministic = all(
-        f.embedding.vector == s.embedding.vector for f, s in zip(first, second)
-    )
+    deterministic = all(f.embedding.vector == s.embedding.vector for f, s in zip(first, second))
 
     dims = {len(r.embedding.vector) for r in first}
     dimension = dims.pop() if len(dims) == 1 else -1
@@ -115,9 +108,7 @@ def _eval_single_mode(
     distances: list[float] = []
     for i in range(len(first)):
         for j in range(i + 1, len(first)):
-            distances.append(
-                _cosine_distance(first[i].embedding.vector, first[j].embedding.vector)
-            )
+            distances.append(_cosine_distance(first[i].embedding.vector, first[j].embedding.vector))
     distinctiveness = sum(distances) / len(distances) if distances else 0.0
 
     # Provenance: should be consistent across fixtures within a mode.

@@ -618,7 +618,7 @@ class TestPacingEventEmission:
             "display": {"allocated_budget": 50_000.0, "spend": 25_000.0, "impressions": 1_000_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        _snapshot = engine.generate_snapshot(
             campaign_id="campaign-003",
             total_budget=50_000.0,
             flight_start=campaign_start,
@@ -652,7 +652,7 @@ class TestPacingEventEmission:
             "display": {"allocated_budget": 50_000.0, "spend": 15_000.0, "impressions": 500_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        _snapshot = engine.generate_snapshot(
             campaign_id="campaign-004",
             total_budget=50_000.0,
             flight_start=campaign_start,
@@ -685,7 +685,7 @@ class TestPacingEventEmission:
             "ctv": {"allocated_budget": 50_000.0, "spend": 40_000.0, "impressions": 1_000_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        _snapshot = engine.generate_snapshot(
             campaign_id="campaign-005",
             total_budget=100_000.0,
             flight_start=campaign_start,
@@ -717,7 +717,7 @@ class TestPacingEventEmission:
             "display": {"allocated_budget": 50_000.0, "spend": 25_000.0, "impressions": 1_000_000},
         }
 
-        snapshot = engine.generate_snapshot(
+        _snapshot = engine.generate_snapshot(
             campaign_id="campaign-006",
             total_budget=50_000.0,
             flight_start=campaign_start,

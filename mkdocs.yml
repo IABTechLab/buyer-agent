@@ -74,6 +74,7 @@ nav:
       - Booking Flow: architecture/booking-flow.md
       - Buyer Deal Flow: architecture/buyer-deal-flow.md
       - Deal Store: architecture/deal-store.md
+      - Storage Backends: architecture/storage-backends.md
       - Models: architecture/models.md
       - Tools Reference: architecture/tools.md
       - MCP Server: architecture/mcp-server.md
@@ -105,6 +106,7 @@ nav:
       - Seller Agent Guide: integration/seller-agent.md
       - OpenDirect Protocol: integration/opendirect.md
       - Meta Ads: integration/meta-ads.md
+      - IAB Diligence Platform Approval: integration/iab-diligence-platform.md
   - AI Assistant Setup:
       - Claude (Desktop & Web): claude-desktop-setup.md
       - ChatGPT, Codex & AI IDEs: multi-client-setup.md

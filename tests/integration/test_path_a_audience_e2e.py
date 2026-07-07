@@ -71,7 +71,6 @@ from ad_buyer.orchestration.multi_seller import (
 )
 from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline
 
-
 # ===========================================================================
 # Fixtures
 # ===========================================================================
@@ -106,9 +105,7 @@ def _three_type_plan_dict() -> dict[str, Any]:
         "extensions": [
             {
                 "type": "agentic",
-                "identifier": (
-                    "emb://buyer.example.com/audiences/auto-converters-q1"
-                ),
+                "identifier": ("emb://buyer.example.com/audiences/auto-converters-q1"),
                 "taxonomy": "agentic-audiences",
                 "version": "draft-2026-01",
                 "source": "explicit",
@@ -151,9 +148,7 @@ def _base_brief_dict(**overrides: Any) -> dict[str, Any]:
 def _three_type_brief() -> CampaignBrief:
     """Brief carrying an explicit 3-type AudiencePlan."""
 
-    return parse_campaign_brief(
-        _base_brief_dict(target_audience=_three_type_plan_dict())
-    )
+    return parse_campaign_brief(_base_brief_dict(target_audience=_three_type_plan_dict()))
 
 
 # ---------------------------------------------------------------------------
@@ -316,9 +311,7 @@ class TestCampaignPipelineThreeTypeHappyPath:
             campaign_id = loop.run_until_complete(
                 pipeline.ingest_brief(brief.model_dump(mode="json"))
             )
-            campaign_plan = loop.run_until_complete(
-                pipeline.plan_campaign(campaign_id)
-            )
+            campaign_plan = loop.run_until_complete(pipeline.plan_campaign(campaign_id))
             loop.run_until_complete(pipeline.execute_booking(campaign_id))
         finally:
             loop.close()
@@ -362,29 +355,18 @@ class TestCampaignPipelineThreeTypeHappyPath:
             # MUST survive plan -> seller (no in-flight mutation). This
             # is the §5.1 step-2 wire-format guarantee for the buyer
             # side of Path A.
-            assert (
-                inv_req.audience_plan.audience_plan_id == post_planner_plan_id
-            )
-            assert (
-                deal_params.audience_plan.audience_plan_id
-                == post_planner_plan_id
-            )
+            assert inv_req.audience_plan.audience_plan_id == post_planner_plan_id
+            assert deal_params.audience_plan.audience_plan_id == post_planner_plan_id
 
             # All three types still present at the seller boundary.
             assert inv_req.audience_plan.primary.type == "standard"
             assert inv_req.audience_plan.primary.identifier == "3-7"
-            assert any(
-                c.type == "contextual" for c in inv_req.audience_plan.constraints
-            )
-            assert any(
-                e.type == "agentic" for e in inv_req.audience_plan.extensions
-            )
+            assert any(c.type == "contextual" for c in inv_req.audience_plan.constraints)
+            assert any(e.type == "agentic" for e in inv_req.audience_plan.extensions)
 
             # Compliance context survives for the agentic extension --
             # required by §5.2's consent-regime guarantee.
-            agentic = next(
-                e for e in inv_req.audience_plan.extensions if e.type == "agentic"
-            )
+            agentic = next(e for e in inv_req.audience_plan.extensions if e.type == "agentic")
             assert isinstance(agentic.compliance_context, ComplianceContext)
             assert agentic.compliance_context.jurisdiction == "US"
             assert agentic.compliance_context.consent_framework == "IAB-TCFv2"
@@ -403,14 +385,14 @@ class TestCampaignPipelineThreeTypeHappyPath:
 # consistent with the unit-level coverage there but framed end-to-end against
 # the same brief-driven 3-type plan the happy-path test uses.
 
-from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
-from ad_buyer.clients.capability_client import CapabilityDiscoveryResult
-from ad_buyer.models.audience_plan import AudienceStrictness
-from ad_buyer.models.deals import DealBookingRequest, DealResponse
-from ad_buyer.orchestration.audience_degradation import (
+from ad_buyer.booking.quote_normalizer import NormalizedQuote, QuoteNormalizer  # noqa: E402
+from ad_buyer.clients.capability_client import CapabilityDiscoveryResult  # noqa: E402
+from ad_buyer.models.audience_plan import AudienceStrictness  # noqa: E402
+from ad_buyer.models.deals import DealBookingRequest, DealResponse  # noqa: E402
+from ad_buyer.orchestration.audience_degradation import (  # noqa: E402
     SellerAudienceCapabilities,
 )
-from ad_buyer.storage import audience_audit_log
+from ad_buyer.storage import audience_audit_log  # noqa: E402
 
 
 def _audience_plan_from_brief() -> AudiencePlan:
@@ -489,16 +471,10 @@ class _RecordingCapabilityClient:
         self._caps_by_url = caps_by_url
         self.calls: list[str] = []
 
-    async def discover_capabilities(
-        self, seller_endpoint: str
-    ) -> CapabilityDiscoveryResult:
+    async def discover_capabilities(self, seller_endpoint: str) -> CapabilityDiscoveryResult:
         self.calls.append(seller_endpoint)
-        caps = self._caps_by_url.get(
-            seller_endpoint, SellerAudienceCapabilities.legacy_default()
-        )
-        return CapabilityDiscoveryResult(
-            capabilities=caps, cache_status="miss", fetched_at=0.0
-        )
+        caps = self._caps_by_url.get(seller_endpoint, SellerAudienceCapabilities.legacy_default())
+        return CapabilityDiscoveryResult(capabilities=caps, cache_status="miss", fetched_at=0.0)
 
 
 @pytest.fixture
@@ -554,8 +530,7 @@ def _orchestrator_with_caps(
 
 # `Callable` is needed by the helper above. Imported lazily to keep the
 # test 1 path's imports stable.
-from typing import Callable  # noqa: E402
-
+from collections.abc import Callable  # noqa: E402
 
 # ===========================================================================
 # 2. Capability degradation against a legacy-default seller
@@ -663,18 +638,12 @@ class TestCapabilityDegradationLegacySeller:
         # -- the pre-degradation id, by design (so a reviewer can correlate
         # the original plan with everything that happened to it downstream).
         events = audience_audit_log.get_events(original_plan_id)
-        assert events, (
-            f"Expected audit events for original plan_id={original_plan_id!r}; "
-            f"got none"
-        )
+        assert events, f"Expected audit events for original plan_id={original_plan_id!r}; got none"
         event_types = [e["event_type"] for e in events]
         assert audience_audit_log.EVENT_DEGRADATION in event_types
         # Find the degradation event and confirm it carries the seller and
         # the structured drop log.
-        deg_events = [
-            e for e in events
-            if e["event_type"] == audience_audit_log.EVENT_DEGRADATION
-        ]
+        deg_events = [e for e in events if e["event_type"] == audience_audit_log.EVENT_DEGRADATION]
         assert len(deg_events) >= 1
         deg_payload = deg_events[0]["payload"]
         assert deg_payload.get("phase") == "preflight"
@@ -799,9 +768,17 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
                 None,
             )
             if buyer_repo_root is None:
-                raise RuntimeError(
-                    "Could not locate ad_buyer_system in path ancestry "
-                    f"of {here}; set AD_SELLER_SRC_PATH to override."
+                # CI / standalone clones (e.g. IABTechLab/buyer-agent) check
+                # out only the buyer repo, so the ad_buyer_system / sibling
+                # ad_seller_system layout this round-trip needs does not
+                # exist. Skip cleanly here rather than erroring; the test
+                # can still be opted in locally by setting
+                # AD_SELLER_SRC_PATH or by checking out the sibling repos
+                # alongside an ad_buyer_system-named buyer checkout.
+                pytest.skip(
+                    "Cross-repo round-trip requires the sibling "
+                    "ad_seller_system checkout; set AD_SELLER_SRC_PATH to "
+                    f"the seller src/ directory to override. (here={here})"
                 )
             agent_range_root = buyer_repo_root.parent
             seller_main = agent_range_root / "ad_seller_system" / "src"
@@ -816,17 +793,20 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
                     break
             if worktree_name is not None:
                 sibling_worktree = (
-                    agent_range_root
-                    / "ad_seller_system"
-                    / ".worktrees"
-                    / worktree_name
-                    / "src"
+                    agent_range_root / "ad_seller_system" / ".worktrees" / worktree_name / "src"
                 )
-                seller_src = str(
-                    sibling_worktree if sibling_worktree.is_dir() else seller_main
-                )
+                seller_src = str(sibling_worktree if sibling_worktree.is_dir() else seller_main)
             else:
                 seller_src = str(seller_main)
+            # Even with an ad_buyer_system-named ancestor, the sibling
+            # ad_seller_system tree may be absent (partial checkout). Skip
+            # in that case too rather than failing on the import below.
+            if not Path(seller_src).is_dir():
+                pytest.skip(
+                    "Cross-repo round-trip requires the sibling "
+                    f"ad_seller_system checkout; resolved path {seller_src} "
+                    "does not exist. Set AD_SELLER_SRC_PATH to override."
+                )
         sys.path.insert(0, seller_src)
         try:
             from ad_seller.models.audience_ref import AudienceRef as SellerRef
@@ -848,9 +828,7 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
             buyer_canon = json.dumps(ref_dict, sort_keys=True)
             seller_canon = json.dumps(re_serialized, sort_keys=True)
             assert buyer_canon == seller_canon, (
-                f"Schema drift at {where}:\n"
-                f"  buyer:  {buyer_canon}\n"
-                f"  seller: {seller_canon}"
+                f"Schema drift at {where}:\n  buyer:  {buyer_canon}\n  seller: {seller_canon}"
             )
 
         # 3. Round-trip every ref slot.
@@ -864,9 +842,7 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
 
         # 4. Confirm the agentic compliance_context survived the round-trip
         # (it's the most failure-prone nested field).
-        agentic_dict = next(
-            r for r in buyer_dict["extensions"] if r["type"] == "agentic"
-        )
+        agentic_dict = next(r for r in buyer_dict["extensions"] if r["type"] == "agentic")
         seller_agentic = SellerRef(**agentic_dict)
         assert seller_agentic.compliance_context is not None
         assert seller_agentic.compliance_context.jurisdiction == "US"

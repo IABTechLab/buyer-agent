@@ -7,6 +7,7 @@ from .a2a_client import A2AClient, A2AError, A2AResponse
 from .deals_client import DealsClient, DealsClientError
 from .mcp_client import IABMCPClient, MCPClientError, MCPToolResult
 from .opendirect_client import OpenDirectClient
+from .sgp_client import SGPAuthError, SGPClient, SGPClientError
 from .ucp_client import UCPClient, UCPExchangeResult
 from .unified_client import Protocol, UnifiedClient, UnifiedResult
 
@@ -31,4 +32,8 @@ __all__ = [
     # IAB Deals API v1.0 client (quote-then-book flow)
     "DealsClient",
     "DealsClientError",
+    # IAB Diligence Platform (SGP) approval gate
+    "SGPClient",
+    "SGPClientError",
+    "SGPAuthError",
 ]

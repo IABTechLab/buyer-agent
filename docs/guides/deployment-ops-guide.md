@@ -254,8 +254,8 @@ The buyer agent runs on **ECS Fargate** with **EFS-backed SQLite persistence**. 
 | Secrets | SSM Parameter Store (SecureString) | Anthropic API key |
 | Logging | CloudWatch Logs | 30-day retention by default |
 
-!!! warning "Single-task constraint"
-    SQLite supports only one concurrent writer. AWS deployments must run exactly **one ECS task** (`DesiredCount: 1`). Running multiple tasks will corrupt the database. A PostgreSQL migration is planned for horizontal scaling.
+!!! warning "Single-task constraint with SQLite"
+    SQLite supports only one concurrent writer. If you deploy with `STORAGE_TYPE=sqlite` (the default), you must run exactly **one ECS task** (`DesiredCount: 1`). Running multiple tasks against the same EFS-backed SQLite file will corrupt the database. For horizontal scaling, switch to `STORAGE_TYPE=hybrid` (PostgreSQL + Redis) — see [Storage Backends](../architecture/storage-backends.md).
 
 ### Prerequisites
 
@@ -449,25 +449,33 @@ DEFAULT_LLM_MODEL=openai/gpt-4o
 MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
 ```
 
-### Database
+### Storage
+
+See [Storage Backends](../architecture/storage-backends.md) for the full backend reference.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `sqlite:///./ad_buyer.db` | SQLAlchemy connection string for deal storage. SQLite for development; PostgreSQL for production multi-instance deployments. |
+| `STORAGE_TYPE` | `sqlite` | Backend selector — `sqlite`, `redis`, or `hybrid` (Postgres + Redis). |
+| `DATABASE_URL` | `sqlite:///./ad_buyer.db` | SQLite or PostgreSQL connection string. Use `postgresql+asyncpg://…` for hybrid. |
+| `REDIS_URL` | `None` | Redis URL. Required for `redis` and `hybrid` backends; also used for CrewAI memory persistence and session caching when set. |
+| `POSTGRES_POOL_MIN` | `2` | Minimum asyncpg pool size (hybrid only). |
+| `POSTGRES_POOL_MAX` | `10` | Maximum asyncpg pool size (hybrid only). |
 
 ```dotenv
-# SQLite (default, development)
+# SQLite (default, development, single-task only)
+STORAGE_TYPE=sqlite
 DATABASE_URL=sqlite:///./ad_buyer.db
 
-# PostgreSQL (production, when horizontal scaling is needed)
-DATABASE_URL=postgresql://buyer:pass@db.example.com:5432/ad_buyer
+# Hybrid (production, horizontal scaling)
+STORAGE_TYPE=hybrid
+DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
+REDIS_URL=redis://cache.example.com:6379/0
 ```
 
 ### Agent Behavior
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDIS_URL` | `None` | Redis URL for CrewAI memory persistence and session caching. When unset, in-memory storage is used. |
 | `CREW_MEMORY_ENABLED` | `True` | Enable CrewAI agent memory across tasks. |
 | `CREW_VERBOSE` | `True` | Enable verbose CrewAI logging. Set to `False` in production. |
 | `CREW_MAX_ITERATIONS` | `15` | Maximum iterations per crew task before forced completion. |
@@ -497,7 +505,8 @@ API_KEY=your-service-api-key
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
 IAB_SERVER_URL=https://primary-seller.example.com
 
-DATABASE_URL=postgresql://buyer:pass@db.example.com:5432/ad_buyer
+STORAGE_TYPE=hybrid
+DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
 REDIS_URL=redis://cache.example.com:6379/0
 
 CREW_VERBOSE=False

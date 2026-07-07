@@ -28,25 +28,30 @@ from crewai.tools import BaseTool
 
 from ad_buyer.agents.level1.portfolio_manager import create_portfolio_manager
 from ad_buyer.agents.level2.branding_agent import create_branding_agent
-from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
 from ad_buyer.agents.level2.buyer_deal_specialist_agent import create_buyer_deal_specialist_agent
+from ad_buyer.agents.level2.ctv_agent import create_ctv_agent
 from ad_buyer.agents.level2.mobile_app_agent import create_mobile_app_agent
 from ad_buyer.agents.level2.performance_agent import create_performance_agent
 from ad_buyer.agents.level3.audience_planner_agent import create_audience_planner_agent
 from ad_buyer.agents.level3.execution_agent import create_execution_agent
 from ad_buyer.agents.level3.reporting_agent import create_reporting_agent
 from ad_buyer.agents.level3.research_agent import create_research_agent
+from ad_buyer.config.settings import settings
 from ad_buyer.crews.channel_crews import (
     _create_audience_tools,
     _create_execution_tools,
     _create_research_tools,
     _format_audience_context,
-    create_branding_crew,
-    create_ctv_crew,
-    create_mobile_crew,
-    create_performance_crew,
 )
-from ad_buyer.crews.portfolio_crew import create_portfolio_crew
+
+
+# Per ar-i84f: agent constructors now honor settings.crew_memory_enabled
+# instead of hard-coding memory=True. Force the flag on for this test module
+# so memory-related assertions don't depend on ambient .env state.
+@pytest.fixture(autouse=True)
+def _force_memory_enabled(monkeypatch):
+    monkeypatch.setattr(settings, "crew_memory_enabled", True)
+
 
 # ---------------------------------------------------------------------------
 # Helper: create valid BaseTool instances for injection tests
@@ -609,6 +614,19 @@ class TestHierarchyInvariants:
             agent = factory(verbose=False)
             assert agent.memory, f"{agent.role} should have memory"
 
+    def test_all_agents_honor_crew_memory_enabled_false(self, monkeypatch):
+        """ar-i84f regression: when settings.crew_memory_enabled is False,
+        every agent must construct WITHOUT memory (no chromadb / OpenAI
+        embedder dependency). Prior to the fix this assertion failed
+        because memory=True was hardcoded in every agent constructor."""
+        monkeypatch.setattr(settings, "crew_memory_enabled", False)
+        all_factories = self.L1_FACTORIES + self.L2_FACTORIES + self.L3_FACTORIES
+        for factory in all_factories:
+            agent = factory(verbose=False)
+            assert not agent.memory, (
+                f"{agent.role} should NOT have memory when crew_memory_enabled=False"
+            )
+
     def test_all_agents_have_non_empty_role(self):
         """Every agent must have a meaningful role string."""
         all_factories = self.L1_FACTORIES + self.L2_FACTORIES + self.L3_FACTORIES
@@ -818,8 +836,8 @@ class TestModuleImports:
     def test_level2_init_exports(self):
         from ad_buyer.agents.level2 import (
             create_branding_agent,
-            create_ctv_agent,
             create_buyer_deal_specialist_agent,
+            create_ctv_agent,
             create_mobile_app_agent,
             create_performance_agent,
         )

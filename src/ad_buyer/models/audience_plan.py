@@ -59,9 +59,9 @@ class ComplianceContext(BaseModel):
         default=None,
         description="Hash or signature carrying any required attestation",
     )
-    embedding_provenance: Literal[
-        "local_buyer", "advertiser_supplied", "hosted_external", "mock"
-    ] | None = Field(
+    embedding_provenance: (
+        Literal["local_buyer", "advertiser_supplied", "hosted_external", "mock"] | None
+    ) = Field(
         default=None,
         description=(
             "Provenance of the embedding bytes (E2-7 Gap 6). Populated by "
@@ -124,9 +124,7 @@ class AudienceRef(BaseModel):
         """
 
         if self.type == "agentic" and self.compliance_context is None:
-            raise ValueError(
-                "AudienceRef.compliance_context is required when type='agentic'"
-            )
+            raise ValueError("AudienceRef.compliance_context is required when type='agentic'")
         return self
 
     @model_validator(mode="after")
@@ -137,9 +135,7 @@ class AudienceRef(BaseModel):
         """
 
         if self.source == "explicit" and self.confidence is not None:
-            raise ValueError(
-                "AudienceRef.confidence must be None when source='explicit'"
-            )
+            raise ValueError("AudienceRef.confidence must be None when source='explicit'")
         return self
 
 
@@ -601,10 +597,7 @@ class GlobalAgenticUnsupported(ValueError):
         if not issues:
             msg = "Global agentic refs are unsupported (no specific issues)"
         else:
-            heads = [
-                f"{i['role']}[{i['index']}] id={i['identifier']!r}"
-                for i in issues
-            ]
+            heads = [f"{i['role']}[{i['index']}] id={i['identifier']!r}" for i in issues]
             msg = (
                 "Brief carries agentic refs with jurisdiction='GLOBAL', "
                 "which is unsupported until per-jurisdiction consent fan-out "
@@ -626,8 +619,7 @@ class ContentTaxonomyMigrationRequired(ValueError):
             msg = "Content Taxonomy migration required (no specific issues)"
         else:
             heads = [
-                f"{i['role']}[{i['index']}] id={i['identifier']!r} "
-                f"version={i['version']!r}"
+                f"{i['role']}[{i['index']}] id={i['identifier']!r} version={i['version']!r}"
                 for i in issues
             ]
             msg = (

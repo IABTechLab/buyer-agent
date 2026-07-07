@@ -19,10 +19,10 @@ import pytest
 
 from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.flows.buyer_deal_flow import (
-    DiscoveredProduct,
     BuyerDealFlow,
     BuyerDealFlowState,
     BuyerDealFlowStatus,
+    DiscoveredProduct,
 )
 from ad_buyer.models.buyer_identity import (
     AccessTier,
@@ -151,7 +151,7 @@ class TestDiscoverInventoryFilters:
             success=True, data=[_product(base_price=15.0)]
         )
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(query="cheap inventory", max_cpm=20.0)
+        _result = await tool._arun(query="cheap inventory", max_cpm=20.0)
         # Verify search was called (query triggers search_products)
         mock_client.search_products.assert_called_once()
         call_kwargs = mock_client.search_products.call_args
@@ -166,7 +166,7 @@ class TestDiscoverInventoryFilters:
             success=True, data=[_product(availableImpressions=10_000_000)]
         )
         tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
-        result = await tool._arun(query="big campaigns", min_impressions=5_000_000)
+        _result = await tool._arun(query="big campaigns", min_impressions=5_000_000)
         call_kwargs = mock_client.search_products.call_args
         filters = call_kwargs.kwargs.get("filters") or call_kwargs[1].get("filters")
         assert filters["minImpressions"] == 5_000_000
@@ -791,14 +791,15 @@ class TestRequestDealOutput:
 
     @pytest.mark.asyncio
     async def test_deal_handles_non_numeric_baseprice(self, mock_client, agency_context):
-        """Product with non-numeric basePrice should use default of $20."""
+        """Product with non-numeric basePrice should return a pricing error."""
         mock_client.get_product.return_value = MagicMock(
             success=True, data={"id": "bad", "name": "Bad Price", "basePrice": "TBD"}
         )
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="bad")
-        # Should not crash, should use $20 default
-        assert "DEAL-" in result
+        # Should not crash; should return error instead of fabricating $20 CPM
+        assert "Error" in result or "pricing" in result.lower()
+        assert "DEAL CREATED" not in result
 
     @pytest.mark.asyncio
     async def test_deal_exception_handling(self, mock_client, agency_context):

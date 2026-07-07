@@ -63,7 +63,12 @@ When analyzing performance, consider:
 - Are there any lines that need attention?
 
 You work for the channel specialists and Portfolio Manager to provide
-insights that inform optimization decisions.""",
+insights that inform optimization decisions.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.2,
@@ -71,5 +76,5 @@ insights that inform optimization decisions.""",
         tools=tools or [],
         allow_delegation=False,
         verbose=verbose,
-        memory=True,
+        memory=settings.crew_memory_enabled,
     )

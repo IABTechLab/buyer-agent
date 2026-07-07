@@ -1,5 +1,6 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
+# ruff: noqa: E501  (long lines unavoidable in docstrings/string literals)
 
 """OpenRTB carrier mapping for `AudiencePlan` (impression-time wire shape).
 
@@ -206,8 +207,7 @@ def build_openrtb_audience_targeting(
     if agentic_refs:
         if not enable_agentic_ext:
             logger.warning(
-                "openrtb_builder skipping agentic refs: "
-                "enable_agentic_openrtb_ext flag disabled",
+                "openrtb_builder skipping agentic refs: enable_agentic_openrtb_ext flag disabled",
                 extra={
                     "openrtb_drop": {
                         "reason": "agentic_ext_feature_flag_disabled",

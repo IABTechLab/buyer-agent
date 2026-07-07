@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS pacing_snapshots (
 PACING_SNAPSHOT_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_pacing_campaign_id ON pacing_snapshots(campaign_id);",
     "CREATE INDEX IF NOT EXISTS idx_pacing_timestamp ON pacing_snapshots(timestamp);",
-    "CREATE INDEX IF NOT EXISTS idx_pacing_campaign_timestamp ON pacing_snapshots(campaign_id, timestamp);",
+    "CREATE INDEX IF NOT EXISTS idx_pacing_campaign_timestamp ON pacing_snapshots(campaign_id, timestamp);",  # noqa: E501
 ]
 
 

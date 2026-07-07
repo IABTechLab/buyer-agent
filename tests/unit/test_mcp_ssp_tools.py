@@ -14,15 +14,13 @@ bead: buyer-sozw
 from __future__ import annotations
 
 import json
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ad_buyer.interfaces.mcp_server import mcp, _set_deal_store
+from ad_buyer.interfaces.mcp_server import _set_deal_store, mcp
 from ad_buyer.storage.deal_store import DealStore
 from ad_buyer.tools.deal_library.ssp_connector_base import SSPFetchResult
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,9 +246,7 @@ class TestImportDealsSSP:
             ],
         )
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.PubMaticConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as MockConnector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
@@ -296,9 +292,7 @@ class TestImportDealsSSP:
             ],
         )
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.MagniteConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.MagniteConnector") as MockConnector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
@@ -330,9 +324,7 @@ class TestImportDealsSSP:
             deals=[],
         )
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.PubMaticConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as MockConnector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result
@@ -343,7 +335,15 @@ class TestImportDealsSSP:
             data = json.loads(_extract_text(result))
 
         # Must have same structure as import_deals_csv
-        for field in ("total_rows", "successful", "failed", "skipped", "errors", "deal_ids", "timestamp"):
+        for field in (
+            "total_rows",
+            "successful",
+            "failed",
+            "skipped",
+            "errors",
+            "deal_ids",
+            "timestamp",
+        ):  # noqa: E501
             assert field in data, f"Missing field: {field}"
 
     @pytest.mark.asyncio
@@ -357,9 +357,7 @@ class TestImportDealsSSP:
 
         fake_result = SSPFetchResult(ssp_name="PubMatic", total_fetched=0, successful=0, deals=[])
 
-        with patch(
-            "ad_buyer.interfaces.mcp_server.PubMaticConnector"
-        ) as MockConnector:
+        with patch("ad_buyer.interfaces.mcp_server.PubMaticConnector") as MockConnector:
             instance = MagicMock()
             instance.is_configured.return_value = True
             instance.fetch_deals.return_value = fake_result

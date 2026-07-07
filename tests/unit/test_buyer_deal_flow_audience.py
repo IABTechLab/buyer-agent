@@ -44,7 +44,6 @@ from ad_buyer.models.buyer_identity import (
 )
 from ad_buyer.models.campaign_brief import CampaignBrief, parse_campaign_brief
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -133,9 +132,7 @@ def _seed_request_state(flow: BuyerDealFlow) -> None:
 class TestPlannerRunsOnReceiveRequest:
     """When a brief is supplied, receive_request must run the planner."""
 
-    def test_brief_yields_audience_plan_on_state(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_brief_yields_audience_plan_on_state(self, mock_unified_client: MagicMock) -> None:
         brief = _make_brief()
         flow = BuyerDealFlow(
             client=mock_unified_client,
@@ -155,9 +152,7 @@ class TestPlannerRunsOnReceiveRequest:
         assert planner_result is not None
         assert planner_result.plan is flow.state.audience_plan
 
-    def test_no_brief_keeps_flow_audience_blind(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_no_brief_keeps_flow_audience_blind(self, mock_unified_client: MagicMock) -> None:
         """Legacy callers (no brief) must keep the original audience-blind path."""
 
         flow = BuyerDealFlow(
@@ -181,9 +176,7 @@ class TestPlannerRunsOnReceiveRequest:
 class TestExplicitBriefPreserved:
     """Explicit user-supplied AudiencePlans are NEVER mutated by the planner."""
 
-    def test_explicit_primary_preserved_verbatim(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_explicit_primary_preserved_verbatim(self, mock_unified_client: MagicMock) -> None:
         brief = _make_brief()
         # Capture the explicit plan as authored by the user.
         original = brief.target_audience
@@ -224,9 +217,7 @@ class TestExplicitBriefPreserved:
 class TestLegacyBriefMigration:
     """Legacy `list[str]` audience field must round-trip through the flow."""
 
-    def test_legacy_brief_yields_inferred_primary(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_legacy_brief_yields_inferred_primary(self, mock_unified_client: MagicMock) -> None:
         brief = _make_legacy_brief()
         # Confirm the parser already migrated the list[str] to a typed plan
         # marked source=inferred (the contract from §4 / coerce_audience_field).
@@ -273,9 +264,7 @@ def _make_minimal_plan(identifier: str = "3-7") -> AudiencePlan:
 class TestAudiencePlanCrossesSellerBoundary:
     """The plan threaded onto state must reach the seller-bound DealRequest."""
 
-    def test_request_deal_id_threads_plan_into_tool(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_request_deal_id_threads_plan_into_tool(self, mock_unified_client: MagicMock) -> None:
         """request_deal_id must call the deal tool with the AudiencePlan."""
 
         flow = BuyerDealFlow(
@@ -290,9 +279,7 @@ class TestAudiencePlanCrossesSellerBoundary:
 
         # Mock the deal tool so we can inspect the call.
         flow._deal_tool = MagicMock()
-        flow._deal_tool._run = MagicMock(
-            return_value="DEAL CREATED: deal-test-001"
-        )
+        flow._deal_tool._run = MagicMock(return_value="DEAL CREATED: deal-test-001")
 
         result = flow.request_deal_id({"status": "success"})
 
@@ -304,9 +291,7 @@ class TestAudiencePlanCrossesSellerBoundary:
         # Deal type / impressions / flights came along too.
         assert call_kwargs.get("product_id") == "ctv-pkg-1"
 
-    def test_request_deal_payload_carries_plan(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_request_deal_payload_carries_plan(self, mock_unified_client: MagicMock) -> None:
         """The seller-bound DealRequest payload must carry the plan."""
 
         from ad_buyer.tools.buyer_deals.request_deal import RequestDealTool
@@ -337,9 +322,7 @@ class TestAudiencePlanCrossesSellerBoundary:
         assert rebuilt.audience_plan is not None
         assert rebuilt.audience_plan.audience_plan_id == plan.audience_plan_id
 
-    def test_legacy_payload_still_works_without_plan(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_legacy_payload_still_works_without_plan(self, mock_unified_client: MagicMock) -> None:
         """No plan supplied -> DealRequest carries audience_plan=None."""
 
         from ad_buyer.tools.buyer_deals.request_deal import RequestDealTool
@@ -389,22 +372,16 @@ class TestPlanIdStableThroughStages:
         # observe the plan that crosses the boundary.
         flow.state.selected_product_id = "ctv-pkg-1"
         flow._deal_tool = MagicMock()
-        flow._deal_tool._run = MagicMock(
-            return_value="DEAL CREATED: deal-test-002"
-        )
+        flow._deal_tool._run = MagicMock(return_value="DEAL CREATED: deal-test-002")
 
         flow.request_deal_id({"status": "success"})
 
-        observed_plan = flow._deal_tool._run.call_args.kwargs.get(
-            "audience_plan"
-        )
+        observed_plan = flow._deal_tool._run.call_args.kwargs.get("audience_plan")
         assert observed_plan is not None
         # Same audience_plan_id from brief through state to tool kwargs.
         assert observed_plan.audience_plan_id == plan_id_after_receive
 
-    def test_plan_id_surfaced_on_status(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_plan_id_surfaced_on_status(self, mock_unified_client: MagicMock) -> None:
         """get_status() exposes audience_plan_id once the planner has run."""
 
         brief = _make_brief()

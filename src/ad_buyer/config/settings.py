@@ -36,6 +36,21 @@ class Settings(BaseSettings):
     opendirect_token: str | None = None
     opendirect_api_key: str | None = None
 
+    # IAB Diligence Platform — vendor approval gate.
+    # The integration is inert when ``sgp_api_key`` is empty; enforcement
+    # only activates once an SGP API key is supplied AND ``sgp_enforce``
+    # is true. When enforcing, NOT APPROVED vendors are filtered out at
+    # discovery and the request-stage gate acts as a safety net.
+    sgp_api_key: str = ""
+    # Production endpoint. For testing, use the demo environment:
+    # https://api.safeguardprivacy-demo.com
+    sgp_base_url: str = "https://api.safeguardprivacy.com"
+    sgp_enforce: bool = False
+    # Behavior when IAB Diligence Platform returns 404 for a seller domain (vendor
+    # not in the buyer's SGP portfolio). One of: "block", "warn", "allow".
+    sgp_unknown_vendor_policy: str = "block"
+    sgp_cache_ttl_seconds: int = 900
+
     def get_seller_endpoints(self) -> list[str]:
         """Parse seller endpoints from comma-separated string.
 
@@ -52,11 +67,12 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
 
-    # Database
+    # Database / Storage Configuration
     database_url: str = "sqlite:///./ad_buyer.db"
-
-    # Optional Redis
     redis_url: str | None = None
+    storage_type: str = "sqlite"  # sqlite, redis, hybrid
+    postgres_pool_min: int = 2
+    postgres_pool_max: int = 10
 
     # CrewAI Settings
     crew_memory_enabled: bool = False

@@ -173,7 +173,7 @@ class TestCreativeAssetSchema:
     def test_creative_assets_indexes_exist(self, store):
         """Expected indexes on creative_assets are created."""
         cursor = store._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_creative_assets_%'"
+            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_creative_assets_%'"  # noqa: E501
         )
         indexes = {row[0] for row in cursor.fetchall()}
         expected = {

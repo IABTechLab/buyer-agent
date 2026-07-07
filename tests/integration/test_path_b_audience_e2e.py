@@ -69,7 +69,6 @@ from ad_buyer.models.buyer_identity import (
 )
 from ad_buyer.models.campaign_brief import CampaignBrief, parse_campaign_brief
 
-
 # ===========================================================================
 # Fixtures
 # ===========================================================================
@@ -104,9 +103,7 @@ def _three_type_plan_dict() -> dict[str, Any]:
         "extensions": [
             {
                 "type": "agentic",
-                "identifier": (
-                    "emb://buyer.example.com/audiences/auto-converters-q1"
-                ),
+                "identifier": ("emb://buyer.example.com/audiences/auto-converters-q1"),
                 "taxonomy": "agentic-audiences",
                 "version": "draft-2026-01",
                 "source": "explicit",
@@ -149,9 +146,7 @@ def _base_brief_dict(**overrides: Any) -> dict[str, Any]:
 def _three_type_brief() -> CampaignBrief:
     """Brief carrying an explicit 3-type AudiencePlan."""
 
-    return parse_campaign_brief(
-        _base_brief_dict(target_audience=_three_type_plan_dict())
-    )
+    return parse_campaign_brief(_base_brief_dict(target_audience=_three_type_plan_dict()))
 
 
 def _legacy_list_brief() -> CampaignBrief:
@@ -229,9 +224,7 @@ def channel_brief() -> dict[str, Any]:
 class TestBuyerDealFlowThreeTypeHappyPath:
     """3-type plan (Standard + Contextual + Agentic) flows end to end."""
 
-    def test_brief_yields_three_type_plan_on_state(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_brief_yields_three_type_plan_on_state(self, mock_unified_client: MagicMock) -> None:
         """Brief -> planner runs -> 3-type plan attached to flow state."""
 
         brief = _three_type_brief()
@@ -298,9 +291,7 @@ class TestBuyerDealFlowThreeTypeHappyPath:
         # observe the plan that crosses the flow -> tool boundary.
         flow.state.selected_product_id = "ctv-pkg-pathb"
         flow._deal_tool = MagicMock()
-        flow._deal_tool._run = MagicMock(
-            return_value="DEAL CREATED: deal-pathb-3type-001"
-        )
+        flow._deal_tool._run = MagicMock(return_value="DEAL CREATED: deal-pathb-3type-001")
 
         outcome = flow.request_deal_id({"status": "success"})
         assert outcome["status"] == "success"
@@ -367,9 +358,7 @@ class TestBuyerDealFlowLegacyMigration:
         # source=inferred reached the DealRequest payload.
         flow.state.selected_product_id = "ctv-pkg-legacy"
         flow._deal_tool = MagicMock()
-        flow._deal_tool._run = MagicMock(
-            return_value="DEAL CREATED: deal-pathb-legacy-001"
-        )
+        flow._deal_tool._run = MagicMock(return_value="DEAL CREATED: deal-pathb-legacy-001")
         flow.request_deal_id({"status": "success"})
 
         observed = flow._deal_tool._run.call_args.kwargs.get("audience_plan")
@@ -377,8 +366,7 @@ class TestBuyerDealFlowLegacyMigration:
         assert observed.primary.source == "inferred"
         # Extension carries source=inferred too -- whole-plan provenance.
         assert any(
-            e.source == "inferred" and e.identifier == "luxury_buyers"
-            for e in observed.extensions
+            e.source == "inferred" and e.identifier == "luxury_buyers" for e in observed.extensions
         )
 
 
@@ -390,9 +378,7 @@ class TestBuyerDealFlowLegacyMigration:
 class TestBuyerDealFlowSerializationParity:
     """AudiencePlan survives JSON serialization at the flow -> seller boundary."""
 
-    def test_dealrequest_roundtrip_preserves_plan_id(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_dealrequest_roundtrip_preserves_plan_id(self, mock_unified_client: MagicMock) -> None:
         """Mock the seller, capture the payload, deserialize, compare.
 
         This is the §5.1 step-2 wire-format guarantee: the buyer's
@@ -441,9 +427,7 @@ class TestBuyerDealFlowSerializationParity:
         assert any(c.type == "contextual" for c in rebuilt.audience_plan.constraints)
         assert any(e.type == "agentic" for e in rebuilt.audience_plan.extensions)
         # Compliance context survives for agentic refs.
-        agentic = next(
-            e for e in rebuilt.audience_plan.extensions if e.type == "agentic"
-        )
+        agentic = next(e for e in rebuilt.audience_plan.extensions if e.type == "agentic")
         assert agentic.compliance_context is not None
         assert agentic.compliance_context.jurisdiction == "US"
 
@@ -481,9 +465,7 @@ class TestBuyerDealFlowSerializationParity:
 
         flow.state.selected_product_id = "ctv-pkg-pathb"
         flow._deal_tool = MagicMock()
-        flow._deal_tool._run = MagicMock(
-            return_value="DEAL CREATED: deal-pathb-roundtrip"
-        )
+        flow._deal_tool._run = MagicMock(return_value="DEAL CREATED: deal-pathb-roundtrip")
         flow.request_deal_id({"status": "success"})
 
         observed = flow._deal_tool._run.call_args.kwargs.get("audience_plan")
@@ -553,13 +535,9 @@ class TestBuyerDealFlowCapabilityDegradation:
             # The agentic extension is still on the plan -- §12 will
             # decide whether to drop it. For §20 we just confirm the
             # extension is there for §12 to act on.
-            assert any(
-                e.type == "agentic" for e in flow.state.audience_plan.extensions
-            )
+            assert any(e.type == "agentic" for e in flow.state.audience_plan.extensions)
 
-    def test_capability_degradation_seam_observable(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_capability_degradation_seam_observable(self, mock_unified_client: MagicMock) -> None:
         """A capability response advertising no agentic is observable.
 
         Records the JSON shape §12 will consume: an audience_capabilities
@@ -612,12 +590,11 @@ class TestBuyerDealFlowCapabilityDegradation:
             # the structure is JSON-serializable and carries the §5.7
             # required fields, so §12's design has a concrete fixture.
             import json as _json
+
             wire = _json.dumps(legacy_caps_payload)
             rebuilt = _json.loads(wire)
             assert rebuilt["audience_capabilities"]["agentic"]["supported"] is False
-            assert (
-                rebuilt["audience_capabilities"]["supports_extensions"] is False
-            )
+            assert rebuilt["audience_capabilities"]["supports_extensions"] is False
 
 
 # ===========================================================================
@@ -628,9 +605,7 @@ class TestBuyerDealFlowCapabilityDegradation:
 class TestBuyerDealFlowPreSetPlanPrecedence:
     """Pre-seeded ``state.audience_plan`` must NOT be overwritten by the planner."""
 
-    def test_preset_plan_skips_planner_run(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_preset_plan_skips_planner_run(self, mock_unified_client: MagicMock) -> None:
         """When state.audience_plan is already set, the planner does not run.
 
         Used when a parent pipeline (e.g. CampaignPipeline / Path A) ran
@@ -667,9 +642,7 @@ class TestBuyerDealFlowPreSetPlanPrecedence:
         # The planner did NOT run -- no cached planner result.
         assert flow.get_audience_planner_result() is None
 
-    def test_preset_plan_threaded_to_seller_payload(
-        self, mock_unified_client: MagicMock
-    ) -> None:
+    def test_preset_plan_threaded_to_seller_payload(self, mock_unified_client: MagicMock) -> None:
         """Pre-seeded plan must reach the seller-bound DealRequest unchanged.
 
         Closes the loop for parent-pipeline integrations: not only does
@@ -702,9 +675,7 @@ class TestBuyerDealFlowPreSetPlanPrecedence:
 
         flow.state.selected_product_id = "ctv-pkg-preset"
         flow._deal_tool = MagicMock()
-        flow._deal_tool._run = MagicMock(
-            return_value="DEAL CREATED: deal-pathb-preset-001"
-        )
+        flow._deal_tool._run = MagicMock(return_value="DEAL CREATED: deal-pathb-preset-001")
         flow.request_deal_id({"status": "success"})
 
         observed = flow._deal_tool._run.call_args.kwargs.get("audience_plan")
