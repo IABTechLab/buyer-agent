@@ -11,6 +11,7 @@ seller-bound ``DealRequest`` / ``RequestDealTool`` payload so the seller can
 match each ref against package capabilities (proposal §5.1).
 """
 
+import asyncio
 import logging
 import sqlite3
 from datetime import datetime
@@ -680,8 +681,12 @@ async def run_buyer_deal_flow(
         if audience_plan is not None:
             flow.state.audience_plan = audience_plan
 
-        # Run flow
-        result = flow.kickoff()
+        # Run flow.
+        # buyer-1g4: offload sync flow.kickoff() to a worker thread so
+        # the caller's event loop stays responsive. See api/main.py
+        # _run_booking_flow for the full rationale (sync Flow steps
+        # block the loop if we use ``await flow.kickoff_async()``).
+        result = await asyncio.to_thread(flow.kickoff)
 
         return {
             "result": result,

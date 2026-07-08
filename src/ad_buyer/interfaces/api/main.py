@@ -3,6 +3,7 @@
 
 """FastAPI server for the Ad Buyer System."""
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -449,7 +450,10 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
             detail="Flow state not available. Job may have expired.",
         )
 
-    result = flow.approve_all()
+    # buyer-1g4: approve_all() runs sync CrewAI work that holds the
+    # calling thread; offload to a worker thread so the event loop
+    # stays responsive.
+    result = await asyncio.to_thread(flow.approve_all)
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
@@ -828,7 +832,22 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        _result = flow.kickoff()
+        # buyer-1g4: offload the whole sync flow.kickoff() to a worker
+        # thread so the FastAPI event loop stays responsive while the
+        # crew agents (which block on real LLM HTTP calls) run.
+        #
+        # We do NOT use ``await flow.kickoff_async()`` here even though
+        # it looks cleaner — the buyer's Flow ``@start`` / ``@listen``
+        # step methods are sync and themselves call ``crew.kickoff()``
+        # directly. Awaited from the event loop, those sync steps would
+        # run IN the event loop thread, re-introducing the block.
+        #
+        # CrewAI's sync ``Flow.kickoff()`` already does
+        # ``ThreadPoolExecutor.submit(asyncio.run, _run_flow).result()``
+        # internally — the ``.result()`` is what blocks the calling
+        # thread. ``asyncio.to_thread`` puts that ``.result()`` on a
+        # worker thread (two threads deep, but the event loop is free).
+        _result = await asyncio.to_thread(flow.kickoff)
 
         # Propagate any errors captured by flow steps into the job response so
         # the client can see what went wrong instead of silent-success (ar-jbod).
@@ -849,7 +868,8 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
         job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
 
         if request.auto_approve:
-            flow.approve_all()
+            # buyer-1g4: same reason as above — offload sync work.
+            await asyncio.to_thread(flow.approve_all)
             job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
             job["status"] = "completed"
         else:
