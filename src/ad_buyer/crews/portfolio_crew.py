@@ -37,6 +37,7 @@ class BudgetAllocationOutput(BaseModel):
     mobile_app: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
     ctv: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
     performance: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
+    social: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
 
 
 def create_portfolio_crew(
