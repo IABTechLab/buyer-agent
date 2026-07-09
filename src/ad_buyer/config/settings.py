@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     postgres_pool_max: int = 10
 
     # CrewAI Settings
-    crew_memory_enabled: bool = False
+    crew_memory_enabled: bool = True
     crew_verbose: bool = True
     crew_max_iterations: int = 15
 
