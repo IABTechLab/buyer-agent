@@ -10,6 +10,7 @@ Audit-class events (AUDIT_EVENT_TYPES) must never be silently dropped:
 - happy path is unchanged
 """
 
+import asyncio
 import json
 from unittest.mock import patch
 
@@ -34,6 +35,9 @@ def reset_bus_singleton():
     bus_mod._event_bus_instance = None
     yield
     bus_mod._event_bus_instance = None
+    # emit_event_sync consumes/closes the thread's default event loop; restore a
+    # fresh one so later tests using asyncio.get_event_loop() still find a loop.
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 
 @pytest.fixture
