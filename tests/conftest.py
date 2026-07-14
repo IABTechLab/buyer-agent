@@ -3,7 +3,56 @@
 
 """Pytest configuration and fixtures."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
+
+
+@pytest.fixture
+def fake_booking_orchestrator():
+    """AsyncMock MultiSellerOrchestrator booking one seller-issued deal per call.
+
+    Canonical-path test double (bead ar-j2nw): echoes the requested
+    DealParams back as a seller-confirmed 201 DealResponse with a
+    SELLER-issued deal_id and quote_id, mirroring the real
+    quotes -> deals contract.
+    """
+    from ad_buyer.models.deals import DealResponse, PricingInfo, ProductInfo, TermsInfo
+    from ad_buyer.orchestration.multi_seller import (
+        DealSelection,
+        MultiSellerOrchestrator,
+        OrchestrationResult,
+    )
+
+    async def _fake_orchestrate(inventory_requirements, deal_params, budget, max_deals=3):
+        deal = DealResponse(
+            deal_id=f"SELLER-DEAL-{deal_params.product_id}",
+            deal_type=deal_params.deal_type,
+            status="active",
+            quote_id=f"quote-{deal_params.product_id}",
+            product=ProductInfo(product_id=deal_params.product_id, name=deal_params.product_id),
+            pricing=PricingInfo(base_cpm=deal_params.target_cpm, final_cpm=deal_params.target_cpm),
+            terms=TermsInfo(
+                impressions=deal_params.impressions,
+                flight_start=deal_params.flight_start,
+                flight_end=deal_params.flight_end,
+            ),
+        )
+        return OrchestrationResult(
+            discovered_sellers=[MagicMock(agent_id="seller-1")],
+            quote_results=[],
+            ranked_quotes=[],
+            selection=DealSelection(
+                booked_deals=[deal],
+                failed_bookings=[],
+                total_spend=budget,
+                remaining_budget=0.0,
+            ),
+        )
+
+    orch = AsyncMock(spec=MultiSellerOrchestrator)
+    orch.orchestrate.side_effect = _fake_orchestrate
+    return orch
 
 
 @pytest.fixture

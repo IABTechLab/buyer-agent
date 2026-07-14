@@ -144,9 +144,9 @@ class TestDealBookingFlowNoStore:
         assert result["status"] == "ready_for_approval"
         assert result["total_recommendations"] == 1
 
-    def test_execute_bookings_no_store(self, mock_opendirect_client):
+    def test_execute_bookings_no_store(self, mock_opendirect_client, fake_booking_orchestrator):
         """Booking execution works without a store."""
-        flow = DealBookingFlow(mock_opendirect_client)
+        flow = DealBookingFlow(mock_opendirect_client, orchestrator=fake_booking_orchestrator)
         flow._state = BookingState(
             campaign_brief={
                 "objectives": ["awareness"],
@@ -241,9 +241,13 @@ class TestDealBookingFlowWithStore:
             history = deal_store.get_status_history("deal", deal["id"])
             assert len(history) >= 1
 
-    def test_execute_bookings_persists_records(self, mock_opendirect_client, deal_store):
+    def test_execute_bookings_persists_records(
+        self, mock_opendirect_client, deal_store, fake_booking_orchestrator
+    ):
         """Booking execution persists booking records and updates deal status."""
-        flow = DealBookingFlow(mock_opendirect_client, store=deal_store)
+        flow = DealBookingFlow(
+            mock_opendirect_client, store=deal_store, orchestrator=fake_booking_orchestrator
+        )
         flow._state = BookingState(
             campaign_brief={
                 "objectives": ["awareness"],
@@ -281,12 +285,19 @@ class TestDealBookingFlowWithStore:
         assert result["status"] == "success"
         assert result["booked"] == 1
 
-        # Verify booking record was persisted
+        # Verify booking record was persisted, keyed by the SELLER-issued
+        # deal id + quote id + confirmed terms (bead ar-j2nw)
+        import json as json_module
+
         bookings = deal_store.get_booking_records(deal_id)
         assert len(bookings) == 1
         assert bookings[0]["channel"] == "branding"
         assert bookings[0]["impressions"] == 100000
         assert bookings[0]["cost"] == 1500.0
+        metadata = json_module.loads(bookings[0]["metadata"])
+        assert metadata["seller_deal_id"] == "SELLER-DEAL-prod_1"
+        assert metadata["quote_id"] == "quote-prod_1"
+        assert metadata["final_cpm"] == 15.0
 
         # Verify deal status was updated to "booked"
         deal = deal_store.get_deal(deal_id)

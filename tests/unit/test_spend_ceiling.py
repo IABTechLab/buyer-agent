@@ -20,7 +20,13 @@ import pytest
 from ad_buyer.booking import SpendCeilingExceeded, enforce_spend_ceiling
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.buyer_identity import BuyerContext, BuyerIdentity
+from ad_buyer.models.deals import DealResponse, PricingInfo, ProductInfo, TermsInfo
 from ad_buyer.models.flow_state import ExecutionStatus, ProductRecommendation
+from ad_buyer.orchestration.multi_seller import (
+    DealSelection,
+    MultiSellerOrchestrator,
+    OrchestrationResult,
+)
 from ad_buyer.tools.buyer_deals import RequestDealTool
 
 # ---------------------------------------------------------------------------
@@ -213,10 +219,47 @@ class TestRequestDealCeiling:
 
 
 class TestBookingBudgetCeiling:
-    """_execute_bookings must refuse bookings whose total exceeds budget."""
+    """_execute_bookings must refuse bookings whose total exceeds budget.
+
+    The guard sits BEFORE the orchestrator handoff: a rejected booking
+    must never reach MultiSellerOrchestrator.orchestrate (no money can
+    be committed to a seller).
+    """
+
+    @staticmethod
+    def _make_orchestrator():
+        """AsyncMock orchestrator booking one seller-issued deal per call."""
+
+        async def _fake_orchestrate(inventory_requirements, deal_params, budget, max_deals=3):
+            deal = DealResponse(
+                deal_id=f"SELLER-DEAL-{deal_params.product_id}",
+                deal_type=deal_params.deal_type,
+                status="active",
+                quote_id=f"quote-{deal_params.product_id}",
+                product=ProductInfo(
+                    product_id=deal_params.product_id, name=deal_params.product_id
+                ),
+                pricing=PricingInfo(final_cpm=deal_params.target_cpm),
+                terms=TermsInfo(impressions=deal_params.impressions),
+            )
+            return OrchestrationResult(
+                discovered_sellers=[MagicMock(agent_id="seller-1")],
+                quote_results=[],
+                ranked_quotes=[],
+                selection=DealSelection(
+                    booked_deals=[deal],
+                    failed_bookings=[],
+                    total_spend=budget,
+                    remaining_budget=0.0,
+                ),
+            )
+
+        orch = AsyncMock(spec=MultiSellerOrchestrator)
+        orch.orchestrate.side_effect = _fake_orchestrate
+        return orch
 
     def _flow_with_approved(self, budget, recs):
-        flow = DealBookingFlow(client=MagicMock())
+        flow = DealBookingFlow(client=MagicMock(), orchestrator=self._make_orchestrator())
         brief = {
             "objectives": ["reach"],
             "start_date": "2026-04-01",
@@ -244,6 +287,8 @@ class TestBookingBudgetCeiling:
         assert len(flow.state.booked_lines) == 0
         assert flow.state.execution_status == ExecutionStatus.FAILED
         assert any("budget" in err.lower() for err in flow.state.errors)
+        # Guard fired BEFORE the handoff: the seller was never contacted.
+        flow._orchestrator.orchestrate.assert_not_called()
 
     def test_booking_at_budget_books(self):
         """Total cost exactly at budget books normally."""

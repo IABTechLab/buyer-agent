@@ -11,7 +11,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from crewai.flow.flow import Flow, listen, or_, start
+from pydantic import ValidationError
 
+from ..async_utils import run_async
 from ..booking.spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
 from ..clients.opendirect_client import OpenDirectClient
 from ..crews.channel_crews import (
@@ -23,7 +25,9 @@ from ..crews.channel_crews import (
 from ..crews.portfolio_crew import create_portfolio_crew
 from ..events.helpers import emit_event_sync
 from ..events.models import EventType
+from ..models.audience_plan import AudiencePlan
 from ..models.flow_state import (
+    BookedLine,
     BookingState,
     ChannelAllocation,
     ChannelBrief,
@@ -31,9 +35,55 @@ from ..models.flow_state import (
     ProductRecommendation,
 )
 from ..models.ucp import SignalType
+from ..orchestration.multi_seller import (
+    DealParams,
+    InventoryRequirements,
+    MultiSellerOrchestrator,
+    OrchestrationResult,
+)
 from ..storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Channel -> deals-API mapping (folded in from the retired CampaignPipeline,
+# adapted to this flow's channel vocabulary; bead ar-j2nw)
+# ---------------------------------------------------------------------------
+
+# Maps this flow's channel names to the media_type string used by the
+# orchestrator's InventoryRequirements for seller discovery.
+_CHANNEL_MEDIA_TYPE_MAP: dict[str, str] = {
+    "branding": "display",
+    "ctv": "ctv",
+    "mobile_app": "mobile",
+    "performance": "display",
+}
+
+# Default deal types to request per channel.
+_CHANNEL_DEAL_TYPES: dict[str, list[str]] = {
+    "branding": ["PD", "PA"],
+    "ctv": ["PG", "PD"],
+    "mobile_app": ["PD", "PA"],
+    "performance": ["PD", "PA"],
+}
+
+
+def _build_default_orchestrator() -> MultiSellerOrchestrator:
+    """Build the production MultiSellerOrchestrator from settings.
+
+    Registry discovery uses the IAB server URL (same wiring as the MCP
+    server's registry client); per-seller DealsClients are created for
+    whichever seller URLs discovery returns.
+    """
+    from ..clients.deals_client import DealsClient
+    from ..config.settings import settings
+    from ..registry.client import RegistryClient
+
+    return MultiSellerOrchestrator(
+        registry_client=RegistryClient(registry_url=settings.iab_server_url),
+        deals_client_factory=lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs),
+    )
 
 
 class DealBookingFlow(Flow[BookingState]):
@@ -53,6 +103,7 @@ class DealBookingFlow(Flow[BookingState]):
         self,
         client: OpenDirectClient,
         store: DealStore | None = None,
+        orchestrator: MultiSellerOrchestrator | None = None,
         **state_kwargs: Any,
     ):
         """Initialize the flow with OpenDirect client and optional persistence.
@@ -61,6 +112,10 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
+            orchestrator: MultiSellerOrchestrator used to execute approved
+                bookings against real sellers (quotes -> deals contract).
+                When None, a default production orchestrator is built
+                lazily from settings on first booking.
             **state_kwargs: Initial state field values for the underlying
                 ``BookingState``.  CrewAI >=1.14 made ``Flow`` a Pydantic
                 model and removed the legacy ``state`` setter, so initial
@@ -77,6 +132,13 @@ class DealBookingFlow(Flow[BookingState]):
             super().__init__()
         self._client = client
         self._store = store
+        self._orchestrator = orchestrator
+
+    def _get_orchestrator(self) -> MultiSellerOrchestrator:
+        """Return the booking orchestrator, building the default lazily."""
+        if self._orchestrator is None:
+            self._orchestrator = _build_default_orchestrator()
+        return self._orchestrator
 
     # ------------------------------------------------------------------
     # Persistence helpers (best-effort dual-write)
@@ -85,16 +147,28 @@ class DealBookingFlow(Flow[BookingState]):
     def _persist_booking(self, deal_id: str, booked_line: Any) -> None:
         """Best-effort persist a booking record to the store.
 
+        The record is keyed by the SELLER-issued deal id, the quote id it
+        was booked from, and the confirmed terms (carried in metadata; the
+        booking_records schema is unchanged).
+
         Never raises -- logs and continues on failure so the flow is
         unaffected by persistence errors.
 
         Args:
-            deal_id: The deal this booking belongs to.
+            deal_id: The store deal row this booking belongs to.
             booked_line: A BookedLine instance from flow state.
         """
         if self._store is None:
             return
         try:
+            metadata = json.dumps(
+                {
+                    "seller_deal_id": getattr(booked_line, "deal_id", None),
+                    "quote_id": getattr(booked_line, "quote_id", None),
+                    "seller_id": getattr(booked_line, "seller_id", None),
+                    "final_cpm": getattr(booked_line, "cpm", None),
+                }
+            )
             self._store.save_booking_record(
                 deal_id=deal_id,
                 order_id=getattr(booked_line, "order_id", None),
@@ -103,6 +177,7 @@ class DealBookingFlow(Flow[BookingState]):
                 impressions=getattr(booked_line, "impressions", 0),
                 cost=getattr(booked_line, "cost", 0.0),
                 booking_status=getattr(booked_line, "booking_status", "pending"),
+                metadata=metadata,
             )
         except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist booking for deal %s", deal_id)
@@ -680,22 +755,48 @@ class DealBookingFlow(Flow[BookingState]):
         all_ids = [rec.product_id for rec in self.state.pending_approvals]
         return self.approve_recommendations(all_ids)
 
-    def _execute_bookings(self) -> dict[str, Any]:
-        """Execute bookings for all approved recommendations."""
-        from ..models.flow_state import BookedLine
+    def _typed_audience_plan(self) -> AudiencePlan | None:
+        """Return the state's audience plan as a typed AudiencePlan, if valid.
 
+        A parent pipeline may pre-seed ``state.audience_plan`` with a typed
+        plan (as a dict). When it validates, the plan is threaded onto
+        DealParams / InventoryRequirements so it survives the buyer ->
+        seller boundary. The flow's own UCP coverage-estimation dict does
+        not follow the AudiencePlan schema and coerces to None.
+        """
+        raw = self.state.audience_plan
+        if not raw:
+            return None
+        if isinstance(raw, AudiencePlan):
+            return raw
+        try:
+            return AudiencePlan.model_validate(raw)
+        except ValidationError:
+            return None
+
+    def _execute_bookings(self) -> dict[str, Any]:
+        """Execute bookings for approved recommendations via the orchestrator.
+
+        Canonical handoff (bead ar-j2nw): each approved recommendation is
+        translated into DealParams / InventoryRequirements and executed by
+        MultiSellerOrchestrator (discover -> quote -> rank ->
+        select_and_book). Booking records key on the SELLER-issued deal_id
+        + quote_id + confirmed terms; the buyer never mints deal ids or
+        placeholder order ids on this path.
+        """
         approved = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
 
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
             return {"status": "success", "booked": 0, "message": "No recommendations approved"}
 
-        # Deterministic spend-ceiling guard (bead ar-70eh): the approved
-        # recommendations come from LLM-parsed crew output, so their total
-        # cost must be checked against the campaign budget BEFORE any line
-        # is booked. A missing budget fails open (allow + warning log) —
-        # an explicit choice to preserve demo behavior for briefs without
-        # a budget; a supplied budget is always enforced.
+        # Deterministic spend-ceiling guard (bead ar-70eh / EP-0.1): the
+        # approved recommendations come from LLM-parsed crew output, so
+        # their total cost must be checked against the campaign budget
+        # BEFORE any money is committed to a seller. A missing budget fails
+        # open (allow + warning log) — an explicit choice to preserve demo
+        # behavior for briefs without a budget; a supplied budget is always
+        # enforced.
         budget = self.state.campaign_brief.get("budget")
         total_cost = sum(rec.cost for rec in approved)
         try:
@@ -713,51 +814,160 @@ class DealBookingFlow(Flow[BookingState]):
                 "budget": budget,
             }
 
-        # In a full implementation, this would use the Execution Agent
-        # to create orders and book lines. For now, we track the approvals.
-        for rec in approved:
-            booked = BookedLine(
-                line_id=f"line_{rec.product_id}",
-                order_id="order_pending",
-                product_id=rec.product_id,
-                product_name=rec.product_name,
-                channel=rec.channel,
-                impressions=rec.impressions,
-                cost=rec.cost,
-                booking_status="pending_execution",
-                booked_at=datetime.now(UTC),
-            )
-            self.state.booked_lines.append(booked)
+        # Real handoff to the multi-seller execution engine. `run_async`
+        # bridges this synchronous approval entry point (CLI/API/chat) to
+        # the async orchestrator.
+        failed_bookings: list[dict[str, Any]] = []
+        booking_results = run_async(self._book_approved(approved))
 
-            # Persist booking record and update deal status
-            deal_id = getattr(rec, "_store_deal_id", None)
-            if deal_id:
-                self._persist_booking(deal_id, booked)
-                self._persist_deal_status(deal_id, "booked")
+        for rec, result, error in booking_results:
+            store_deal_id = getattr(rec, "_store_deal_id", None)
 
-        self.state.execution_status = ExecutionStatus.COMPLETED
+            if error is not None or result is None:
+                msg = f"Booking failed for {rec.product_id}: {error}"
+                logger.warning(msg)
+                self.state.errors.append(msg)
+                failed_bookings.append({"product_id": rec.product_id, "error": str(error)})
+                if store_deal_id:
+                    self._persist_deal_status(store_deal_id, "failed")
+                continue
+
+            booked_deals = result.selection.booked_deals
+            if not booked_deals:
+                # Orchestrator ran but no seller issued a deal (no sellers,
+                # no viable quotes, or every booking attempt failed).
+                details = result.selection.failed_bookings or [
+                    {"error": "no viable quotes from any seller"}
+                ]
+                msg = f"No deal booked for {rec.product_id}: {details}"
+                logger.warning(msg)
+                self.state.errors.append(msg)
+                failed_bookings.append({"product_id": rec.product_id, "details": details})
+                if store_deal_id:
+                    self._persist_deal_status(store_deal_id, "failed")
+                continue
+
+            quote_seller_ids = {
+                qr.quote.quote_id: qr.seller_id
+                for qr in result.quote_results
+                if qr.quote is not None
+            }
+            for deal in booked_deals:
+                # Confirmed terms from the seller's 201 DealResponse take
+                # precedence over the researched estimates.
+                impressions = deal.terms.impressions or rec.impressions
+                final_cpm = deal.pricing.final_cpm
+                cost = (
+                    round(impressions * final_cpm / 1000.0, 2)
+                    if final_cpm is not None and impressions
+                    else rec.cost
+                )
+                booked = BookedLine(
+                    deal_id=deal.deal_id,
+                    quote_id=deal.quote_id,
+                    product_id=rec.product_id,
+                    product_name=rec.product_name,
+                    channel=rec.channel,
+                    impressions=impressions,
+                    cpm=final_cpm,
+                    cost=cost,
+                    booking_status=deal.status or "booked",
+                    booked_at=datetime.now(UTC),
+                    seller_id=quote_seller_ids.get(deal.quote_id or ""),
+                )
+                self.state.booked_lines.append(booked)
+
+                # Persist booking record and update deal status
+                if store_deal_id:
+                    self._persist_booking(store_deal_id, booked)
+                    self._persist_deal_status(store_deal_id, "booked")
+
+                # Emit deal.booked event keyed by the seller-issued deal id
+                emit_event_sync(
+                    EventType.DEAL_BOOKED,
+                    flow_type="deal_booking",
+                    deal_id=deal.deal_id,
+                    payload={
+                        "deal_id": deal.deal_id,
+                        "quote_id": deal.quote_id,
+                        "product_id": rec.product_id,
+                        "channel": rec.channel,
+                        "impressions": impressions,
+                        "cost": cost,
+                        "final_cpm": final_cpm,
+                    },
+                )
+
+        if self.state.booked_lines:
+            self.state.execution_status = ExecutionStatus.COMPLETED
+            status = "success"
+        else:
+            # Every approved recommendation failed to book.
+            self.state.execution_status = ExecutionStatus.FAILED
+            status = "failed"
         self.state.updated_at = datetime.now(UTC)
 
-        # Emit deal.booked event for each booked line
-        for booked in self.state.booked_lines:
-            emit_event_sync(
-                EventType.DEAL_BOOKED,
-                flow_type="deal_booking",
-                deal_id=getattr(booked, "line_id", ""),
-                payload={
-                    "product_id": booked.product_id,
-                    "channel": booked.channel,
-                    "impressions": booked.impressions,
-                    "cost": booked.cost,
-                },
-            )
-
         return {
-            "status": "success",
+            "status": status,
             "booked": len(self.state.booked_lines),
+            "failed": failed_bookings,
             "total_impressions": sum(b.impressions for b in self.state.booked_lines),
             "total_cost": sum(b.cost for b in self.state.booked_lines),
         }
+
+    async def _book_approved(
+        self,
+        approved: list[ProductRecommendation],
+    ) -> list[tuple[ProductRecommendation, OrchestrationResult | None, str | None]]:
+        """Book each approved recommendation through the orchestrator.
+
+        The approved terms are binding on execution: the recommendation's
+        cost is the budget ceiling and its CPM the max acceptable CPM for
+        that line, so the orchestrator cannot commit money beyond what the
+        human approved. Per-recommendation isolation: one failure records
+        an error tuple and the rest continue.
+
+        Returns:
+            List of (recommendation, orchestration_result, error) tuples.
+            Exactly one of result/error is non-None per entry.
+        """
+        orchestrator = self._get_orchestrator()
+        audience_plan = self._typed_audience_plan()
+        brief = self.state.campaign_brief
+
+        results: list[tuple[ProductRecommendation, OrchestrationResult | None, str | None]] = []
+        for rec in approved:
+            media_type = _CHANNEL_MEDIA_TYPE_MAP.get(rec.channel, rec.channel)
+            deal_types = _CHANNEL_DEAL_TYPES.get(rec.channel, ["PD"])
+
+            inventory_requirements = InventoryRequirements(
+                media_type=media_type,
+                deal_types=deal_types,
+                max_cpm=rec.cpm if rec.cpm > 0 else None,
+                audience_plan=audience_plan,
+            )
+            deal_params = DealParams(
+                product_id=rec.product_id,
+                deal_type=deal_types[0],
+                impressions=rec.impressions,
+                flight_start=brief.get("start_date", ""),
+                flight_end=brief.get("end_date", ""),
+                target_cpm=rec.cpm if rec.cpm > 0 else None,
+                media_type=media_type,
+                audience_plan=audience_plan,
+            )
+
+            try:
+                result = await orchestrator.orchestrate(
+                    inventory_requirements=inventory_requirements,
+                    deal_params=deal_params,
+                    budget=rec.cost,
+                    max_deals=1,
+                )
+                results.append((rec, result, None))
+            except Exception as exc:  # noqa: BLE001 - per-recommendation isolation
+                results.append((rec, None, str(exc)))
+        return results
 
     def get_status(self) -> dict[str, Any]:
         """Get current flow status.
