@@ -69,7 +69,7 @@ _CHANNEL_DEAL_TYPES: dict[str, list[str]] = {
 }
 
 
-def _build_default_orchestrator() -> MultiSellerOrchestrator:
+def build_default_orchestrator() -> MultiSellerOrchestrator:
     """Build the production MultiSellerOrchestrator from settings.
 
     Registry discovery uses the IAB server URL (same wiring as the MCP
@@ -137,7 +137,7 @@ class DealBookingFlow(Flow[BookingState]):
     def _get_orchestrator(self) -> MultiSellerOrchestrator:
         """Return the booking orchestrator, building the default lazily."""
         if self._orchestrator is None:
-            self._orchestrator = _build_default_orchestrator()
+            self._orchestrator = build_default_orchestrator()
         return self._orchestrator
 
     # ------------------------------------------------------------------
