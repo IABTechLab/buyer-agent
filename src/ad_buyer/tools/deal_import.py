@@ -16,6 +16,7 @@ tool) is responsible for:
 from __future__ import annotations
 
 import csv
+import io
 import logging
 import re
 from dataclasses import dataclass, field
@@ -591,15 +592,87 @@ def parse_csv_deals(
         headers = [str(i) for i in range(len(rows[0]))]
         data_rows = rows
 
+    _ingest_rows(
+        result,
+        headers,
+        data_rows,
+        column_mapping=column_mapping,
+        default_seller_url=default_seller_url,
+        default_product_id=default_product_id,
+    )
+    return result
+
+
+def parse_csv_string(
+    csv_data: str,
+    *,
+    column_mapping: dict[str, str] | None = None,
+    default_seller_url: str = "",
+    default_product_id: str = "imported",
+) -> ImportResult:
+    """Parse CSV *text* (header row + data rows) into an ImportResult.
+
+    In-memory sibling of :func:`parse_csv_deals` for callers that already
+    hold the CSV content as a string rather than a file path (e.g. the
+    ``import_deals_csv`` MCP tool, which receives pasted CSV text).  Like
+    ``parse_csv_deals`` this is a pure function: it does NOT touch any
+    store or emit events -- the caller persists ``result.deals``.
+
+    Args:
+        csv_data: CSV text with a header row followed by data rows.
+        column_mapping: Optional overrides (original_header -> schema_field).
+        default_seller_url: Default ``seller_url`` for imported deals.
+        default_product_id: Default ``product_id`` for imported deals.
+
+    Returns:
+        An ``ImportResult`` with parsed deals, errors, and counts.
+    """
+    result = ImportResult()
+
+    reader = csv.reader(io.StringIO(csv_data))
+    rows = list(reader)
+    if not rows:
+        return result
+
+    headers = rows[0]
+    data_rows = rows[1:]
+
+    _ingest_rows(
+        result,
+        headers,
+        data_rows,
+        column_mapping=column_mapping,
+        default_seller_url=default_seller_url,
+        default_product_id=default_product_id,
+    )
+    return result
+
+
+def _ingest_rows(
+    result: ImportResult,
+    headers: list[str],
+    data_rows: list[list[str]],
+    *,
+    column_mapping: dict[str, str] | None,
+    default_seller_url: str,
+    default_product_id: str,
+) -> None:
+    """Resolve columns and parse ``data_rows`` into ``result`` (mutates it).
+
+    Shared core for :func:`parse_csv_deals` and :func:`parse_csv_string`
+    so both file- and string-based imports apply identical column
+    resolution, empty-row skipping, per-row validation, and in-batch
+    deduplication by ``seller_deal_id``.
+    """
     col_map = _resolve_columns(headers, column_mapping)
 
     if not col_map:
         logger.warning("No columns could be mapped to schema fields")
-        return result
+        return
 
     result.total_rows = len(data_rows)
 
-    # Track seen deal IDs for deduplication within the file
+    # Track seen deal IDs for deduplication within the batch
     seen_deal_ids: set[str] = set()
 
     for row_idx, row in enumerate(data_rows, start=1):
@@ -632,5 +705,3 @@ def parse_csv_deals(
 
         result.deals.append(deal)
         result.successful += 1
-
-    return result
