@@ -769,6 +769,10 @@ class DealBookingFlow(Flow[BookingState]):
             return None
         if isinstance(raw, AudiencePlan):
             return raw
+        if isinstance(raw, dict):
+            # CrewAI >=1.14 wraps state dicts in a LockedDictProxy that
+            # pydantic cannot introspect; copy into a plain dict first.
+            raw = dict(raw)
         try:
             return AudiencePlan.model_validate(raw)
         except ValidationError:

@@ -4,7 +4,7 @@
 """Audience Planner pipeline step (full reasoning loop).
 
 Wires the Audience Planner agent (`agents/level3/audience_planner_agent.py`)
-into `CampaignPipeline` between brief ingestion and orchestrator handoff
+between brief ingestion and the canonical orchestrator handoff
 per proposal §5.3 / bead ar-fgyq §6, and now drives the full reasoning
 loop per proposal §5.5 / bead ar-9u25 §7.
 

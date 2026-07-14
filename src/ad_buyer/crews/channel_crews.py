@@ -72,7 +72,7 @@ def _create_audience_tools() -> list[Any]:
     by the Research Agent. The Research Agent operates on inventory; the
     Audience Planner owns audience composition, discovery, matching, and
     coverage estimation. This helper is kept here so the planner factory
-    in `pipelines/campaign_pipeline.py` can build the same three-tool
+    on the canonical booking flow can build the same three-tool
     bundle, and so existing tests that assert "the bundle is these three
     classes" continue to pass at the bundle level (just no longer attached
     to the Research Agent's `tools` list).
@@ -233,7 +233,7 @@ def _format_audience_context(
 #
 # `_ChannelCrewSpec` captures those four variations; `_build_channel_crew` does
 # the construction. Each `create_*_crew` is now a thin delegate. Public
-# signatures are unchanged so existing callers (CampaignPipeline,
+# signatures are unchanged so existing callers (DealBookingFlow,
 # BuyerDealFlow, direct invocation tests) are unaffected.
 #
 # Per proposal §5.3 + bead ar-fgyq: audience tools live on the Audience
@@ -515,7 +515,7 @@ def kickoff_channel_crew_with_audience(
 
     Convenience wrapper for the third deal-finding entry point identified
     in proposal §5.3 -- the "direct channel-crew invocation path" used by
-    tests and demos that don't go through `CampaignPipeline` (Path A) or
+    tests and demos that don't go through the canonical flow or
     `BuyerDealFlow` (Path B). Either pass an explicit `audience_plan`, or
     pass a `CampaignBrief` and let the planner produce one in place.
 

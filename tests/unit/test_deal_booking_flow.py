@@ -1037,6 +1037,41 @@ class TestApprovalAndBooking:
         assert result["booked"] == 0
         assert flow.state.execution_status == ExecutionStatus.FAILED
 
+    def test_orchestrate_called_once_per_approved_recommendation(self, flow, mock_orchestrator):
+        """Composition: one orchestrate call per approved recommendation.
+
+        (Moved from the retired CampaignPipeline execute_booking tests —
+        the per-channel orchestrator composition now lives on the flow.)
+        """
+        self._setup_pending_approvals(flow)
+
+        flow.approve_all()
+
+        assert mock_orchestrator.orchestrate.call_count == 3
+        media_types = [
+            call.kwargs["inventory_requirements"].media_type
+            for call in mock_orchestrator.orchestrate.call_args_list
+        ]
+        # branding/performance -> display, ctv -> ctv (channel mapping)
+        assert sorted(media_types) == ["ctv", "display", "display"]
+
+    def test_deal_booked_event_emitted_with_seller_deal_id(self, flow):
+        """DEAL_BOOKED events key on the seller-issued deal id."""
+        from ad_buyer.events.models import EventType
+
+        self._setup_pending_approvals(flow)
+
+        with patch("ad_buyer.flows.deal_booking_flow.emit_event_sync") as emit:
+            flow.approve_recommendations(["prod_a"])
+
+        booked_calls = [
+            c for c in emit.call_args_list if c.args and c.args[0] == EventType.DEAL_BOOKED
+        ]
+        assert len(booked_calls) == 1
+        call = booked_calls[0]
+        assert call.kwargs["deal_id"] == "SELLER-DEAL-prod_a"
+        assert call.kwargs["payload"]["quote_id"] == "quote-prod_a"
+
     def test_total_cost_and_impressions(self, flow):
         """Result includes aggregated totals."""
         self._setup_pending_approvals(flow)

@@ -1,21 +1,23 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""End-to-end integration test for Path A (CampaignPipeline).
+"""End-to-end integration test: audience plan on the canonical pipeline.
 
-Bead ar-lk23 / proposal §6 row 16 -- the buyer-side end-to-end test for
-the brief-driven CampaignPipeline path identified in proposal §5.3:
+Bead ar-lk23 / proposal §6 row 16, adapted to the ONE canonical buyer
+pipeline (bead ar-j2nw -- CampaignPipeline and BuyerDealFlow were
+retired). The brief-driven path is now:
 
-    Path A: CampaignPipeline.ingest_brief -> plan_campaign -> execute_booking
+    DealBookingFlow (planning + approval gate) -> approved
+    recommendations -> MultiSellerOrchestrator (quotes -> deals)
 
 The seller side is **mocked**: a MultiSellerOrchestrator stand-in captures
-the InventoryRequirements / DealParams that the pipeline forwards, so we
-can assert the full typed AudiencePlan (Standard primary + Contextual
-constraint + Agentic extension) survives every stage and arrives at the
-seller-facing boundary intact.
+the InventoryRequirements / DealParams that the flow's booking handoff
+forwards, so we can assert the full typed AudiencePlan (Standard primary +
+Contextual constraint + Agentic extension) survives every stage and
+arrives at the seller-facing boundary intact.
 
 Part 1: fixtures + happy-path scenario.
-Part 2 (this commit): adds three more scenarios:
+Part 2: three more scenarios:
   - Capability degradation against a legacy-default seller. Builds a real
     `MultiSellerOrchestrator` wired to a recording capability client +
     mocked deals client to exercise the actual `degrade_plan_for_seller`
@@ -43,7 +45,6 @@ import asyncio
 import json
 import os
 import sys
-import uuid
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -56,20 +57,19 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-path-a-e2e")
 
 import pytest
 
-from ad_buyer.events.bus import InMemoryEventBus
+from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.audience_plan import (
     AudiencePlan,
     AudienceRef,
     ComplianceContext,
 )
 from ad_buyer.models.campaign_brief import CampaignBrief, parse_campaign_brief
-from ad_buyer.models.state_machine import CampaignStatus
+from ad_buyer.models.flow_state import ExecutionStatus, ProductRecommendation
 from ad_buyer.orchestration.multi_seller import (
     DealSelection,
     MultiSellerOrchestrator,
     OrchestrationResult,
 )
-from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline
 
 # ===========================================================================
 # Fixtures
@@ -151,60 +151,6 @@ def _three_type_brief() -> CampaignBrief:
     return parse_campaign_brief(_base_brief_dict(target_audience=_three_type_plan_dict()))
 
 
-# ---------------------------------------------------------------------------
-# FakeCampaignStore -- mirrors the unit-test fake from
-# tests/unit/test_campaign_pipeline.py so the pipeline can exercise its
-# state-machine transitions without a real SQLite-backed store.
-# ---------------------------------------------------------------------------
-
-
-class FakeCampaignStore:
-    """In-memory CampaignStore stand-in for pipeline integration tests."""
-
-    def __init__(self) -> None:
-        self._campaigns: dict[str, dict[str, Any]] = {}
-
-    def connect(self) -> None:
-        pass
-
-    def disconnect(self) -> None:
-        pass
-
-    def create_campaign(self, brief: dict[str, Any]) -> str:
-        campaign_id = str(uuid.uuid4())
-        self._campaigns[campaign_id] = {
-            "campaign_id": campaign_id,
-            "advertiser_id": brief["advertiser_id"],
-            "campaign_name": brief["campaign_name"],
-            "status": CampaignStatus.DRAFT.value,
-            "total_budget": brief["total_budget"],
-            "currency": brief.get("currency", "USD"),
-            "flight_start": brief["flight_start"],
-            "flight_end": brief["flight_end"],
-            "channels": brief.get("channels"),
-            "target_audience": brief.get("target_audience"),
-        }
-        return campaign_id
-
-    def get_campaign(self, campaign_id: str) -> dict[str, Any] | None:
-        return self._campaigns.get(campaign_id)
-
-    def start_planning(self, campaign_id: str) -> None:
-        self._campaigns[campaign_id]["status"] = CampaignStatus.PLANNING.value
-
-    def start_booking(self, campaign_id: str) -> None:
-        self._campaigns[campaign_id]["status"] = CampaignStatus.BOOKING.value
-
-    def mark_ready(self, campaign_id: str) -> None:
-        self._campaigns[campaign_id]["status"] = CampaignStatus.READY.value
-
-    def update_campaign(self, campaign_id: str, **kwargs: Any) -> bool:
-        if campaign_id not in self._campaigns:
-            return False
-        self._campaigns[campaign_id].update(kwargs)
-        return True
-
-
 def _booked_orchestration_result(
     deal_id: str = "deal-patha-001",
     spend: float = 50_000.0,
@@ -215,8 +161,12 @@ def _booked_orchestration_result(
     deal = MagicMock()
     deal.deal_id = deal_id
     deal.deal_type = "PD"
+    deal.status = "active"
+    deal.quote_id = f"quote-{deal_id}"
     deal.pricing = MagicMock()
     deal.pricing.final_cpm = 12.50
+    deal.terms = MagicMock()
+    deal.terms.impressions = 500_000
     return OrchestrationResult(
         discovered_sellers=[MagicMock(agent_id=f"seller-{i}") for i in range(2)],
         quote_results=[],
@@ -231,23 +181,13 @@ def _booked_orchestration_result(
 
 
 @pytest.fixture
-def fake_store() -> FakeCampaignStore:
-    return FakeCampaignStore()
-
-
-@pytest.fixture
-def event_bus() -> InMemoryEventBus:
-    return InMemoryEventBus()
-
-
-@pytest.fixture
 def mock_orchestrator() -> AsyncMock:
     """A MultiSellerOrchestrator AsyncMock that captures every orchestrate call.
 
-    The pipeline forwards InventoryRequirements / DealParams (each with
-    an `audience_plan` attached per proposal §5.3 / bead ar-fgyq §6) into
-    `orchestrate`. Inspecting the captured call args is how we verify
-    the typed AudiencePlan reaches the seller boundary.
+    The canonical flow's booking handoff forwards InventoryRequirements /
+    DealParams (each with an `audience_plan` attached per proposal §5.3 /
+    bead ar-fgyq §6) into `orchestrate`. Inspecting the captured call args
+    is how we verify the typed AudiencePlan reaches the seller boundary.
     """
 
     orch = AsyncMock(spec=MultiSellerOrchestrator)
@@ -255,89 +195,92 @@ def mock_orchestrator() -> AsyncMock:
     return orch
 
 
-@pytest.fixture
-def pipeline(
-    fake_store: FakeCampaignStore,
-    mock_orchestrator: AsyncMock,
-    event_bus: InMemoryEventBus,
-) -> CampaignPipeline:
-    return CampaignPipeline(
-        store=fake_store,
-        orchestrator=mock_orchestrator,
-        event_bus=event_bus,
+def _flow_brief_dict() -> dict[str, Any]:
+    """Campaign brief in the canonical flow's loose-dict format."""
+
+    return {
+        "name": "Canonical audience integration test",
+        "objectives": ["brand awareness"],
+        "budget": 100_000,
+        "start_date": "2026-05-01",
+        "end_date": "2026-05-31",
+        "target_audience": {"geo": ["US"]},
+    }
+
+
+def _approved_rec(product_id: str, channel: str) -> ProductRecommendation:
+    rec = ProductRecommendation(
+        product_id=product_id,
+        product_name=f"Product {product_id}",
+        publisher="http://seller-a.test",
+        channel=channel,
+        impressions=500_000,
+        cpm=15.0,
+        cost=7_500.0,
     )
+    rec.status = "pending_approval"
+    return rec
 
 
 # ===========================================================================
-# 1. CampaignPipeline happy path -- 3 audience types
+# 1. Canonical flow happy path -- 3 audience types
 # ===========================================================================
 
 
-class TestCampaignPipelineThreeTypeHappyPath:
-    """3-type plan flows brief -> plan -> book through CampaignPipeline."""
+class TestCanonicalFlowThreeTypeHappyPath:
+    """3-type plan flows approval gate -> orchestrator on the canonical path."""
 
-    def test_happy_path_three_types_through_path_a(
+    def test_happy_path_three_types_through_canonical_flow(
         self,
-        pipeline: CampaignPipeline,
         mock_orchestrator: AsyncMock,
     ) -> None:
-        """Full Path A: brief -> plan -> book; audience plan reaches seller.
+        """Full canonical path: approved recs -> handoff; plan reaches seller.
 
-        The brief carries an explicit 3-type plan (Standard primary +
-        Contextual constraint + Agentic extension). After
-        ingest_brief -> plan_campaign -> execute_booking the pipeline
-        must:
+        A parent planning stage resolved the brief's audience into the
+        typed 3-type plan (Standard primary + Contextual constraint +
+        Agentic extension) and pre-seeded it on the flow state. After the
+        approval gate fires, the booking handoff must:
 
-          - Call the orchestrator once per channel (2 channels here).
+          - Call the orchestrator once per approved recommendation
+            (2 recommendations across 2 channels here).
           - Forward the typed AudiencePlan on BOTH InventoryRequirements
             and DealParams (the §5 wiring -- both surfaces carry it so
             seller discovery and the materialized DealRequest agree).
           - Preserve every audience type (standard / contextual /
             agentic) at the boundary.
-          - Keep the audience_plan_id stable from CampaignPlan onwards
-            -- the post-planner plan_id and the plan_id observed at the
-            seller boundary must match. The pre-planner brief plan_id
-            and the post-planner plan_id may legitimately differ when
-            the planner adds inferred refs (§5.5 / §7); we only assert
-            equality with the ingested id when the planner added none.
+          - Keep the audience_plan_id stable from the flow state to the
+            seller boundary (no in-flight mutation).
         """
 
         brief = _three_type_brief()
         assert brief.target_audience is not None
-        original_plan_id = brief.target_audience.audience_plan_id
+        plan = brief.target_audience
+        original_plan_id = plan.audience_plan_id
 
-        loop = asyncio.new_event_loop()
-        try:
-            campaign_id = loop.run_until_complete(
-                pipeline.ingest_brief(brief.model_dump(mode="json"))
-            )
-            campaign_plan = loop.run_until_complete(pipeline.plan_campaign(campaign_id))
-            loop.run_until_complete(pipeline.execute_booking(campaign_id))
-        finally:
-            loop.close()
-
-        # Planner step ran and attached a typed AudiencePlan to the plan.
-        assert campaign_plan.target_audience is not None
-        plan_after_planner = campaign_plan.target_audience
-        post_planner_plan_id = plan_after_planner.audience_plan_id
-        # The pre-planner -> post-planner hash is stable only when no
-        # inferred refs were added (proposal §5.5). Mirror the existing
-        # unit test pattern in tests/unit/test_audience_planner_wiring.py.
-        no_inferred_constraints = not any(
-            c.source == "inferred" for c in plan_after_planner.constraints
+        flow = DealBookingFlow(
+            client=MagicMock(),
+            orchestrator=mock_orchestrator,
+            campaign_brief=_flow_brief_dict(),
         )
-        no_inferred_extensions = not any(
-            e.source == "inferred" for e in plan_after_planner.extensions
-        )
-        if no_inferred_constraints and no_inferred_extensions:
-            assert post_planner_plan_id == original_plan_id
-        # All three audience types survived the planner pass.
-        assert plan_after_planner.primary.type == "standard"
-        assert plan_after_planner.primary.identifier == "3-7"
-        assert any(c.type == "contextual" for c in plan_after_planner.constraints)
-        assert any(e.type == "agentic" for e in plan_after_planner.extensions)
+        # Pre-seed the typed plan (as a dict, the way a parent planning
+        # stage persists it) and the approval-gate output.
+        flow.state.audience_plan = plan.model_dump(mode="json")
+        flow.state.pending_approvals = [
+            _approved_rec("prod-ctv-001", "ctv"),
+            _approved_rec("prod-display-001", "branding"),
+        ]
+        flow.state.execution_status = ExecutionStatus.AWAITING_APPROVAL
 
-        # Orchestrator called once per channel (CTV + DISPLAY = 2 calls).
+        result = flow.approve_all()
+        assert result["status"] == "success"
+        assert result["booked"] == 2
+
+        # The typed plan survived the state round-trip.
+        threaded = flow._typed_audience_plan()
+        assert threaded is not None
+        assert threaded.audience_plan_id == original_plan_id
+
+        # Orchestrator called once per approved recommendation.
         assert mock_orchestrator.orchestrate.call_count == 2
 
         # Inspect every orchestrate call: both InventoryRequirements and
@@ -351,12 +294,11 @@ class TestCampaignPipelineThreeTypeHappyPath:
             assert deal_params.audience_plan is not None
             assert isinstance(deal_params.audience_plan, AudiencePlan)
 
-            # End-to-end identity hash stability: post-planner plan_id
-            # MUST survive plan -> seller (no in-flight mutation). This
-            # is the §5.1 step-2 wire-format guarantee for the buyer
-            # side of Path A.
-            assert inv_req.audience_plan.audience_plan_id == post_planner_plan_id
-            assert deal_params.audience_plan.audience_plan_id == post_planner_plan_id
+            # End-to-end identity hash stability: the pre-seeded plan_id
+            # MUST survive state -> seller (no in-flight mutation). This
+            # is the §5.1 step-2 wire-format guarantee for the buyer side.
+            assert inv_req.audience_plan.audience_plan_id == original_plan_id
+            assert deal_params.audience_plan.audience_plan_id == original_plan_id
 
             # All three types still present at the seller boundary.
             assert inv_req.audience_plan.primary.type == "standard"
@@ -860,6 +802,5 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
 # ===========================================================================
 
 __all__ = [
-    "FakeCampaignStore",
     "AudienceRef",  # used by part 2 fixtures
 ]

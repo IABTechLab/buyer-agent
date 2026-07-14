@@ -20,7 +20,6 @@ Run standalone:
     # Opens on http://localhost:5055
 
 Uses real pipeline modules:
-  - CampaignPipeline (campaign_pipeline.py)
   - ApprovalGate (approval.py)
   - CampaignReporter (campaign_report.py)
   - BudgetPacingEngine (pacing/engine.py)
