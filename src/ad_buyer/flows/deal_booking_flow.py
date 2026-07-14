@@ -14,6 +14,10 @@ from crewai.flow.flow import Flow, listen, or_, start
 from pydantic import ValidationError
 
 from ..async_utils import run_async
+from ..booking.recommendation_guard import (
+    RecommendationBounds,
+    validate_and_clamp_recommendation,
+)
 from ..booking.spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
 from ..clients.opendirect_client import OpenDirectClient
 from ..crews.channel_crews import (
@@ -638,36 +642,71 @@ class DealBookingFlow(Flow[BookingState]):
             kpis=self.state.campaign_brief.get("kpis", {}),
         ).model_dump(by_alias=True)
 
+    def _recommendation_bounds(self, channel: str) -> RecommendationBounds:
+        """Build the deterministic clamp bounds for a channel's LLM output.
+
+        The CPM ceiling comes from the campaign brief's ``max_cpm`` (when
+        supplied and positive); the per-line cost ceiling is the channel's
+        allocated budget, falling back to the campaign's total budget. A
+        limit that is absent or non-positive disables the corresponding
+        clamp (None), preserving behavior for briefs without configured
+        limits. Bead ar-1ow7 (EP-4.3).
+        """
+        brief = self.state.campaign_brief or {}
+
+        raw_max_cpm = brief.get("max_cpm")
+        max_cpm = (
+            float(raw_max_cpm)
+            if isinstance(raw_max_cpm, (int, float)) and raw_max_cpm > 0
+            else None
+        )
+
+        allocation = self.state.budget_allocations.get(channel)
+        max_cost: float | None = None
+        if allocation is not None and allocation.budget > 0:
+            max_cost = float(allocation.budget)
+        else:
+            raw_budget = brief.get("budget")
+            if isinstance(raw_budget, (int, float)) and raw_budget > 0:
+                max_cost = float(raw_budget)
+
+        return RecommendationBounds(max_cpm=max_cpm, max_cost=max_cost)
+
     def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
-        """Parse recommendations from crew result."""
-        recommendations = []
+        """Parse recommendations from crew result.
 
-        try:
-            # Try to find JSON array in result
-            start_idx = result_str.find("[")
-            end_idx = result_str.rfind("]") + 1
-            if start_idx >= 0 and end_idx > start_idx:
-                json_str = result_str[start_idx:end_idx]
-                items = json.loads(json_str)
+        Every item crosses the deterministic validation+clamp boundary
+        (``validate_and_clamp_recommendation``) before it becomes a typed
+        ``ProductRecommendation``: malformed items are rejected and numeric
+        fields are clamped to campaign bounds, so an out-of-bounds LLM value
+        can never reach the booking primitive. Bead ar-1ow7 (EP-4.3).
+        """
+        bounds = self._recommendation_bounds(channel)
+        recommendations: list[ProductRecommendation] = []
 
-                for item in items:
-                    rec = ProductRecommendation(
-                        product_id=item.get("product_id", "unknown"),
-                        product_name=item.get("product_name", "Unknown Product"),
-                        publisher=item.get("publisher", "Unknown"),
-                        channel=channel,
-                        format=item.get("format"),
-                        impressions=item.get("impressions", 0),
-                        cpm=item.get("cpm", 0),
-                        cost=item.get("cost", 0),
-                        rationale=item.get("rationale"),
-                    )
-                    recommendations.append(rec)
-        except (json.JSONDecodeError, KeyError):
-            # If parsing fails, create a placeholder recommendation
-            pass
+        for item in self._extract_recommendation_items(result_str):
+            rec = validate_and_clamp_recommendation(item, channel, bounds)
+            if rec is not None:
+                recommendations.append(rec)
 
         return recommendations
+
+    @staticmethod
+    def _extract_recommendation_items(result_str: str) -> list[Any]:
+        """Extract the JSON array of raw recommendation items from crew text.
+
+        Returns an empty list when no JSON array is present or it does not
+        parse -- non-JSON free text yields no recommendations.
+        """
+        start_idx = result_str.find("[")
+        end_idx = result_str.rfind("]") + 1
+        if start_idx < 0 or end_idx <= start_idx:
+            return []
+        try:
+            items = json.loads(result_str[start_idx:end_idx])
+        except json.JSONDecodeError:
+            return []
+        return items if isinstance(items, list) else []
 
     @listen(or_(research_branding, research_ctv, research_mobile, research_performance))
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
