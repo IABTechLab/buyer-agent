@@ -18,6 +18,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "aiosqlite>=0.20.0",
     "pyyaml>=6.0.0",
+    "iab-agentic-primitives @ git+https://github.com/IABTechLab/iab-agentic-primitives.git@v0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +54,12 @@ ad-buyer = "ad_buyer.interfaces.cli.main:app"
 [build-system]
 requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# Allow the direct git reference to the private shared contract library
+# (iab-agentic-primitives) in project.dependencies. Hatchling rejects
+# direct-URL/VCS deps unless this is opted into explicitly.
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ad_buyer"]
