@@ -12,6 +12,7 @@ from typing import Any
 
 from crewai.flow.flow import Flow, listen, or_, start
 
+from ..booking.spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
 from ..clients.opendirect_client import OpenDirectClient
 from ..crews.channel_crews import (
     create_branding_crew,
@@ -688,6 +689,29 @@ class DealBookingFlow(Flow[BookingState]):
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
             return {"status": "success", "booked": 0, "message": "No recommendations approved"}
+
+        # Deterministic spend-ceiling guard (bead ar-70eh): the approved
+        # recommendations come from LLM-parsed crew output, so their total
+        # cost must be checked against the campaign budget BEFORE any line
+        # is booked. A missing budget fails open (allow + warning log) —
+        # an explicit choice to preserve demo behavior for briefs without
+        # a budget; a supplied budget is always enforced.
+        budget = self.state.campaign_brief.get("budget")
+        total_cost = sum(rec.cost for rec in approved)
+        try:
+            enforce_spend_ceiling(total_cost=total_cost, budget=budget)
+        except SpendCeilingExceeded as e:
+            logger.warning("Booking rejected by spend ceiling: %s", e)
+            self.state.errors.append(f"Booking rejected: {e}")
+            self.state.execution_status = ExecutionStatus.FAILED
+            self.state.updated_at = datetime.now(UTC)
+            return {
+                "status": "rejected",
+                "booked": 0,
+                "error": str(e),
+                "total_cost": total_cost,
+                "budget": budget,
+            }
 
         # In a full implementation, this would use the Execution Agent
         # to create orders and book lines. For now, we track the approvals.
