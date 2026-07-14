@@ -649,7 +649,7 @@ class TestCampaignAutomationEventBus:
             event_type=EventType.CAMPAIGN_READY,
             campaign_id="camp-500",
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.CAMPAIGN_READY
 
@@ -662,7 +662,7 @@ class TestCampaignAutomationEventBus:
             campaign_id="camp-501",
             payload={"deviation_pct": -12.5},
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.PACING_DEVIATION_DETECTED
 
@@ -674,7 +674,7 @@ class TestCampaignAutomationEventBus:
             event_type=EventType.CREATIVE_VALIDATED,
             payload={"creative_id": "cr-10", "valid": True},
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.CREATIVE_VALIDATED
 
@@ -683,12 +683,12 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("campaign.ready", lambda e: received.append(e))
         )
 
         event = Event(event_type=EventType.CAMPAIGN_READY, campaign_id="camp-510")
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
         assert len(received) == 1
         assert received[0].event_type == EventType.CAMPAIGN_READY
@@ -698,7 +698,7 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("pacing.reallocation_recommended", lambda e: received.append(e))
         )
 
@@ -706,7 +706,7 @@ class TestCampaignAutomationEventBus:
             event_type=EventType.PACING_REALLOCATION_RECOMMENDED,
             campaign_id="camp-511",
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
         assert len(received) == 1
         assert received[0].event_type == EventType.PACING_REALLOCATION_RECOMMENDED
@@ -716,12 +716,12 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("creative.matched", lambda e: received.append(e))
         )
 
         event = Event(event_type=EventType.CREATIVE_MATCHED, campaign_id="camp-512")
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
         assert len(received) == 1
         assert received[0].event_type == EventType.CREATIVE_MATCHED
@@ -730,28 +730,28 @@ class TestCampaignAutomationEventBus:
         """Should filter events by campaign automation event types."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.CAMPAIGN_READY))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.PACING_SNAPSHOT_TAKEN))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.CREATIVE_UPLOADED))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_BOOKED))
         )
 
         # Filter by campaign.ready
-        events = asyncio.get_event_loop().run_until_complete(
+        events = asyncio.run(
             bus.list_events(event_type="campaign.ready")
         )
         assert len(events) == 1
         assert events[0].event_type == EventType.CAMPAIGN_READY
 
         # Filter by pacing.snapshot_taken
-        events = asyncio.get_event_loop().run_until_complete(
+        events = asyncio.run(
             bus.list_events(event_type="pacing.snapshot_taken")
         )
         assert len(events) == 1
@@ -762,17 +762,17 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("*", lambda e: received.append(e))
         )
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.CAMPAIGN_READY))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.PACING_DEVIATION_DETECTED))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.CREATIVE_VALIDATED))
         )
 
@@ -880,7 +880,7 @@ class TestCampaignAutomationEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.CAMPAIGN_READY,
                 payload={"campaign_id": "camp-700"},
@@ -899,7 +899,7 @@ class TestCampaignAutomationEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.PACING_DEVIATION_DETECTED,
                 payload={"deviation_pct": -10.0},
@@ -918,7 +918,7 @@ class TestCampaignAutomationEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.CREATIVE_MATCHED,
                 deal_id="deal-60",

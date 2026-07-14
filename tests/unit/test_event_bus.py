@@ -113,7 +113,7 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         event = Event(event_type=EventType.DEAL_BOOKED)
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_id == event.event_id
 
@@ -124,10 +124,10 @@ class TestInMemoryEventBus:
         received = []
         callback = lambda e: received.append(e)  # noqa: E731
 
-        asyncio.get_event_loop().run_until_complete(bus.subscribe("deal.booked", callback))
+        asyncio.run(bus.subscribe("deal.booked", callback))
 
         event = Event(event_type=EventType.DEAL_BOOKED)
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
         assert len(received) == 1
         assert received[0].event_id == event.event_id
@@ -137,14 +137,14 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("*", lambda e: received.append(e))
         )
 
         e1 = Event(event_type=EventType.DEAL_BOOKED)
         e2 = Event(event_type=EventType.CAMPAIGN_CREATED)
-        asyncio.get_event_loop().run_until_complete(bus.publish(e1))
-        asyncio.get_event_loop().run_until_complete(bus.publish(e2))
+        asyncio.run(bus.publish(e1))
+        asyncio.run(bus.publish(e2))
 
         assert len(received) == 2
 
@@ -155,11 +155,11 @@ class TestInMemoryEventBus:
         def bad_callback(e):
             raise RuntimeError("boom")
 
-        asyncio.get_event_loop().run_until_complete(bus.subscribe("deal.booked", bad_callback))
+        asyncio.run(bus.subscribe("deal.booked", bad_callback))
 
         event = Event(event_type=EventType.DEAL_BOOKED)
         # Should not raise
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
 
     def test_get_event(self, bus):
@@ -167,15 +167,15 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         event = Event(event_type=EventType.BUDGET_ALLOCATED)
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
-        found = asyncio.get_event_loop().run_until_complete(bus.get_event(event.event_id))
+        found = asyncio.run(bus.get_event(event.event_id))
         assert found is not None
         assert found.event_id == event.event_id
 
     def test_get_event_not_found(self, bus):
         """Should return None for unknown event ID."""
-        result = asyncio.get_event_loop().run_until_complete(bus.get_event("nonexistent"))
+        result = asyncio.run(bus.get_event("nonexistent"))
         assert result is None
 
     def test_list_events_no_filter(self, bus):
@@ -183,25 +183,25 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         for _ in range(3):
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 bus.publish(Event(event_type=EventType.DEAL_BOOKED))
             )
 
-        events = asyncio.get_event_loop().run_until_complete(bus.list_events())
+        events = asyncio.run(bus.list_events())
         assert len(events) == 3
 
     def test_list_events_by_flow_id(self, bus):
         """Should filter events by flow_id."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f1"))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f2"))
         )
 
-        events = asyncio.get_event_loop().run_until_complete(bus.list_events(flow_id="f1"))
+        events = asyncio.run(bus.list_events(flow_id="f1"))
         assert len(events) == 1
         assert events[0].flow_id == "f1"
 
@@ -209,14 +209,14 @@ class TestInMemoryEventBus:
         """Should filter events by event_type."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_BOOKED))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.CAMPAIGN_CREATED))
         )
 
-        events = asyncio.get_event_loop().run_until_complete(
+        events = asyncio.run(
             bus.list_events(event_type="deal.booked")
         )
         assert len(events) == 1
@@ -225,14 +225,14 @@ class TestInMemoryEventBus:
         """Should filter events by session_id."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.SESSION_CREATED, session_id="s1"))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.SESSION_CLOSED, session_id="s2"))
         )
 
-        events = asyncio.get_event_loop().run_until_complete(bus.list_events(session_id="s1"))
+        events = asyncio.run(bus.list_events(session_id="s1"))
         assert len(events) == 1
 
     def test_list_events_limit(self, bus):
@@ -240,11 +240,11 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         for _ in range(10):
-            asyncio.get_event_loop().run_until_complete(
+            asyncio.run(
                 bus.publish(Event(event_type=EventType.DEAL_BOOKED))
             )
 
-        events = asyncio.get_event_loop().run_until_complete(bus.list_events(limit=3))
+        events = asyncio.run(bus.list_events(limit=3))
         assert len(events) == 3
 
 
@@ -265,7 +265,7 @@ class TestEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.DEAL_BOOKED,
                 flow_id="f1",
@@ -298,7 +298,7 @@ class TestEmitEvent:
             "ad_buyer.events.bus.get_event_bus",
             side_effect=RuntimeError("bus down"),
         ):
-            result = asyncio.get_event_loop().run_until_complete(
+            result = asyncio.run(
                 emit_event(event_type=EventType.QUOTE_REQUESTED)
             )
             assert result is None
@@ -321,7 +321,7 @@ class TestGetEventBus:
 
         bus_mod._event_bus_instance = None
 
-        bus = asyncio.get_event_loop().run_until_complete(get_event_bus())
+        bus = asyncio.run(get_event_bus())
         assert isinstance(bus, InMemoryEventBus)
 
         bus_mod._event_bus_instance = None
@@ -333,8 +333,8 @@ class TestGetEventBus:
 
         bus_mod._event_bus_instance = None
 
-        bus1 = asyncio.get_event_loop().run_until_complete(get_event_bus())
-        bus2 = asyncio.get_event_loop().run_until_complete(get_event_bus())
+        bus1 = asyncio.run(get_event_bus())
+        bus2 = asyncio.run(get_event_bus())
         assert bus1 is bus2
 
         bus_mod._event_bus_instance = None
@@ -346,10 +346,10 @@ class TestGetEventBus:
 
         bus_mod._event_bus_instance = None
 
-        bus1 = asyncio.get_event_loop().run_until_complete(get_event_bus())
-        asyncio.get_event_loop().run_until_complete(close_event_bus())
+        bus1 = asyncio.run(get_event_bus())
+        asyncio.run(close_event_bus())
 
-        bus2 = asyncio.get_event_loop().run_until_complete(get_event_bus())
+        bus2 = asyncio.run(get_event_bus())
         assert bus1 is not bus2
 
         bus_mod._event_bus_instance = None
