@@ -281,10 +281,16 @@ class TestEmitEvent:
         bus_mod._event_bus_instance = None
 
     def test_emit_event_fail_open(self):
-        """emit_event should return None on failure, not raise."""
+        """emit_event should return None on failure, not raise.
+
+        Uses a non-audit event type: audit-class events (AUDIT_EVENT_TYPES)
+        are fail-closed and covered in test_audit_fail_closed.py.
+        """
         import ad_buyer.events.bus as bus_mod
         from ad_buyer.events.helpers import emit_event
-        from ad_buyer.events.models import EventType
+        from ad_buyer.events.models import AUDIT_EVENT_TYPES, EventType
+
+        assert EventType.QUOTE_REQUESTED not in AUDIT_EVENT_TYPES
 
         bus_mod._event_bus_instance = None
 
@@ -293,7 +299,7 @@ class TestEmitEvent:
             side_effect=RuntimeError("bus down"),
         ):
             result = asyncio.get_event_loop().run_until_complete(
-                emit_event(event_type=EventType.DEAL_BOOKED)
+                emit_event(event_type=EventType.QUOTE_REQUESTED)
             )
             assert result is None
 
