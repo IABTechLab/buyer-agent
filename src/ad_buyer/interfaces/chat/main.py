@@ -4,11 +4,15 @@
 
 """Chat interface for the Ad Buyer System.
 
-Supports connecting to multiple seller agents via MCP/A2A protocols.
-Each seller should implement IAB Tech Lab OpenDirect/AdCOM standards.
+Booking goes through the ONE canonical pipeline (bead ar-j2nw): the chat
+agent's tools are thin wrappers over MultiSellerOrchestrator (discover ->
+quote -> rank -> select_and_book against the real quotes -> deals
+contract). The former inline seller-protocol tools (MultiSellerSearchTool,
+CallSellerToolTool, BookPGDealTool, CreatePMPDealTool) were deleted --
+chat never speaks a bespoke booking dialect again; every deal id shown to
+the user is SELLER-issued.
 """
 
-import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -16,8 +20,15 @@ from crewai import LLM, Agent, Crew, Task
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...clients.mcp_client import SimpleMCPClient
+from ...async_utils import run_async
 from ...config.settings import settings
+from ...flows.deal_booking_flow import build_default_orchestrator
+from ...orchestration.multi_seller import (
+    DealParams,
+    InventoryRequirements,
+    MultiSellerOrchestrator,
+)
+from ...registry.models import AgentCard, TrustLevel
 
 
 class ConversationMessage:
@@ -30,15 +41,13 @@ class ConversationMessage:
 
 @dataclass
 class SellerConnection:
-    """Connection to a seller agent."""
+    """Health-checked connection info for a configured seller agent."""
 
     url: str
     name: str = ""
-    client: SimpleMCPClient | None = None
     capabilities: dict[str, Any] = field(default_factory=dict)
     connected: bool = False
     error: str = ""
-    _initialized: bool = False
 
     def check_health(self) -> bool:
         """Synchronously check if seller is reachable and discover tools."""
@@ -75,398 +84,220 @@ class SellerConnection:
             self.connected = False
         return False
 
-    async def ensure_client(self) -> SimpleMCPClient | None:
-        """Lazily create client on first use."""
-        if self.client is None and self.connected:
-            self.client = SimpleMCPClient(base_url=self.url)
-            # Don't call connect() since we already checked health
-        return self.client
-
-    async def close(self) -> None:
-        """Close the connection."""
-        if self.client:
-            await self.client.close()
-            self.client = None
 
 
-class MultiSellerSearchInput(BaseModel):
-    """Input for searching across multiple sellers."""
+class _ConfiguredSellersRegistry:
+    """Registry adapter exposing configured SELLER_ENDPOINTS as AgentCards.
 
-    query: str = Field(default="", description="Natural language search query")
-    channel: str = Field(default="", description="Channel filter: ctv, display, video, mobile")
-    max_cpm: float = Field(default=0, description="Maximum CPM price filter")
+    Chat deployments configure sellers via SELLER_ENDPOINTS rather than a
+    live agent registry. This adapter feeds those endpoints into the
+    canonical MultiSellerOrchestrator's discovery stage; quoting and
+    booking then run through the real quotes -> deals contract exactly as
+    on every other path.
+    """
 
-
-class MultiSellerSearchTool(BaseTool):
-    """Tool to search inventory across all connected sellers."""
-
-    name: str = "search_all_sellers"
-    description: str = """Search for advertising inventory across ALL connected seller agents.
-    Use this to find products, check availability, and compare offerings from multiple publishers/SSPs.
-    Returns aggregated results from all sellers."""
-    args_schema: type[BaseModel] = MultiSellerSearchInput
-
-    def __init__(self, sellers: list[SellerConnection], **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, sellers: list[SellerConnection]):
         self._sellers = sellers
 
-    def _run(self, query: str = "", channel: str = "", max_cpm: float = 0) -> str:
-        """Synchronous wrapper."""
-        return asyncio.get_event_loop().run_until_complete(self._arun(query, channel, max_cpm))
-
-    async def _arun(self, query: str = "", channel: str = "", max_cpm: float = 0) -> str:
-        """Search all sellers asynchronously."""
-        results = []
-
-        for seller in self._sellers:
-            if not seller.connected:
-                continue
-
-            try:
-                # Lazily create client
-                client = await seller.ensure_client()
-                if not client:
-                    continue
-
-                # Use list_products from SimpleMCPClient
-                result = await client.list_products()
-
-                if result.success and result.data:
-                    products = result.data
-                    # Handle nested result structure
-                    if isinstance(products, dict) and "products" in products:
-                        products = products["products"]
-
-                    # Apply filters if specified
-                    if channel and isinstance(products, list):
-                        products = [
-                            p for p in products if p.get("channel", "").lower() == channel.lower()
-                        ]  # noqa: E501
-                    if max_cpm > 0 and isinstance(products, list):
-                        products = [
-                            p
-                            for p in products
-                            if p.get("base_cpm", p.get("floor_cpm", 0)) <= max_cpm
-                        ]  # noqa: E501
-
-                    results.append(
-                        {
-                            "seller": seller.name,
-                            "url": seller.url,
-                            "products": products,
-                        }
-                    )
-            except (OSError, ValueError, KeyError) as e:
-                results.append(
-                    {
-                        "seller": seller.name,
-                        "url": seller.url,
-                        "error": str(e),
-                    }
-                )
-
-        if not results:
-            return "No sellers connected. Configure SELLER_ENDPOINTS in .env"
-
-        # Format results
-        output = [f"Found inventory from {len(results)} seller(s):\n"]
-        for r in results:
-            output.append(f"\n=== {r['seller']} ===")
-            if "error" in r:
-                output.append(f"  Error: {r['error']}")
-            elif "products" in r:
-                products = r["products"]
-                if isinstance(products, list):
-                    for p in products[:5]:  # Limit to 5 per seller
-                        name = p.get("name", "Unknown")
-                        # Try various price field names
-                        price = p.get(
-                            "base_cpm",
-                            p.get("floor_cpm", p.get("basePrice", p.get("price", "N/A"))),
-                        )  # noqa: E501
-                        channel = p.get("channel", "")
-                        publisher = p.get("publisher", "")
-                        avail = p.get("available_impressions", 0)
-                        avail_str = f"{avail / 1_000_000:.0f}M" if avail else ""
-                        output.append(
-                            f"  - {name} | {publisher} | {channel} | ${price} CPM | {avail_str} avail"
-                        )  # noqa: E501
-                else:
-                    output.append(f"  {products}")
-
-        return "\n".join(output)
+    async def discover_sellers(
+        self, capabilities_filter: list[str] | None = None
+    ) -> list[AgentCard]:
+        return [
+            AgentCard(
+                agent_id=seller.name or seller.url,
+                name=seller.name or seller.url,
+                url=seller.url,
+                trust_level=TrustLevel.VERIFIED,
+            )
+            for seller in self._sellers
+            if seller.connected
+        ]
 
 
-class CallSellerToolInput(BaseModel):
-    """Input for calling any tool on a seller."""
+def _format_orchestration_result(result: Any) -> str:
+    """Render an OrchestrationResult conversationally."""
+    lines: list[str] = []
+    selection = result.selection
 
-    seller_name: str = Field(
-        ..., description="Name of the seller agent (e.g., 'Publisher Seller Agent')"
-    )  # noqa: E501
-    tool_name: str = Field(
-        ..., description="Name of the tool to call (e.g., 'book_programmatic_guaranteed')"
-    )  # noqa: E501
-    arguments: str = Field(default="{}", description="JSON string of arguments to pass to the tool")
+    if selection.booked_deals:
+        lines.append(f"BOOKED {len(selection.booked_deals)} deal(s):")
+        for deal in selection.booked_deals:
+            cpm = (
+                f"${deal.pricing.final_cpm:.2f} CPM"
+                if deal.pricing.final_cpm is not None
+                else "CPM on request"
+            )
+            impressions = deal.terms.impressions or 0
+            lines.append(
+                f"  - Deal ID {deal.deal_id} (seller-issued) | quote {deal.quote_id} | "
+                f"{deal.deal_type} | {cpm} | {impressions:,} impressions"
+            )
+        lines.append(f"Total spend: ${selection.total_spend:,.2f}")
+        lines.append(f"Remaining budget: ${selection.remaining_budget:,.2f}")
+    else:
+        lines.append("No deals were booked.")
+
+    if selection.failed_bookings:
+        lines.append(f"Failed bookings ({len(selection.failed_bookings)}):")
+        for failure in selection.failed_bookings:
+            lines.append(f"  - {failure}")
+
+    lines.append(
+        f"(Sellers discovered: {len(result.discovered_sellers)}, "
+        f"quotes ranked: {len(result.ranked_quotes)})"
+    )
+    return "\n".join(lines)
 
 
-class CallSellerToolTool(BaseTool):
-    """Tool to call any tool on any connected seller agent."""
+class RequestQuotesInput(BaseModel):
+    """Input for requesting quotes across sellers (no money committed)."""
 
-    name: str = "call_seller_tool"
-    description: str = """Call any tool on a specific seller agent. Use this to:
-    - Book programmatic guaranteed deals (book_programmatic_guaranteed)
-    - Create PMP deals (create_pmp_deal)
-    - Check availability (check_availability)
-    - Get pricing (get_pricing)
-    - Create campaigns (create_performance_campaign, create_mobile_campaign)
-    - Attach deals to DSP (attach_deal)
+    product_id: str = Field(..., description="Product ID to request quotes for")
+    media_type: str = Field(
+        default="display", description="Media type: ctv, display, audio, native, mobile"
+    )
+    deal_type: str = Field(default="PD", description="Deal type: PG, PD, or PA")
+    impressions: int = Field(..., description="Desired impression volume")
+    flight_start: str = Field(default="", description="Flight start date (YYYY-MM-DD)")
+    flight_end: str = Field(default="", description="Flight end date (YYYY-MM-DD)")
+    max_cpm: float = Field(default=0, description="Maximum acceptable CPM (0 = no cap)")
 
-    First use search_all_sellers to find inventory and seller names, then use this tool to execute actions."""  # noqa: E501
-    args_schema: type[BaseModel] = CallSellerToolInput
 
-    def __init__(self, sellers: list[SellerConnection], **kwargs):
+class RequestQuotesTool(BaseTool):
+    """Thin wrapper: canonical discover -> quote -> rank (no booking)."""
+
+    name: str = "request_quotes"
+    description: str = """Request price quotes from ALL connected sellers for a product.
+    Runs the canonical multi-seller pipeline: discover sellers, request quotes in
+    parallel, then normalize and rank them (best first). No money is committed.
+    Use this BEFORE book_deals to compare the market."""
+    args_schema: type[BaseModel] = RequestQuotesInput
+
+    def __init__(self, orchestrator: MultiSellerOrchestrator, **kwargs):
         super().__init__(**kwargs)
-        self._sellers = sellers
+        self._orchestrator = orchestrator
 
-    def _run(self, seller_name: str, tool_name: str, arguments: str = "{}") -> str:
-        """Synchronous wrapper."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self._arun(seller_name, tool_name, arguments))
-
-    async def _arun(self, seller_name: str, tool_name: str, arguments: str = "{}") -> str:
-        """Call a tool on a specific seller."""
-        import json as json_module
-
-        # Find the seller
-        seller = None
-        for s in self._sellers:
-            if seller_name.lower() in s.name.lower() or seller_name.lower() in s.url.lower():
-                seller = s
-                break
-
-        if not seller:
-            available = [s.name for s in self._sellers if s.connected]
-            return f"Seller '{seller_name}' not found. Available sellers: {', '.join(available)}"
-
-        if not seller.connected:
-            return f"Seller '{seller.name}' is not connected: {seller.error}"
-
-        # Parse arguments
-        try:
-            args = json_module.loads(arguments) if arguments else {}
-        except json_module.JSONDecodeError as e:
-            return f"Invalid JSON arguments: {e}"
-
-        # Get client and call tool
-        try:
-            client = await seller.ensure_client()
-            if not client:
-                return f"Could not connect to seller '{seller.name}'"
-
-            result = await client.call_tool(tool_name, args)
-
-            if result.success:
-                return f"SUCCESS - {seller.name} - {tool_name}:\n{json_module.dumps(result.data, indent=2)}"  # noqa: E501
-            else:
-                return f"FAILED - {seller.name} - {tool_name}: {result.error}"
-        except (OSError, ValueError, RuntimeError) as e:
-            return f"Error calling {tool_name} on {seller.name}: {e}"
-
-
-class BookPGDealInput(BaseModel):
-    """Input for booking a Programmatic Guaranteed deal."""
-
-    seller_name: str = Field(..., description="Name of the seller agent")
-    product_id: str = Field(..., description="Product ID to book (e.g., 'ctv-hbo-max-001')")
-    impressions: int = Field(..., description="Number of impressions to book")
-    cpm_price: float = Field(..., description="CPM price for the deal")
-    start_date: str = Field(default="", description="Start date (YYYY-MM-DD)")
-    end_date: str = Field(default="", description="End date (YYYY-MM-DD)")
-    advertiser_name: str = Field(default="Demo Advertiser", description="Advertiser name")
-    campaign_name: str = Field(default="Demo Campaign", description="Campaign name")
-
-
-class BookPGDealTool(BaseTool):
-    """Tool to book a Programmatic Guaranteed deal with a seller."""
-
-    name: str = "book_pg_deal"
-    description: str = """Book a Programmatic Guaranteed (PG) deal with a seller agent.
-    PG deals have fixed pricing and guaranteed delivery.
-    Use search_all_sellers first to find products and their IDs."""
-    args_schema: type[BaseModel] = BookPGDealInput
-
-    def __init__(self, sellers: list[SellerConnection], **kwargs):
-        super().__init__(**kwargs)
-        self._sellers = sellers
-
-    def _run(
-        self,
-        seller_name: str,
-        product_id: str,
-        impressions: int,
-        cpm_price: float,
-        start_date: str = "",
-        end_date: str = "",
-        advertiser_name: str = "Demo Advertiser",
-        campaign_name: str = "Demo Campaign",
-    ) -> str:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(
-            self._arun(
-                seller_name,
-                product_id,
-                impressions,
-                cpm_price,
-                start_date,
-                end_date,
-                advertiser_name,
-                campaign_name,
-            )  # noqa: E501
-        )
+    def _run(self, **kwargs: Any) -> str:
+        return run_async(self._arun(**kwargs))
 
     async def _arun(
         self,
-        seller_name: str,
         product_id: str,
-        impressions: int,
-        cpm_price: float,
-        start_date: str = "",
-        end_date: str = "",
-        advertiser_name: str = "Demo Advertiser",  # noqa: E501
-        campaign_name: str = "Demo Campaign",
-    ) -> str:
-        import json as json_module
-        from datetime import datetime, timedelta
-
-        # Find seller
-        seller = None
-        for s in self._sellers:
-            if seller_name.lower() in s.name.lower() or seller_name.lower() in s.url.lower():
-                seller = s
-                break
-
-        if not seller or not seller.connected:
-            return f"Seller '{seller_name}' not found or not connected"
-
-        # Default dates
-        if not start_date:
-            start_date = datetime.now().strftime("%Y-%m-%d")
-        if not end_date:
-            end_date = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
-
-        # Build arguments
-        args = {
-            "product_id": product_id,
-            "impressions": impressions,
-            "cpm_price": cpm_price,
-            "start_date": start_date,
-            "end_date": end_date,
-            "advertiser_name": advertiser_name,
-            "campaign_name": campaign_name,
-        }
-
-        try:
-            client = await seller.ensure_client()
-            result = await client.call_tool("book_programmatic_guaranteed", args)
-
-            if result.success:
-                return f"✓ PG DEAL BOOKED SUCCESSFULLY!\n\nSeller: {seller.name}\nProduct: {product_id}\nImpressions: {impressions:,}\nCPM: ${cpm_price}\nTotal Cost: ${(impressions / 1000) * cpm_price:,.2f}\n\nBooking Details:\n{json_module.dumps(result.data, indent=2)}"  # noqa: E501
-            else:
-                return f"✗ Failed to book PG deal: {result.error}"
-        except (OSError, ValueError, RuntimeError) as e:
-            return f"Error booking PG deal: {e}"
-
-
-class CreatePMPDealInput(BaseModel):
-    """Input for creating a PMP deal."""
-
-    seller_name: str = Field(..., description="Name of the seller agent")
-    product_id: str = Field(..., description="Product ID")
-    floor_price: float = Field(..., description="Floor CPM price")
-    impressions: int = Field(default=0, description="Expected impressions")
-    buyer_seat_id: str = Field(default="buyer-seat-001", description="Buyer's DSP seat ID")
-
-
-class CreatePMPDealTool(BaseTool):
-    """Tool to create a Private Marketplace deal."""
-
-    name: str = "create_pmp_deal"
-    description: str = """Create a Private Marketplace (PMP) deal with a seller.
-    Returns a Deal ID that can be used in DSP platforms."""
-    args_schema: type[BaseModel] = CreatePMPDealInput
-
-    def __init__(self, sellers: list[SellerConnection], **kwargs):
-        super().__init__(**kwargs)
-        self._sellers = sellers
-
-    def _run(
-        self,
-        seller_name: str,
-        product_id: str,
-        floor_price: float,
+        media_type: str = "display",
+        deal_type: str = "PD",
         impressions: int = 0,
-        buyer_seat_id: str = "buyer-seat-001",
+        flight_start: str = "",
+        flight_end: str = "",
+        max_cpm: float = 0,
     ) -> str:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(
-            self._arun(seller_name, product_id, floor_price, impressions, buyer_seat_id)
+        requirements = InventoryRequirements(
+            media_type=media_type,
+            deal_types=[deal_type],
+            max_cpm=max_cpm if max_cpm > 0 else None,
         )
+        deal_params = DealParams(
+            product_id=product_id,
+            deal_type=deal_type,
+            impressions=impressions,
+            flight_start=flight_start,
+            flight_end=flight_end,
+            media_type=media_type,
+        )
+
+        sellers = await self._orchestrator.discover_sellers(requirements)
+        if not sellers:
+            return "No sellers available. Configure SELLER_ENDPOINTS in .env"
+
+        quote_results = await self._orchestrator.request_quotes_parallel(sellers, deal_params)
+        ranked = await self._orchestrator.evaluate_and_rank(
+            quote_results, max_cpm=requirements.max_cpm
+        )
+
+        if not ranked:
+            failures = [r.error for r in quote_results if r.error]
+            return f"No viable quotes. Seller errors: {failures or 'none'}"
+
+        lines = [f"Ranked quotes from {len(sellers)} seller(s), best first:"]
+        for nq in ranked:
+            cpm = f"${nq.effective_cpm:.2f}" if nq.effective_cpm is not None else "on request"
+            lines.append(
+                f"  - quote {nq.quote_id} | seller {nq.seller_id} | {nq.deal_type} | "
+                f"{cpm} effective CPM | score {nq.score:.1f}"
+            )
+        return "\n".join(lines)
+
+
+class BookDealsInput(BaseModel):
+    """Input for booking deals through the canonical pipeline."""
+
+    product_id: str = Field(..., description="Product ID to book")
+    budget: float = Field(..., description="Budget ceiling for this booking (hard bound)")
+    impressions: int = Field(..., description="Desired impression volume")
+    media_type: str = Field(
+        default="display", description="Media type: ctv, display, audio, native, mobile"
+    )
+    deal_type: str = Field(default="PD", description="Deal type: PG, PD, or PA")
+    flight_start: str = Field(default="", description="Flight start date (YYYY-MM-DD)")
+    flight_end: str = Field(default="", description="Flight end date (YYYY-MM-DD)")
+    max_cpm: float = Field(default=0, description="Maximum acceptable CPM (0 = no cap)")
+    max_deals: int = Field(default=1, description="Maximum number of deals to book")
+
+
+class BookDealsTool(BaseTool):
+    """Thin wrapper over the canonical booking pipeline.
+
+    Delegates to MultiSellerOrchestrator.orchestrate: discover -> quote ->
+    rank -> select_and_book. Deal IDs in the result are SELLER-issued.
+    """
+
+    name: str = "book_deals"
+    description: str = """Book advertising deals through the canonical multi-seller
+    pipeline (discover sellers -> request quotes -> rank -> book best within budget).
+    The budget is a hard bound; returned Deal IDs are issued by the seller.
+    Use request_quotes first to preview the market."""
+    args_schema: type[BaseModel] = BookDealsInput
+
+    def __init__(self, orchestrator: MultiSellerOrchestrator, **kwargs):
+        super().__init__(**kwargs)
+        self._orchestrator = orchestrator
+
+    def _run(self, **kwargs: Any) -> str:
+        return run_async(self._arun(**kwargs))
 
     async def _arun(
         self,
-        seller_name: str,
         product_id: str,
-        floor_price: float,
-        impressions: int = 0,
-        buyer_seat_id: str = "buyer-seat-001",
+        budget: float,
+        impressions: int,
+        media_type: str = "display",
+        deal_type: str = "PD",
+        flight_start: str = "",
+        flight_end: str = "",
+        max_cpm: float = 0,
+        max_deals: int = 1,
     ) -> str:
-        import json as json_module
+        requirements = InventoryRequirements(
+            media_type=media_type,
+            deal_types=[deal_type],
+            max_cpm=max_cpm if max_cpm > 0 else None,
+        )
+        deal_params = DealParams(
+            product_id=product_id,
+            deal_type=deal_type,
+            impressions=impressions,
+            flight_start=flight_start,
+            flight_end=flight_end,
+            target_cpm=max_cpm if max_cpm > 0 else None,
+            media_type=media_type,
+        )
 
-        # Find seller
-        seller = None
-        for s in self._sellers:
-            if seller_name.lower() in s.name.lower():
-                seller = s
-                break
-
-        if not seller or not seller.connected:
-            return f"Seller '{seller_name}' not found or not connected"
-
-        args = {
-            "product_id": product_id,
-            "floor_price": floor_price,
-            "impressions": impressions,
-            "buyer_seat_id": buyer_seat_id,
-        }
-
-        try:
-            client = await seller.ensure_client()
-            result = await client.call_tool("create_pmp_deal", args)
-
-            if result.success:
-                deal_data = result.data
-                deal_id = (
-                    deal_data.get("deal", {}).get("deal_id", "N/A")
-                    if isinstance(deal_data, dict)
-                    else "N/A"
-                )  # noqa: E501
-                return f"✓ PMP DEAL CREATED!\n\nDeal ID: {deal_id}\nSeller: {seller.name}\nProduct: {product_id}\nFloor: ${floor_price} CPM\n\nFull Details:\n{json_module.dumps(deal_data, indent=2)}"  # noqa: E501
-            else:
-                return f"✗ Failed to create PMP deal: {result.error}"
-        except (OSError, ValueError, RuntimeError) as e:
-            return f"Error creating PMP deal: {e}"
+        result = await self._orchestrator.orchestrate(
+            inventory_requirements=requirements,
+            deal_params=deal_params,
+            budget=budget,
+            max_deals=max_deals,
+        )
+        return _format_orchestration_result(result)
 
 
 class ChatInterface:
@@ -503,18 +334,18 @@ You are connected to the following seller agents:
 {seller_info}
 
 You have tools to:
-1. **search_all_sellers** - Search inventory across ALL connected sellers
-2. **book_pg_deal** - Book Programmatic Guaranteed deals directly with sellers
-3. **create_pmp_deal** - Create Private Marketplace deals and get Deal IDs
-4. **call_seller_tool** - Call any tool on any seller (for advanced operations)
+1. **request_quotes** - Get ranked price quotes from ALL connected sellers
+   (canonical discover -> quote -> rank pipeline; commits no money)
+2. **book_deals** - Book deals through the canonical pipeline within a hard
+   budget bound; Deal IDs in the result are issued by the seller
 
 WORKFLOW FOR BOOKING:
-1. Use search_all_sellers to find products and get their product_id
+1. Use request_quotes to compare the market for a product_id
 2. Calculate impressions from budget: impressions = (budget / cpm) * 1000
-3. Use book_pg_deal or create_pmp_deal to execute the booking
-4. Return the confirmation to the user
+3. Use book_deals with the user's budget to execute the booking
+4. Return the seller-issued Deal ID(s) to the user
 
-When a user wants to book a deal, DO IT - use the booking tools directly.
+When a user wants to book a deal, DO IT - use book_deals directly.
 Don't just explain how to do it, actually execute the booking.
 
 Be conversational but professional. Ask clarifying questions when needed.
@@ -543,13 +374,27 @@ Provide specific, actionable recommendations based on user requirements.""",
             seller.check_health()
             self._sellers.append(seller)
 
-        # Create tools for connected sellers
+        # Thin wrappers over the canonical booking pipeline. When sellers
+        # are configured via SELLER_ENDPOINTS, discovery is seeded from
+        # them; otherwise the default registry-backed orchestrator is used.
+        if self._sellers:
+            self._orchestrator = MultiSellerOrchestrator(
+                registry_client=_ConfiguredSellersRegistry(self._sellers),
+                deals_client_factory=self._make_deals_client,
+            )
+        else:
+            self._orchestrator = build_default_orchestrator()
         self._tools = [
-            MultiSellerSearchTool(sellers=self._sellers),
-            CallSellerToolTool(sellers=self._sellers),
-            BookPGDealTool(sellers=self._sellers),
-            CreatePMPDealTool(sellers=self._sellers),
+            RequestQuotesTool(orchestrator=self._orchestrator),
+            BookDealsTool(orchestrator=self._orchestrator),
         ]
+
+    @staticmethod
+    def _make_deals_client(seller_url: str, **kwargs: Any) -> Any:
+        """DealsClient factory for the canonical orchestrator."""
+        from ...clients.deals_client import DealsClient
+
+        return DealsClient(seller_url, **kwargs)
 
     def _get_seller_info(self) -> str:
         """Get formatted info about connected sellers."""
@@ -680,6 +525,5 @@ the user's requirements.
         ]
 
     async def close(self) -> None:
-        """Close all seller connections."""
-        for seller in self._sellers:
-            await seller.close()
+        """Close the interface (per-seller clients are managed per call)."""
+        return None

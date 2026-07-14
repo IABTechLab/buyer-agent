@@ -5,7 +5,7 @@
 
 Bead ar-5y8v / proposal §5.3 / §6 row 19 -- the third deal-finding entry
 point: direct channel-crew invocation. Used by tests, demos, and any
-caller that bypasses CampaignPipeline (Path A) and BuyerDealFlow (Path B).
+caller that bypasses the canonical DealBookingFlow pipeline.
 
 Verifies:
 

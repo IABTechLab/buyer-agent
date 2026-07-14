@@ -460,8 +460,8 @@ Returns:
     ) -> DealRequest:
         """Construct the typed seller-bound payload for the deal request.
 
-        The Audience Planner step on BuyerDealFlow puts an ``AudiencePlan``
-        on flow state; this helper materializes the wire-shape ``DealRequest``
+        The buyer's planning stage puts an ``AudiencePlan`` on the request
+        context; this helper materializes the wire-shape ``DealRequest``
         so the plan rides on the seller-bound payload (proposal §5.2 / §5.3
         + bead ar-ts30 §18). Tests assert the plan survives this boundary.
         """

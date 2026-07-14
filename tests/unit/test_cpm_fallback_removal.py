@@ -19,7 +19,6 @@ from ad_buyer.models.buyer_identity import (
     BuyerContext,
     BuyerIdentity,
 )
-from ad_buyer.pipelines.campaign_pipeline import CampaignPipeline
 from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, RequestDealTool
 
 # ---------------------------------------------------------------------------
@@ -304,29 +303,12 @@ class TestQuoteFlowNoFallback:
 
 
 # ---------------------------------------------------------------------------
-# 4. campaign_pipeline.py — no assumed_cpm=15.0
+# 4. canonical booking path — no fabricated impressions
 # ---------------------------------------------------------------------------
-
-
-class TestCampaignPipelineNoAssumedCPM:
-    """campaign_pipeline must not fabricate impressions from assumed CPM.
-    When no CPM is available, channels should be flagged as 'pricing TBD'."""
-
-    def test_estimate_impressions_requires_cpm(self):
-        """_estimate_impressions without a CPM should not fabricate impressions."""
-        # The method should no longer accept a default assumed_cpm
-        # Calling without a CPM should return 0 or raise
-        result = CampaignPipeline._estimate_impressions(budget=60_000.0)
-
-        # Must NOT return impressions based on a fabricated $15 CPM
-        # Old behavior: (60000 / 15) * 1000 = 4,000,000
-        assert result != 4_000_000
-        # Should return 0 or None when no CPM provided
-        assert result == 0 or result is None
-
-    def test_estimate_impressions_with_explicit_cpm(self):
-        """_estimate_impressions with an explicit CPM should still work."""
-        result = CampaignPipeline._estimate_impressions(budget=60_000.0, assumed_cpm=20.0)
-
-        # (60000 / 20) * 1000 = 3,000,000
-        assert result == 3_000_000
+# The retired CampaignPipeline._estimate_impressions (and its assumed_cpm
+# fallback) was deleted with the pipeline (bead ar-j2nw). On the canonical
+# path, impression counts flow from the approved recommendation into
+# DealParams verbatim — asserted by
+# tests/unit/test_deal_booking_flow.py::TestApprovalAndBooking::
+# test_handoff_passes_binding_approved_terms — so there is no estimation
+# step left that could fabricate impressions from a made-up CPM.

@@ -16,11 +16,17 @@ Covers:
 
 import json
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
+from ad_buyer.models.deals import (
+    DealResponse,
+    PricingInfo,
+    ProductInfo,
+    TermsInfo,
+)
 from ad_buyer.models.flow_state import (
     BookedLine,
     ChannelAllocation,
@@ -28,6 +34,11 @@ from ad_buyer.models.flow_state import (
     ProductRecommendation,
 )
 from ad_buyer.models.ucp import SignalType
+from ad_buyer.orchestration.multi_seller import (
+    DealSelection,
+    MultiSellerOrchestrator,
+    OrchestrationResult,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -38,6 +49,53 @@ from ad_buyer.models.ucp import SignalType
 def mock_opendirect_client():
     """Create a mock OpenDirectClient."""
     return MagicMock()
+
+
+def _make_seller_deal_response(deal_params) -> DealResponse:
+    """Build a seller-confirmed DealResponse echoing the requested terms."""
+    return DealResponse(
+        deal_id=f"SELLER-DEAL-{deal_params.product_id}",
+        deal_type=deal_params.deal_type,
+        status="active",
+        quote_id=f"quote-{deal_params.product_id}",
+        product=ProductInfo(product_id=deal_params.product_id, name=deal_params.product_id),
+        pricing=PricingInfo(base_cpm=deal_params.target_cpm, final_cpm=deal_params.target_cpm),
+        terms=TermsInfo(
+            impressions=deal_params.impressions,
+            flight_start=deal_params.flight_start,
+            flight_end=deal_params.flight_end,
+            guaranteed=deal_params.deal_type == "PG",
+        ),
+    )
+
+
+async def _fake_orchestrate(
+    inventory_requirements,
+    deal_params,
+    budget,
+    max_deals=3,
+):
+    """Fake MultiSellerOrchestrator.orchestrate: one seller-issued deal."""
+    deal = _make_seller_deal_response(deal_params)
+    return OrchestrationResult(
+        discovered_sellers=[MagicMock(agent_id="seller-1")],
+        quote_results=[],
+        ranked_quotes=[],
+        selection=DealSelection(
+            booked_deals=[deal],
+            failed_bookings=[],
+            total_spend=budget,
+            remaining_budget=0.0,
+        ),
+    )
+
+
+@pytest.fixture
+def mock_orchestrator():
+    """AsyncMock orchestrator that books one deal per orchestrate() call."""
+    orch = AsyncMock(spec=MultiSellerOrchestrator)
+    orch.orchestrate.side_effect = _fake_orchestrate
+    return orch
 
 
 @pytest.fixture
@@ -72,9 +130,9 @@ def minimal_campaign_brief():
 
 
 @pytest.fixture
-def flow(mock_opendirect_client):
-    """Create a DealBookingFlow with mocked client."""
-    return DealBookingFlow(client=mock_opendirect_client)
+def flow(mock_opendirect_client, mock_orchestrator):
+    """Create a DealBookingFlow with mocked client and orchestrator."""
+    return DealBookingFlow(client=mock_opendirect_client, orchestrator=mock_orchestrator)
 
 
 @pytest.fixture
@@ -913,19 +971,106 @@ class TestApprovalAndBooking:
         assert all(r.status == "rejected" for r in flow.state.pending_approvals)
 
     def test_booked_lines_created(self, flow):
-        """Booked lines are created with correct fields."""
+        """Booked lines carry the SELLER-issued deal id and confirmed terms."""
         self._setup_pending_approvals(flow)
 
         flow.approve_recommendations(["prod_a"])
 
         assert len(flow.state.booked_lines) == 1
         booked = flow.state.booked_lines[0]
+        assert booked.deal_id == "SELLER-DEAL-prod_a"  # seller-issued, never minted locally
+        assert booked.quote_id == "quote-prod_a"
         assert booked.product_id == "prod_a"
         assert booked.channel == "branding"
         assert booked.impressions == 500000
+        assert booked.cpm == 15.0
         assert booked.cost == 7500.0  # 500000 * 15.0 / 1000
-        assert booked.booking_status == "pending_execution"
+        assert booked.booking_status == "active"
+        assert booked.order_id is None  # no placeholder OpenDirect order ids
         assert isinstance(booked.booked_at, datetime)
+
+    def test_handoff_passes_binding_approved_terms(self, flow, mock_orchestrator):
+        """The orchestrator receives the approved terms as hard bounds."""
+        self._setup_pending_approvals(flow)
+
+        flow.approve_recommendations(["prod_a"])
+
+        assert mock_orchestrator.orchestrate.call_count == 1
+        kwargs = mock_orchestrator.orchestrate.call_args.kwargs
+        assert kwargs["budget"] == 7500.0  # approved cost is the budget ceiling
+        assert kwargs["max_deals"] == 1
+        assert kwargs["inventory_requirements"].max_cpm == 15.0
+        assert kwargs["deal_params"].product_id == "prod_a"
+        assert kwargs["deal_params"].impressions == 500000
+        assert kwargs["deal_params"].target_cpm == 15.0
+
+    def test_orchestrator_failure_isolated_per_recommendation(self, flow, mock_orchestrator):
+        """One failed booking does not abort the others."""
+        self._setup_pending_approvals(flow)
+        call_count = {"n": 0}
+
+        async def _flaky(inventory_requirements, deal_params, budget, max_deals=3):
+            call_count["n"] += 1
+            if deal_params.product_id == "prod_b":
+                raise RuntimeError("seller unreachable")
+            return await _fake_orchestrate(inventory_requirements, deal_params, budget, max_deals)
+
+        mock_orchestrator.orchestrate.side_effect = _flaky
+
+        result = flow.approve_all()
+
+        assert call_count["n"] == 3
+        assert result["status"] == "success"
+        assert result["booked"] == 2
+        assert len(result["failed"]) == 1
+        assert result["failed"][0]["product_id"] == "prod_b"
+        assert any("prod_b" in err for err in flow.state.errors)
+
+    def test_all_bookings_failed_marks_flow_failed(self, flow, mock_orchestrator):
+        """When no seller issues a deal, the flow ends FAILED, not COMPLETED."""
+        self._setup_pending_approvals(flow)
+        mock_orchestrator.orchestrate.side_effect = RuntimeError("registry down")
+
+        result = flow.approve_all()
+
+        assert result["status"] == "failed"
+        assert result["booked"] == 0
+        assert flow.state.execution_status == ExecutionStatus.FAILED
+
+    def test_orchestrate_called_once_per_approved_recommendation(self, flow, mock_orchestrator):
+        """Composition: one orchestrate call per approved recommendation.
+
+        (Moved from the retired CampaignPipeline execute_booking tests —
+        the per-channel orchestrator composition now lives on the flow.)
+        """
+        self._setup_pending_approvals(flow)
+
+        flow.approve_all()
+
+        assert mock_orchestrator.orchestrate.call_count == 3
+        media_types = [
+            call.kwargs["inventory_requirements"].media_type
+            for call in mock_orchestrator.orchestrate.call_args_list
+        ]
+        # branding/performance -> display, ctv -> ctv (channel mapping)
+        assert sorted(media_types) == ["ctv", "display", "display"]
+
+    def test_deal_booked_event_emitted_with_seller_deal_id(self, flow):
+        """DEAL_BOOKED events key on the seller-issued deal id."""
+        from ad_buyer.events.models import EventType
+
+        self._setup_pending_approvals(flow)
+
+        with patch("ad_buyer.flows.deal_booking_flow.emit_event_sync") as emit:
+            flow.approve_recommendations(["prod_a"])
+
+        booked_calls = [
+            c for c in emit.call_args_list if c.args and c.args[0] == EventType.DEAL_BOOKED
+        ]
+        assert len(booked_calls) == 1
+        call = booked_calls[0]
+        assert call.kwargs["deal_id"] == "SELLER-DEAL-prod_a"
+        assert call.kwargs["payload"]["quote_id"] == "quote-prod_a"
 
     def test_total_cost_and_impressions(self, flow):
         """Result includes aggregated totals."""
@@ -987,8 +1132,8 @@ class TestGetStatus:
         """Status reflects booked lines."""
         flow.state.booked_lines = [
             BookedLine(
-                line_id="l1",
-                order_id="o1",
+                deal_id="SELLER-DEAL-p1",
+                quote_id="quote-p1",
                 product_id="p1",
                 product_name="Test",
                 channel="branding",

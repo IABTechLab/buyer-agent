@@ -9,24 +9,24 @@ with a backward-compatible None default. This bead does NOT populate the
 field from the planner -- that's a follow-up bead. These tests confirm
 only the field exists, defaults to None, accepts a valid AudiencePlan,
 serializes round-trip, and survives an end-to-end derivation chain from
-CampaignPlan -> InventoryRequirements -> DealParams -> QuoteRequest ->
-DealBookingRequest.
+the canonical flow's typed plan (DealBookingFlow, bead ar-j2nw) ->
+InventoryRequirements -> DealParams -> QuoteRequest -> DealBookingRequest.
 """
 
 from __future__ import annotations
 
 from dataclasses import asdict
+from unittest.mock import MagicMock
 
 import pytest
 
+from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.models.audience_plan import AudiencePlan, AudienceRef
-from ad_buyer.models.campaign_brief import ChannelType
 from ad_buyer.models.deals import DealBookingRequest, QuoteRequest
 from ad_buyer.orchestration.multi_seller import (
     DealParams,
     InventoryRequirements,
 )
-from ad_buyer.pipelines.campaign_pipeline import CampaignPlan, ChannelPlan
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -214,31 +214,20 @@ class TestEndToEndThread:
         plan = _build_minimal_plan()
         plan_id = plan.audience_plan_id
 
-        # 1. CampaignPlan carries the audience plan from brief ingestion.
-        campaign_plan = CampaignPlan(
-            campaign_id="camp-1",
-            channel_plans=[
-                ChannelPlan(
-                    channel=ChannelType.CTV,
-                    budget=50_000.0,
-                    budget_pct=1.0,
-                    media_type="ctv",
-                    deal_types=["PD"],
-                )
-            ],
-            total_budget=50_000.0,
-            flight_start="2026-05-01",
-            flight_end="2026-06-30",
-            target_audience=plan,
-        )
-        assert campaign_plan.target_audience is not None
-        assert campaign_plan.target_audience.audience_plan_id == plan_id
+        # 1. The canonical flow (bead ar-j2nw) carries the audience plan
+        # on its state; _typed_audience_plan is what the booking handoff
+        # threads onto the orchestrator surfaces.
+        flow = DealBookingFlow(client=MagicMock(), orchestrator=MagicMock())
+        flow.state.audience_plan = plan.model_dump(mode="json")
+        typed_plan = flow._typed_audience_plan()
+        assert typed_plan is not None
+        assert typed_plan.audience_plan_id == plan_id
 
-        # 2. CampaignPlan -> InventoryRequirements (orchestrator stage 1).
+        # 2. Flow state -> InventoryRequirements (orchestrator stage 1).
         ir = InventoryRequirements(
-            media_type=campaign_plan.channel_plans[0].media_type,
-            deal_types=campaign_plan.channel_plans[0].deal_types,
-            audience_plan=campaign_plan.target_audience,
+            media_type="ctv",
+            deal_types=["PD"],
+            audience_plan=typed_plan,
         )
         assert ir.audience_plan is not None
         assert ir.audience_plan.audience_plan_id == plan_id
@@ -248,8 +237,8 @@ class TestEndToEndThread:
             product_id="prod-ctv-001",
             deal_type="PD",
             impressions=500_000,
-            flight_start=campaign_plan.flight_start,
-            flight_end=campaign_plan.flight_end,
+            flight_start="2026-05-01",
+            flight_end="2026-06-30",
             audience_plan=ir.audience_plan,
         )
         assert dp.audience_plan is not None
