@@ -7,8 +7,7 @@ Provides async methods to query the seller's order endpoints:
 - GET /api/v1/orders/{order_id}         -- current order status
 - GET /api/v1/orders/{order_id}/history -- full transition history
 
-Used by the OrderSyncService to pull seller-side order state into the
-buyer's local database.
+Used to pull seller-side order state into the buyer's local database.
 
 bead: buyer-nz9 (Order Status & Audit API Integration)
 """

@@ -50,7 +50,7 @@ LOCAL_EMBEDDING_MODEL_DIM = 384
 # Real sentence-transformers vectors live in a smoother semantic space and
 # tolerate the original 0.7 strong threshold. Advertiser-supplied vectors
 # follow the same convention as the buyer's local model. Re-derive these
-# from `ad_buyer.eval.evaluate_embedding_modes()` whenever the model swaps.
+# by measuring per-mode embedding quality whenever the model swaps.
 _SIMILARITY_THRESHOLDS: dict[str, dict[str, float]] = {
     "mock": {"strong": 0.85, "moderate": 0.65, "weak": 0.40},
     "local": {"strong": 0.70, "moderate": 0.50, "weak": 0.30},

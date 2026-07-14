@@ -32,7 +32,6 @@ from ad_buyer.clients.ucp_client import (
     _similarity_thresholds_for_mode,
 )
 from ad_buyer.config.settings import settings
-from ad_buyer.eval import evaluate_embedding_modes
 from ad_buyer.models.audience_plan import (
     AudiencePlan,
     AudienceRef,
@@ -91,15 +90,6 @@ class TestRealModelPath:
                 # Each mode produces a distinct, non-empty label
                 assert label
                 assert mode.upper() in label.upper()
-
-    def test_eval_harness_sees_real_provenance_for_each_mode(self):
-        """E2-3 eval harness reports the actual provenance per mode."""
-
-        report = evaluate_embedding_modes(modes=["mock", "hybrid"])
-        modes = {m.mode: m.provenance for m in report.per_mode}
-        assert modes["mock"] == "mock"
-        # Hybrid without advertiser_vector falls back to local or mock
-        assert modes["hybrid"] in ("local_buyer", "mock")
 
     def test_minted_ref_carries_provenance_in_compliance_context(self):
         """E2-2 + E2-7 Gap 6: embedding_provenance persists on the typed ref."""
