@@ -25,6 +25,11 @@ from typing import Any
 
 import httpx
 
+# Shared contract envelopes (iab_agentic_primitives) adopted at the wire edge.
+# Internal code keeps using ad_buyer.models; only serialize/deserialize speaks
+# the shared schema (EP-12.1).
+from iab_agentic_primitives.protocol import QuoteResponse as WireQuoteResponse
+
 from ..models.deals import (
     DealBookingRequest,
     DealResponse,
@@ -32,6 +37,10 @@ from ..models.deals import (
     QuoteResponse,
 )
 from ..models.linear_tv import CancellationRequest, MakegoodRequest
+from .contract_mappers import (
+    from_wire_quote_response,
+    to_wire_quote_request,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -158,10 +167,15 @@ class DealsClient:
         Raises:
             DealsClientError: On HTTP or transport errors.
         """
-        body = quote_request.model_dump(exclude_none=True)
+        # Serialize the outbound request as the shared QuoteRequest envelope:
+        # money crosses as the shared Money (micros), and the request carries a
+        # required idempotency_key (FD-12). Map back to the internal model at the
+        # boundary so callers keep seeing ad_buyer.models types.
+        wire_request = to_wire_quote_request(quote_request)
+        body = wire_request.model_dump(mode="json", exclude_none=True)
         response = await self._request_with_retry("POST", "/api/v1/quotes", json=body)
-        data = response.json()
-        result = QuoteResponse.model_validate(data)
+        wire_response = WireQuoteResponse.model_validate(response.json())
+        result = from_wire_quote_response(wire_response)
 
         # Persist to DealStore if available
         self._persist_quote(result, quote_request)
@@ -183,8 +197,8 @@ class DealsClient:
             DealsClientError: On HTTP or transport errors.
         """
         response = await self._request_with_retry("GET", f"/api/v1/quotes/{quote_id}")
-        data = response.json()
-        return QuoteResponse.model_validate(data)
+        wire_response = WireQuoteResponse.model_validate(response.json())
+        return from_wire_quote_response(wire_response)
 
     async def book_deal(self, booking_request: DealBookingRequest) -> DealResponse:
         """Book a deal from an existing quote.

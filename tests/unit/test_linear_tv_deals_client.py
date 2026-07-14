@@ -34,64 +34,74 @@ SELLER_URL = "http://seller.example.com"
 
 
 def _linear_tv_quote_response_json() -> dict:
-    """Minimal valid linear TV QuoteResponse JSON."""
+    """Linear TV seller quote response on the wire: shared QuoteResponse envelope.
+
+    EP-12.1 — the shared ``iab_agentic_primitives.protocol.QuoteResponse`` wraps
+    the ``Quote`` primitive; CPP/CPM money fields cross as the shared ``Money``
+    (integer micros: $50,000 CPP -> 50_000_000_000 micros).
+    """
     return {
-        "quote_id": "qt-ltv-001",
-        "status": "available",
-        "product": {
-            "product_id": "linear-primetime-nbc",
-            "name": "NBC Primetime :30",
-            "inventory_type": "linear_tv",
-        },
-        "pricing": {
-            "base_cpm": 0.0,
-            "final_cpm": 0.0,
-            "pricing_model": "cpp",
-            "base_cpp": 50000.0,
-            "final_cpp": 45000.0,
-            "currency": "USD",
-            "rationale": "Scatter CPP: $50K base, -10% volume => $45K",
-        },
-        "terms": {
-            "grps": 200,
-            "guaranteed_grps": 180,
-            "target_demo": "A18-49",
-            "flight_start": "2026-04-01",
-            "flight_end": "2026-04-30",
-            "guaranteed": True,
-        },
-        "availability": {
-            "inventory_available": True,
-            "estimated_fill_rate": 0.85,
-        },
-        "buyer_tier": "advertiser",
-        "expires_at": "2026-03-15T14:30:00Z",
-        "seller_id": "seller-network-001",
-        "created_at": "2026-03-11T14:30:00Z",
-        "media_type": "linear_tv",
-        "linear_tv": {
-            "target_demo": "A18-49",
-            "estimated_grps": 200.0,
-            "estimated_rating": 5.2,
-            "cpp": 45000.0,
-            "dayparts": ["primetime"],
-            "networks": ["NBC"],
-            "spots_per_week": 10,
-            "total_spots": 40,
-            "spot_length": 30,
-            "measurement_currency": "nielsen",
-            "audience_estimate": {
-                "demo": "A18-49",
-                "universe": 130000000,
-                "impressions_equiv": 65000000,
+        "quote": {
+            "quote_id": "qt-ltv-001",
+            "status": "available",
+            # The shared contract has no "scatter" deal_type (linear TV is
+            # modelled via media_type + linear_tv params); it rides as PD.
+            "deal_type": "PD",
+            "product": {
+                "product_id": "linear-primetime-nbc",
+                "name": "NBC Primetime :30",
+                "inventory_type": "linear_tv",
             },
-            "cancellation_terms": {
-                "notice_days": 14,
-                "cancellable_pct": 1.0,
-                "force_majeure": True,
+            "pricing": {
+                "pricing_type": "fixed",
+                "base_cpm": {"amount_micros": 0, "currency": "USD"},
+                "final_cpm": {"amount_micros": 0, "currency": "USD"},
+                "pricing_model": "cpp",
+                "base_cpp": {"amount_micros": 50_000_000_000, "currency": "USD"},
+                "final_cpp": {"amount_micros": 45_000_000_000, "currency": "USD"},
+                "rationale": "Scatter CPP: $50K base, -10% volume => $45K",
             },
-            "makegood_policy": "standard",
-        },
+            "terms": {
+                "grps": 200,
+                "guaranteed_grps": 180,
+                "target_demo": "A18-49",
+                "flight_start": "2026-04-01",
+                "flight_end": "2026-04-30",
+                "guaranteed": True,
+            },
+            "availability": {
+                "inventory_available": True,
+                "estimated_fill_rate": 0.85,
+            },
+            "buyer_tier": "advertiser",
+            "expires_at": "2026-03-15T14:30:00Z",
+            "seller_id": "seller-network-001",
+            "created_at": "2026-03-11T14:30:00Z",
+            "media_type": "linear_tv",
+            "linear_tv": {
+                "target_demo": "A18-49",
+                "estimated_grps": 200.0,
+                "estimated_rating": 5.2,
+                "cpp": {"amount_micros": 45_000_000_000, "currency": "USD"},
+                "dayparts": ["primetime"],
+                "networks": ["NBC"],
+                "spots_per_week": 10,
+                "total_spots": 40,
+                "spot_length": 30,
+                "measurement_currency": "nielsen",
+                "audience_estimate": {
+                    "demo": "A18-49",
+                    "universe": 130000000,
+                    "impressions_equiv": 65000000,
+                },
+                "cancellation_terms": {
+                    "notice_days": 14,
+                    "cancellable_pct": 1.0,
+                    "force_majeure": True,
+                },
+                "makegood_policy": "standard",
+            },
+        }
     }
 
 
@@ -193,7 +203,9 @@ class TestLinearTVQuoteRequest:
 
         body = json.loads(capture.last.content)
         assert body["media_type"] == "linear_tv"
-        assert body["deal_type"] == "scatter"
+        # The shared QuoteRequest types deal_type as DealType (PG/PD/PA); the
+        # buyer's linear-TV "scatter" has no shared equivalent and rides as PD.
+        assert body["deal_type"] == "PD"
         assert body["linear_tv"]["target_demo"] == "A18-49"
         assert body["linear_tv"]["grps_requested"] == 200
         await c.close()
