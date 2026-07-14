@@ -19,7 +19,7 @@ Design decisions:
   push the buyer into a stale-cap state for hours.
 - **Legacy seller fallback.** A seller that does not ship
   `audience_capabilities` (legacy or older deployment) is treated as
-  legacy via `_legacy_default_capabilities()` per §5.7.
+  legacy via `SellerAudienceCapabilities.legacy_default()` per §5.7.
   Same fallback applies on HTTP errors / parse errors -- failing closed
   to "I know less about this seller than I think" is the safe move.
 - **Cache hit / miss is observable.** Each `discover_capabilities` call
@@ -43,43 +43,19 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import httpx
 
-# Runtime import deferred to avoid a circular import:
-#   ad_buyer.orchestration.__init__ -> multi_seller -> clients.capability_client
-# `audience_degradation` itself has no client-side dependencies so we import
-# the module (not the package) lazily on first use. The TYPE_CHECKING import
-# keeps the type annotations precise without triggering the cycle.
-if TYPE_CHECKING:
-    from ..orchestration.audience_degradation import SellerAudienceCapabilities
+# `SellerAudienceCapabilities` is a pure data model in the `models` layer, so
+# a low-level client can import it at module top level. It used to live in
+# `orchestration.audience_degradation`, which forced this client to reach up
+# into the orchestration package via function-local deferred imports -- a
+# layering inversion. Hoisting the model to `models/` lets the dependency flow
+# one way only: orchestration -> clients -> models.
+from ..models.audience_capabilities import SellerAudienceCapabilities
 
 logger = logging.getLogger(__name__)
-
-
-def _legacy_default_capabilities() -> SellerAudienceCapabilities:
-    """Return `SellerAudienceCapabilities.legacy_default()` (deferred import).
-
-    Wraps the deferred import so call sites stay readable. The first call
-    pays the import cost; subsequent calls hit the resolved module.
-    """
-
-    from ..orchestration.audience_degradation import (
-        SellerAudienceCapabilities as _SAC,
-    )
-
-    return _SAC.legacy_default()
-
-
-def _validate_capabilities(block: dict[str, Any]) -> SellerAudienceCapabilities:
-    """Parse a JSON block into `SellerAudienceCapabilities` (deferred import)."""
-
-    from ..orchestration.audience_degradation import (
-        SellerAudienceCapabilities as _SAC,
-    )
-
-    return _SAC.model_validate(block)
 
 
 # Per proposal §5.7: "the buyer caches capability responses for at most
@@ -229,7 +205,7 @@ class CapabilityClient:
         1h ceiling), and stores in the cache.
 
         On any failure path (HTTP error, parse error, missing block) the
-        function returns `_legacy_default_capabilities()`
+        function returns `SellerAudienceCapabilities.legacy_default()`
         with `cache_status="error"` or `"legacy"` -- the orchestrator
         always gets a usable capabilities object so booking can proceed
         under the most conservative assumption.
@@ -277,7 +253,7 @@ class CapabilityClient:
                 seller_endpoint,
                 exc,
             )
-            caps = _legacy_default_capabilities()
+            caps = SellerAudienceCapabilities.legacy_default()
             self._store(key, caps, fetched_at=now, max_age=None)
             return CapabilityDiscoveryResult(
                 capabilities=caps, cache_status="error", fetched_at=now
@@ -289,7 +265,7 @@ class CapabilityClient:
                 seller_endpoint,
                 response.status_code,
             )
-            caps = _legacy_default_capabilities()
+            caps = SellerAudienceCapabilities.legacy_default()
             self._store(key, caps, fetched_at=now, max_age=None)
             return CapabilityDiscoveryResult(
                 capabilities=caps, cache_status="error", fetched_at=now
@@ -304,7 +280,7 @@ class CapabilityClient:
                 seller_endpoint,
                 exc,
             )
-            caps = _legacy_default_capabilities()
+            caps = SellerAudienceCapabilities.legacy_default()
             self._store(key, caps, fetched_at=now, max_age=None)
             return CapabilityDiscoveryResult(
                 capabilities=caps, cache_status="error", fetched_at=now
@@ -320,7 +296,7 @@ class CapabilityClient:
                 "capability_client legacy seller (no audience_capabilities) endpoint=%s",
                 seller_endpoint,
             )
-            caps = _legacy_default_capabilities()
+            caps = SellerAudienceCapabilities.legacy_default()
             self._store(
                 key,
                 caps,
@@ -332,7 +308,7 @@ class CapabilityClient:
             )
 
         try:
-            caps = _validate_capabilities(block)
+            caps = SellerAudienceCapabilities.model_validate(block)
         except (ValueError, TypeError) as exc:
             logger.warning(
                 "capability_client malformed audience_capabilities "
@@ -340,7 +316,7 @@ class CapabilityClient:
                 seller_endpoint,
                 exc,
             )
-            caps = _legacy_default_capabilities()
+            caps = SellerAudienceCapabilities.legacy_default()
             self._store(key, caps, fetched_at=now, max_age=None)
             return CapabilityDiscoveryResult(
                 capabilities=caps, cache_status="error", fetched_at=now
