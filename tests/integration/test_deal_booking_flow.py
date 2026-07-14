@@ -209,10 +209,12 @@ class TestBudgetAllocationIntegration:
 class TestRecommendationConsolidation:
     """Tests recommendation consolidation and approval flow."""
 
-    def _make_flow_with_allocations(self, campaign_brief: dict) -> DealBookingFlow:
+    def _make_flow_with_allocations(
+        self, campaign_brief: dict, orchestrator=None
+    ) -> DealBookingFlow:
         """Create a flow with pre-set budget allocations."""
         client = OpenDirectClient(base_url="http://fake.test")
-        flow = DealBookingFlow(client)
+        flow = DealBookingFlow(client, orchestrator=orchestrator)
         _set_flow_brief(flow, campaign_brief)
 
         # Pre-set allocations
@@ -279,9 +281,13 @@ class TestRecommendationConsolidation:
         assert result["total_recommendations"] == 2
         assert flow.state.execution_status == ExecutionStatus.AWAITING_APPROVAL
 
-    def test_approve_specific_recommendations(self, sample_campaign_brief: dict):
+    def test_approve_specific_recommendations(
+        self, sample_campaign_brief: dict, fake_booking_orchestrator
+    ):
         """Approving specific products should book only those."""
-        flow = self._make_flow_with_allocations(sample_campaign_brief)
+        flow = self._make_flow_with_allocations(
+            sample_campaign_brief, orchestrator=fake_booking_orchestrator
+        )
 
         recs = [
             ProductRecommendation(
@@ -313,9 +319,13 @@ class TestRecommendationConsolidation:
         assert flow.state.booked_lines[0].product_id == "prod_1"
         assert flow.state.execution_status == ExecutionStatus.COMPLETED
 
-    def test_approve_all_recommendations(self, sample_campaign_brief: dict):
+    def test_approve_all_recommendations(
+        self, sample_campaign_brief: dict, fake_booking_orchestrator
+    ):
         """approve_all should book all pending recommendations."""
-        flow = self._make_flow_with_allocations(sample_campaign_brief)
+        flow = self._make_flow_with_allocations(
+            sample_campaign_brief, orchestrator=fake_booking_orchestrator
+        )
 
         recs = [
             ProductRecommendation(
