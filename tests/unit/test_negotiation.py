@@ -587,3 +587,115 @@ class TestEdgeCases:
         )
         assert result.outcome == NegotiationOutcome.ACCEPTED
         assert result.final_price == 28.0
+
+
+# =========================================================================
+# EP-12.1: shared NegotiationMessage wire-contract adoption
+# =========================================================================
+
+
+class TestSharedNegotiationMessageWire:
+    """The buyer emits the shared NegotiationMessage the seller validates.
+
+    Structural fix for the historical 422: the request body carries a required
+    `action` enum and `buyer_price` (shared Money, micros) — never a bare
+    `{"price": <float>}` — and hits the canonical
+    `/api/v1/negotiations/messages` endpoint.
+    """
+
+    def _mock_post(self, response_json: dict):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = response_json
+        mock_response.raise_for_status = MagicMock()
+        mock_client_instance = AsyncMock()
+        mock_client_instance.post.return_value = mock_response
+        mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+        return mock_client_instance
+
+    @pytest.mark.asyncio
+    async def test_counter_emits_shared_negotiation_message(self):
+        """A counter POSTs action + buyer_price (Money) + idempotency_key."""
+        client = NegotiationClient()
+        strategy = SimpleThresholdStrategy(
+            target_cpm=20.0, max_cpm=30.0, concession_step=2.0, max_rounds=5
+        )
+        mock_client = self._mock_post(
+            {
+                "negotiation_id": "neg-1",
+                "seller_price": 30.0,
+                "action": "counter",
+                "round_number": 1,
+            }
+        )
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await client.start_negotiation(
+                seller_url="http://seller.example.com",
+                proposal_id="prop-001",
+                initial_price=20.0,
+                strategy=strategy,
+            )
+
+        args, kwargs = mock_client.post.call_args
+        # Canonical shared endpoint; retired /proposals/{id}/counter route gone.
+        url = args[0] if args else kwargs["url"]
+        assert url.endswith("/api/v1/negotiations/messages")
+        body = kwargs["json"]
+        assert "price" not in body  # the bare-price payload that caused the 422
+        assert body["action"] == "counter"
+        assert body["proposal_id"] == "prop-001"
+        assert body["buyer_price"] == {"amount_micros": 20_000_000, "currency": "USD"}
+        assert body["idempotency_key"]
+
+    @pytest.mark.asyncio
+    async def test_reject_carries_no_buyer_price(self):
+        """A walk-away emits action='reject' and omits buyer_price."""
+        client = NegotiationClient()
+        session = NegotiationSession(
+            proposal_id="prop-001",
+            seller_url="http://seller.example.com",
+            negotiation_id="neg-1",
+            current_seller_price=35.0,
+            our_last_offer=28.0,
+            rounds=[],
+        )
+        mock_client = self._mock_post({"status": "rejected"})
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await client.decline(session)
+
+        _, kwargs = mock_client.post.call_args
+        body = kwargs["json"]
+        assert body["action"] == "reject"
+        assert "buyer_price" not in body
+
+    @pytest.mark.asyncio
+    async def test_parses_shared_negotiation_round_response(self):
+        """The client reads a shared NegotiationRoundResponse (Money -> float)."""
+        client = NegotiationClient()
+        session = NegotiationSession(
+            proposal_id="prop-001",
+            seller_url="http://seller.example.com",
+            negotiation_id="neg-1",
+            current_seller_price=35.0,
+            our_last_offer=20.0,
+            rounds=[],
+        )
+        shared_response = {
+            "negotiation_id": "neg-1",
+            "status": "active",
+            "round": {
+                "round_number": 2,
+                "buyer_price": {"amount_micros": 22_000_000, "currency": "USD"},
+                "seller_price": {"amount_micros": 31_500_000, "currency": "USD"},
+                "action": "counter",
+                "rationale": "Counter at $31.50",
+            },
+        }
+        mock_client = self._mock_post(shared_response)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            round_result = await client.counter_offer(session, price=22.0)
+
+        assert round_result.seller_price == 31.5
+        assert round_result.action == "counter"
+        assert round_result.round_number == 2

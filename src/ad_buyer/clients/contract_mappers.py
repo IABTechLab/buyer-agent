@@ -38,6 +38,7 @@ from iab_agentic_primitives.primitives import (
     DealType,
     MediaType,
     Money,
+    NegotiationAction,
     Quote,
     QuoteAvailability,
     QuotePricing,
@@ -57,6 +58,12 @@ from iab_agentic_primitives.protocol import (
 )
 from iab_agentic_primitives.protocol import (
     DealBookingResponse as WireDealBookingResponse,
+)
+from iab_agentic_primitives.protocol import (
+    NegotiationMessage as WireNegotiationMessage,
+)
+from iab_agentic_primitives.protocol import (
+    NegotiationRoundResponse as WireNegotiationRoundResponse,
 )
 from iab_agentic_primitives.protocol import (
     QuoteRequest as WireQuoteRequest,
@@ -377,9 +384,74 @@ def from_wire_deal_booking_response(wire: WireDealBookingResponse) -> DealRespon
     )
 
 
+# ---------------------------------------------------------------------------
+# Negotiation surface
+# ---------------------------------------------------------------------------
+
+
+def to_wire_negotiation_message(
+    *,
+    action: str,
+    proposal_id: str | None = None,
+    negotiation_id: str | None = None,
+    quote_id: str | None = None,
+    buyer_price: float | None = None,
+    round_number: int | None = None,
+    rationale: str = "",
+    idempotency_key: str | None = None,
+) -> WireNegotiationMessage:
+    """Build the shared ``NegotiationMessage`` the seller validates.
+
+    This is the structural fix for the historical 422: the buyer used to POST
+    a bare ``{"price": <float>}`` while the seller required ``buyer_price`` and a
+    required ``action`` enum. The shared message makes that impossible by
+    construction — ``action`` is a required :class:`NegotiationAction`, the money
+    field is ``buyer_price`` (shared ``Money``, micros), and both sides validate
+    the same model. Money-mutating (FD-12): carries a required idempotency_key.
+
+    Action rules enforced by the shared model: 'counter'/'final_offer' require
+    ``buyer_price``; 'reject' must omit it; 'accept' may echo it. Exactly one of
+    negotiation_id/proposal_id/quote_id must be present.
+    """
+    return WireNegotiationMessage(
+        idempotency_key=idempotency_key or uuid4().hex,
+        action=NegotiationAction(action),
+        proposal_id=proposal_id,
+        negotiation_id=negotiation_id,
+        quote_id=quote_id,
+        round_number=round_number,
+        buyer_price=_money_from_float(buyer_price),
+        rationale=rationale,
+    )
+
+
+def normalize_negotiation_round_response(data: dict) -> dict:
+    """Accept the shared ``NegotiationRoundResponse`` or the legacy flat dict.
+
+    Anti-corruption reader: a shared-contract seller answers with a
+    ``NegotiationRoundResponse`` (money as ``Money``, action enum, the round
+    nested under ``round``); older/mock sellers answer with the flat ad-hoc
+    dict. Both are flattened to the shape the buyer's client already consumes.
+    """
+    if isinstance(data, dict) and isinstance(data.get("round"), dict):
+        rr = WireNegotiationRoundResponse.model_validate(data)
+        return {
+            "negotiation_id": rr.negotiation_id,
+            "round_number": rr.round.round_number,
+            "seller_price": _float_from_money(rr.round.seller_price),
+            "buyer_price": _float_from_money(rr.round.buyer_price),
+            "action": rr.round.action.value,
+            "rationale": rr.round.rationale,
+            "status": rr.status.value,
+        }
+    return data
+
+
 __all__ = [
     "to_wire_quote_request",
     "from_wire_quote_response",
     "to_wire_deal_booking_request",
     "from_wire_deal_booking_response",
+    "to_wire_negotiation_message",
+    "normalize_negotiation_round_response",
 ]
