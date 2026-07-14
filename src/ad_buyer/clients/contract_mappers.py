@@ -53,6 +53,12 @@ from iab_agentic_primitives.primitives import (
 from iab_agentic_primitives.primitives import (
     OpenRTBParams as WireOpenRTBParams,
 )
+from iab_agentic_primitives.primitives import (
+    PricingModel as WirePricingModel,
+)
+from iab_agentic_primitives.primitives import (
+    Product as WireProduct,
+)
 from iab_agentic_primitives.protocol import (
     DealBookingRequest as WireDealBookingRequest,
 )
@@ -87,6 +93,9 @@ from ..models.deals import (
     TermsInfo,
 )
 from ..models.linear_tv import CancellationTerms, LinearTVParams, LinearTVQuoteDetails
+from ..models.opendirect import DeliveryType as ODDeliveryType
+from ..models.opendirect import Product as ODProduct
+from ..models.opendirect import RateType
 
 # ---------------------------------------------------------------------------
 # Scalar helpers
@@ -385,6 +394,64 @@ def from_wire_deal_booking_response(wire: WireDealBookingResponse) -> DealRespon
 
 
 # ---------------------------------------------------------------------------
+# Catalog surface
+# ---------------------------------------------------------------------------
+
+_PRICING_MODEL_TO_RATE_TYPE: dict[WirePricingModel, RateType] = {
+    WirePricingModel.CPM: RateType.CPM,
+    WirePricingModel.CPMV: RateType.CPMV,
+    WirePricingModel.CPC: RateType.CPC,
+    WirePricingModel.CPD: RateType.CPD,
+    WirePricingModel.FLAT_FEE: RateType.FLAT_RATE,
+}
+
+
+def _to_rate_type(pricing_model: WirePricingModel) -> RateType:
+    """Map the shared PricingModel onto the OpenDirect RateType vocabulary."""
+    return _PRICING_MODEL_TO_RATE_TYPE.get(pricing_model, RateType.CPM)
+
+
+def from_wire_product(product: WireProduct) -> ODProduct:
+    """Map the shared catalog ``Product`` to the buyer's OpenDirect model.
+
+    ``base_price`` crosses as the shared ``Money`` and is None for on-request
+    pricing; the OpenDirect model requires a numeric base_price so None maps to
+    0.0. The three IAB taxonomy targeting blocks fold into the OpenDirect model's
+    single open ``targeting`` slot, and ``ad_formats`` (no OpenDirect field)
+    rides in ``ext`` so client-side format filters can still see it.
+    """
+    base_price = _float_from_money(product.base_price)
+    currency = product.base_price.currency if product.base_price is not None else "USD"
+
+    targeting: dict = {}
+    if product.audience_targeting:
+        targeting["audience"] = product.audience_targeting
+    if product.ad_product_targeting:
+        targeting["ad_product"] = product.ad_product_targeting
+    if product.content_targeting:
+        targeting["content"] = product.content_targeting
+
+    ext = dict(product.ext) if product.ext else {}
+    if product.ad_formats:
+        ext.setdefault("ad_formats", product.ad_formats)
+
+    return ODProduct(
+        id=product.product_id,
+        publisherId=product.seller_organization_id,
+        name=product.name,
+        description=product.description,
+        currency=currency,
+        basePrice=base_price if base_price is not None else 0.0,
+        rateType=_to_rate_type(product.pricing_model),
+        deliveryType=ODDeliveryType(product.delivery_type.value),
+        domain=product.domain,
+        availableImpressions=product.available_impressions,
+        targeting=targeting or None,
+        ext=ext or None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Negotiation surface
 # ---------------------------------------------------------------------------
 
@@ -454,4 +521,5 @@ __all__ = [
     "from_wire_deal_booking_response",
     "to_wire_negotiation_message",
     "normalize_negotiation_round_response",
+    "from_wire_product",
 ]

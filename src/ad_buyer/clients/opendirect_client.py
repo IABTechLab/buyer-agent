@@ -7,6 +7,13 @@ from typing import Any
 
 import httpx
 
+# Shared contract catalog envelope (iab_agentic_primitives) adopted at the wire
+# edge for product discovery (EP-12.1): GET /products returns the shared
+# ProductListResponse; there is no POST /products/search — filtering is
+# client-side over the returned Product records.
+from iab_agentic_primitives.primitives import Product as WireProduct
+from iab_agentic_primitives.protocol import ProductListResponse as WireProductListResponse
+
 from ..models.opendirect import (
     Account,
     AvailsRequest,
@@ -17,6 +24,35 @@ from ..models.opendirect import (
     Order,
     Product,
 )
+from .contract_mappers import from_wire_product
+
+
+def _filter_wire_products(
+    products: list[WireProduct], filters: dict[str, Any]
+) -> list[WireProduct]:
+    """Client-side catalog filtering over the shared Product fields.
+
+    Replaces the retired ``POST /products/search``. Understood filter keys map
+    onto shared Product fields (``adFormat`` -> ``ad_formats``, ``deliveryType``
+    -> ``delivery_type``, ``publisherIds`` -> ``seller_organization_id``);
+    unknown keys (e.g. free-text/targeting) are ignored here — rich discovery
+    remains the media-kit search surface, not the catalog.
+    """
+    result = products
+
+    ad_format = filters.get("adFormat")
+    if ad_format:
+        result = [p for p in result if ad_format in (p.ad_formats or [])]
+
+    delivery_type = filters.get("deliveryType")
+    if delivery_type:
+        result = [p for p in result if p.delivery_type.value == delivery_type]
+
+    publisher_ids = filters.get("publisherIds")
+    if publisher_ids:
+        result = [p for p in result if p.seller_organization_id in publisher_ids]
+
+    return result
 
 
 class OpenDirectClient:
@@ -57,26 +93,44 @@ class OpenDirectClient:
     # Products
     # -------------------------------------------------------------------------
 
+    async def _fetch_wire_products(self, *, limit: int, offset: int) -> list[Any]:
+        """GET /products and return the shared Product records (unmapped).
+
+        Serializes the shared ``ProductListRequest`` pagination params
+        (``limit``/``offset``) and parses the shared ``ProductListResponse``
+        envelope. Filtering is done client-side by the callers.
+        """
+        params = {"limit": limit, "offset": offset}
+        response = await self._client.get("/products", params=params)
+        response.raise_for_status()
+        wire = WireProductListResponse.model_validate(response.json())
+        return list(wire.products)
+
     async def list_products(self, skip: int = 0, top: int = 50, **filters: Any) -> list[Product]:
         """List available products with pagination.
 
+        Emits the shared ``ProductListRequest`` pagination (``limit``/``offset``)
+        and maps the returned shared ``Product`` records to the OpenDirect model
+        at the boundary. Any ``**filters`` are applied client-side.
+
         Args:
-            skip: Number of items to skip
-            top: Maximum number of items to return
-            **filters: Additional filter parameters
+            skip: Number of items to skip (shared ``offset``)
+            top: Maximum number of items to return (shared ``limit``)
+            **filters: Additional filter parameters, applied client-side
 
         Returns:
             List of Product objects
         """
-        params = {"$skip": skip, "$top": top, **filters}
-        response = await self._client.get("/products", params=params)
-        response.raise_for_status()
-        data = response.json()
-        products = data.get("products", data) if isinstance(data, dict) else data
-        return [Product.model_validate(p) for p in products]
+        wire_products = await self._fetch_wire_products(limit=top, offset=skip)
+        if filters:
+            wire_products = _filter_wire_products(wire_products, filters)
+        return [from_wire_product(p) for p in wire_products]
 
     async def get_product(self, product_id: str) -> Product:
         """Get a single product by ID.
+
+        GET /products/{product_id} returns the shared ``Product`` primitive
+        (no wrapper); it is mapped to the OpenDirect model at the boundary.
 
         Args:
             product_id: The product ID
@@ -86,10 +140,17 @@ class OpenDirectClient:
         """
         response = await self._client.get(f"/products/{product_id}")
         response.raise_for_status()
-        return Product.model_validate(response.json())
+        wire_product = WireProduct.model_validate(response.json())
+        return from_wire_product(wire_product)
 
     async def search_products(self, filters: dict[str, Any]) -> list[Product]:
         """Search products with filters.
+
+        The shared catalog has NO ``POST /products/search`` route (remediation
+        plan §7 amendment 3): the seller returns the full filterable product
+        record on ``GET /products`` and the buyer filters CLIENT-SIDE over the
+        returned fields. This method fetches the catalog and applies the filters
+        locally instead of POSTing to the retired search route.
 
         Args:
             filters: Search filter parameters (channel, format, pricing, etc.)
@@ -97,11 +158,9 @@ class OpenDirectClient:
         Returns:
             List of matching Product objects
         """
-        response = await self._client.post("/products/search", json=filters)
-        response.raise_for_status()
-        data = response.json()
-        products = data.get("products", data) if isinstance(data, dict) else data
-        return [Product.model_validate(p) for p in products]
+        wire_products = await self._fetch_wire_products(limit=500, offset=0)
+        wire_products = _filter_wire_products(wire_products, filters)
+        return [from_wire_product(p) for p in wire_products]
 
     async def check_avails(self, request: AvailsRequest) -> AvailsResponse:
         """Check availability and pricing for a product.

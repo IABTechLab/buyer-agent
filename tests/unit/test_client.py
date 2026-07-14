@@ -47,20 +47,27 @@ class TestOpenDirectClient:
 
     @pytest.mark.asyncio
     async def test_list_products(self, client):
-        """Test listing products."""
+        """Test listing products.
+
+        EP-12.1 — GET /products returns the shared ProductListResponse envelope
+        (shared Product records, Money base_price); the client maps them to the
+        OpenDirect model at the boundary.
+        """
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "products": [
                 {
-                    "id": "prod_1",
-                    "publisherId": "pub_1",
+                    "product_id": "prod_1",
+                    "seller_organization_id": "pub_1",
                     "name": "Test Product",
-                    "currency": "USD",
-                    "basePrice": 15.00,
-                    "rateType": "CPM",
-                    "deliveryType": "Guaranteed",
+                    "base_price": {"amount_micros": 15_000_000, "currency": "USD"},
+                    "pricing_model": "cpm",
+                    "delivery_type": "Guaranteed",
                 }
-            ]
+            ],
+            "total_count": 1,
+            "limit": 10,
+            "offset": 0,
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -71,20 +78,22 @@ class TestOpenDirectClient:
         assert len(products) == 1
         assert products[0].id == "prod_1"
         assert products[0].name == "Test Product"
+        assert products[0].base_price == 15.00
         mock_get.assert_called_once()
+        # Wire pagination now matches the shared ProductListRequest (limit/offset).
+        assert mock_get.call_args.kwargs["params"] == {"limit": 10, "offset": 0}
 
     @pytest.mark.asyncio
     async def test_get_product(self, client):
-        """Test getting a single product."""
+        """Test getting a single product (shared Product primitive on the wire)."""
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "id": "prod_123",
-            "publisherId": "pub_abc",
+            "product_id": "prod_123",
+            "seller_organization_id": "pub_abc",
             "name": "Homepage Banner",
-            "currency": "USD",
-            "basePrice": 20.00,
-            "rateType": "CPM",
-            "deliveryType": "PMP",
+            "base_price": {"amount_micros": 20_000_000, "currency": "USD"},
+            "pricing_model": "cpm",
+            "delivery_type": "PMP",
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -95,6 +104,44 @@ class TestOpenDirectClient:
         assert product.id == "prod_123"
         assert product.base_price == 20.00
         assert product.delivery_type == DeliveryType.PMP
+
+    @pytest.mark.asyncio
+    async def test_search_products_uses_get_and_filters_client_side(self, client):
+        """EP-12.1 — search hits GET /products (no POST /products/search) and
+        filters the returned shared Product records client-side."""
+
+        def _wire_product(pid: str, fmt: str) -> dict:
+            return {
+                "product_id": pid,
+                "seller_organization_id": "pub_1",
+                "name": pid,
+                "base_price": {"amount_micros": 10_000_000, "currency": "USD"},
+                "pricing_model": "cpm",
+                "delivery_type": "Guaranteed",
+                "ad_formats": [fmt],
+            }
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "products": [_wire_product("banner_1", "banner"), _wire_product("video_1", "video")],
+            "total_count": 2,
+            "limit": 500,
+            "offset": 0,
+        }
+        mock_response.raise_for_status = MagicMock()
+
+        with (
+            patch.object(client._client, "get", new_callable=AsyncMock) as mock_get,
+            patch.object(client._client, "post", new_callable=AsyncMock) as mock_post,
+        ):
+            mock_get.return_value = mock_response
+            results = await client.search_products({"adFormat": "video"})
+
+        # The retired POST /products/search route is never called.
+        mock_post.assert_not_called()
+        assert mock_get.call_args.args[0] == "/products"
+        # Client-side format filter kept only the matching product.
+        assert [p.id for p in results] == ["video_1"]
 
     @pytest.mark.asyncio
     async def test_create_order(self, client):
