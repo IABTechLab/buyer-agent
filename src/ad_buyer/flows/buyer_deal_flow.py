@@ -531,6 +531,14 @@ Return the product_id of the best matching product and explain why.""",
         try:
             self.state.status = BuyerDealFlowStatus.REQUESTING_DEAL
 
+            # Deterministic spend-ceiling guard (bead ar-70eh): thread the
+            # campaign's max_cpm onto the deal tool so the final computed
+            # CPM is checked against it before a Deal ID is minted. Set
+            # here (state is populated after tool construction) and NOT
+            # via an LLM-visible tool argument, so the model cannot raise
+            # or drop the ceiling. None fails open (demo behavior).
+            self._deal_tool._max_cpm = self.state.max_cpm
+
             # Forward the AudiencePlan (when present) so the seller-bound
             # call carries the typed plan onto the wire per the §5
             # field additions. Tests assert the plan survives the flow ->

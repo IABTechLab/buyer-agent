@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from ...async_utils import run_async
 from ...booking.deal_id import generate_deal_id
 from ...booking.pricing import PricingCalculator
+from ...booking.spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
 from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
 from ...clients.unified_client import UnifiedClient
 from ...models.audience_plan import AudiencePlan
@@ -103,6 +104,7 @@ Returns:
     _sgp_client: SGPClient | None
     _sgp_enforce: bool
     _sgp_unknown_policy: str
+    _max_cpm: float | None
 
     def __init__(
         self,
@@ -111,6 +113,7 @@ Returns:
         sgp_client: SGPClient | None = None,
         sgp_enforce: bool = False,
         sgp_unknown_policy: str = "block",
+        max_cpm: float | None = None,
         **kwargs: Any,
     ):
         """Initialize with unified client and buyer context.
@@ -126,12 +129,20 @@ Returns:
             sgp_unknown_policy: How to treat vendors absent from the
                 buyer's SGP portfolio (HTTP 404). One of ``block``,
                 ``warn``, ``allow``.
+            max_cpm: Deterministic CPM ceiling for this buyer/campaign.
+                When set, a deal whose computed final CPM exceeds it is
+                rejected before a Deal ID is minted (spend-ceiling guard,
+                bead ar-70eh). Set at construction or by the owning flow
+                — never from LLM tool arguments — so the model cannot
+                raise or drop the ceiling. None means no ceiling
+                (fail-open, preserves demo behavior).
         """
         super().__init__(**kwargs)
         self._client = client
         self._buyer_context = buyer_context
         self._sgp_client = sgp_client
         self._sgp_enforce = sgp_enforce
+        self._max_cpm = max_cpm
         if sgp_unknown_policy not in _VALID_UNKNOWN_POLICIES:
             raise ValueError(
                 f"Invalid sgp_unknown_policy '{sgp_unknown_policy}'. "
@@ -250,6 +261,26 @@ Returns:
                 formatted = f"{approval_banner}\n{formatted}"
             return formatted
 
+        except SpendCeilingExceeded as e:
+            # Deterministic rejection — no Deal ID was minted. Return a
+            # structured error the agent/flow can surface verbatim.
+            logger.warning(
+                "Deal request for product %s rejected by spend ceiling: %s",
+                product_id,
+                e,
+            )
+            ceiling = f"${e.max_cpm:.2f}" if e.max_cpm is not None else "n/a"
+            final = f"${e.final_cpm:.2f}" if e.final_cpm is not None else "n/a"
+            return (
+                "DEAL REJECTED: SPEND CEILING EXCEEDED\n"
+                f"Product ID: {product_id}\n"
+                f"Final CPM: {final}\n"
+                f"Max CPM ceiling: {ceiling}\n"
+                f"Reason: {e}\n"
+                "No Deal ID was issued. Negotiate a lower price or raise "
+                "the campaign's max CPM."
+            )
+
         except (OSError, ValueError, RuntimeError) as e:
             return f"Error requesting deal: {e}"
 
@@ -364,6 +395,20 @@ Returns:
             target_cpm=target_cpm,
             can_negotiate=self._buyer_context.can_negotiate(),
             negotiation_enabled=product.get("negotiation_enabled", False),
+        )
+
+        # Deterministic spend-ceiling guard (bead ar-70eh): the final CPM
+        # must be checked against the buyer's max_cpm BEFORE a Deal ID is
+        # minted. Raises SpendCeilingExceeded, handled in _arun. When
+        # _max_cpm is None the guard fails open (allow + warning log) —
+        # an explicit choice to preserve demo behavior for callers that
+        # never supplied a ceiling.
+        final_cpm = round(pricing.final_price, 2)
+        total_cost = (final_cpm / 1000) * impressions if impressions else None
+        enforce_spend_ceiling(
+            final_cpm=final_cpm,
+            total_cost=total_cost,
+            max_cpm=self._max_cpm,
         )
 
         identity = self._buyer_context.identity
