@@ -233,8 +233,8 @@ def _format_audience_context(
 #
 # `_ChannelCrewSpec` captures those four variations; `_build_channel_crew` does
 # the construction. Each `create_*_crew` is now a thin delegate. Public
-# signatures are unchanged so existing callers (DealBookingFlow,
-# BuyerDealFlow, direct invocation tests) are unaffected.
+# signatures are unchanged so existing callers (DealBookingFlow and
+# direct invocation tests) are unaffected.
 #
 # Per proposal §5.3 + bead ar-fgyq: audience tools live on the Audience
 # Planner upstream — the Research Agent here operates on inventory only.
@@ -515,8 +515,8 @@ def kickoff_channel_crew_with_audience(
 
     Convenience wrapper for the third deal-finding entry point identified
     in proposal §5.3 -- the "direct channel-crew invocation path" used by
-    tests and demos that don't go through the canonical flow or
-    `BuyerDealFlow` (Path B). Either pass an explicit `audience_plan`, or
+    tests and demos that don't go through the canonical flow
+    (DealBookingFlow). Either pass an explicit `audience_plan`, or
     pass a `CampaignBrief` and let the planner produce one in place.
 
     Args:
