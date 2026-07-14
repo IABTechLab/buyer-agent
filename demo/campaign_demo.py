@@ -16,7 +16,7 @@ Automation pipeline, one stage at a time, with approval at each step.
 
 Run standalone:
     cd ad_buyer_system && source venv/bin/activate
-    python -m ad_buyer.demo.campaign_demo
+    python -m demo.campaign_demo
     # Opens on http://localhost:5055
 
 Uses real pipeline modules:
@@ -41,20 +41,20 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
-from ..events.bus import InMemoryEventBus
-from ..events.models import Event, EventType
-from ..models.campaign import (
+from ad_buyer.events.bus import InMemoryEventBus
+from ad_buyer.events.models import Event, EventType
+from ad_buyer.models.campaign import (
     ChannelSnapshot,
     DealSnapshot,
     PacingSnapshot,
 )
-from ..models.campaign_brief import (
+from ad_buyer.models.campaign_brief import (
     parse_campaign_brief,
 )
-from ..pacing.engine import BudgetPacingEngine, PacingConfig
-from ..reporting.campaign_report import CampaignReporter
-from ..storage.campaign_store import CampaignStore
-from ..storage.pacing_store import PacingStore
+from ad_buyer.pacing.engine import BudgetPacingEngine, PacingConfig
+from ad_buyer.reporting.campaign_report import CampaignReporter
+from ad_buyer.storage.campaign_store import CampaignStore
+from ad_buyer.storage.pacing_store import PacingStore
 
 logger = logging.getLogger(__name__)
 
@@ -740,7 +740,7 @@ def _extract_alerts(snapshot: PacingSnapshot) -> list:
     Uses the BudgetPacingEngine to detect deviations at both the campaign
     level and per-channel level.
     """
-    from ..pacing.engine import BudgetPacingEngine, PacingAlert
+    from ad_buyer.pacing.engine import BudgetPacingEngine, PacingAlert
 
     engine = BudgetPacingEngine()
     alerts: list[PacingAlert] = []

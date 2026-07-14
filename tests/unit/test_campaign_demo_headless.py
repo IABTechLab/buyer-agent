@@ -10,13 +10,15 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 
 
 def _run_module(args: list[str]) -> subprocess.CompletedProcess:
-    """Run `python -m ad_buyer.demo.campaign_demo <args>` with a fresh tmp DB."""
+    """Run `python -m demo.campaign_demo <args>` with a fresh tmp DB."""
 
     tmp_dir = tempfile.mkdtemp(prefix="ar-jzek-")
     db_path = f"sqlite:///{tmp_dir}/demo.db"
-    env = {**os.environ, "CAMPAIGN_DEMO_DB": db_path, "PYTHONPATH": "src"}
+    # `src` puts ad_buyer on the path; `.` makes the top-level demo package
+    # (moved out of the shipped wheel in EP-8.1) importable.
+    env = {**os.environ, "CAMPAIGN_DEMO_DB": db_path, "PYTHONPATH": f"src{os.pathsep}."}
     return subprocess.run(
-        [sys.executable, "-m", "ad_buyer.demo.campaign_demo", *args],
+        [sys.executable, "-m", "demo.campaign_demo", *args],
         env=env,
         capture_output=True,
         text=True,

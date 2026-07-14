@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import UTC, datetime
 
-from ..storage.deal_store import DealStore
+from ad_buyer.storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
 

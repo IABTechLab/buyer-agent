@@ -144,4 +144,4 @@ if command -v open >/dev/null 2>&1; then
 fi
 
 cd "$BUYER_DIR"
-$BUYER_PYTHON -m ad_buyer.demo.campaign_demo 2>&1 | tee "$LOG_DIR/campaign_demo.log"
+PYTHONPATH="$BUYER_DIR/src:$BUYER_DIR" $BUYER_PYTHON -m demo.campaign_demo 2>&1 | tee "$LOG_DIR/campaign_demo.log"

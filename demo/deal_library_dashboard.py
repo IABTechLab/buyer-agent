@@ -13,7 +13,7 @@ Standalone Flask app that exercises all Phase 1 capabilities:
 
 Run with:
     cd ad_buyer_system && source venv/bin/activate
-    python -m ad_buyer.demo.deal_library_dashboard
+    python -m demo.deal_library_dashboard
     # Opens on http://localhost:5050
 """
 
@@ -27,10 +27,10 @@ from typing import Any
 
 from flask import Flask, jsonify, render_template, request
 
-from ..storage.deal_store import DealStore
-from ..storage.schema import SCHEMA_VERSION
-from ..tools.deal_import import parse_csv_deals
-from ..tools.deal_library.deal_entry import (
+from ad_buyer.storage.deal_store import DealStore
+from ad_buyer.storage.schema import SCHEMA_VERSION
+from ad_buyer.tools.deal_import import parse_csv_deals
+from ad_buyer.tools.deal_library.deal_entry import (
     VALID_DEAL_TYPES,
     VALID_MEDIA_TYPES,
     VALID_PRICE_MODELS,
