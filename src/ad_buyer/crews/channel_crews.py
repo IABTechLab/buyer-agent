@@ -39,6 +39,7 @@ from ..agents.level3.research_agent import create_research_agent
 from ..clients.opendirect_client import OpenDirectClient
 from ..config.settings import settings
 from ..models.audience_plan import AudiencePlan, AudienceRef
+from ..security.prompt_sanitizer import sanitize_untrusted_text, wrap_untrusted_text
 from ..tools.audience import AudienceDiscoveryTool, AudienceMatchingTool, CoverageEstimationTool
 from ..tools.execution.line_management import BookLineTool, CreateLineTool, ReserveLineTool
 from ..tools.execution.order_management import CreateOrderTool
@@ -95,9 +96,13 @@ def _format_audience_ref(ref: AudienceRef) -> str:
     regime in the same context block.
     """
 
+    # ref.identifier / taxonomy can carry seller/UCP-influenced free text that
+    # ends up in the research task prompt -> defang (soft layer; the EP-0.1
+    # spend ceiling is the hard overspend guarantee).
     parts = [
-        f"[{ref.type}] {ref.identifier}",
-        f"(taxonomy={ref.taxonomy}, version={ref.version}, source={ref.source}",
+        f"[{ref.type}] {sanitize_untrusted_text(ref.identifier)}",
+        f"(taxonomy={sanitize_untrusted_text(str(ref.taxonomy))}, "
+        f"version={ref.version}, source={ref.source}",
     ]
     if ref.confidence is not None:
         parts.append(f", confidence={ref.confidence:.2f}")
@@ -141,7 +146,13 @@ def _format_typed_audience_plan(plan: AudiencePlan) -> str:
             parts.append(f"  * {_format_audience_ref(ref)}")
 
     if plan.rationale:
-        parts.append(f"- Rationale: {plan.rationale}")
+        # The planner's narrative is generated over seller discovery data, so a
+        # seller can indirectly influence it -> pass it through as explicitly
+        # untrusted DATA rather than instructions (soft layer; EP-0.1 spend
+        # ceiling is the hard guarantee).
+        parts.append(
+            "- Rationale:\n" + wrap_untrusted_text(plan.rationale, label="planner rationale")
+        )
 
     parts.append(
         "\nPrioritize inventory whose audience_capabilities cover the primary "

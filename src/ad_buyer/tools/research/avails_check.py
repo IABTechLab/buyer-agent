@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from ...async_utils import run_async
 from ...clients.opendirect_client import OpenDirectClient
 from ...models.opendirect import AvailsRequest
+from ...security.prompt_sanitizer import sanitize_untrusted_text
 
 
 class AvailsCheckInput(BaseModel):
@@ -129,7 +130,12 @@ Returns:
         """Format availability results as readable text."""
         targeting_str = "N/A"
         if avails.available_targeting:
-            targeting_str = ", ".join(avails.available_targeting)
+            # Seller-controlled targeting labels the research agent reads ->
+            # defang before they enter the prompt (soft layer; the EP-0.1
+            # spend ceiling is the hard overspend guarantee).
+            targeting_str = sanitize_untrusted_text(
+                ", ".join(str(t) for t in avails.available_targeting)
+            )
 
         guaranteed_str = (
             f"{avails.guaranteed_impressions:,}" if avails.guaranteed_impressions else "N/A"
