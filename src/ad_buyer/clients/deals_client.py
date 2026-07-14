@@ -28,6 +28,7 @@ import httpx
 # Shared contract envelopes (iab_agentic_primitives) adopted at the wire edge.
 # Internal code keeps using ad_buyer.models; only serialize/deserialize speaks
 # the shared schema (EP-12.1).
+from iab_agentic_primitives.protocol import DealBookingResponse as WireDealBookingResponse
 from iab_agentic_primitives.protocol import QuoteResponse as WireQuoteResponse
 
 from ..models.deals import (
@@ -38,7 +39,9 @@ from ..models.deals import (
 )
 from ..models.linear_tv import CancellationRequest, MakegoodRequest
 from .contract_mappers import (
+    from_wire_deal_booking_response,
     from_wire_quote_response,
+    to_wire_deal_booking_request,
     to_wire_quote_request,
 )
 
@@ -230,7 +233,12 @@ class DealsClient:
         Raises:
             DealsClientError: On HTTP or transport errors.
         """
-        body = booking_request.model_dump(exclude_none=True)
+        # Serialize the outbound booking as the shared DealBookingRequest
+        # envelope (money-mutating commit: carries a required idempotency_key,
+        # FD-12). The audience-plan header/logging logic below still reads the
+        # internal booking_request so the wire-format carriers are unchanged.
+        wire_request = to_wire_deal_booking_request(booking_request)
+        body = wire_request.model_dump(mode="json", exclude_none=True)
 
         # Build per-request headers when the booking carries an audience plan.
         # Otherwise we let the client's default JSON headers ride (which is
@@ -255,8 +263,8 @@ class DealsClient:
         if headers:
             kwargs["headers"] = headers
         response = await self._request_with_retry("POST", "/api/v1/deals", **kwargs)
-        data = response.json()
-        result = DealResponse.model_validate(data)
+        wire_response = WireDealBookingResponse.model_validate(response.json())
+        result = from_wire_deal_booking_response(wire_response)
 
         # Persist to DealStore if available
         self._persist_deal(result)
@@ -278,8 +286,8 @@ class DealsClient:
             DealsClientError: On HTTP or transport errors.
         """
         response = await self._request_with_retry("GET", f"/api/v1/deals/{deal_id}")
-        data = response.json()
-        result = DealResponse.model_validate(data)
+        wire_response = WireDealBookingResponse.model_validate(response.json())
+        result = from_wire_deal_booking_response(wire_response)
 
         # Update stored status if DealStore is available
         self._update_stored_deal_status(result)

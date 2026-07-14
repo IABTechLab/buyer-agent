@@ -56,43 +56,50 @@ def _make_audience_plan() -> AudiencePlan:
 
 
 def _deal_response_json(plan: AudiencePlan | None = None) -> dict:
-    """Minimal valid DealResponse JSON, optionally with snapshot fields."""
+    """Shared DealBookingResponse envelope, optionally with snapshot fields.
+
+    EP-12.1 — the seller now answers with the shared
+    ``iab_agentic_primitives.protocol.DealBookingResponse`` ({"deal": Deal, ...})
+    where the audience-plan snapshot and match summary ride at the envelope
+    level (not inside the Deal) and money fields are the shared ``Money``.
+    """
 
     body: dict = {
-        "deal_id": "DEMO-A1B2C3D4E5F6",
-        "deal_type": "PD",
-        "status": "proposed",
-        "quote_id": "qt-abc123",
-        "product": {
-            "product_id": "ctv-premium-sports",
-            "name": "Premium CTV - Sports",
-            "inventory_type": "ctv",
-        },
-        "pricing": {
-            "base_cpm": 35.00,
-            "tier_discount_pct": 15.0,
-            "volume_discount_pct": 5.0,
-            "final_cpm": 28.26,
-            "currency": "USD",
-            "pricing_model": "cpm",
-            "rationale": "Base $35 | -15% tier | -5% volume => $28.26",
-        },
-        "terms": {
-            "impressions": 5000000,
-            "flight_start": "2026-04-01",
-            "flight_end": "2026-04-30",
-            "guaranteed": False,
-        },
-        "buyer_tier": "advertiser",
-        "expires_at": "2026-04-08T00:00:00Z",
-        "activation_instructions": {},
-        "openrtb_params": {
-            "id": "DEMO-A1B2C3D4E5F6",
-            "bidfloor": 28.26,
-            "bidfloorcur": "USD",
-            "at": 3,
-        },
-        "created_at": "2026-03-08T14:30:00Z",
+        "deal": {
+            "deal_id": "DEMO-A1B2C3D4E5F6",
+            "deal_type": "PD",
+            "status": "proposed",
+            "quote_id": "qt-abc123",
+            "product": {
+                "product_id": "ctv-premium-sports",
+                "name": "Premium CTV - Sports",
+                "inventory_type": "ctv",
+            },
+            "pricing": {
+                "pricing_type": "fixed",
+                "base_cpm": {"amount_micros": 35_000_000, "currency": "USD"},
+                "tier_discount_pct": 15.0,
+                "volume_discount_pct": 5.0,
+                "final_cpm": {"amount_micros": 28_260_000, "currency": "USD"},
+                "pricing_model": "cpm",
+                "rationale": "Base $35 | -15% tier | -5% volume => $28.26",
+            },
+            "terms": {
+                "impressions": 5000000,
+                "flight_start": "2026-04-01",
+                "flight_end": "2026-04-30",
+                "guaranteed": False,
+            },
+            "buyer_tier": "advertiser",
+            "expires_at": "2026-04-08T00:00:00Z",
+            "activation_instructions": {},
+            "openrtb_params": {
+                "id": "DEMO-A1B2C3D4E5F6",
+                "bidfloor": {"amount_micros": 28_260_000, "currency": "USD"},
+                "at": 3,
+            },
+            "created_at": "2026-03-08T14:30:00Z",
+        }
     }
     if plan is not None:
         body["audience_plan_snapshot"] = plan.model_dump(mode="json")

@@ -49,6 +49,15 @@ from iab_agentic_primitives.primitives import (
 from iab_agentic_primitives.primitives import (
     LinearTVQuoteDetails as WireLinearTVQuoteDetails,
 )
+from iab_agentic_primitives.primitives import (
+    OpenRTBParams as WireOpenRTBParams,
+)
+from iab_agentic_primitives.protocol import (
+    DealBookingRequest as WireDealBookingRequest,
+)
+from iab_agentic_primitives.protocol import (
+    DealBookingResponse as WireDealBookingResponse,
+)
 from iab_agentic_primitives.protocol import (
     QuoteRequest as WireQuoteRequest,
 )
@@ -56,9 +65,14 @@ from iab_agentic_primitives.protocol import (
     QuoteResponse as WireQuoteResponse,
 )
 
+from ..models.audience_plan import AudiencePlan
 from ..models.deals import (
+    AudienceMatchSummary,
     AvailabilityInfo,
     BuyerIdentityPayload,
+    DealBookingRequest,
+    DealResponse,
+    OpenRTBParams,
     PricingInfo,
     ProductInfo,
     QuoteRequest,
@@ -235,6 +249,19 @@ def _from_wire_linear_tv_details(
     )
 
 
+def _from_wire_openrtb(params: WireOpenRTBParams | None) -> OpenRTBParams | None:
+    if params is None:
+        return None
+    return OpenRTBParams(
+        id=params.id,
+        bidfloor=_float_from_money(params.bidfloor) or 0.0,
+        bidfloorcur=params.bidfloor.currency,
+        at=params.at,
+        wseat=params.wseat,
+        wadomain=params.wadomain,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Quote surface
 # ---------------------------------------------------------------------------
@@ -291,7 +318,68 @@ def from_wire_quote_response(wire: WireQuoteResponse) -> QuoteResponse:
     )
 
 
+# ---------------------------------------------------------------------------
+# Deal booking surface
+# ---------------------------------------------------------------------------
+
+
+def to_wire_deal_booking_request(
+    req: DealBookingRequest, *, idempotency_key: str | None = None
+) -> WireDealBookingRequest:
+    """Build the shared ``DealBookingRequest`` envelope from the buyer's model.
+
+    The booking is the money-mutating commit point and carries a required
+    ``idempotency_key`` (FD-12), minted per request when not supplied.
+    """
+    return WireDealBookingRequest(
+        idempotency_key=idempotency_key or uuid4().hex,
+        quote_id=req.quote_id,
+        buyer_identity=_to_wire_buyer_identity(req.buyer_identity),
+        notes=req.notes,
+        audience_plan=(
+            req.audience_plan.model_dump(mode="json") if req.audience_plan else None
+        ),
+    )
+
+
+def from_wire_deal_booking_response(wire: WireDealBookingResponse) -> DealResponse:
+    """Map the shared ``DealBookingResponse`` envelope to the buyer's model."""
+    deal = wire.deal
+    snapshot = (
+        AudiencePlan.model_validate(wire.audience_plan_snapshot)
+        if wire.audience_plan_snapshot
+        else None
+    )
+    match_summary = (
+        AudienceMatchSummary.model_validate(wire.audience_match_summary)
+        if wire.audience_match_summary
+        else None
+    )
+    return DealResponse(
+        deal_id=deal.deal_id,
+        deal_type=deal.deal_type.value,
+        status=deal.status.value,
+        quote_id=deal.quote_id,
+        product=ProductInfo(
+            product_id=deal.product.product_id,
+            name=deal.product.name,
+            inventory_type=deal.product.inventory_type,
+        ),
+        pricing=_from_wire_pricing(deal.pricing),
+        terms=_from_wire_terms(deal.terms),
+        buyer_tier=deal.buyer_tier.value,
+        expires_at=_dt_to_iso(deal.expires_at),
+        activation_instructions=deal.activation_instructions,
+        openrtb_params=_from_wire_openrtb(deal.openrtb_params),
+        created_at=_dt_to_iso(deal.created_at),
+        audience_plan_snapshot=snapshot,
+        audience_match_summary=match_summary,
+    )
+
+
 __all__ = [
     "to_wire_quote_request",
     "from_wire_quote_response",
+    "to_wire_deal_booking_request",
+    "from_wire_deal_booking_response",
 ]
