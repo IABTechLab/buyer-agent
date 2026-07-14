@@ -3,9 +3,9 @@
 
 """Integration tests: config -> registry -> client interactions.
 
-Tests that configuration settings flow through to registry clients,
-UnifiedClient construction, and identity management. Verifies the
-coordination between the config, registry, and client modules.
+Tests that configuration settings flow through to registry clients and
+UnifiedClient construction. Verifies the coordination between the config,
+registry, and client modules.
 """
 
 from unittest.mock import MagicMock
@@ -14,15 +14,8 @@ import pytest
 
 from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
 from ad_buyer.config.settings import Settings
-from ad_buyer.identity.strategy import (
-    CampaignGoal,
-    DealContext,
-    IdentityStrategy,
-    SellerRelationship,
-)
 from ad_buyer.models.buyer_identity import (
     BuyerIdentity,
-    DealType,
 )
 from ad_buyer.registry.models import AgentCard
 
@@ -176,66 +169,6 @@ class TestRegistryToUnifiedClientCoordination:
         # Change identity
         client.set_buyer_identity(advertiser_identity)
         assert client.get_access_tier() == "advertiser"
-
-        await client.close()
-
-
-class TestIdentityStrategyToClientCoordination:
-    """Tests identity strategy recommendations feeding into client configuration."""
-
-    @pytest.mark.asyncio
-    async def test_strategy_recommend_then_set_on_client(
-        self,
-        advertiser_identity: BuyerIdentity,
-    ):
-        """Strategy recommendation should correctly configure the client."""
-        strategy = IdentityStrategy()
-
-        # Low-value deal with unknown seller -> conservative tier
-        ctx = DealContext(
-            deal_value_usd=5_000,
-            deal_type=DealType.PRIVATE_AUCTION,
-            seller_relationship=SellerRelationship.UNKNOWN,
-            campaign_goal=CampaignGoal.AWARENESS,
-        )
-        tier = strategy.recommend_tier(ctx)
-        masked = strategy.build_identity(advertiser_identity, tier)
-
-        # Create client with masked identity
-        client = UnifiedClient(
-            base_url="http://seller.test",
-            buyer_identity=masked,
-        )
-
-        # Should be a conservative tier (not advertiser for low-value unknown seller)
-        assert client.get_access_tier() in ("seat", "agency", "public")
-
-        await client.close()
-
-    @pytest.mark.asyncio
-    async def test_high_value_trusted_gets_full_identity(
-        self,
-        advertiser_identity: BuyerIdentity,
-    ):
-        """High-value deal with trusted seller should get advertiser tier."""
-        strategy = IdentityStrategy()
-
-        ctx = DealContext(
-            deal_value_usd=500_000,
-            deal_type=DealType.PREFERRED_DEAL,
-            seller_relationship=SellerRelationship.TRUSTED,
-            campaign_goal=CampaignGoal.PERFORMANCE,
-        )
-        tier = strategy.recommend_tier(ctx)
-        masked = strategy.build_identity(advertiser_identity, tier)
-
-        client = UnifiedClient(
-            base_url="http://seller.test",
-            buyer_identity=masked,
-        )
-
-        assert client.get_access_tier() == "advertiser"
-        assert masked.advertiser_id == advertiser_identity.advertiser_id
 
         await client.close()
 

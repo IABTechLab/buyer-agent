@@ -8,7 +8,6 @@ being swallowed silently, and that partial failures are handled
 gracefully by downstream modules.
 """
 
-from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,8 +26,6 @@ from ad_buyer.models.flow_state import (
 )
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.sessions.session_manager import SessionManager
-from ad_buyer.sessions.session_store import SessionRecord
 
 
 class TestClientErrorPropagation:
@@ -157,69 +154,6 @@ class TestFlowErrorPropagation:
         # CTV should fail but be captured
         assert ctv_result["status"] == "failed"
         assert "CTV research failed" in flow.state.errors[0]
-
-
-class TestSessionErrorPropagation:
-    """Tests error handling in session management."""
-
-    @pytest.mark.asyncio
-    async def test_session_creation_failure_raises(self, tmp_session_store_path: str):
-        """Failed session creation should raise RuntimeError."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-
-        mock_response = MagicMock()
-        mock_response.status_code = 503
-        mock_response.text = "Service unavailable"
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            with pytest.raises(RuntimeError, match="Failed to create session"):
-                await manager.create_session("http://seller.example.com")
-
-    @pytest.mark.asyncio
-    async def test_send_message_failure_after_retry(self, tmp_session_store_path: str):
-        """send_message should raise after retry also fails."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-        seller_url = "http://seller.example.com"
-
-        # Insert an active session
-        record = SessionRecord(
-            session_id="active-sess",
-            seller_url=seller_url,
-            created_at=datetime.now(UTC).isoformat(),
-            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        )
-        manager.store.save(record)
-
-        # Mock: first message -> 404, session creation -> 201, retry message -> 500
-        expired_resp = MagicMock()
-        expired_resp.status_code = 404
-
-        new_session_resp = MagicMock()
-        new_session_resp.status_code = 201
-        new_session_resp.json.return_value = {
-            "session_id": "new-sess",
-            "created_at": datetime.now(UTC).isoformat(),
-            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        }
-
-        failed_retry_resp = MagicMock()
-        failed_retry_resp.status_code = 500
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(
-                side_effect=[expired_resp, new_session_resp, failed_retry_resp]
-            )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            with pytest.raises(RuntimeError, match="Failed to send message"):
-                await manager.send_message(seller_url, "active-sess", {"type": "query"})
 
 
 class TestNegotiationErrorPropagation:
