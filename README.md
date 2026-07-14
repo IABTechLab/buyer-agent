@@ -171,22 +171,58 @@ python -m ad_buyer.interfaces.api.main
 # Server runs at http://localhost:8000
 ```
 
+This is equivalent to running the ASGI app directly with uvicorn:
+
+```bash
+uvicorn ad_buyer.interfaces.api.main:app --port 8000
+```
+
+`ANTHROPIC_API_KEY` is optional to *start* the server (the API boots without it);
+it is only required once you run CrewAI-backed booking flows.
+
+> **This quickstart is tested.** `tests/smoke/test_quickstart_smoke.py` boots the app at
+> the exact module path documented above (`ad_buyer.interfaces.api.main:app`) through its
+> real startup lifecycle and asserts `/health` and `/bookings` respond — no network or LLM
+> calls. Run it with `ANTHROPIC_API_KEY=test pytest tests/smoke/test_quickstart_smoke.py`.
+> If it fails, the entrypoint above is wrong.
+
 ### Verify
 
 ```bash
-# Health check
+# Health check (served by the buyer agent itself — no backend needed)
 curl http://localhost:8000/health
 
-# Browse seller media kit
+# List bookings (empty on a fresh server)
+curl http://localhost:8000/bookings
+```
+
+The next two calls reach *outward* to a seller agent / OpenDirect backend, so they
+only work once a seller agent is running (see the [Seller Agent](https://github.com/IABTechLab/seller-agent)
+and `SELLER_BASE_URL` in `.env`):
+
+```bash
+# Browse a seller's media kit (requires a seller agent on :8001)
 curl http://localhost:8001/media-kit
 
-# Search products
+# Search products across sellers (requires a reachable seller/OpenDirect backend)
 curl -X POST http://localhost:8000/products/search \
   -H "Content-Type: application/json" \
-  -d '{"query": "CTV video"}'
+  -d '{"channel": "ctv", "limit": 5}'
 ```
 
 → [Quickstart Guide](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/)
+
+### Campaign Automation Demo
+
+A self-contained, browser-based walkthrough of the campaign automation flow (budget
+allocation → pacing → reporting). It runs entirely in-process — no seller agent or
+external services required — and needs Flask, which ships in the `dev` extra:
+
+```bash
+pip install -e ".[dev]"
+python -m demo.campaign_demo
+# Opens at http://localhost:5055 (override with CAMPAIGN_DEMO_PORT)
+```
 
 ### Docker
 
