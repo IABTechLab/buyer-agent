@@ -3,8 +3,6 @@
 
 """FastAPI server for the Ad Buyer System."""
 
-import asyncio
-import json
 import logging
 import sqlite3
 import sys
@@ -20,10 +18,9 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
-from ...flows.deal_booking_flow import DealBookingFlow
+from ...services import booking_service
 from ...storage import DealStore
 from ...storage.order_store import OrderStore
-from ...time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -213,30 +210,11 @@ from .order_endpoints import create_order_router as _create_order_router  # noqa
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
     """Best-effort dual-write of a job dict to the DealStore.
 
-    Never raises -- logs errors and continues so the API endpoint is
-    unaffected by persistence failures.
-
-    Args:
-        job_id: Unique job identifier.
-        job: The in-memory job dict.
+    Thin wrapper delegating the persistence logic to
+    ``booking_service.persist_job``; the DealStore singleton lookup stays
+    here so tests can inject a store via ``_deal_store``.
     """
-    store = _get_store()
-    if store is None:
-        return
-    try:
-        store.save_job(
-            job_id=job_id,
-            status=job.get("status", "pending"),
-            progress=job.get("progress", 0.0),
-            brief=json.dumps(job.get("brief", {})),
-            auto_approve=job.get("auto_approve", False),
-            budget_allocs=json.dumps(job.get("budget_allocations", {})),
-            recommendations=json.dumps(job.get("recommendations", [])),
-            booked_lines=json.dumps(job.get("booked_lines", [])),
-            errors=json.dumps(job.get("errors", [])),
-        )
-    except (sqlite3.Error, OSError, ValueError, AttributeError):
-        logger.exception("Failed to persist job %s", job_id)
+    booking_service.persist_job(_get_store(), job_id, job)
 
 
 # Request/Response Models
@@ -332,20 +310,11 @@ async def create_booking(
     Use GET /bookings/{job_id} to check status.
     """
     job_id = str(uuid.uuid4())
-    now = utc_now().isoformat()
 
-    jobs[job_id] = {
-        "status": "pending",
-        "progress": 0.0,
-        "brief": request.brief.model_dump(),
-        "auto_approve": request.auto_approve,
-        "budget_allocations": {},
-        "recommendations": [],
-        "booked_lines": [],
-        "errors": [],
-        "created_at": now,
-        "updated_at": now,
-    }
+    jobs[job_id] = booking_service.new_job_record(
+        request.brief.model_dump(),
+        request.auto_approve,
+    )
 
     # Dual-write to SQLite
     _persist_job(job_id, jobs[job_id])
@@ -400,32 +369,20 @@ async def approve_recommendations(
             detail=f"Job is not awaiting approval. Current status: {job['status']}",
         )
 
-    # Get the flow from the job (in production, restore from storage)
-    flow = job.get("_flow")
-    if not flow:
+    # Flow must still be resident for the approval handoff.
+    if not job.get("_flow"):
         raise HTTPException(
             status_code=500,
             detail="Flow state not available. Job may have expired.",
         )
 
-    # Execute approvals
-    result = flow.approve_recommendations(request.approved_product_ids)
-
-    # Update job
-    job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-    job["updated_at"] = utc_now().isoformat()
-    job["progress"] = 1.0
-
-    # Dual-write to SQLite
-    _persist_job(job_id, job)
-
-    return {
-        "status": result.get("status"),
-        "approved_count": len(request.approved_product_ids),
-        "booked": result.get("booked", 0),
-        "total_cost": result.get("total_cost", 0),
-    }
+    return await booking_service.approve(
+        job_id,
+        job,
+        request.approved_product_ids,
+        store=_get_store(),
+        persist=_persist_job,
+    )
 
 
 @app.post("/bookings/{job_id}/approve-all", tags=["Bookings"])
@@ -441,27 +398,21 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
             detail=f"Job is not awaiting approval. Current status: {job['status']}",
         )
 
-    flow = job.get("_flow")
-    if not flow:
+    # Flow must still be resident for the approval handoff.
+    if not job.get("_flow"):
         raise HTTPException(
             status_code=500,
             detail="Flow state not available. Job may have expired.",
         )
 
-    # buyer-1g4: approve_all() runs sync CrewAI work that holds the
-    # calling thread; offload to a worker thread so the event loop
-    # stays responsive.
-    result = await asyncio.to_thread(flow.approve_all)
-
-    job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-    job["updated_at"] = utc_now().isoformat()
-    job["progress"] = 1.0
-
-    # Dual-write to SQLite
-    _persist_job(job_id, job)
-
-    return result
+    # buyer-1g4: approve_all() runs sync CrewAI work; the service offloads
+    # it to a worker thread so the event loop stays responsive.
+    return await booking_service.approve_all(
+        job_id,
+        job,
+        store=_get_store(),
+        persist=_persist_job,
+    )
 
 
 @app.get("/bookings", tags=["Bookings"])
@@ -554,72 +505,22 @@ async def get_event(event_id: str) -> dict[str, Any]:
 
 
 async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
-    """Background task to run the booking flow."""
-    job = jobs[job_id]
+    """Background task to run the booking flow.
 
-    try:
-        job["status"] = "running"
-        job["progress"] = 0.1
-        job["updated_at"] = utc_now().isoformat()
-        _persist_job(job_id, job)
-
-        client = _create_client()
-        # Pass initial state via constructor — CrewAI 1.10.1 removed flow.state setter.
-        flow = DealBookingFlow(
-            client,
-            store=_get_store(),
-            campaign_brief=request.brief.model_dump(),
-        )
-
-        # Store flow reference for approval
-        job["_flow"] = flow
-
-        job["progress"] = 0.2
-        # buyer-1g4: offload the whole sync flow.kickoff() to a worker
-        # thread so the FastAPI event loop stays responsive while the
-        # crew agents (which block on real LLM HTTP calls) run.
-        #
-        # We do NOT use ``await flow.kickoff_async()`` here even though
-        # it looks cleaner — the buyer's Flow ``@start`` / ``@listen``
-        # step methods are sync and themselves call ``crew.kickoff()``
-        # directly. Awaited from the event loop, those sync steps would
-        # run IN the event loop thread, re-introducing the block.
-        #
-        # CrewAI's sync ``Flow.kickoff()`` already does
-        # ``ThreadPoolExecutor.submit(asyncio.run, _run_flow).result()``
-        # internally — the ``.result()`` is what blocks the calling
-        # thread. ``asyncio.to_thread`` puts that ``.result()`` on a
-        # worker thread (two threads deep, but the event loop is free).
-        _result = await asyncio.to_thread(flow.kickoff)
-
-        # Propagate any errors captured by flow steps into the job response so
-        # the client can see what went wrong instead of silent-success (ar-jbod).
-        if flow.state.errors:
-            job["errors"].extend(flow.state.errors)
-
-        job["progress"] = 0.8
-        job["budget_allocations"] = {
-            k: v.model_dump() for k, v in flow.state.budget_allocations.items()
-        }
-        job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
-
-        if request.auto_approve:
-            # buyer-1g4: same reason as above — offload sync work.
-            await asyncio.to_thread(flow.approve_all)
-            job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
-            job["status"] = "completed"
-        else:
-            job["status"] = "awaiting_approval"
-
-        job["progress"] = 1.0 if job["status"] == "completed" else 0.9
-        job["updated_at"] = utc_now().isoformat()
-        _persist_job(job_id, job)
-
-    except Exception as e:  # noqa: BLE001 - top-level background task handler; must record any failure
-        job["status"] = "failed"
-        job["errors"].append(str(e))
-        job["updated_at"] = utc_now().isoformat()
-        _persist_job(job_id, job)
+    Thin adapter over ``booking_service.execute_booking``: wires the
+    OpenDirect client, the DealStore, and the persistence callback, then
+    hands off to the service which owns the canonical DealBookingFlow run
+    (including the buyer-1g4 worker-thread offload of the sync kickoff).
+    """
+    await booking_service.execute_booking(
+        job_id,
+        jobs[job_id],
+        request.brief.model_dump(),
+        request.auto_approve,
+        client=_create_client(),
+        store=_get_store(),
+        persist=_persist_job,
+    )
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
