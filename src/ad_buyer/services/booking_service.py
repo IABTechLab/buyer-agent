@@ -23,7 +23,8 @@ import asyncio
 import json
 import logging
 import sqlite3
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from ..flows.deal_booking_flow import DealBookingFlow
 from ..time_utils import utc_now

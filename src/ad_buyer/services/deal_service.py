@@ -26,6 +26,8 @@ from ..storage.deal_store import DealStore
 from ..tools.deal_import import parse_csv_string
 from ..tools.deal_library.deal_entry import (
     ManualDealEntry,
+)
+from ..tools.deal_library.deal_entry import (
     create_manual_deal as validate_manual_deal,
 )
 

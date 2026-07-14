@@ -138,8 +138,7 @@ class TestImportDealsCsv:
 
     def test_invalid_deal_type_reports_error(self, store):
         csv_data = (
-            "deal_name,publisher,seller_domain,deal_type\n"
-            "Bad Deal,ESPN,espn.com,NOT_A_TYPE\n"
+            "deal_name,publisher,seller_domain,deal_type\nBad Deal,ESPN,espn.com,NOT_A_TYPE\n"
         )
         result = deal_service.import_deals_csv(store, csv_data)
         assert result["failed"] >= 1
