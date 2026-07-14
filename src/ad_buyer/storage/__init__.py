@@ -19,9 +19,20 @@ backend incrementally; the two coexist.
 """
 
 from .base import StorageBackend
+from .booking_record_store import BookingRecordStore
+from .creative_asset_store import CreativeAssetStore
+from .deal_activation_store import DealActivationStore
+from .deal_event_store import DealEventStore
 from .deal_store import DealStore
+from .deal_template_store import DealTemplateStore
 from .factory import get_storage_backend
+from .job_store import JobStore
+from .negotiation_store import NegotiationStore
+from .performance_cache_store import PerformanceCacheStore
+from .portfolio_metadata_store import PortfolioMetadataStore
 from .schema import SCHEMA_VERSION, create_tables, initialize_schema
+from .status_transition_store import StatusTransitionStore
+from .supply_path_template_store import SupplyPathTemplateStore
 
 _store_instance: DealStore | None = None
 
@@ -51,4 +62,16 @@ __all__ = [
     "SCHEMA_VERSION",
     "create_tables",
     "initialize_schema",
+    # Aggregate stores extracted from DealStore (ar-bonx, EP-2.4)
+    "BookingRecordStore",
+    "CreativeAssetStore",
+    "DealActivationStore",
+    "DealEventStore",
+    "DealTemplateStore",
+    "JobStore",
+    "NegotiationStore",
+    "PerformanceCacheStore",
+    "PortfolioMetadataStore",
+    "StatusTransitionStore",
+    "SupplyPathTemplateStore",
 ]

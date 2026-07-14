@@ -7,11 +7,19 @@ Uses synchronous sqlite3 (not aiosqlite) because CrewAI runs flows in
 worker threads that may not have an asyncio event loop.  Thread safety
 is provided by check_same_thread=False and a threading.Lock().
 
-The DealStore is the single persistence layer for deal lifecycle state,
-negotiation history, booking records, job tracking, and status transitions.
+``DealStore`` is the composition root ("facade") for deal-lifecycle
+persistence.  It owns the SQLite connection and lock and keeps the core
+deal CRUD (save/get/list/update-status) inline.  Every other aggregate --
+negotiation rounds, booking records, jobs, events, status transitions,
+portfolio metadata, deal activations, performance cache, creative assets,
+deal templates, and supply path templates -- lives in its own focused
+store module under ``ad_buyer.storage`` (bead ar-bonx, EP-2.4 god-class
+split).  Those stores share this facade's single connection and lock, so
+the public API, table layout, SQL, and thread-safety semantics are
+unchanged; callers that use ``deal_store.<method>()`` continue to work
+without modification.
 """
 
-import json
 import logging
 import sqlite3
 import threading
@@ -23,7 +31,18 @@ from ..models.state_machine import (
     BuyerDealStatus,
     DealStateMachine,
 )
+from .booking_record_store import BookingRecordStore
+from .creative_asset_store import CreativeAssetStore
+from .deal_activation_store import DealActivationStore
+from .deal_event_store import DealEventStore
+from .deal_template_store import DealTemplateStore
+from .job_store import JobStore
+from .negotiation_store import NegotiationStore
+from .performance_cache_store import PerformanceCacheStore
+from .portfolio_metadata_store import PortfolioMetadataStore
 from .schema import initialize_schema
+from .status_transition_store import StatusTransitionStore
+from .supply_path_template_store import SupplyPathTemplateStore
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +53,14 @@ def _now_iso() -> str:
 
 
 class DealStore:
-    """SQLite-backed store for deal state, negotiations, bookings, and jobs.
+    """SQLite-backed facade for deal state, negotiations, bookings, and jobs.
 
-    Thread-safe via a reentrant lock. Uses WAL mode for concurrent
+    Thread-safe via a shared lock. Uses WAL mode for concurrent
     read/write access. All public methods are synchronous.
+
+    Core deal CRUD is implemented inline; the remaining aggregate
+    operations are delegated to focused stores (composed in
+    :meth:`connect`) that share this instance's connection and lock.
 
     Args:
         database_url: SQLite connection string (e.g. ``sqlite:///./ad_buyer.db``
@@ -48,6 +71,21 @@ class DealStore:
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
+
+        # Composed aggregate stores. Wired in connect() once the shared
+        # connection exists; None until then (methods are only usable
+        # after connect(), matching the pre-split behavior).
+        self._negotiation_store: NegotiationStore | None = None
+        self._booking_record_store: BookingRecordStore | None = None
+        self._job_store: JobStore | None = None
+        self._event_store: DealEventStore | None = None
+        self._status_store: StatusTransitionStore | None = None
+        self._portfolio_store: PortfolioMetadataStore | None = None
+        self._activation_store: DealActivationStore | None = None
+        self._performance_store: PerformanceCacheStore | None = None
+        self._creative_asset_store: CreativeAssetStore | None = None
+        self._deal_template_store: DealTemplateStore | None = None
+        self._supply_path_template_store: SupplyPathTemplateStore | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -61,12 +99,45 @@ class DealStore:
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.execute("PRAGMA busy_timeout=5000")
         initialize_schema(self._conn)
+        self._wire_stores()
 
     def disconnect(self) -> None:
         """Close the database connection."""
         if self._conn is not None:
             self._conn.close()
             self._conn = None
+        self._negotiation_store = None
+        self._booking_record_store = None
+        self._job_store = None
+        self._event_store = None
+        self._status_store = None
+        self._portfolio_store = None
+        self._activation_store = None
+        self._performance_store = None
+        self._creative_asset_store = None
+        self._deal_template_store = None
+        self._supply_path_template_store = None
+
+    def _wire_stores(self) -> None:
+        """Construct the composed aggregate stores over the shared connection.
+
+        Every sub-store receives this facade's live connection and lock,
+        so all reads/writes flow through a single connection serialized by
+        one lock -- identical to the pre-split monolith.
+        """
+        conn = self._conn
+        lock = self._lock
+        self._negotiation_store = NegotiationStore(conn, lock)
+        self._booking_record_store = BookingRecordStore(conn, lock)
+        self._job_store = JobStore(conn, lock)
+        self._event_store = DealEventStore(conn, lock)
+        self._status_store = StatusTransitionStore(conn, lock)
+        self._portfolio_store = PortfolioMetadataStore(conn, lock)
+        self._activation_store = DealActivationStore(conn, lock)
+        self._performance_store = PerformanceCacheStore(conn, lock)
+        self._creative_asset_store = CreativeAssetStore(conn, lock)
+        self._deal_template_store = DealTemplateStore(conn, lock)
+        self._supply_path_template_store = SupplyPathTemplateStore(conn, lock)
 
     # ------------------------------------------------------------------
     # Deals
@@ -533,1242 +604,191 @@ class DealStore:
         return True
 
     # ------------------------------------------------------------------
-    # Negotiation Rounds
+    # Delegated aggregate operations
+    #
+    # The following methods forward verbatim to the composed aggregate
+    # stores wired in connect().  They preserve the historical DealStore
+    # public API so existing ``deal_store.<method>()`` call sites and test
+    # fixtures keep working unchanged after the god-class split (ar-bonx).
     # ------------------------------------------------------------------
 
-    def save_negotiation_round(
-        self,
-        *,
-        deal_id: str,
-        proposal_id: str,
-        round_number: int,
-        buyer_price: float,
-        seller_price: float,
-        action: str,
-        rationale: str = "",
-    ) -> int:
-        """Record a negotiation round.
-
-        Args:
-            deal_id: FK to deals.
-            proposal_id: Seller's proposal ID.
-            round_number: Sequential round number.
-            buyer_price: Buyer's offered price.
-            seller_price: Seller's asking price.
-            action: counter, accept, reject, final_offer.
-            rationale: Explanation for the action.
-
-        Returns:
-            The auto-generated row ID.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """INSERT INTO negotiation_rounds
-                   (deal_id, proposal_id, round_number, buyer_price,
-                    seller_price, action, rationale)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    deal_id,
-                    proposal_id,
-                    round_number,
-                    buyer_price,
-                    seller_price,
-                    action,
-                    rationale,
-                ),
-            )
-            self._conn.commit()
-            return cursor.lastrowid
-
-    def get_negotiation_history(self, deal_id: str) -> list[dict[str, Any]]:
-        """Get all negotiation rounds for a deal, ordered by round number.
-
-        Args:
-            deal_id: The deal to query.
-
-        Returns:
-            List of round dicts.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """SELECT * FROM negotiation_rounds
-                   WHERE deal_id = ?
-                   ORDER BY round_number ASC""",
-                (deal_id,),
-            )
-            rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Booking Records
-    # ------------------------------------------------------------------
-
-    def save_booking_record(
-        self,
-        *,
-        deal_id: str,
-        order_id: str | None = None,
-        line_id: str | None = None,
-        channel: str = "",
-        impressions: int = 0,
-        cost: float = 0.0,
-        booking_status: str = "pending",
-        metadata: str | None = None,
-    ) -> int:
-        """Record a booked line item.
-
-        Args:
-            deal_id: FK to deals.
-            order_id: OpenDirect order ID.
-            line_id: OpenDirect line ID.
-            channel: Channel name.
-            impressions: Contracted impressions.
-            cost: Line cost.
-            booking_status: Initial booking status.
-            metadata: JSON string for extensible fields.
-
-        Returns:
-            The auto-generated row ID.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """INSERT INTO booking_records
-                   (deal_id, order_id, line_id, channel, impressions, cost,
-                    booking_status, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    deal_id,
-                    order_id,
-                    line_id,
-                    channel,
-                    impressions,
-                    cost,
-                    booking_status,
-                    metadata or "{}",
-                ),
-            )
-            self._conn.commit()
-            return cursor.lastrowid
-
-    def get_booking_records(self, deal_id: str) -> list[dict[str, Any]]:
-        """Get all booking records for a deal.
-
-        Args:
-            deal_id: The deal to query.
-
-        Returns:
-            List of booking record dicts.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM booking_records WHERE deal_id = ?",
-                (deal_id,),
-            )
-            rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Jobs
-    # ------------------------------------------------------------------
-
-    def save_job(
-        self,
-        *,
-        job_id: str,
-        status: str = "pending",
-        progress: float = 0.0,
-        brief: str | None = None,
-        auto_approve: bool = False,
-        budget_allocs: str | None = None,
-        recommendations: str | None = None,
-        booked_lines: str | None = None,
-        errors: str | None = None,
-    ) -> str:
-        """Insert or update a job record (upsert).
-
-        Args:
-            job_id: Unique job identifier.
-            status: Job status.
-            progress: Progress 0.0-1.0.
-            brief: JSON campaign brief.
-            auto_approve: Whether to auto-approve.
-            budget_allocs: JSON budget allocations.
-            recommendations: JSON recommendation list.
-            booked_lines: JSON booked lines list.
-            errors: JSON error list.
-
-        Returns:
-            The job ID.
-        """
-        now = _now_iso()
-
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO jobs
-                   (id, status, progress, brief, auto_approve,
-                    budget_allocs, recommendations, booked_lines, errors,
-                    created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(id) DO UPDATE SET
-                       status = excluded.status,
-                       progress = excluded.progress,
-                       brief = excluded.brief,
-                       auto_approve = excluded.auto_approve,
-                       budget_allocs = excluded.budget_allocs,
-                       recommendations = excluded.recommendations,
-                       booked_lines = excluded.booked_lines,
-                       errors = excluded.errors,
-                       updated_at = excluded.updated_at""",
-                (
-                    job_id,
-                    status,
-                    progress,
-                    brief or "{}",
-                    1 if auto_approve else 0,
-                    budget_allocs or "{}",
-                    recommendations or "[]",
-                    booked_lines or "[]",
-                    errors or "[]",
-                    now,
-                    now,
-                ),
-            )
-            self._conn.commit()
-        return job_id
-
-    def get_job(self, job_id: str) -> dict[str, Any] | None:
-        """Retrieve a job by ID.
-
-        Args:
-            job_id: The job's primary key.
-
-        Returns:
-            Job as a dict, or None if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
-            row = cursor.fetchone()
-        if row is None:
-            return None
-
-        result = dict(row)
-        # Deserialize JSON fields for API compatibility
-        for field in ("brief", "budget_allocs", "recommendations", "booked_lines", "errors"):
-            val = result.get(field)
-            if isinstance(val, str):
-                try:
-                    result[field] = json.loads(val)
-                except (json.JSONDecodeError, TypeError):
-                    pass
-        # Convert auto_approve int to bool
-        result["auto_approve"] = bool(result.get("auto_approve", 0))
-        return result
-
-    def list_jobs(
-        self,
-        *,
-        status: str | None = None,
-        limit: int = 20,
-    ) -> list[dict[str, Any]]:
-        """List jobs with optional status filter.
-
-        Args:
-            status: Filter by job status.
-            limit: Maximum rows to return.
-
-        Returns:
-            List of job dicts ordered by created_at descending.
-        """
-        if status is not None:
-            query = "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?"
-            params: tuple = (status, limit)
-        else:
-            query = "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?"
-            params = (limit,)
-
-        with self._lock:
-            cursor = self._conn.execute(query, params)
-            rows = cursor.fetchall()
-
-        results = []
-        for row in rows:
-            r = dict(row)
-            # Deserialize JSON fields
-            for field in ("brief", "budget_allocs", "recommendations", "booked_lines", "errors"):
-                val = r.get(field)
-                if isinstance(val, str):
-                    try:
-                        r[field] = json.loads(val)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-            r["auto_approve"] = bool(r.get("auto_approve", 0))
-            results.append(r)
-        return results
-
-    # ------------------------------------------------------------------
-    # Events
-    # ------------------------------------------------------------------
-
-    def save_event(
-        self,
-        *,
-        event_id: str | None = None,
-        event_type: str,
-        flow_id: str = "",
-        flow_type: str = "",
-        deal_id: str = "",
-        session_id: str = "",
-        payload: str | None = None,
-        metadata: str | None = None,
-    ) -> str:
-        """Persist an event to the events table.
-
-        Args:
-            event_id: Optional UUID. Generated if not provided.
-            event_type: Event type string (e.g. "deal.booked").
-            flow_id: Flow that produced this event.
-            flow_type: Type of flow (e.g. "deal_booking").
-            deal_id: Associated deal ID.
-            session_id: Associated session ID.
-            payload: JSON-serialized payload.
-            metadata: JSON-serialized metadata.
-
-        Returns:
-            The event ID (generated or provided).
-        """
-        if event_id is None:
-            event_id = str(uuid.uuid4())
-
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO events
-                   (id, event_type, flow_id, flow_type, deal_id,
-                    session_id, payload, metadata)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    event_id,
-                    event_type,
-                    flow_id,
-                    flow_type,
-                    deal_id,
-                    session_id,
-                    payload or "{}",
-                    metadata or "{}",
-                ),
-            )
-            self._conn.commit()
-
-        return event_id
-
-    def get_event(self, event_id: str) -> dict[str, Any] | None:
-        """Retrieve an event by ID.
-
-        Args:
-            event_id: The event's primary key.
-
-        Returns:
-            Event as a dict, or None if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute("SELECT * FROM events WHERE id = ?", (event_id,))
-            row = cursor.fetchone()
-        return dict(row) if row else None
-
-    def list_events(
-        self,
-        *,
-        event_type: str | None = None,
-        flow_id: str | None = None,
-        session_id: str | None = None,
-        limit: int = 50,
-    ) -> list[dict[str, Any]]:
-        """List events with optional filters.
-
-        Args:
-            event_type: Filter by event type.
-            flow_id: Filter by flow ID.
-            session_id: Filter by session ID.
-            limit: Maximum rows to return.
-
-        Returns:
-            List of event dicts ordered by created_at descending.
-        """
-        clauses: list[str] = []
-        params: list[Any] = []
-
-        if event_type is not None:
-            clauses.append("event_type = ?")
-            params.append(event_type)
-        if flow_id is not None:
-            clauses.append("flow_id = ?")
-            params.append(flow_id)
-        if session_id is not None:
-            clauses.append("session_id = ?")
-            params.append(session_id)
-
-        where = ""
-        if clauses:
-            where = "WHERE " + " AND ".join(clauses)
-
-        query = f"SELECT * FROM events {where} ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
-
-        with self._lock:
-            cursor = self._conn.execute(query, params)
-            rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Status Transitions
-    # ------------------------------------------------------------------
-
-    def record_status_transition(
-        self,
-        *,
-        entity_type: str,
-        entity_id: str,
-        from_status: str | None,
-        to_status: str,
-        triggered_by: str = "system",
-        notes: str = "",
-    ) -> int:
-        """Log a status change to the audit table.
-
-        Args:
-            entity_type: ``deal`` or ``booking``.
-            entity_id: The entity's primary key.
-            from_status: Previous status (None for creation).
-            to_status: New status.
-            triggered_by: system, seller_push, user, agent.
-            notes: Free-text note.
-
-        Returns:
-            The auto-generated row ID.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """INSERT INTO status_transitions
-                   (entity_type, entity_id, from_status, to_status,
-                    triggered_by, notes)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (entity_type, entity_id, from_status, to_status, triggered_by, notes),
-            )
-            self._conn.commit()
-            return cursor.lastrowid
-
-    def get_status_history(
-        self,
-        entity_type: str,
-        entity_id: str,
-    ) -> list[dict[str, Any]]:
-        """Get status transition history for an entity.
-
-        Args:
-            entity_type: ``deal`` or ``booking``.
-            entity_id: The entity's primary key.
-
-        Returns:
-            List of transition dicts ordered by created_at ascending.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """SELECT * FROM status_transitions
-                   WHERE entity_type = ? AND entity_id = ?
-                   ORDER BY created_at ASC""",
-                (entity_type, entity_id),
-            )
-            rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
-    # Portfolio Metadata (v2)
-    # ------------------------------------------------------------------
-
-    def save_portfolio_metadata(
-        self,
-        *,
-        deal_id: str,
-        import_source: str | None = None,
-        import_date: str | None = None,
-        tags: str | None = None,
-        advertiser_id: str | None = None,
-        agency_id: str | None = None,
-    ) -> int:
-        """Insert a portfolio metadata record for a deal.
-
-        Args:
-            deal_id: FK to deals.
-            import_source: How the deal was imported (CSV, MANUAL, TTD_API, etc.).
-            import_date: ISO date when the deal was imported.
-            tags: JSON array of user-defined tags.
-            advertiser_id: Advertiser this deal belongs to.
-            agency_id: Agency managing this deal.
-
-        Returns:
-            The auto-generated row ID.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """INSERT INTO portfolio_metadata
-                   (deal_id, import_source, import_date, tags,
-                    advertiser_id, agency_id)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (deal_id, import_source, import_date, tags, advertiser_id, agency_id),
-            )
-            self._conn.commit()
-            return cursor.lastrowid
-
-    def get_portfolio_metadata(self, deal_id: str) -> dict[str, Any] | None:
-        """Get portfolio metadata for a deal.
-
-        Args:
-            deal_id: The deal to query.
-
-        Returns:
-            Metadata as a dict, or None if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM portfolio_metadata WHERE deal_id = ?",
-                (deal_id,),
-            )
-            row = cursor.fetchone()
-        return dict(row) if row else None
-
-    def update_portfolio_metadata(self, deal_id: str, **kwargs: Any) -> bool:
-        """Update specific fields on a deal's portfolio metadata.
-
-        Args:
-            deal_id: The deal whose metadata to update.
-            **kwargs: Column-value pairs to update. Only known columns
-                (import_source, import_date, tags, advertiser_id,
-                agency_id) are accepted.
-
-        Returns:
-            True if a row was updated, False if no metadata exists for
-            the deal or no valid kwargs were provided.
-        """
-        allowed = {"import_source", "import_date", "tags", "advertiser_id", "agency_id"}
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return False
-
-        set_clause = ", ".join(f"{col} = ?" for col in updates)
-        values = list(updates.values())
-        values.append(deal_id)
-
-        with self._lock:
-            cursor = self._conn.execute(
-                f"UPDATE portfolio_metadata SET {set_clause} WHERE deal_id = ?",
-                values,
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    def delete_portfolio_metadata(self, deal_id: str) -> bool:
-        """Delete portfolio metadata for a deal.
-
-        Args:
-            deal_id: The deal whose metadata to delete.
-
-        Returns:
-            True if a row was deleted, False if no metadata existed.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM portfolio_metadata WHERE deal_id = ?",
-                (deal_id,),
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    # ------------------------------------------------------------------
-    # Deal Activations (v2)
-    # ------------------------------------------------------------------
-
-    def save_deal_activation(
-        self,
-        *,
-        deal_id: str,
-        platform: str,
-        platform_deal_id: str | None = None,
-        activation_status: str | None = None,
-        last_sync_at: str | None = None,
-    ) -> int:
-        """Insert a deal activation record.
-
-        Args:
-            deal_id: FK to deals.
-            platform: Platform name (TTD, DV360, XANDR, AMAZON_DSP, DIRECT).
-            platform_deal_id: Deal ID on the platform.
-            activation_status: ACTIVE, PAUSED, PENDING, or ERROR.
-            last_sync_at: ISO timestamp of last sync.
-
-        Returns:
-            The auto-generated row ID.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """INSERT INTO deal_activations
-                   (deal_id, platform, platform_deal_id,
-                    activation_status, last_sync_at)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (deal_id, platform, platform_deal_id, activation_status, last_sync_at),
-            )
-            self._conn.commit()
-            return cursor.lastrowid
-
-    def get_deal_activations(self, deal_id: str) -> list[dict[str, Any]]:
-        """Get all activations for a deal.
-
-        Args:
-            deal_id: The deal to query.
-
-        Returns:
-            List of activation dicts.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM deal_activations WHERE deal_id = ?",
-                (deal_id,),
-            )
-            rows = cursor.fetchall()
-        return [dict(r) for r in rows]
-
-    def update_deal_activation(self, activation_id: int, **kwargs: Any) -> bool:
-        """Update specific fields on a deal activation.
-
-        Args:
-            activation_id: The activation row ID to update.
-            **kwargs: Column-value pairs to update. Only known columns
-                (platform, platform_deal_id, activation_status,
-                last_sync_at) are accepted.
-
-        Returns:
-            True if a row was updated, False if the activation was not
-            found or no valid kwargs were provided.
-        """
-        allowed = {"platform", "platform_deal_id", "activation_status", "last_sync_at"}
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return False
-
-        set_clause = ", ".join(f"{col} = ?" for col in updates)
-        values = list(updates.values())
-        values.append(activation_id)
-
-        with self._lock:
-            cursor = self._conn.execute(
-                f"UPDATE deal_activations SET {set_clause} WHERE id = ?",
-                values,
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    def delete_deal_activation(self, activation_id: int) -> bool:
-        """Delete a deal activation by ID.
-
-        Args:
-            activation_id: The activation row ID to delete.
-
-        Returns:
-            True if a row was deleted, False if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM deal_activations WHERE id = ?",
-                (activation_id,),
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    # ------------------------------------------------------------------
-    # Performance Cache (v2)
-    # ------------------------------------------------------------------
-
-    def save_performance_cache(
-        self,
-        *,
-        deal_id: str,
-        impressions_delivered: int | None = None,
-        spend_to_date: float | None = None,
-        fill_rate: float | None = None,
-        win_rate: float | None = None,
-        avg_effective_cpm: float | None = None,
-        last_delivery_at: str | None = None,
-        performance_trend: str | None = None,
-        cached_at: str | None = None,
-    ) -> int:
-        """Insert a performance cache entry for a deal.
-
-        Args:
-            deal_id: FK to deals.
-            impressions_delivered: Total impressions delivered.
-            spend_to_date: Total spend.
-            fill_rate: Fill rate (0.0-1.0).
-            win_rate: Win rate (0.0-1.0).
-            avg_effective_cpm: Average effective CPM.
-            last_delivery_at: ISO timestamp of last delivery.
-            performance_trend: IMPROVING, STABLE, DECLINING, or NO_DATA.
-            cached_at: ISO timestamp when this cache entry was created.
-
-        Returns:
-            The auto-generated row ID.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """INSERT INTO performance_cache
-                   (deal_id, impressions_delivered, spend_to_date,
-                    fill_rate, win_rate, avg_effective_cpm,
-                    last_delivery_at, performance_trend, cached_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    deal_id,
-                    impressions_delivered,
-                    spend_to_date,
-                    fill_rate,
-                    win_rate,
-                    avg_effective_cpm,
-                    last_delivery_at,
-                    performance_trend,
-                    cached_at,
-                ),
-            )
-            self._conn.commit()
-            return cursor.lastrowid
-
-    def get_performance_cache(self, deal_id: str) -> dict[str, Any] | None:
-        """Get the latest performance cache entry for a deal.
-
-        Args:
-            deal_id: The deal to query.
-
-        Returns:
-            Performance data as a dict, or None if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                """SELECT * FROM performance_cache
-                   WHERE deal_id = ?
-                   ORDER BY id DESC LIMIT 1""",
-                (deal_id,),
-            )
-            row = cursor.fetchone()
-        return dict(row) if row else None
-
-    def update_performance_cache(self, deal_id: str, **kwargs: Any) -> bool:
-        """Update the latest performance cache entry for a deal.
-
-        Updates the most recently inserted cache row for the given
-        deal_id.  Functions as an upsert-style update by deal_id.
-
-        Args:
-            deal_id: The deal whose cache to update.
-            **kwargs: Column-value pairs to update. Only known columns
-                (impressions_delivered, spend_to_date, fill_rate,
-                win_rate, avg_effective_cpm, last_delivery_at,
-                performance_trend, cached_at) are accepted.
-
-        Returns:
-            True if a row was updated, False if no cache exists for
-            the deal or no valid kwargs were provided.
-        """
-        allowed = {
-            "impressions_delivered",
-            "spend_to_date",
-            "fill_rate",
-            "win_rate",
-            "avg_effective_cpm",
-            "last_delivery_at",
-            "performance_trend",
-            "cached_at",
-        }
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return False
-
-        set_clause = ", ".join(f"{col} = ?" for col in updates)
-        values = list(updates.values())
-        values.append(deal_id)
-
-        with self._lock:
-            # Update the most recent cache entry for this deal
-            cursor = self._conn.execute(
-                f"""UPDATE performance_cache SET {set_clause}
-                    WHERE id = (
-                        SELECT id FROM performance_cache
-                        WHERE deal_id = ?
-                        ORDER BY id DESC LIMIT 1
-                    )""",
-                values,
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    def delete_performance_cache(self, deal_id: str) -> bool:
-        """Delete all performance cache entries for a deal.
-
-        Args:
-            deal_id: The deal whose cache to delete.
-
-        Returns:
-            True if any rows were deleted, False if none existed.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM performance_cache WHERE deal_id = ?",
-                (deal_id,),
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    # ------------------------------------------------------------------
-    # Creative Assets (v3 — Campaign Automation)
-    # ------------------------------------------------------------------
-
-    def save_creative_asset(
-        self,
-        *,
-        asset_id: str | None = None,
-        campaign_id: str,
-        asset_name: str,
-        asset_type: str,
-        format_spec: dict | None = None,
-        source_url: str | None = None,
-        validation_status: str = "pending",
-        validation_errors: list | None = None,
-    ) -> str:
-        """Insert a new creative asset.
-
-        Args:
-            asset_id: Optional UUID. Generated if not provided.
-            campaign_id: ID of the campaign this asset belongs to.
-            asset_name: Human-readable name for the creative.
-            asset_type: Type of creative (display, video, audio, interactive, native).
-            format_spec: Format-specific metadata dict (varies by asset_type).
-            source_url: URL where the creative file is hosted.
-            validation_status: IAB spec validation status (pending, valid, invalid).
-            validation_errors: List of validation error/warning messages.
-
-        Returns:
-            The asset ID (generated or provided).
-        """
-        if asset_id is None:
-            asset_id = str(uuid.uuid4())
-        now = _now_iso()
-
-        format_spec_json = json.dumps(format_spec) if format_spec is not None else "{}"
-        errors_json = json.dumps(validation_errors) if validation_errors is not None else "[]"
-
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO creative_assets
-                   (asset_id, campaign_id, asset_name, asset_type,
-                    format_spec, source_url, validation_status,
-                    validation_errors, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    asset_id,
-                    campaign_id,
-                    asset_name,
-                    asset_type,
-                    format_spec_json,
-                    source_url,
-                    validation_status,
-                    errors_json,
-                    now,
-                    now,
-                ),
-            )
-            self._conn.commit()
-
-        return asset_id
-
-    def get_creative_asset(self, asset_id: str) -> dict[str, Any] | None:
-        """Retrieve a creative asset by ID.
-
-        JSON fields (format_spec, validation_errors) are automatically
-        deserialized.
-
-        Args:
-            asset_id: The asset's primary key.
-
-        Returns:
-            Asset as a dict with deserialized JSON fields, or None if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM creative_assets WHERE asset_id = ?",
-                (asset_id,),
-            )
-            row = cursor.fetchone()
-
-        if row is None:
-            return None
-
-        result = dict(row)
-        # Deserialize JSON fields
-        for field in ("format_spec", "validation_errors"):
-            val = result.get(field)
-            if isinstance(val, str):
-                try:
-                    result[field] = json.loads(val)
-                except (json.JSONDecodeError, TypeError):
-                    pass
-        return result
-
-    def list_creative_assets(
-        self,
-        *,
-        campaign_id: str | None = None,
-        asset_type: str | None = None,
-        validation_status: str | None = None,
-        limit: int = 50,
-    ) -> list[dict[str, Any]]:
-        """List creative assets with optional filters.
-
-        Args:
-            campaign_id: Filter by campaign ID.
-            asset_type: Filter by asset type (display, video, etc.).
-            validation_status: Filter by validation status (pending, valid, invalid).
-            limit: Maximum rows to return.
-
-        Returns:
-            List of asset dicts ordered by created_at descending.
-        """
-        clauses: list[str] = []
-        params: list[Any] = []
-
-        if campaign_id is not None:
-            clauses.append("campaign_id = ?")
-            params.append(campaign_id)
-        if asset_type is not None:
-            clauses.append("asset_type = ?")
-            params.append(asset_type)
-        if validation_status is not None:
-            clauses.append("validation_status = ?")
-            params.append(validation_status)
-
-        where = ""
-        if clauses:
-            where = "WHERE " + " AND ".join(clauses)
-
-        query = f"SELECT * FROM creative_assets {where} ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
-
-        with self._lock:
-            cursor = self._conn.execute(query, params)
-            rows = cursor.fetchall()
-
-        results = []
-        for row in rows:
-            r = dict(row)
-            # Deserialize JSON fields
-            for field in ("format_spec", "validation_errors"):
-                val = r.get(field)
-                if isinstance(val, str):
-                    try:
-                        r[field] = json.loads(val)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-            results.append(r)
-        return results
-
-    def update_creative_asset(self, asset_id: str, **kwargs: Any) -> bool:
-        """Update specific fields on a creative asset.
-
-        Automatically serializes format_spec (dict) and validation_errors
-        (list) to JSON before writing.  Bumps ``updated_at``.
-
-        Args:
-            asset_id: The asset to update.
-            **kwargs: Column-value pairs to update. Accepted columns:
-                asset_name, asset_type, format_spec, source_url,
-                validation_status, validation_errors, campaign_id.
-
-        Returns:
-            True if a row was updated, False if the asset was not found
-            or no valid kwargs were provided.
-        """
-        allowed = {
-            "asset_name",
-            "asset_type",
-            "format_spec",
-            "source_url",
-            "validation_status",
-            "validation_errors",
-            "campaign_id",
-        }
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return False
-
-        # Serialize JSON fields
-        if "format_spec" in updates and isinstance(updates["format_spec"], dict):
-            updates["format_spec"] = json.dumps(updates["format_spec"])
-        if "validation_errors" in updates and isinstance(updates["validation_errors"], list):
-            updates["validation_errors"] = json.dumps(updates["validation_errors"])
-
-        # Always bump updated_at
-        updates["updated_at"] = _now_iso()
-
-        set_clause = ", ".join(f"{col} = ?" for col in updates)
-        values = list(updates.values())
-        values.append(asset_id)
-
-        with self._lock:
-            cursor = self._conn.execute(
-                f"UPDATE creative_assets SET {set_clause} WHERE asset_id = ?",
-                values,
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    def delete_creative_asset(self, asset_id: str) -> bool:
-        """Delete a creative asset by ID.
-
-        Args:
-            asset_id: The asset to delete.
-
-        Returns:
-            True if a row was deleted, False if not found.
-        """
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM creative_assets WHERE asset_id = ?",
-                (asset_id,),
-            )
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    # ------------------------------------------------------------------
-    # Deal Templates (v5, Strategic Plan Section 6.3)
-    # ------------------------------------------------------------------
-
-    def save_deal_template(
-        self,
-        *,
-        template_id: str | None = None,
-        name: str,
-        deal_type_pref: str | None = None,
-        inventory_types: str | None = None,
-        preferred_publishers: str | None = None,
-        excluded_publishers: str | None = None,
-        targeting_defaults: str | None = None,
-        default_price: float | None = None,
-        max_cpm: float | None = None,
-        min_impressions: int | None = None,
-        default_flight_days: int | None = None,
-        supply_path_prefs: str | None = None,
-        advertiser_id: str | None = None,
-        agency_id: str | None = None,
-    ) -> str:  # noqa: E501
-        """Insert a new deal template. Returns the template ID."""
-        if template_id is None:
-            template_id = str(uuid.uuid4())
-        now = _now_iso()
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO deal_templates (
-                    id, name, deal_type_pref, inventory_types,
-                    preferred_publishers, excluded_publishers,
-                    targeting_defaults, default_price, max_cpm,
-                    min_impressions, default_flight_days,
-                    supply_path_prefs, advertiser_id, agency_id,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    template_id,
-                    name,
-                    deal_type_pref,
-                    inventory_types,
-                    preferred_publishers,
-                    excluded_publishers,
-                    targeting_defaults,
-                    default_price,
-                    max_cpm,
-                    min_impressions,
-                    default_flight_days,
-                    supply_path_prefs,
-                    advertiser_id,
-                    agency_id,
-                    now,
-                    now,
-                ),  # noqa: E501
-            )
-            self._conn.commit()
-        logger.info("Saved deal template %s: %s", template_id, name)
-        return template_id
-
-    def get_deal_template(self, template_id: str) -> dict[str, Any] | None:
-        """Retrieve a deal template by ID."""
-        with self._lock:
-            cursor = self._conn.execute("SELECT * FROM deal_templates WHERE id = ?", (template_id,))
-            row = cursor.fetchone()
-        return dict(row) if row else None
-
-    def list_deal_templates(
-        self,
-        *,
-        advertiser_id: str | None = None,
-        deal_type_pref: str | None = None,
-        limit: int = 100,
-    ) -> list[dict[str, Any]]:  # noqa: E501
-        """List deal templates with optional filters."""
-        conditions: list[str] = []
-        params: list[Any] = []
-        if advertiser_id is not None:
-            conditions.append("advertiser_id = ?")
-            params.append(advertiser_id)
-        if deal_type_pref is not None:
-            conditions.append("deal_type_pref = ?")
-            params.append(deal_type_pref)
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-        query = f"SELECT * FROM deal_templates {where} ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
-        with self._lock:
-            cursor = self._conn.execute(query, params)
-            rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-    def update_deal_template(self, template_id: str, **kwargs: Any) -> bool:
-        """Update fields on an existing deal template."""
-        if not kwargs:
-            return False
-        allowed = {
-            "name",
-            "deal_type_pref",
-            "inventory_types",
-            "preferred_publishers",
-            "excluded_publishers",
-            "targeting_defaults",
-            "default_price",
-            "max_cpm",
-            "min_impressions",
-            "default_flight_days",
-            "supply_path_prefs",
-            "advertiser_id",
-            "agency_id",
-        }  # noqa: E501
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return False
-        updates["updated_at"] = _now_iso()
-        set_clause = ", ".join(f"{col} = ?" for col in updates)
-        values = list(updates.values()) + [template_id]
-        with self._lock:
-            cursor = self._conn.execute(
-                f"UPDATE deal_templates SET {set_clause} WHERE id = ?", values
-            )  # noqa: E501
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    def delete_deal_template(self, template_id: str) -> bool:
-        """Delete a deal template by ID."""
-        with self._lock:
-            cursor = self._conn.execute("DELETE FROM deal_templates WHERE id = ?", (template_id,))
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    # ------------------------------------------------------------------
-    # Supply Path Templates (v5, Strategic Plan Section 6.4)
-    # ------------------------------------------------------------------
-
-    def save_supply_path_template(
-        self,
-        *,
-        template_id: str | None = None,
-        name: str,
-        scoring_weights: str | None = None,
-        max_reseller_hops: int | None = None,
-        require_sellers_json: int | None = None,
-        preferred_ssps: str | None = None,
-        blocked_ssps: str | None = None,
-        preferred_curators: str | None = None,
-        rules: str | None = None,
-    ) -> str:  # noqa: E501
-        """Insert a new supply path template. Returns the template ID."""
-        if template_id is None:
-            template_id = str(uuid.uuid4())
-        now = _now_iso()
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO supply_path_templates (
-                    id, name, scoring_weights, max_reseller_hops,
-                    require_sellers_json, preferred_ssps, blocked_ssps,
-                    preferred_curators, rules, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    template_id,
-                    name,
-                    scoring_weights,
-                    max_reseller_hops,
-                    require_sellers_json,
-                    preferred_ssps,
-                    blocked_ssps,
-                    preferred_curators,
-                    rules,
-                    now,
-                    now,
-                ),  # noqa: E501
-            )
-            self._conn.commit()
-        logger.info("Saved supply path template %s: %s", template_id, name)
-        return template_id
-
-    def get_supply_path_template(self, template_id: str) -> dict[str, Any] | None:
-        """Retrieve a supply path template by ID."""
-        with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM supply_path_templates WHERE id = ?", (template_id,)
-            )  # noqa: E501
-            row = cursor.fetchone()
-        return dict(row) if row else None
-
-    def list_supply_path_templates(self, *, limit: int = 100) -> list[dict[str, Any]]:
-        """List supply path templates."""
-        with self._lock:
-            cursor = self._conn.execute(
-                "SELECT * FROM supply_path_templates ORDER BY created_at DESC LIMIT ?", (limit,)
-            )  # noqa: E501
-            rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-    def update_supply_path_template(self, template_id: str, **kwargs: Any) -> bool:
-        """Update fields on an existing supply path template."""
-        if not kwargs:
-            return False
-        allowed = {
-            "name",
-            "scoring_weights",
-            "max_reseller_hops",
-            "require_sellers_json",
-            "preferred_ssps",
-            "blocked_ssps",
-            "preferred_curators",
-            "rules",
-        }  # noqa: E501
-        updates = {k: v for k, v in kwargs.items() if k in allowed}
-        if not updates:
-            return False
-        updates["updated_at"] = _now_iso()
-        set_clause = ", ".join(f"{col} = ?" for col in updates)
-        values = list(updates.values()) + [template_id]
-        with self._lock:
-            cursor = self._conn.execute(
-                f"UPDATE supply_path_templates SET {set_clause} WHERE id = ?", values
-            )  # noqa: E501
-            self._conn.commit()
-            return cursor.rowcount > 0
-
-    def delete_supply_path_template(self, template_id: str) -> bool:
-        """Delete a supply path template by ID."""
-        with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM supply_path_templates WHERE id = ?", (template_id,)
-            )  # noqa: E501
-            self._conn.commit()
-            return cursor.rowcount > 0
+    # -- Negotiation rounds ------------------------------------------------
+
+    def save_negotiation_round(self, *args: Any, **kwargs: Any) -> int:
+        """Delegates to :meth:`NegotiationStore.save_negotiation_round`."""
+        return self._negotiation_store.save_negotiation_round(*args, **kwargs)
+
+    def get_negotiation_history(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`NegotiationStore.get_negotiation_history`."""
+        return self._negotiation_store.get_negotiation_history(*args, **kwargs)
+
+    # -- Booking records ---------------------------------------------------
+
+    def save_booking_record(self, *args: Any, **kwargs: Any) -> int:
+        """Delegates to :meth:`BookingRecordStore.save_booking_record`."""
+        return self._booking_record_store.save_booking_record(*args, **kwargs)
+
+    def get_booking_records(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`BookingRecordStore.get_booking_records`."""
+        return self._booking_record_store.get_booking_records(*args, **kwargs)
+
+    # -- Jobs --------------------------------------------------------------
+
+    def save_job(self, *args: Any, **kwargs: Any) -> str:
+        """Delegates to :meth:`JobStore.save_job`."""
+        return self._job_store.save_job(*args, **kwargs)
+
+    def get_job(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`JobStore.get_job`."""
+        return self._job_store.get_job(*args, **kwargs)
+
+    def list_jobs(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`JobStore.list_jobs`."""
+        return self._job_store.list_jobs(*args, **kwargs)
+
+    # -- Events ------------------------------------------------------------
+
+    def save_event(self, *args: Any, **kwargs: Any) -> str:
+        """Delegates to :meth:`DealEventStore.save_event`."""
+        return self._event_store.save_event(*args, **kwargs)
+
+    def get_event(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`DealEventStore.get_event`."""
+        return self._event_store.get_event(*args, **kwargs)
+
+    def list_events(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`DealEventStore.list_events`."""
+        return self._event_store.list_events(*args, **kwargs)
+
+    # -- Status transitions ------------------------------------------------
+
+    def record_status_transition(self, *args: Any, **kwargs: Any) -> int:
+        """Delegates to :meth:`StatusTransitionStore.record_status_transition`."""
+        return self._status_store.record_status_transition(*args, **kwargs)
+
+    def get_status_history(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`StatusTransitionStore.get_status_history`."""
+        return self._status_store.get_status_history(*args, **kwargs)
+
+    # -- Portfolio metadata (v2) -------------------------------------------
+
+    def save_portfolio_metadata(self, *args: Any, **kwargs: Any) -> int:
+        """Delegates to :meth:`PortfolioMetadataStore.save_portfolio_metadata`."""
+        return self._portfolio_store.save_portfolio_metadata(*args, **kwargs)
+
+    def get_portfolio_metadata(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`PortfolioMetadataStore.get_portfolio_metadata`."""
+        return self._portfolio_store.get_portfolio_metadata(*args, **kwargs)
+
+    def update_portfolio_metadata(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`PortfolioMetadataStore.update_portfolio_metadata`."""
+        return self._portfolio_store.update_portfolio_metadata(*args, **kwargs)
+
+    def delete_portfolio_metadata(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`PortfolioMetadataStore.delete_portfolio_metadata`."""
+        return self._portfolio_store.delete_portfolio_metadata(*args, **kwargs)
+
+    # -- Deal activations (v2) ---------------------------------------------
+
+    def save_deal_activation(self, *args: Any, **kwargs: Any) -> int:
+        """Delegates to :meth:`DealActivationStore.save_deal_activation`."""
+        return self._activation_store.save_deal_activation(*args, **kwargs)
+
+    def get_deal_activations(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`DealActivationStore.get_deal_activations`."""
+        return self._activation_store.get_deal_activations(*args, **kwargs)
+
+    def update_deal_activation(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`DealActivationStore.update_deal_activation`."""
+        return self._activation_store.update_deal_activation(*args, **kwargs)
+
+    def delete_deal_activation(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`DealActivationStore.delete_deal_activation`."""
+        return self._activation_store.delete_deal_activation(*args, **kwargs)
+
+    # -- Performance cache (v2) --------------------------------------------
+
+    def save_performance_cache(self, *args: Any, **kwargs: Any) -> int:
+        """Delegates to :meth:`PerformanceCacheStore.save_performance_cache`."""
+        return self._performance_store.save_performance_cache(*args, **kwargs)
+
+    def get_performance_cache(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`PerformanceCacheStore.get_performance_cache`."""
+        return self._performance_store.get_performance_cache(*args, **kwargs)
+
+    def update_performance_cache(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`PerformanceCacheStore.update_performance_cache`."""
+        return self._performance_store.update_performance_cache(*args, **kwargs)
+
+    def delete_performance_cache(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`PerformanceCacheStore.delete_performance_cache`."""
+        return self._performance_store.delete_performance_cache(*args, **kwargs)
+
+    # -- Creative assets (v3) ----------------------------------------------
+
+    def save_creative_asset(self, *args: Any, **kwargs: Any) -> str:
+        """Delegates to :meth:`CreativeAssetStore.save_creative_asset`."""
+        return self._creative_asset_store.save_creative_asset(*args, **kwargs)
+
+    def get_creative_asset(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`CreativeAssetStore.get_creative_asset`."""
+        return self._creative_asset_store.get_creative_asset(*args, **kwargs)
+
+    def list_creative_assets(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`CreativeAssetStore.list_creative_assets`."""
+        return self._creative_asset_store.list_creative_assets(*args, **kwargs)
+
+    def update_creative_asset(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`CreativeAssetStore.update_creative_asset`."""
+        return self._creative_asset_store.update_creative_asset(*args, **kwargs)
+
+    def delete_creative_asset(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`CreativeAssetStore.delete_creative_asset`."""
+        return self._creative_asset_store.delete_creative_asset(*args, **kwargs)
+
+    # -- Deal templates (v5) -----------------------------------------------
+
+    def save_deal_template(self, *args: Any, **kwargs: Any) -> str:
+        """Delegates to :meth:`DealTemplateStore.save_deal_template`."""
+        return self._deal_template_store.save_deal_template(*args, **kwargs)
+
+    def get_deal_template(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`DealTemplateStore.get_deal_template`."""
+        return self._deal_template_store.get_deal_template(*args, **kwargs)
+
+    def list_deal_templates(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`DealTemplateStore.list_deal_templates`."""
+        return self._deal_template_store.list_deal_templates(*args, **kwargs)
+
+    def update_deal_template(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`DealTemplateStore.update_deal_template`."""
+        return self._deal_template_store.update_deal_template(*args, **kwargs)
+
+    def delete_deal_template(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`DealTemplateStore.delete_deal_template`."""
+        return self._deal_template_store.delete_deal_template(*args, **kwargs)
+
+    # -- Supply path templates (v5) ----------------------------------------
+
+    def save_supply_path_template(self, *args: Any, **kwargs: Any) -> str:
+        """Delegates to :meth:`SupplyPathTemplateStore.save_supply_path_template`."""
+        return self._supply_path_template_store.save_supply_path_template(*args, **kwargs)
+
+    def get_supply_path_template(self, *args: Any, **kwargs: Any) -> dict[str, Any] | None:
+        """Delegates to :meth:`SupplyPathTemplateStore.get_supply_path_template`."""
+        return self._supply_path_template_store.get_supply_path_template(*args, **kwargs)
+
+    def list_supply_path_templates(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+        """Delegates to :meth:`SupplyPathTemplateStore.list_supply_path_templates`."""
+        return self._supply_path_template_store.list_supply_path_templates(*args, **kwargs)
+
+    def update_supply_path_template(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`SupplyPathTemplateStore.update_supply_path_template`."""
+        return self._supply_path_template_store.update_supply_path_template(*args, **kwargs)
+
+    def delete_supply_path_template(self, *args: Any, **kwargs: Any) -> bool:
+        """Delegates to :meth:`SupplyPathTemplateStore.delete_supply_path_template`."""
+        return self._supply_path_template_store.delete_supply_path_template(*args, **kwargs)
 
     # ------------------------------------------------------------------
     # Helpers
