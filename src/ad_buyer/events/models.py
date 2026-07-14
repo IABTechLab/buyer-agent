@@ -83,6 +83,36 @@ class EventType(str, Enum):
     APPROVAL_REJECTED = "approval.rejected"
 
 
+# Audit-class event types: money decisions and order state transitions whose
+# loss would break the audit trail. Emission for these is fail-closed: if the
+# event bus fails, the event is appended to a durable fallback JSONL file; if
+# that also fails, the error propagates to the caller instead of being
+# swallowed. Non-audit events keep the existing fail-open behavior.
+# See events/helpers.py and events/audit_fallback.py.
+AUDIT_EVENT_TYPES: frozenset[EventType] = frozenset(
+    {
+        # Deal / booking money decisions
+        EventType.DEAL_BOOKED,
+        EventType.DEAL_CANCELLED,
+        EventType.BOOKING_SUBMITTED,
+        EventType.BUDGET_ALLOCATED,
+        # Campaign booking (order) state transitions
+        EventType.CAMPAIGN_BOOKING_STARTED,
+        EventType.CAMPAIGN_BOOKING_COMPLETED,
+        # Negotiation rounds / concessions
+        EventType.NEGOTIATION_STARTED,
+        EventType.NEGOTIATION_ROUND,
+        EventType.NEGOTIATION_CONCLUDED,
+        # Approval decisions
+        EventType.APPROVAL_REQUESTED,
+        EventType.APPROVAL_GRANTED,
+        EventType.APPROVAL_REJECTED,
+        # Budget reallocation actually applied (money movement)
+        EventType.PACING_REALLOCATION_APPLIED,
+    }
+)
+
+
 class Event(BaseModel):
     """An event emitted by the buyer system."""
 
