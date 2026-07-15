@@ -6,6 +6,7 @@
 from .a2a_client import A2AClient, A2AError, A2AResponse
 from .deals_client import DealsClient, DealsClientError
 from .mcp_client import IABMCPClient, MCPClientError, MCPToolResult
+from .mixpeek_client import MixpeekClient, MixpeekError
 from .opendirect_client import OpenDirectClient
 from .sgp_client import SGPAuthError, SGPClient, SGPClientError
 from .ucp_client import UCPClient, UCPExchangeResult
@@ -32,6 +33,9 @@ __all__ = [
     # IAB Deals API v1.0 client (quote-then-book flow)
     "DealsClient",
     "DealsClientError",
+    # Mixpeek contextual enrichment
+    "MixpeekClient",
+    "MixpeekError",
     # IAB Diligence Platform (SGP) approval gate
     "SGPClient",
     "SGPClientError",
