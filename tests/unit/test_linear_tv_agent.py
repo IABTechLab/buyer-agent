@@ -8,6 +8,7 @@ Tests written first (TDD) per bead buyer-6io.
 """
 
 import os
+from unittest.mock import patch
 
 # Set a dummy API key for tests (agents validate on creation)
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
@@ -69,7 +70,10 @@ class TestLinearTVAgent:
 
     def test_linear_tv_agent_has_memory(self):
         """Linear TV agent should have memory enabled."""
-        agent = create_linear_tv_agent(verbose=False)
+        with patch("ad_buyer.agents.level2.linear_tv_agent.settings") as mock_settings:
+            mock_settings.crew_memory_enabled = True
+            mock_settings.default_llm_model = "anthropic/claude-haiku-4-5-20251001"
+            agent = create_linear_tv_agent(verbose=False)
         # crewai converts memory=True to a Memory object
         assert agent.memory is not None
 

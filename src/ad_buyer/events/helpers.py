@@ -193,9 +193,7 @@ def emit_event_sync(
                 # writes the fallback record (best effort, logged if it fails).
                 future = asyncio.ensure_future(bus.publish(event))
                 if event_type in AUDIT_EVENT_TYPES:
-                    future.add_done_callback(
-                        lambda fut, ev=event: _audit_publish_done(fut, ev)
-                    )
+                    future.add_done_callback(lambda fut, ev=event: _audit_publish_done(fut, ev))
             else:
                 loop.run_until_complete(bus.publish(event))
         except RuntimeError:

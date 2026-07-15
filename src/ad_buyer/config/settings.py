@@ -113,6 +113,19 @@ class Settings(BaseSettings):
     # Override via EMBEDDING_MODE env var.
     embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
 
+    # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # Meta Ads API integration
+    # --------------------------------------------------------------------------
+    # System user access token (from Meta Business Manager → System Users)
+    meta_access_token: str = ""
+    # Ad account ID (format: act_XXXXXXXXX — assign to system user in Business Manager)
+    meta_ad_account_id: str = ""
+    # Facebook Page ID (required for ad creative creation)
+    meta_page_id: str = ""
+    # Graph API version (used for reach estimates)
+    meta_api_version: str = "v21.0"
+
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,
         "env_file_encoding": "utf-8",

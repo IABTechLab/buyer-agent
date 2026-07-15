@@ -59,6 +59,7 @@ class BookedLine(BaseModel):
 
     line_id: str = Field(..., alias="lineId")
     order_id: str = Field(..., alias="orderId")
+    seller_deal_id: str | None = Field(None, alias="sellerDealId")
     product_id: str = Field(..., alias="productId")
     product_name: str = Field(..., alias="productName")
     channel: str

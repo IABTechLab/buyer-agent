@@ -19,6 +19,7 @@ from ..crews.channel_crews import (
     create_ctv_crew,
     create_mobile_crew,
     create_performance_crew,
+    create_social_crew,
 )
 from ..crews.portfolio_crew import create_portfolio_crew
 from ..events.helpers import emit_event_sync
@@ -61,20 +62,16 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
-            **state_kwargs: Initial state field values for the underlying
-                ``BookingState``.  CrewAI >=1.14 made ``Flow`` a Pydantic
-                model and removed the legacy ``state`` setter, so initial
-                state is now supplied via the ``initial_state=`` field on
-                ``Flow.__init__`` rather than as ad-hoc keyword arguments.
+            **state_kwargs: Initial state field values applied directly to
+                ``BookingState`` after ``Flow.__init__`` creates the default
+                state. Compatible with all crewai versions: crewai >=1.15
+                made ``Flow`` a ``BaseModel`` whose extra fields are silently
+                dropped, so we must set state attributes post-init instead of
+                relying on ``Flow.__init__`` kwargs or ``_initialize_state``.
         """
-        if state_kwargs:
-            # CrewAI >=1.14 expects ``initial_state`` to be the typed
-            # state model instance (or None), not a loose dict.  Build a
-            # ``BookingState`` from the supplied kwargs so callers can
-            # keep passing fields by name (e.g. ``campaign_brief=...``).
-            super().__init__(initial_state=BookingState(**state_kwargs))
-        else:
-            super().__init__()
+        super().__init__()
+        for key, value in state_kwargs.items():
+            setattr(self.state, key, value)
         self._client = client
         self._store = store
 
@@ -322,11 +319,47 @@ class DealBookingFlow(Flow[BookingState]):
             # allocations if used directly.
             allocations = self._extract_allocations(result)
 
-            # Store allocations
+            # If brief specifies channels, respect LLM allocation for those channels
+            # and rescale to total budget. Equal split is only a fallback when the
+            # LLM failed to allocate to any of the requested channels at all.
+            requested = [
+                c.lower() for c in self.state.campaign_brief.get("channels", []) if c.strip()
+            ]
+            if requested:
+                grand_total = self.state.campaign_brief.get("budget", 0)
+                filtered = {
+                    ch: allocations[ch]
+                    for ch in requested
+                    if ch in allocations and allocations[ch].get("budget", 0) > 0
+                }
+                if filtered:
+                    alloc_total = sum(v["budget"] for v in filtered.values())
+                    for ch in filtered:
+                        filtered[ch]["budget"] = round(
+                            filtered[ch]["budget"] / alloc_total * grand_total, 2
+                        )
+                        filtered[ch]["percentage"] = round(
+                            filtered[ch]["budget"] / grand_total * 100, 1
+                        )
+                    allocations = filtered
+                else:
+                    per_channel = round(grand_total / len(requested), 2)
+                    pct = round(100.0 / len(requested), 1)
+                    allocations = {
+                        ch: {
+                            "budget": per_channel,
+                            "percentage": pct,
+                            "rationale": f"Requested channel: {ch}",
+                        }
+                        for ch in requested
+                    }
+
+            # Store allocations (normalize channel keys to lowercase)
             for channel, alloc_data in allocations.items():
                 if alloc_data.get("budget", 0) > 0:
-                    self.state.budget_allocations[channel] = ChannelAllocation(
-                        channel=channel,
+                    ch = channel.lower()
+                    self.state.budget_allocations[ch] = ChannelAllocation(
+                        channel=ch,
                         budget=alloc_data["budget"],
                         percentage=alloc_data.get("percentage", 0),
                         rationale=alloc_data.get("rationale", ""),
@@ -454,7 +487,14 @@ class DealBookingFlow(Flow[BookingState]):
             )
             result = crew.kickoff()
 
-            recommendations = self._parse_recommendations(str(result), "branding")
+            result_str = str(result)
+            recommendations = self._parse_recommendations(result_str, "branding")
+            if not recommendations:
+                for task in crew.tasks or []:
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "branding")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["branding"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -484,6 +524,12 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "ctv")
+            if not recommendations:
+                for task in crew.tasks or []:
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "ctv")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["ctv"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -513,6 +559,12 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
+            if not recommendations:
+                for task in crew.tasks or []:
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "mobile_app")
+                        if recommendations:
+                            break
             self.state.channel_recommendations["mobile_app"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -542,6 +594,14 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "performance")
+            if not recommendations:
+                for task in crew.tasks or []:
+                    if task.output:
+                        recommendations = self._parse_recommendations(
+                            task.output.raw, "performance"
+                        )
+                        if recommendations:
+                            break
             self.state.channel_recommendations["performance"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -563,38 +623,135 @@ class DealBookingFlow(Flow[BookingState]):
             kpis=self.state.campaign_brief.get("kpis", {}),
         ).model_dump(by_alias=True)
 
-    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
-        """Parse recommendations from crew result."""
-        recommendations = []
+    @staticmethod
+    def _extract_items_from_str(result_str: str) -> list[dict]:
+        """Extract a product list from the crew result string.
 
+        Tries three strategies in order:
+        1. Strip markdown fences, parse as JSON object/array directly.
+        2. If the parsed object has a 'recommendations' key, use that list.
+        3. Bracket-scan: find every outermost '[...]' span and try each.
+        """
+        product_keys = {"product_id", "product_name", "cpm", "cost", "impressions"}
+
+        def _is_product_list(lst: list) -> bool:
+            return (
+                isinstance(lst, list)
+                and bool(lst)
+                and any(isinstance(it, dict) and product_keys & it.keys() for it in lst)
+            )
+
+        # Strategy 1 & 2 — try direct JSON parse (strip ``` fences first)
+        clean = result_str.strip()
+        if clean.startswith("```"):
+            lines = clean.splitlines()
+            # Remove first line (```json or ```) and last line (```)
+            inner = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
+            clean = "\n".join(inner)
         try:
-            # Try to find JSON array in result
-            start_idx = result_str.find("[")
-            end_idx = result_str.rfind("]") + 1
-            if start_idx >= 0 and end_idx > start_idx:
-                json_str = result_str[start_idx:end_idx]
-                items = json.loads(json_str)
-
-                for item in items:
-                    rec = ProductRecommendation(
-                        product_id=item.get("product_id", "unknown"),
-                        product_name=item.get("product_name", "Unknown Product"),
-                        publisher=item.get("publisher", "Unknown"),
-                        channel=channel,
-                        format=item.get("format"),
-                        impressions=item.get("impressions", 0),
-                        cpm=item.get("cpm", 0),
-                        cost=item.get("cost", 0),
-                        rationale=item.get("rationale"),
-                    )
-                    recommendations.append(rec)
-        except (json.JSONDecodeError, KeyError):
-            # If parsing fails, create a placeholder recommendation
+            data = json.loads(clean)
+            if isinstance(data, list) and _is_product_list(data):
+                return [it for it in data if isinstance(it, dict)]
+            if isinstance(data, dict):
+                # Handle {"recommendations": [...]} wrapper
+                for key in ("recommendations", "products", "items"):
+                    lst = data.get(key, [])
+                    if _is_product_list(lst):
+                        return [it for it in lst if isinstance(it, dict)]
+        except (json.JSONDecodeError, TypeError):
             pass
+
+        # Strategy 3 — bracket-scan every '[...]' span
+        candidates: list[str] = []
+        i = 0
+        while i < len(result_str):
+            if result_str[i] == "[":
+                depth = 0
+                for j in range(i, len(result_str)):
+                    if result_str[j] == "[":
+                        depth += 1
+                    elif result_str[j] == "]":
+                        depth -= 1
+                        if depth == 0:
+                            candidates.append(result_str[i : j + 1])
+                            i = j + 1
+                            break
+                else:
+                    i += 1
+            else:
+                i += 1
+
+        for candidate in candidates:
+            try:
+                lst = json.loads(candidate)
+                if _is_product_list(lst):
+                    return [it for it in lst if isinstance(it, dict)]
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+        return []
+
+    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
+        """Parse product recommendations from a crew result string."""
+        recommendations: list[ProductRecommendation] = []
+
+        for item in self._extract_items_from_str(result_str):
+            if not isinstance(item, dict):
+                continue
+            rec = ProductRecommendation(
+                product_id=item.get("product_id", "unknown"),
+                product_name=item.get("product_name", "Unknown Product"),
+                publisher=item.get("publisher", "Unknown"),
+                channel=channel,
+                format=item.get("format"),
+                impressions=item.get("impressions", 0),
+                cpm=item.get("cpm", 0),
+                cost=item.get("cost", 0),
+                rationale=item.get("rationale"),
+            )
+            recommendations.append(rec)
 
         return recommendations
 
-    @listen(or_(research_branding, research_ctv, research_mobile, research_performance))
+    @listen(allocate_budget)
+    def research_social(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+        """Social media specialist researches Meta Ads inventory."""
+        if allocation_result.get("status") != "success":
+            return {"channel": "social", "status": "skipped"}
+
+        social_alloc = self.state.budget_allocations.get("social")
+        if not social_alloc or social_alloc.budget <= 0:
+            return {"channel": "social", "status": "no_budget"}
+
+        try:
+            channel_brief = self._create_channel_brief("social", social_alloc)
+            crew = create_social_crew(
+                self._client,
+                channel_brief,
+                audience_plan=self.state.audience_plan,
+            )
+            result = crew.kickoff()
+
+            result_str = str(result)
+            recommendations = self._parse_recommendations(result_str, "social")
+            if not recommendations:
+                for task in crew.tasks or []:
+                    if task.output:
+                        recommendations = self._parse_recommendations(task.output.raw, "social")
+                        if recommendations:
+                            break
+            self.state.channel_recommendations["social"] = recommendations
+            self.state.updated_at = datetime.now(UTC)
+
+            return {"channel": "social", "status": "success", "count": len(recommendations)}
+
+        except Exception as e:  # noqa: BLE001
+            self.state.errors.append(f"Social research failed: {e}")
+            return {"channel": "social", "status": "failed", "error": str(e)}
+
+    @listen(
+        or_(research_branding, research_ctv, research_mobile, research_performance, research_social)
+    )
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
         """Consolidate all channel recommendations for approval."""
         # Check if all active channels have reported
@@ -680,15 +837,156 @@ class DealBookingFlow(Flow[BookingState]):
         all_ids = [rec.product_id for rec in self.state.pending_approvals]
         return self.approve_recommendations(all_ids)
 
+    def _book_via_seller_api(self, rec: Any) -> tuple[str, str, str]:
+        """Call seller: quote → deal → order. Returns (quote_id, deal_id, order_id).
+
+        Uses a synchronous httpx.Client so this can be called from the
+        non-async _execute_bookings method. Raises on HTTP errors.
+        """
+        import httpx
+
+        base_url = self._client.base_url.rstrip("/")
+        headers = {**self._client._headers}
+        brief = self.state.campaign_brief
+
+        with httpx.Client(base_url=base_url, headers=headers, timeout=30.0) as http:
+            # 1. Request a quote from the seller
+            quote_payload = {
+                "product_id": rec.product_id,
+                "deal_type": "PD",
+                "impressions": rec.impressions,
+                "flight_start": brief.get("start_date"),
+                "flight_end": brief.get("end_date"),
+                "target_cpm": rec.cpm,
+                "buyer_identity": {
+                    "advertiser_id": "buyer-agent-001",
+                    "dsp_platform": "iab-buyer-agent",
+                },
+            }
+            r = http.post("/api/v1/quotes", json=quote_payload)
+            r.raise_for_status()
+            quote_id = r.json().get("quote_id") or r.json().get("id", "")
+
+            # 2. Book the deal using the quote
+            deal_payload = {
+                "quote_id": quote_id,
+                "buyer_identity": {
+                    "advertiser_id": "buyer-agent-001",
+                    "dsp_platform": "iab-buyer-agent",
+                },
+                "notes": f"Booked via buyer agent — {rec.product_name}",
+            }
+            r = http.post("/api/v1/deals", json=deal_payload)
+            r.raise_for_status()
+            deal_id = r.json().get("deal_id") or r.json().get("id", "")
+
+            # 3. Create an order record on the seller
+            order_payload = {"deal_id": deal_id, "quote_id": quote_id}
+            r = http.post("/api/v1/orders", json=order_payload)
+            r.raise_for_status()
+            order_id = r.json().get("order_id") or r.json().get("id", "")
+
+        return quote_id, deal_id, order_id
+
+    def _book_via_meta_api(self, rec: Any) -> tuple[str, str, str]:
+        """Book a Meta Ads campaign via 4 sequential CLI commands.
+
+        Steps:
+            1. meta ads campaign create  → campaign_id  (PAUSED)
+            2. meta ads adset create     → ad_set_id    (PAUSED)
+            3. meta ads creative create  → creative_id
+            4. meta ads ad create        → ad_id        (PAUSED)
+
+        Returns:
+            (campaign_id, ad_set_id, "meta")
+        """
+        from ..clients.meta_ads_client import MetaAdsClient
+        from ..config.settings import settings as _settings
+
+        if not _settings.meta_access_token or not _settings.meta_ad_account_id:
+            raise ValueError("Meta not configured: set META_ACCESS_TOKEN + META_AD_ACCOUNT_ID")
+        if not _settings.meta_page_id:
+            raise ValueError("META_PAGE_ID required — set in .env (Business Manager → Pages)")
+
+        brief = self.state.campaign_brief
+        target_audience = brief.get("target_audience", {})
+        geo_locations = target_audience.get("geo_locations", ["US"])
+
+        obj_map = {
+            "brand_awareness": "OUTCOME_AWARENESS",
+            "reach": "OUTCOME_AWARENESS",
+            "traffic": "OUTCOME_TRAFFIC",
+            "conversions": "OUTCOME_SALES",
+            "video_views": "OUTCOME_ENGAGEMENT",
+            "lead_generation": "OUTCOME_LEADS",
+        }
+        objectives = brief.get("objectives", ["brand_awareness"])
+        meta_obj = obj_map.get(
+            objectives[0] if objectives else "brand_awareness", "OUTCOME_AWARENESS"
+        )
+
+        optimization_goal = "LINK_CLICKS" if rec.channel == "performance" else "REACH"
+        daily_budget_cents = max(int((rec.cost / 30) * 100), 100)
+        bid_amount_cents = max(int((rec.cpm or 5.0) * 100), 1)
+        campaign_name = f"{brief.get('name', 'Campaign')} — {rec.product_name}"
+
+        client = MetaAdsClient(
+            access_token=_settings.meta_access_token,
+            ad_account_id=_settings.meta_ad_account_id,
+            page_id=_settings.meta_page_id,
+            api_version=_settings.meta_api_version,
+        )
+
+        # 1. Create campaign
+        camp = client.create_campaign(
+            name=campaign_name,
+            objective=meta_obj,
+            daily_budget_cents=daily_budget_cents,
+        )
+        campaign_id = camp.get("id") or camp.get("campaign_id", "")
+        if not campaign_id:
+            raise ValueError(f"Campaign creation failed — no id in response: {camp}")
+
+        # 2. Create ad set
+        adset = client.create_adset(
+            campaign_id=campaign_id,
+            name=f"{rec.product_name} Ad Set",
+            optimization_goal=optimization_goal,
+            billing_event="IMPRESSIONS",
+            bid_amount_cents=bid_amount_cents,
+            targeting_countries=geo_locations if isinstance(geo_locations, list) else ["US"],
+        )
+        ad_set_id = adset.get("id") or adset.get("adset_id", "")
+        if not ad_set_id:
+            raise ValueError(f"Ad set creation failed — no id in response: {adset}")
+
+        # 3. Create creative (optional — requires an image asset)
+        # Skipped here: ad creative needs a real image URL or file.
+        # Campaign + ad set are created PAUSED and sufficient for booking.
+        # Add creative + ad via Meta Ads Manager or a follow-up API call
+        # once real creative assets are available for this placement.
+
+        return campaign_id, ad_set_id, "meta"
+
     def _execute_bookings(self) -> dict[str, Any]:
-        """Execute bookings for all approved recommendations."""
+        """Execute bookings for all approved recommendations via seller API."""
         from ..models.flow_state import BookedLine
 
-        approved = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+        approved_all = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+
+        # Deduplicate: if the same product_id appears from multiple channel crews,
+        # keep the one with the highest impressions to avoid double-booking.
+        seen: dict[str, Any] = {}
+        for rec in approved_all:
+            if rec.product_id not in seen or rec.impressions > seen[rec.product_id].impressions:
+                seen[rec.product_id] = rec
+        approved = list(seen.values())
 
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
             return {"status": "success", "booked": 0, "message": "No recommendations approved"}
+
+        booking_errors: list[str] = []
 
         # Deterministic spend-ceiling guard (bead ar-70eh): the approved
         # recommendations come from LLM-parsed crew output, so their total
@@ -716,24 +1014,44 @@ class DealBookingFlow(Flow[BookingState]):
         # In a full implementation, this would use the Execution Agent
         # to create orders and book lines. For now, we track the approvals.
         for rec in approved:
+            booking_status = "booked"
+            order_id = "order_pending"
+            seller_deal_id: str | None = None
+            line_id_override: str | None = None
+
+            try:
+                if rec.channel in ("social", "meta"):
+                    campaign_id, ad_set_id, _ = self._book_via_meta_api(rec)
+                    order_id = campaign_id
+                    line_id_override = ad_set_id
+                    booking_status = "paused"
+                else:
+                    _quote_id, seller_deal_id, order_id = self._book_via_seller_api(rec)
+                    booking_status = "booked"
+            except Exception as e:  # noqa: BLE001
+                booking_status = "booking_failed"
+                booking_errors.append(f"{rec.product_id}: {e}")
+                logger.warning("Booking failed for %s: %s", rec.product_id, e)
+
             booked = BookedLine(
-                line_id=f"line_{rec.product_id}",
-                order_id="order_pending",
+                line_id=line_id_override or f"line_{rec.product_id}",
+                order_id=order_id,
+                seller_deal_id=seller_deal_id,
                 product_id=rec.product_id,
                 product_name=rec.product_name,
                 channel=rec.channel,
                 impressions=rec.impressions,
                 cost=rec.cost,
-                booking_status="pending_execution",
+                booking_status=booking_status,
                 booked_at=datetime.now(UTC),
             )
             self.state.booked_lines.append(booked)
 
             # Persist booking record and update deal status
-            deal_id = getattr(rec, "_store_deal_id", None)
-            if deal_id:
-                self._persist_booking(deal_id, booked)
-                self._persist_deal_status(deal_id, "booked")
+            store_deal_id = getattr(rec, "_store_deal_id", None)
+            if store_deal_id:
+                self._persist_booking(store_deal_id, booked)
+                self._persist_deal_status(store_deal_id, booking_status)
 
         self.state.execution_status = ExecutionStatus.COMPLETED
         self.state.updated_at = datetime.now(UTC)
@@ -752,11 +1070,13 @@ class DealBookingFlow(Flow[BookingState]):
                 },
             )
 
+        actually_booked = [b for b in self.state.booked_lines if b.booking_status == "booked"]
         return {
             "status": "success",
-            "booked": len(self.state.booked_lines),
-            "total_impressions": sum(b.impressions for b in self.state.booked_lines),
-            "total_cost": sum(b.cost for b in self.state.booked_lines),
+            "booked": len(actually_booked),
+            "total_impressions": sum(b.impressions for b in actually_booked),
+            "total_cost": sum(b.cost for b in actually_booked),
+            "booking_errors": booking_errors,
         }
 
     def get_status(self) -> dict[str, Any]:

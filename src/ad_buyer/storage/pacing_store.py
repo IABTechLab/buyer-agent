@@ -252,20 +252,25 @@ class PacingStore:
         return [self._row_to_snapshot(row) for row in rows]
 
     def get_latest_pacing_snapshot(self, campaign_id: str) -> PacingSnapshot | None:
-        """Get the most recent pacing snapshot for a campaign.
+        """Get the most recently *written* pacing snapshot for a campaign.
+
+        Ordered by ``created_at`` (insertion time), not ``timestamp`` — the
+        latter is caller-supplied business/simulated time and isn't
+        guaranteed to be monotonic with write order (e.g. demo snapshots use
+        a simulated "current time" that can lag behind real wall-clock time).
 
         Args:
             campaign_id: Campaign to look up.
 
         Returns:
-            The most recent PacingSnapshot, or None if no snapshots exist.
+            The most recently written PacingSnapshot, or None if no snapshots exist.
         """
         with self._lock:
             cursor = self._conn.execute(
                 """
                 SELECT * FROM pacing_snapshots
                 WHERE campaign_id = ?
-                ORDER BY timestamp DESC
+                ORDER BY created_at DESC
                 LIMIT 1
                 """,
                 (campaign_id,),

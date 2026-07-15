@@ -13,7 +13,7 @@ Covers:
 """
 
 import logging
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -250,7 +250,8 @@ class TestBookingBudgetCeiling:
         recs = [_make_recommendation("prod_a", "branding", 500000, 15.0)]  # cost 7500
         flow = self._flow_with_approved(7500, recs)
 
-        result = flow._execute_bookings()
+        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
+            result = flow._execute_bookings()
 
         assert result["status"] == "success"
         assert result["booked"] == 1
@@ -264,7 +265,8 @@ class TestBookingBudgetCeiling:
         ]
         flow = self._flow_with_approved(100000, recs)
 
-        result = flow._execute_bookings()
+        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
+            result = flow._execute_bookings()
 
         assert result["status"] == "success"
         assert result["booked"] == 2
@@ -275,7 +277,10 @@ class TestBookingBudgetCeiling:
         recs = [_make_recommendation("prod_a", "branding", 500000, 15.0)]
         flow = self._flow_with_approved(None, recs)
 
-        with caplog.at_level(logging.WARNING):
+        with (
+            caplog.at_level(logging.WARNING),
+            patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")),
+        ):
             result = flow._execute_bookings()
 
         assert result["status"] == "success"
