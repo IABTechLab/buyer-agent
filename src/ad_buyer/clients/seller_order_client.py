@@ -113,7 +113,5 @@ class SellerOrderClient:
             )
             return None
         except (httpx.RequestError, OSError) as e:
-            logger.error(
-                "Failed to reach seller for order %s history: %s", order_id, e
-            )
+            logger.error("Failed to reach seller for order %s history: %s", order_id, e)
             return None

@@ -16,7 +16,7 @@ the seller's OrderStateMachine framework.  Provides:
   PAUSED/PACING_HOLD distinction, and validate_transition() method
 - Linear TV extensions: makegood_pending, partially_canceled
 
-Existing code continues to work: ExecutionStatus and DSPFlowStatus are
+Existing code continues to work: ExecutionStatus and BuyerDealFlowStatus are
 preserved and mapped into the new enums where flows need the machine.
 
 Pure Pydantic + stdlib -- no external dependencies.
@@ -29,6 +29,8 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from ..time_utils import utc_now
 
 # ---------------------------------------------------------------------------
 # Buyer Deal Status
@@ -155,7 +157,7 @@ class StateTransition(BaseModel):
     transition_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     from_status: str
     to_status: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utc_now)
     actor: str = "system"  # "system", "human:<user_id>", "agent:<agent_id>"
     reason: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -637,5 +639,5 @@ def from_execution_status(value: str) -> BuyerCampaignStatus:
 
 
 def from_dsp_flow_status(value: str) -> BuyerDealStatus:
-    """Map a legacy DSPFlowStatus value to BuyerDealStatus."""
+    """Map a legacy BuyerDealFlowStatus value to BuyerDealStatus."""
     return _DSP_FLOW_STATUS_MAP.get(value, BuyerDealStatus.QUOTED)

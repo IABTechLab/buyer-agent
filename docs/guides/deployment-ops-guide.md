@@ -9,10 +9,10 @@ This guide covers everything needed to run the buyer agent in any environment �
 1. [Local Development Setup](#local-development-setup)
 2. [Docker Deployment](#docker-deployment)
 3. [AWS Deployment](#aws-deployment)
-4. [Environment Variables & Configuration](#environment-variables--configuration)
-5. [Health Checks & Monitoring](#health-checks--monitoring)
-6. [MCP Server Setup & Connectivity](#mcp-server-setup--connectivity)
-7. [Backup & Recovery](#backup--recovery)
+4. [Environment Variables and Configuration](#environment-variables-and-configuration)
+5. [Health Checks and Monitoring](#health-checks-and-monitoring)
+6. [MCP Server Setup and Connectivity](#mcp-server-setup-and-connectivity)
+7. [Backup and Recovery](#backup-and-recovery)
 8. [Troubleshooting](#troubleshooting)
 
 ---
@@ -23,7 +23,7 @@ This guide covers everything needed to run the buyer agent in any environment �
 
 - Python 3.11 or later (3.12 recommended)
 - `pip` or `uv`
-- An LLM API key (Anthropic, OpenAI, or any litellm-supported provider)
+- An LLM API key (Anthropic, OpenAI, Gemini, Azure, or Bedrock)
 - Git
 
 ### Install Dependencies
@@ -64,7 +64,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 Full development configuration:
 
 ```dotenv
-# LLM provider (Anthropic default; see litellm docs for others)
+# LLM provider (Anthropic default; install crewai[openai] etc. for others)
 ANTHROPIC_API_KEY=sk-ant-...
 
 # Inbound API key for this service (leave empty to disable auth in dev)
@@ -86,7 +86,7 @@ ENVIRONMENT=development
 LOG_LEVEL=INFO
 ```
 
-See the [Configuration Reference](#environment-variables--configuration) below for the full variable list.
+See the [Configuration Reference](#environment-variables-and-configuration) below for the full variable list.
 
 ### Run the Development Server
 
@@ -254,8 +254,8 @@ The buyer agent runs on **ECS Fargate** with **EFS-backed SQLite persistence**. 
 | Secrets | SSM Parameter Store (SecureString) | Anthropic API key |
 | Logging | CloudWatch Logs | 30-day retention by default |
 
-!!! warning "Single-task constraint"
-    SQLite supports only one concurrent writer. AWS deployments must run exactly **one ECS task** (`DesiredCount: 1`). Running multiple tasks will corrupt the database. A PostgreSQL migration is planned for horizontal scaling.
+!!! warning "Single-task constraint with SQLite"
+    SQLite supports only one concurrent writer. If you deploy with `STORAGE_TYPE=sqlite` (the default), you must run exactly **one ECS task** (`DesiredCount: 1`). Running multiple tasks against the same EFS-backed SQLite file will corrupt the database. For horizontal scaling, switch to `STORAGE_TYPE=hybrid` (PostgreSQL + Redis) — see [Storage Backends](../architecture/storage-backends.md).
 
 ### Prerequisites
 
@@ -410,7 +410,7 @@ terraform apply -var="container_image_tag=v1.2.0"
 
 ---
 
-## Environment Variables & Configuration
+## Environment Variables and Configuration
 
 All settings are loaded from environment variables or a `.env` file via `pydantic-settings`. Shell environment variables take precedence over `.env` values.
 
@@ -442,32 +442,40 @@ Authentication is enforced via the `X-API-Key` header. Public paths (`/health`, 
 | `LLM_TEMPERATURE` | `0.3` | Default temperature. Individual agents use tuned values (0.1–0.5). |
 | `LLM_MAX_TOKENS` | `4096` | Maximum token output per LLM call. |
 
-Models use [litellm](https://docs.litellm.ai/) format — `provider/model-name`. Any litellm-supported provider works (OpenAI, Azure, Cohere, Ollama, Vertex AI, Bedrock, etc.):
+Models use `provider/model-name` format with CrewAI's native provider integrations (Anthropic, OpenAI, Gemini, Azure, Bedrock):
 
 ```dotenv
 DEFAULT_LLM_MODEL=openai/gpt-4o
 MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
 ```
 
-### Database
+### Storage
+
+See [Storage Backends](../architecture/storage-backends.md) for the full backend reference.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `sqlite:///./ad_buyer.db` | SQLAlchemy connection string for deal storage. SQLite for development; PostgreSQL for production multi-instance deployments. |
+| `STORAGE_TYPE` | `sqlite` | Backend selector — `sqlite`, `redis`, or `hybrid` (Postgres + Redis). |
+| `DATABASE_URL` | `sqlite:///./ad_buyer.db` | SQLite or PostgreSQL connection string. Use `postgresql+asyncpg://…` for hybrid. |
+| `REDIS_URL` | `None` | Redis URL. Required for `redis` and `hybrid` backends; also used for CrewAI memory persistence and session caching when set. |
+| `POSTGRES_POOL_MIN` | `2` | Minimum asyncpg pool size (hybrid only). |
+| `POSTGRES_POOL_MAX` | `10` | Maximum asyncpg pool size (hybrid only). |
 
 ```dotenv
-# SQLite (default, development)
+# SQLite (default, development, single-task only)
+STORAGE_TYPE=sqlite
 DATABASE_URL=sqlite:///./ad_buyer.db
 
-# PostgreSQL (production, when horizontal scaling is needed)
-DATABASE_URL=postgresql://buyer:pass@db.example.com:5432/ad_buyer
+# Hybrid (production, horizontal scaling)
+STORAGE_TYPE=hybrid
+DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
+REDIS_URL=redis://cache.example.com:6379/0
 ```
 
 ### Agent Behavior
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDIS_URL` | `None` | Redis URL for CrewAI memory persistence and session caching. When unset, in-memory storage is used. |
 | `CREW_MEMORY_ENABLED` | `True` | Enable CrewAI agent memory across tasks. |
 | `CREW_VERBOSE` | `True` | Enable verbose CrewAI logging. Set to `False` in production. |
 | `CREW_MAX_ITERATIONS` | `15` | Maximum iterations per crew task before forced completion. |
@@ -497,7 +505,8 @@ API_KEY=your-service-api-key
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
 IAB_SERVER_URL=https://primary-seller.example.com
 
-DATABASE_URL=postgresql://buyer:pass@db.example.com:5432/ad_buyer
+STORAGE_TYPE=hybrid
+DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
 REDIS_URL=redis://cache.example.com:6379/0
 
 CREW_VERBOSE=False
@@ -532,7 +541,7 @@ To add additional secrets (seller API keys, service credentials):
 
 ---
 
-## Health Checks & Monitoring
+## Health Checks and Monitoring
 
 ### Health Endpoint
 
@@ -643,17 +652,19 @@ Pacing alert levels:
 
 ---
 
-## MCP Server Setup & Connectivity
+## MCP Server Setup and Connectivity
 
 ### Overview
 
 The buyer agent exposes its own MCP server for external clients (Claude Desktop, Cursor, Windsurf, custom agents). The MCP server is mounted automatically on the FastAPI app at startup and exposes buyer operations as structured tools.
 
-MCP endpoint:
+MCP endpoint (Streamable HTTP, canonical):
 
 ```
-http://localhost:8001/mcp/sse
+http://localhost:8001/mcp
 ```
+
+Legacy SSE fallback (for older MCP clients): `http://localhost:8001/mcp-sse/sse`
 
 Available tool categories:
 
@@ -673,7 +684,7 @@ Add the buyer agent to your Claude Desktop MCP configuration (`~/Library/Applica
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8001/mcp/sse"
+        "http://localhost:8001/mcp"
       ]
     }
   }
@@ -684,13 +695,13 @@ Restart Claude Desktop after editing the configuration. The buyer agent tools wi
 
 ### Connecting Other MCP Clients
 
-Any client supporting Streamable HTTP (SSE) transport can connect:
+Any client supporting Streamable HTTP transport can connect:
 
 ```python
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-async with streamablehttp_client("http://localhost:8001/mcp/sse") as (read, write, _):
+async with streamablehttp_client("http://localhost:8001/mcp") as (read, write, _):
     async with ClientSession(read, write) as session:
         await session.initialize()
         tools = await session.list_tools()
@@ -705,7 +716,7 @@ The buyer agent acts as an **MCP client** to seller agents (in addition to expos
 SELLER_ENDPOINTS=http://seller1.example.com:8000,http://seller2.example.com:8000
 ```
 
-The buyer's `UnifiedClient` connects to the seller's MCP SSE endpoint at `{base_url}/mcp/sse`. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.
+The buyer's `UnifiedClient` connects to the seller's MCP SSE endpoint at `{base_url}/mcp-sse/sse`. Protocol selection is automatic — MCP for structured tool calls, A2A for discovery and negotiation.
 
 **Test seller MCP connectivity manually:**
 
@@ -733,7 +744,7 @@ If connecting to an external seller:
 
 ---
 
-## Backup & Recovery
+## Backup and Recovery
 
 ### What Needs to Be Backed Up
 
@@ -971,7 +982,7 @@ SELLER_ENDPOINTS=http://host.docker.internal:8000
 Test the seller's MCP endpoint directly:
 
 ```bash
-curl -N http://seller.example.com:8000/mcp/sse  # Should stream SSE events
+curl -N http://seller.example.com:8000/mcp-sse/sse  # Should stream SSE events
 ```
 
 ---
@@ -1019,7 +1030,7 @@ If not installed, install it: `pip install mcp`
 
 ```bash
 # The SSE endpoint should keep the connection open
-curl -N -H "Accept: text/event-stream" http://seller.example.com:8000/mcp/sse
+curl -N -H "Accept: text/event-stream" http://seller.example.com:8000/mcp-sse/sse
 ```
 
 **Check 3 — Firewall / security groups:**

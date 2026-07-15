@@ -21,13 +21,12 @@ Requirements:
 
 import asyncio
 import os
-import signal
 import subprocess
 import sys
 import tempfile
 import time
+from datetime import UTC
 from pathlib import Path
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -175,7 +174,7 @@ def stop_server(proc: subprocess.Popen) -> None:
 # Results tracking
 # ---------------------------------------------------------------------------
 
-results: dict[str, Optional[bool]] = {
+results: dict[str, bool | None] = {
     "Auth": None,
     "Identity": None,
     "Registry": None,
@@ -332,7 +331,7 @@ def test_registry() -> bool:
     banner("[3/6] REGISTRY MODULE (client + cache)")
 
     from ad_buyer.registry.client import RegistryClient
-    from ad_buyer.registry.models import AgentCard, AgentCapability
+    from ad_buyer.registry.models import AgentCapability, AgentCard
 
     step("Create registry client")
     client = RegistryClient(
@@ -344,7 +343,7 @@ def test_registry() -> bool:
 
     step("Fetch agent card from seller (GET /.well-known/agent.json)")
 
-    async def _fetch_card() -> Optional[AgentCard]:
+    async def _fetch_card() -> AgentCard | None:
         return await client.fetch_agent_card(SELLER_URL)
 
     card = asyncio.run(_fetch_card())
@@ -400,7 +399,7 @@ def test_media_kit() -> bool:
                 ok(f"Media kit: {kit.seller_name}, {kit.total_packages} packages")
             except MediaKitError as e:
                 if e.status_code == 404:
-                    warn(f"Seller does not have /media-kit endpoint (404)")
+                    warn("Seller does not have /media-kit endpoint (404)")
                     warn("Skipping remaining media kit tests")
                     return True  # Graceful skip
                 raise
@@ -465,11 +464,12 @@ def test_sessions(tmp_dir: str) -> bool:
             warn("Seller may not support /sessions endpoint")
             # Still test local persistence
             step("Testing local session store persistence")
+            from datetime import datetime, timedelta
+
             from ad_buyer.sessions.session_store import SessionRecord, SessionStore
-            from datetime import datetime, timedelta, timezone
 
             store = SessionStore(store_path)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             record = SessionRecord(
                 session_id="local-test-001",
                 seller_url=SELLER_URL,
@@ -665,14 +665,14 @@ def main() -> int:
     # Pre-flight checks
     if not SELLER_VENV_PYTHON.exists():
         fail(f"Seller venv not found at {SELLER_VENV_PYTHON}")
-        fail("Run: cd ad_seller_system && python3.13 -m venv venv && source venv/bin/activate && pip install -e .")
+        fail("Run: cd ad_seller_system && python3.13 -m venv venv && source venv/bin/activate && pip install -e .")  # noqa: E501
         return 1
 
     # Create temp directory for test artifacts
     tmp_dir_obj = tempfile.mkdtemp(prefix="phase1_uat_")
     tmp_dir = tmp_dir_obj
 
-    server_proc: Optional[subprocess.Popen] = None
+    server_proc: subprocess.Popen | None = None
 
     try:
         # Start seller server

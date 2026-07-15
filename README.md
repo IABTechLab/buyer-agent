@@ -43,7 +43,7 @@ Campaign Brief ──→ Portfolio Manager (Opus)
           ┌──────────────┼──────────────┐
           ▼              ▼              ▼
     Channel Specialists (Sonnet)
-    Branding │ CTV │ Mobile │ Performance │ DSP
+    Branding │ CTV │ Mobile │ Performance │ Deals
           │              │              │
           ▼              ▼              ▼
     Functional Agents (Sonnet)
@@ -118,6 +118,12 @@ Reveal buyer identity progressively to unlock better pricing from sellers:
 
 → [Authentication Guide](https://iabtechlab.github.io/buyer-agent/api/authentication/)
 
+### Vendor Approval Gating (optional)
+
+Plug in an [IAB Diligence Platform](https://safeguardprivacy.com) tenant to keep unapproved sellers out of the buyer-agent workflow. Consults the `iabBuyerAgentApproval` flag via SGP's integration API. When `SGP_ENFORCE=true`, `DiscoverInventoryTool` filters NOT APPROVED vendors out of search results before the agent ever sees them, and `RequestDealTool` enforces the same check as a safety net at Deal ID time. With enforcement off, products are annotated APPROVED / NOT APPROVED / UNKNOWN but never filtered. Off by default — inert when `SGP_API_KEY` is empty.
+
+→ [IAB Diligence Platform Approval](https://iabtechlab.github.io/buyer-agent/integration/iab-diligence-platform/)
+
 ## Quick Start
 
 ### Install
@@ -142,7 +148,7 @@ ANTHROPIC_API_KEY=sk-ant-api03-xxxxx        # For Anthropic (default)
 # OPENAI_API_KEY=sk-xxxxx                   # For OpenAI / Azure
 # COHERE_API_KEY=xxxxx                      # For Cohere
 
-# LLM model (uses litellm provider/model format — any provider works)
+# LLM model (uses provider/model format — native Anthropic, OpenAI, Gemini, Azure, Bedrock)
 DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
 # DEFAULT_LLM_MODEL=openai/gpt-4o          # OpenAI example
 # DEFAULT_LLM_MODEL=ollama/llama3           # Local Ollama example
@@ -154,7 +160,7 @@ SELLER_BASE_URL=http://localhost:8001        # Seller agent URL
 DATABASE_URL=sqlite:///./ad_buyer.db
 ```
 
-> **LLM Provider Flexibility:** The agent uses [litellm](https://docs.litellm.ai/) under the hood, supporting 100+ LLM providers (OpenAI, Azure, Cohere, Ollama, Vertex AI, Bedrock, etc.). Set `DEFAULT_LLM_MODEL` and `MANAGER_LLM_MODEL` using `provider/model-name` format and provide the matching API key. See the [Quickstart Guide](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/) for details.
+> **LLM Provider Flexibility:** CrewAI supports native integrations with Anthropic (default), OpenAI, Google Gemini, Azure OpenAI, and AWS Bedrock. Set `DEFAULT_LLM_MODEL` and `MANAGER_LLM_MODEL` using `provider/model-name` format (e.g., `anthropic/claude-sonnet-4-5-20250929`) and provide the matching API key. Install the matching extra: `pip install "crewai[anthropic]"`. See the [Quickstart Guide](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/) for details.
 
 → [Full Configuration](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/)
 

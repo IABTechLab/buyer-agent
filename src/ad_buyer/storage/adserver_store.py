@@ -50,7 +50,7 @@ AD_SERVER_CAMPAIGN_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_adserver_campaign_id ON ad_server_campaigns(campaign_id);",
     "CREATE INDEX IF NOT EXISTS idx_adserver_ad_server ON ad_server_campaigns(ad_server);",
     "CREATE INDEX IF NOT EXISTS idx_adserver_status ON ad_server_campaigns(status);",
-    "CREATE INDEX IF NOT EXISTS idx_adserver_campaign_server ON ad_server_campaigns(campaign_id, ad_server);",
+    "CREATE INDEX IF NOT EXISTS idx_adserver_campaign_server ON ad_server_campaigns(campaign_id, ad_server);",  # noqa: E501
 ]
 
 

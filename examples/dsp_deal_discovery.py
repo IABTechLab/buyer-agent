@@ -29,7 +29,7 @@ try:
         BuyerIdentity,
         DealType,
     )
-    from ad_buyer.tools.dsp import DiscoverInventoryTool, GetPricingTool, RequestDealTool
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool, GetPricingTool, RequestDealTool
 except ImportError as e:
     print(f"Error: {e}")
     print("\nPlease install the ad_buyer package first:")
@@ -102,7 +102,7 @@ async def demo_dsp_workflow():
         preferred_deal_types=[DealType.PREFERRED_DEAL],
     )
 
-    print(f"\nBuyer Identity:")
+    print("\nBuyer Identity:")
     print(f"  Agency: {identity.agency_name} ({identity.agency_holding_company})")
     print(f"  Advertiser: {identity.advertiser_name}")
     print(f"  Access Tier: {buyer_context.get_access_tier().value}")

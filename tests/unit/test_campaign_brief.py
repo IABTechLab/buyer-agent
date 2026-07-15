@@ -121,7 +121,13 @@ class TestRequiredFields:
         assert brief.total_budget == 500000.00
         assert brief.currency == "USD"
         assert len(brief.channels) == 2
-        assert len(brief.target_audience) == 2
+        # Legacy list[str] is migrated to a typed AudiencePlan with the
+        # first item as the primary ref and the rest as extensions
+        # (proposal §6 row 4 / bead ar-fe0h migration policy).
+        assert brief.target_audience is not None
+        assert brief.target_audience.primary.identifier == "auto_intenders"
+        assert len(brief.target_audience.extensions) == 1
+        assert brief.target_audience.extensions[0].identifier == "iab-607"
 
     def test_missing_advertiser_id_rejected(self):
         """Brief without advertiser_id must fail validation."""
@@ -196,16 +202,25 @@ class TestRequiredFields:
         # min_length=1 should trigger
         assert "channels" in str(exc_info.value)
 
-    def test_missing_target_audience_rejected(self):
-        """Brief without target_audience must fail validation."""
+    def test_missing_target_audience_now_optional(self):
+        """target_audience is now AudiencePlan | None = None (proposal §5.2).
+
+        Briefs that omit it parse successfully; downstream pipeline stages
+        treat a None plan as 'no audience targeting' and the Audience
+        Planner agent will fill it in (per proposal §5.3).
+        """
         data = _minimal_brief_data()
         del data["target_audience"]
-        with pytest.raises(ValidationError) as exc_info:
-            CampaignBrief(**data)
-        assert "target_audience" in str(exc_info.value)
+        brief = CampaignBrief(**data)
+        assert brief.target_audience is None
 
     def test_empty_target_audience_rejected(self):
-        """Brief with empty target_audience must fail validation."""
+        """Empty list legacy input still rejects — preserves prior behavior.
+
+        The compat shim raises ValueError for an empty `list[str]` so the
+        lossy-conversion case never produces a sentinel-only AudiencePlan.
+        Pydantic surfaces this as a ValidationError on the field.
+        """
         data = _minimal_brief_data()
         data["target_audience"] = []
         with pytest.raises(ValidationError) as exc_info:
@@ -712,7 +727,12 @@ class TestJSONSchemaExport:
         assert isinstance(schema, dict)
 
     def test_json_schema_has_required_fields(self):
-        """JSON Schema should list all required fields."""
+        """JSON Schema should list all required fields.
+
+        Note: as of proposal §5.2 (bead ar-fe0h), `target_audience` is now
+        optional (typed `AudiencePlan | None`) so it does NOT appear in
+        the required list anymore.
+        """
         schema = CampaignBrief.model_json_schema()
         assert "required" in schema
         required = schema["required"]
@@ -725,9 +745,9 @@ class TestJSONSchemaExport:
             "flight_start",
             "flight_end",
             "channels",
-            "target_audience",
         ]:
             assert field in required, f"{field} should be in required fields"
+        assert "target_audience" not in required
 
     def test_json_schema_has_properties(self):
         """JSON Schema should include properties for all fields."""

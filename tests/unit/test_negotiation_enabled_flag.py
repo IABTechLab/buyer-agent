@@ -23,7 +23,7 @@ from ad_buyer.models.buyer_identity import (
 )
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.tools.dsp import GetPricingTool, RequestDealTool
+from ad_buyer.tools.buyer_deals import GetPricingTool, RequestDealTool
 
 # -- Fixtures ----------------------------------------------------------------
 

@@ -86,6 +86,13 @@ mcp = FastMCP(
         "Use the available tools to check system status, review configuration, "
         "and manage buyer workflows."
     ),
+    # streamable_http_path="/" so that when mounted at /mcp in FastAPI the
+    # endpoint resolves to /mcp (not /mcp/mcp which is the default).
+    streamable_http_path="/",
+    # host="0.0.0.0" disables the auto DNS-rebinding protection that FastMCP
+    # applies when host is 127.0.0.1/localhost. That protection blocks requests
+    # from Cloud Run (Host header is the public *.run.app domain) with 421.
+    host="0.0.0.0",
 )
 
 
@@ -224,7 +231,7 @@ def get_setup_status() -> str:
         db_url = settings.database_url
         # Strip sqlite:/// prefix for direct connection test
         if db_url.startswith("sqlite:///"):
-            db_path = db_url[len("sqlite:///"):]
+            db_path = db_url[len("sqlite:///") :]
         else:
             db_path = db_url
 
@@ -245,10 +252,7 @@ def get_setup_status() -> str:
 
     # Overall setup completeness
     # Minimum required: seller endpoints + database
-    setup_complete = (
-        checks["seller_endpoints_configured"]
-        and checks["database_accessible"]
-    )
+    setup_complete = checks["seller_endpoints_configured"] and checks["database_accessible"]
 
     result = {
         "setup_complete": setup_complete,
@@ -276,7 +280,7 @@ def health_check() -> str:
     try:
         db_url = settings.database_url
         if db_url.startswith("sqlite:///"):
-            db_path = db_url[len("sqlite:///"):]
+            db_path = db_url[len("sqlite:///") :]
         else:
             db_path = db_url
 
@@ -304,9 +308,7 @@ def health_check() -> str:
     services["event_bus"] = {"status": "healthy"}
 
     # Determine overall status
-    unhealthy_count = sum(
-        1 for s in services.values() if s.get("status") == "unhealthy"
-    )
+    unhealthy_count = sum(1 for s in services.values() if s.get("status") == "unhealthy")
     if unhealthy_count == 0:
         overall_status = "healthy"
     elif unhealthy_count < len(services):
@@ -534,16 +536,18 @@ def list_campaigns(status: str | None = None) -> str:
 
         campaign_summaries = []
         for c in campaigns:
-            campaign_summaries.append({
-                "campaign_id": c["campaign_id"],
-                "campaign_name": c["campaign_name"],
-                "advertiser_id": c["advertiser_id"],
-                "status": c["status"],
-                "total_budget": c["total_budget"],
-                "currency": c.get("currency", "USD"),
-                "flight_start": c["flight_start"],
-                "flight_end": c["flight_end"],
-            })
+            campaign_summaries.append(
+                {
+                    "campaign_id": c["campaign_id"],
+                    "campaign_name": c["campaign_name"],
+                    "advertiser_id": c["advertiser_id"],
+                    "status": c["status"],
+                    "total_budget": c["total_budget"],
+                    "currency": c.get("currency", "USD"),
+                    "flight_start": c["flight_start"],
+                    "flight_end": c["flight_end"],
+                }
+            )
 
         result = {
             "total": len(campaign_summaries),
@@ -681,13 +685,15 @@ def check_pacing(campaign_id: str) -> str:
         # Build channel pacing breakdown
         channel_pacing = []
         for ch in latest.channel_snapshots:
-            channel_pacing.append({
-                "channel": ch.channel,
-                "allocated_budget": ch.allocated_budget,
-                "spend": ch.spend,
-                "pacing_pct": ch.pacing_pct,
-                "impressions": ch.impressions,
-            })
+            channel_pacing.append(
+                {
+                    "channel": ch.channel,
+                    "allocated_budget": ch.allocated_budget,
+                    "spend": ch.spend,
+                    "pacing_pct": ch.pacing_pct,
+                    "impressions": ch.impressions,
+                }
+            )
 
         result = {
             "campaign_id": campaign_id,
@@ -742,22 +748,23 @@ def review_budgets() -> str:
             # Calculate delivery percentage
             delivery_pct = (spend / budget * 100.0) if budget > 0 else 0.0
 
-            campaign_budgets.append({
-                "campaign_id": c["campaign_id"],
-                "campaign_name": c["campaign_name"],
-                "status": c["status"],
-                "total_budget": budget,
-                "total_spend": spend,
-                "delivery_pct": round(delivery_pct, 1),
-                "currency": c.get("currency", "USD"),
-            })
+            campaign_budgets.append(
+                {
+                    "campaign_id": c["campaign_id"],
+                    "campaign_name": c["campaign_name"],
+                    "status": c["status"],
+                    "total_budget": budget,
+                    "total_spend": spend,
+                    "delivery_pct": round(delivery_pct, 1),
+                    "currency": c.get("currency", "USD"),
+                }
+            )
 
         result = {
             "total_budget": total_budget,
             "total_spend": total_spend,
             "overall_delivery_pct": (
-                round(total_spend / total_budget * 100.0, 1)
-                if total_budget > 0 else 0.0
+                round(total_spend / total_budget * 100.0, 1) if total_budget > 0 else 0.0
             ),
             "campaign_count": len(campaign_budgets),
             "campaigns": campaign_budgets,
@@ -813,19 +820,21 @@ def list_deals(
 
         deal_summaries = []
         for d in deals:
-            deal_summaries.append({
-                "deal_id": d["id"],
-                "display_name": d.get("display_name") or d.get("product_name") or "(unnamed)",
-                "status": d.get("status", "unknown"),
-                "deal_type": d.get("deal_type", "unknown"),
-                "media_type": d.get("media_type"),
-                "seller_org": d.get("seller_org"),
-                "seller_domain": d.get("seller_domain"),
-                "price": d.get("price"),
-                "impressions": d.get("impressions"),
-                "flight_start": d.get("flight_start"),
-                "flight_end": d.get("flight_end"),
-            })
+            deal_summaries.append(
+                {
+                    "deal_id": d["id"],
+                    "display_name": d.get("display_name") or d.get("product_name") or "(unnamed)",
+                    "status": d.get("status", "unknown"),
+                    "deal_type": d.get("deal_type", "unknown"),
+                    "media_type": d.get("media_type"),
+                    "seller_org": d.get("seller_org"),
+                    "seller_domain": d.get("seller_domain"),
+                    "price": d.get("price"),
+                    "impressions": d.get("impressions"),
+                    "flight_start": d.get("flight_start"),
+                    "flight_end": d.get("flight_end"),
+                }
+            )
 
         result = {
             "total": len(deal_summaries),
@@ -884,21 +893,21 @@ def search_deals(query: str) -> str:
                 if value and query_lower in str(value).lower():
                     matched_fields.append(field_label)
             if matched_fields:
-                matches.append({
-                    "deal_id": deal["id"],
-                    "display_name": (
-                        deal.get("display_name")
-                        or deal.get("product_name")
-                        or "(unnamed)"
-                    ),
-                    "status": deal.get("status", "unknown"),
-                    "deal_type": deal.get("deal_type", "unknown"),
-                    "media_type": deal.get("media_type"),
-                    "seller_org": deal.get("seller_org"),
-                    "seller_domain": deal.get("seller_domain"),
-                    "price": deal.get("price"),
-                    "matched_in": matched_fields,
-                })
+                matches.append(
+                    {
+                        "deal_id": deal["id"],
+                        "display_name": (
+                            deal.get("display_name") or deal.get("product_name") or "(unnamed)"
+                        ),
+                        "status": deal.get("status", "unknown"),
+                        "deal_type": deal.get("deal_type", "unknown"),
+                        "media_type": deal.get("media_type"),
+                        "seller_org": deal.get("seller_org"),
+                        "seller_domain": deal.get("seller_domain"),
+                        "price": deal.get("price"),
+                        "matched_in": matched_fields,
+                    }
+                )
 
         result = {
             "total": len(matches),
@@ -942,17 +951,19 @@ async def discover_sellers(capability: str | None = None) -> str:
 
         seller_list = []
         for seller in sellers:
-            seller_list.append({
-                "agent_id": seller.agent_id,
-                "name": seller.name,
-                "url": seller.url,
-                "capabilities": [
-                    {"name": c.name, "description": c.description, "tags": c.tags}
-                    for c in seller.capabilities
-                ],
-                "trust_level": seller.trust_level.value,
-                "protocols": seller.protocols,
-            })
+            seller_list.append(
+                {
+                    "agent_id": seller.agent_id,
+                    "name": seller.name,
+                    "url": seller.url,
+                    "capabilities": [
+                        {"name": c.name, "description": c.description, "tags": c.tags}
+                        for c in seller.capabilities
+                    ],
+                    "trust_level": seller.trust_level.value,
+                    "protocols": seller.protocols,
+                }
+            )
 
         result = {
             "total": len(seller_list),
@@ -995,18 +1006,20 @@ async def get_seller_media_kit(seller_url: str) -> str:
 
         packages = []
         for pkg in kit.all_packages:
-            packages.append({
-                "package_id": pkg.package_id,
-                "name": pkg.name,
-                "description": pkg.description,
-                "ad_formats": pkg.ad_formats,
-                "device_types": pkg.device_types,
-                "price_range": pkg.price_range,
-                "rate_type": pkg.rate_type,
-                "is_featured": pkg.is_featured,
-                "geo_targets": pkg.geo_targets,
-                "tags": pkg.tags,
-            })
+            packages.append(
+                {
+                    "package_id": pkg.package_id,
+                    "name": pkg.name,
+                    "description": pkg.description,
+                    "ad_formats": pkg.ad_formats,
+                    "device_types": pkg.device_types,
+                    "price_range": pkg.price_range,
+                    "rate_type": pkg.rate_type,
+                    "is_featured": pkg.is_featured,
+                    "geo_targets": pkg.geo_targets,
+                    "tags": pkg.tags,
+                }
+            )
 
         result = {
             "seller_name": kit.seller_name,
@@ -1028,7 +1041,9 @@ async def get_seller_media_kit(seller_url: str) -> str:
 
     except Exception as exc:
         logger.warning(
-            "Unexpected error fetching media kit from %s: %s", seller_url, exc,
+            "Unexpected error fetching media kit from %s: %s",
+            seller_url,
+            exc,
         )
         result = {
             "error": f"Unexpected error: {exc}",
@@ -1068,34 +1083,40 @@ async def compare_sellers(seller_urls: list[str]) -> str:
             packages = []
             for pkg in kit.all_packages:
                 seller_formats.update(pkg.ad_formats)
-                packages.append({
-                    "package_id": pkg.package_id,
-                    "name": pkg.name,
-                    "price_range": pkg.price_range,
-                    "ad_formats": pkg.ad_formats,
-                    "rate_type": pkg.rate_type,
-                })
+                packages.append(
+                    {
+                        "package_id": pkg.package_id,
+                        "name": pkg.name,
+                        "price_range": pkg.price_range,
+                        "ad_formats": pkg.ad_formats,
+                        "rate_type": pkg.rate_type,
+                    }
+                )
 
             all_ad_formats.update(seller_formats)
             total_packages += len(packages)
 
-            sellers_data.append({
-                "seller_url": url,
-                "seller_name": kit.seller_name,
-                "total_packages": len(packages),
-                "ad_formats": sorted(seller_formats),
-                "packages": packages,
-            })
+            sellers_data.append(
+                {
+                    "seller_url": url,
+                    "seller_name": kit.seller_name,
+                    "total_packages": len(packages),
+                    "ad_formats": sorted(seller_formats),
+                    "packages": packages,
+                }
+            )
 
         except (MediaKitError, Exception) as exc:
             logger.warning("Failed to fetch media kit from %s: %s", url, exc)
-            sellers_data.append({
-                "seller_url": url,
-                "error": f"Failed to fetch media kit: {exc}",
-                "total_packages": 0,
-                "ad_formats": [],
-                "packages": [],
-            })
+            sellers_data.append(
+                {
+                    "seller_url": url,
+                    "error": f"Failed to fetch media kit: {exc}",
+                    "total_packages": 0,
+                    "ad_formats": [],
+                    "packages": [],
+                }
+            )
 
     result = {
         "sellers_compared": len(seller_urls),
@@ -1103,12 +1124,8 @@ async def compare_sellers(seller_urls: list[str]) -> str:
         "summary": {
             "total_packages_across_sellers": total_packages,
             "all_ad_formats": sorted(all_ad_formats),
-            "sellers_reachable": sum(
-                1 for s in sellers_data if "error" not in s
-            ),
-            "sellers_unreachable": sum(
-                1 for s in sellers_data if "error" in s
-            ),
+            "sellers_reachable": sum(1 for s in sellers_data if "error" not in s),
+            "sellers_unreachable": sum(1 for s in sellers_data if "error" in s),
         },
         "timestamp": datetime.now(UTC).isoformat(),
     }
@@ -1211,13 +1228,15 @@ def get_negotiation_status(deal_id: str) -> str:
 
         round_summaries = []
         for r in rounds:
-            round_summaries.append({
-                "round_number": r["round_number"],
-                "buyer_price": r["buyer_price"],
-                "seller_price": r["seller_price"],
-                "action": r["action"],
-                "rationale": r.get("rationale", ""),
-            })
+            round_summaries.append(
+                {
+                    "round_number": r["round_number"],
+                    "buyer_price": r["buyer_price"],
+                    "seller_price": r["seller_price"],
+                    "action": r["action"],
+                    "rationale": r.get("rationale", ""),
+                }
+            )
 
         result = {
             "deal_id": deal_id,
@@ -1561,21 +1580,27 @@ def create_deal_manual(
             tags=tags,
         )
     except (ValueError, TypeError) as exc:
-        return json.dumps({
-            "success": False,
-            "errors": [str(exc)],
-            "timestamp": datetime.now(UTC).isoformat(),
-        }, indent=2)
+        return json.dumps(
+            {
+                "success": False,
+                "errors": [str(exc)],
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+            indent=2,
+        )
 
     # Validate and prepare
     entry_result = create_manual_deal(entry)
 
     if not entry_result.success:
-        return json.dumps({
-            "success": False,
-            "errors": entry_result.errors,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }, indent=2)
+        return json.dumps(
+            {
+                "success": False,
+                "errors": entry_result.errors,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+            indent=2,
+        )
 
     # Save the deal
     store = _get_deal_store()
@@ -1584,9 +1609,7 @@ def create_deal_manual(
 
         # Save portfolio metadata
         tags_json = (
-            json.dumps(entry_result.metadata["tags"])
-            if entry_result.metadata.get("tags")
-            else None
+            json.dumps(entry_result.metadata["tags"]) if entry_result.metadata.get("tags") else None
         )
         store.save_portfolio_metadata(
             deal_id=deal_id,
@@ -1596,12 +1619,15 @@ def create_deal_manual(
             tags=tags_json,
         )
 
-        return json.dumps({
-            "success": True,
-            "deal_id": deal_id,
-            "display_name": display_name,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }, indent=2)
+        return json.dumps(
+            {
+                "success": True,
+                "deal_id": deal_id,
+                "display_name": display_name,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+            indent=2,
+        )
     finally:
         if _deal_store_override is None:
             store.disconnect()
@@ -1638,16 +1664,19 @@ def get_portfolio_summary(
         total = len(deals)
 
         if total == 0:
-            return json.dumps({
-                "total_deals": 0,
-                "total_value": 0.0,
-                "by_status": {},
-                "by_deal_type": {},
-                "by_media_type": {},
-                "top_sellers": [],
-                "expiring_deals": [],
-                "timestamp": datetime.now(UTC).isoformat(),
-            }, indent=2)
+            return json.dumps(
+                {
+                    "total_deals": 0,
+                    "total_value": 0.0,
+                    "by_status": {},
+                    "by_deal_type": {},
+                    "by_media_type": {},
+                    "top_sellers": [],
+                    "expiring_deals": [],
+                    "timestamp": datetime.now(UTC).isoformat(),
+                },
+                indent=2,
+            )
 
         # Count by status
         status_counts: dict[str, int] = {}
@@ -1673,7 +1702,9 @@ def get_portfolio_summary(
             seller = deal.get("seller_org") or deal.get("seller_domain") or "Unknown"
             seller_counts[seller] = seller_counts.get(seller, 0) + 1
         top_sellers = sorted(
-            seller_counts.items(), key=lambda x: x[1], reverse=True,
+            seller_counts.items(),
+            key=lambda x: x[1],
+            reverse=True,
         )[:top_sellers_count]
 
         # Total portfolio value: sum of (price * impressions / 1000)
@@ -1696,15 +1727,15 @@ def get_portfolio_summary(
                 continue
             flight_end = deal.get("flight_end")
             if flight_end and now_str <= flight_end <= cutoff_str:
-                expiring_deals.append({
-                    "deal_id": deal["id"],
-                    "display_name": (
-                        deal.get("display_name")
-                        or deal.get("product_name")
-                        or "(unnamed)"
-                    ),
-                    "flight_end": flight_end,
-                })
+                expiring_deals.append(
+                    {
+                        "deal_id": deal["id"],
+                        "display_name": (
+                            deal.get("display_name") or deal.get("product_name") or "(unnamed)"
+                        ),
+                        "flight_end": flight_end,
+                    }
+                )
 
         result = {
             "total_deals": total,
@@ -1712,10 +1743,7 @@ def get_portfolio_summary(
             "by_status": status_counts,
             "by_deal_type": type_counts,
             "by_media_type": media_counts,
-            "top_sellers": [
-                {"seller": name, "deal_count": count}
-                for name, count in top_sellers
-            ],
+            "top_sellers": [{"seller": name, "deal_count": count} for name, count in top_sellers],
             "expiring_deals": expiring_deals,
             "timestamp": datetime.now(UTC).isoformat(),
         }
@@ -1745,16 +1773,18 @@ def list_active_negotiations() -> str:
             deal_id = d["id"]
             rounds = store.get_negotiation_history(deal_id)
 
-            negotiations.append({
-                "deal_id": deal_id,
-                "product_id": d.get("product_id", ""),
-                "product_name": d.get("product_name", ""),
-                "seller_url": d.get("seller_url", ""),
-                "price": d.get("price"),
-                "status": d.get("status", "negotiating"),
-                "rounds_count": len(rounds),
-                "created_at": d.get("created_at", ""),
-            })
+            negotiations.append(
+                {
+                    "deal_id": deal_id,
+                    "product_id": d.get("product_id", ""),
+                    "product_name": d.get("product_name", ""),
+                    "seller_url": d.get("seller_url", ""),
+                    "price": d.get("price"),
+                    "status": d.get("status", "negotiating"),
+                    "rounds_count": len(rounds),
+                    "created_at": d.get("created_at", ""),
+                }
+            )
 
         result = {
             "total": len(negotiations),
@@ -1904,14 +1934,16 @@ def list_pending_approvals(campaign_id: str | None = None) -> str:
 
         pending = []
         for row in rows:
-            pending.append({
-                "approval_request_id": row["approval_request_id"],
-                "campaign_id": row["campaign_id"],
-                "stage": row["stage"],
-                "status": row["status"],
-                "requested_at": row["requested_at"],
-                "context": json.loads(row.get("context") or "{}"),
-            })
+            pending.append(
+                {
+                    "approval_request_id": row["approval_request_id"],
+                    "campaign_id": row["campaign_id"],
+                    "stage": row["stage"],
+                    "status": row["status"],
+                    "requested_at": row["requested_at"],
+                    "context": json.loads(row.get("context") or "{}"),
+                }
+            )
 
         result = {
             "total": len(pending),
@@ -2023,10 +2055,12 @@ def list_api_keys() -> str:
     keys = []
     for seller_url in sellers:
         raw_key = key_store.get_key(seller_url)
-        keys.append({
-            "seller_url": seller_url,
-            "masked_key": _mask_key(raw_key) if raw_key else "****",
-        })
+        keys.append(
+            {
+                "seller_url": seller_url,
+                "masked_key": _mask_key(raw_key) if raw_key else "****",
+            }
+        )
 
     result = {
         "total": len(keys),
@@ -2124,24 +2158,28 @@ def list_templates(template_type: str | None = None) -> str:
         if template_type is None or template_type == "deal":
             raw = store.list_deal_templates()
             for t in raw:
-                deal_templates.append({
-                    "template_id": t["id"],
-                    "name": t["name"],
-                    "deal_type_pref": t.get("deal_type_pref"),
-                    "advertiser_id": t.get("advertiser_id"),
-                    "max_cpm": t.get("max_cpm"),
-                    "created_at": t.get("created_at"),
-                })
+                deal_templates.append(
+                    {
+                        "template_id": t["id"],
+                        "name": t["name"],
+                        "deal_type_pref": t.get("deal_type_pref"),
+                        "advertiser_id": t.get("advertiser_id"),
+                        "max_cpm": t.get("max_cpm"),
+                        "created_at": t.get("created_at"),
+                    }
+                )
 
         if template_type is None or template_type == "supply_path":
             raw = store.list_supply_path_templates()
             for t in raw:
-                spo_templates.append({
-                    "template_id": t["id"],
-                    "name": t["name"],
-                    "max_reseller_hops": t.get("max_reseller_hops"),
-                    "created_at": t.get("created_at"),
-                })
+                spo_templates.append(
+                    {
+                        "template_id": t["id"],
+                        "name": t["name"],
+                        "max_reseller_hops": t.get("max_reseller_hops"),
+                        "created_at": t.get("created_at"),
+                    }
+                )
 
         result = {
             "deal_templates": deal_templates,
@@ -2493,25 +2531,29 @@ def get_pacing_report(campaign_id: str) -> str:
         # Build channel pacing with full details
         channel_pacing = []
         for ch in dashboard.channel_pacing:
-            channel_pacing.append({
-                "channel": ch.channel,
-                "allocated_budget": ch.allocated_budget,
-                "spend": ch.spend,
-                "pacing_pct": ch.pacing_pct,
-                "impressions": ch.impressions,
-                "effective_cpm": ch.effective_cpm,
-                "fill_rate": ch.fill_rate,
-            })
+            channel_pacing.append(
+                {
+                    "channel": ch.channel,
+                    "allocated_budget": ch.allocated_budget,
+                    "spend": ch.spend,
+                    "pacing_pct": ch.pacing_pct,
+                    "impressions": ch.impressions,
+                    "effective_cpm": ch.effective_cpm,
+                    "fill_rate": ch.fill_rate,
+                }
+            )
 
         # Build alerts
         alerts = []
         for alert in dashboard.alerts:
-            alerts.append({
-                "severity": alert.severity,
-                "message": alert.message,
-                "channel": alert.channel,
-                "deviation_pct": alert.deviation_pct,
-            })
+            alerts.append(
+                {
+                    "severity": alert.severity,
+                    "message": alert.message,
+                    "channel": alert.channel,
+                    "deviation_pct": alert.deviation_pct,
+                }
+            )
 
         result = {
             "campaign_id": campaign_id,
@@ -2559,6 +2601,7 @@ def _get_ssp_connector_class(name: str) -> type | None:
     if class_name is None:
         return None
     import sys
+
     module = sys.modules[__name__]
     return getattr(module, class_name, None)
 
@@ -2585,12 +2628,14 @@ def list_ssp_connectors() -> str:
             continue
         instance = cls()
         required = instance.get_required_config()
-        connectors.append({
-            "name": name,
-            "display_name": instance.ssp_name,
-            "configured": instance.is_configured(),
-            "required_env_vars": required,
-        })
+        connectors.append(
+            {
+                "name": name,
+                "display_name": instance.ssp_name,
+                "configured": instance.is_configured(),
+                "required_env_vars": required,
+            }
+        )
 
     result = {
         "total": len(connectors),
@@ -2629,10 +2674,7 @@ def import_deals_ssp(ssp_name: str) -> str:
         known = ", ".join(sorted(_SSP_CLASS_NAMES.keys()))
         return json.dumps(
             {
-                "error": (
-                    f"Unknown SSP connector: '{ssp_name}'. "
-                    f"Known connectors: {known}"
-                ),
+                "error": (f"Unknown SSP connector: '{ssp_name}'. Known connectors: {known}"),
                 "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
@@ -2712,10 +2754,7 @@ def test_ssp_connection(ssp_name: str) -> str:
         known = ", ".join(sorted(_SSP_CLASS_NAMES.keys()))
         return json.dumps(
             {
-                "error": (
-                    f"Unknown SSP connector: '{ssp_name}'. "
-                    f"Known connectors: {known}"
-                ),
+                "error": (f"Unknown SSP connector: '{ssp_name}'. Known connectors: {known}"),
                 "timestamp": datetime.now(UTC).isoformat(),
             },
             indent=2,
@@ -2762,112 +2801,132 @@ def test_ssp_connection(ssp_name: str) -> str:
 
 @mcp.prompt(name="setup", description="First-time guided setup wizard")
 async def setup_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Check my setup status and walk me through configuring everything "
-                "that's incomplete. Go step by step through all 8 wizard steps: "
-                "deployment, seller connections, credentials, buyer identity, deal "
-                "preferences, campaign defaults, approval gates, and review. "
-                "Ask me one question at a time.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Check my setup status and walk me through configuring everything "
+            "that's incomplete. Go step by step through all 8 wizard steps: "
+            "deployment, seller connections, credentials, buyer identity, deal "
+            "preferences, campaign defaults, approval gates, and review. "
+            "Ask me one question at a time.",
+        )
+    ]
 
 
 @mcp.prompt(name="status", description="Configuration and health overview")
 async def status_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Show me a complete status overview: setup state, system health, "
-                "seller connections, database status, and any issues that need "
-                "attention.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Show me a complete status overview: setup state, system health, "
+            "seller connections, database status, and any issues that need "
+            "attention.",
+        )
+    ]
 
 
 @mcp.prompt(name="campaigns", description="Campaign portfolio with budget pacing")
 async def campaigns_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Show me all my campaigns with their current status and budget "
-                "pacing. Highlight any campaigns that are behind or ahead on "
-                "pacing, and flag anything that needs attention. Include a budget "
-                "summary across all campaigns.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Show me all my campaigns with their current status and budget "
+            "pacing. Highlight any campaigns that are behind or ahead on "
+            "pacing, and flag anything that needs attention. Include a budget "
+            "summary across all campaigns.",
+        )
+    ]
 
 
 @mcp.prompt(name="deals", description="Deal portfolio dashboard")
 async def deals_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Give me a full dashboard of my deal portfolio: total deals, "
-                "breakdown by status and deal type, top sellers, portfolio value, "
-                "and any deals expiring in the next 30 days. Include recent "
-                "activity.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Give me a full dashboard of my deal portfolio: total deals, "
+            "breakdown by status and deal type, top sellers, portfolio value, "
+            "and any deals expiring in the next 30 days. Include recent "
+            "activity.",
+        )
+    ]
 
 
 @mcp.prompt(name="discover", description="Find and compare seller agents")
 async def discover_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Search the IAB registry for available seller agents. Show me "
-                "who's out there, what they offer, and their capabilities. If I'm "
-                "interested in specific sellers, help me compare their media kits "
-                "and pricing side by side.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Search the IAB registry for available seller agents. Show me "
+            "who's out there, what they offer, and their capabilities. If I'm "
+            "interested in specific sellers, help me compare their media kits "
+            "and pricing side by side.",
+        )
+    ]
 
 
 @mcp.prompt(name="negotiate", description="Negotiation status and actions")
 async def negotiate_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Show me all active negotiations: where each one stands, how many "
-                "rounds we've been through, the current price positions, and what "
-                "action is needed next. If there are no active negotiations, help "
-                "me start one by discovering sellers and their inventory.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Show me all active negotiations: where each one stands, how many "
+            "rounds we've been through, the current price positions, and what "
+            "action is needed next. If there are no active negotiations, help "
+            "me start one by discovering sellers and their inventory.",
+        )
+    ]
 
 
 @mcp.prompt(name="orders", description="Active orders and execution status")
 async def orders_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Show me all my orders: their current status, any pending "
-                "transitions, and orders that need my action. Group them by "
-                "status and highlight anything stuck or overdue.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Show me all my orders: their current status, any pending "
+            "transitions, and orders that need my action. Group them by "
+            "status and highlight anything stuck or overdue.",
+        )
+    ]
 
 
 @mcp.prompt(name="approvals", description="Pending approvals queue")
 async def approvals_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Show me everything waiting for my approval: pending deal "
-                "approvals, campaign approvals, and any budget or order changes "
-                "that need my decision. Most urgent first. For each item, show "
-                "me the context I need to decide.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Show me everything waiting for my approval: pending deal "
+            "approvals, campaign approvals, and any budget or order changes "
+            "that need my decision. Most urgent first. For each item, show "
+            "me the context I need to decide.",
+        )
+    ]
 
 
 @mcp.prompt(name="configure", description="Settings, templates, and SSP connectors")
 async def configure_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="Show me my current configuration: deal and supply path templates, "
-                "SSP connector status, API keys (masked), and campaign defaults. "
-                "Help me create new templates, configure SSP connectors, or update "
-                "settings.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="Show me my current configuration: deal and supply path templates, "
+            "SSP connector status, API keys (masked), and campaign defaults. "
+            "Help me create new templates, configure SSP connectors, or update "
+            "settings.",
+        )
+    ]
 
 
 @mcp.prompt(name="help", description="What can this agent do?")
 async def help_prompt() -> list[Message]:
-    return [Message(
-        role="user",
-        content="List everything I can do with this buyer agent, organized by "
-                "category. Include all slash commands with descriptions, and "
-                "summarize the tool categories: campaigns, deals, seller discovery, "
-                "negotiation, orders, approvals, templates, reporting, SSP "
-                "connectors, and API keys.",
-    )]
+    return [
+        Message(
+            role="user",
+            content="List everything I can do with this buyer agent, organized by "
+            "category. Include all slash commands with descriptions, and "
+            "summarize the tool categories: campaigns, deals, seller discovery, "
+            "negotiation, orders, approvals, templates, reporting, SSP "
+            "connectors, and API keys.",
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -3021,13 +3080,15 @@ async def contextual_search(
 
 
 def mount_mcp(app: FastAPI) -> None:
-    """Mount the MCP SSE server onto a FastAPI application.
+    """Mount the MCP server onto a FastAPI application.
 
-    Creates an SSE endpoint at /mcp/sse that MCP clients can connect to.
+    Mounts both transports:
+    - Streamable HTTP at /mcp (current MCP standard, protocol 2025-06-18)
+    - Legacy SSE at /mcp-sse (deprecated, kept for backwards compat with older clients)
 
     Args:
         app: The FastAPI application to mount onto.
     """
-    sse_app = mcp.sse_app()
-    app.mount("/mcp/sse", sse_app)
-    logger.info("MCP SSE server mounted at /mcp/sse")
+    app.mount("/mcp", mcp.streamable_http_app())
+    app.mount("/mcp-sse", mcp.sse_app())
+    logger.info("MCP server mounted: Streamable HTTP at /mcp, legacy SSE at /mcp-sse/sse")

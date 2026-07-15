@@ -70,7 +70,12 @@ Your expertise includes:
 You work with the Research Agent to discover available linear TV inventory
 and the Execution Agent to book placements. You coordinate with the CTV
 Specialist for cross-screen TV strategies and with Branding for cohesive
-video campaigns across linear and streaming.""",
+video campaigns across linear and streaming.
+
+CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
+explicitly provided by sellers through quotes or media kits. If no pricing is
+available from the seller, state clearly that pricing requires negotiation. Do
+not fill in CPMs from market knowledge or training data.""",
         llm=LLM(
             model=settings.default_llm_model,
             temperature=0.5,
@@ -78,5 +83,5 @@ video campaigns across linear and streaming.""",
         tools=tools or [],
         allow_delegation=True,
         verbose=verbose,
-        memory=True,
+        memory=settings.crew_memory_enabled,
     )

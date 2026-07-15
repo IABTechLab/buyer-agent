@@ -14,7 +14,6 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent))
 import generate_progress as gp
 
-
 # ---------------------------------------------------------------------------
 # Fixtures: synthetic issue data
 # ---------------------------------------------------------------------------
@@ -296,9 +295,10 @@ class TestSubEpicRendering:
                 for issue in issues:
                     f.write(json.dumps(issue) + "\n")
 
-            # Patch paths and refresh
+            # Patch paths, refresh, and disable prefix filter (synthetic IDs)
             with patch.object(gp, "JSONL_PATH", jsonl_path), \
                  patch.object(gp, "OUTPUT_PATH", output_path), \
+                 patch.object(gp, "BEAD_PREFIX", ""), \
                  patch.object(gp, "refresh_jsonl", lambda: None):
                 gp.generate()
 
@@ -319,8 +319,10 @@ class TestSubEpicRendering:
                 for issue in issues:
                     f.write(json.dumps(issue) + "\n")
 
+            # Disable prefix filter for synthetic test IDs
             with patch.object(gp, "JSONL_PATH", jsonl_path), \
                  patch.object(gp, "OUTPUT_PATH", output_path), \
+                 patch.object(gp, "BEAD_PREFIX", ""), \
                  patch.object(gp, "refresh_jsonl", lambda: None):
                 gp.generate()
 
@@ -365,26 +367,40 @@ class TestLoadIssues:
         with tempfile.TemporaryDirectory() as tmpdir:
             jsonl_path = Path(tmpdir) / "issues.jsonl"
             with open(jsonl_path, "w") as f:
-                f.write(json.dumps(make_issue("live", "Active bead")) + "\n")
-                f.write(json.dumps(make_issue("dead", "Tombstoned",
+                f.write(json.dumps(make_issue("buyer-live", "Active bead")) + "\n")
+                f.write(json.dumps(make_issue("buyer-dead", "Tombstoned",
                                               status="tombstone")) + "\n")
 
             with patch.object(gp, "JSONL_PATH", jsonl_path):
                 issues = gp.load_issues()
             assert len(issues) == 1
-            assert issues[0]["id"] == "live"
+            assert issues[0]["id"] == "buyer-live"
 
     def test_filters_legacy(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             jsonl_path = Path(tmpdir) / "issues.jsonl"
             with open(jsonl_path, "w") as f:
-                f.write(json.dumps(make_issue("new", "Active bead")) + "\n")
-                f.write(json.dumps(make_issue("old", "[LEGACY] Old bead")) + "\n")
+                f.write(json.dumps(make_issue("buyer-new", "Active bead")) + "\n")
+                f.write(json.dumps(make_issue("buyer-old", "[LEGACY] Old bead")) + "\n")
 
             with patch.object(gp, "JSONL_PATH", jsonl_path):
                 issues = gp.load_issues()
             assert len(issues) == 1
-            assert issues[0]["id"] == "new"
+            assert issues[0]["id"] == "buyer-new"
+
+    def test_filters_wrong_prefix(self):
+        """Beads with non-buyer prefixes are excluded by the prefix filter."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            jsonl_path = Path(tmpdir) / "issues.jsonl"
+            with open(jsonl_path, "w") as f:
+                f.write(json.dumps(make_issue("buyer-ok", "Buyer bead")) + "\n")
+                f.write(json.dumps(make_issue("ar-xyz", "Parent repo bead")) + "\n")
+                f.write(json.dumps(make_issue("seller-abc", "Seller bead")) + "\n")
+
+            with patch.object(gp, "JSONL_PATH", jsonl_path):
+                issues = gp.load_issues()
+            assert len(issues) == 1
+            assert issues[0]["id"] == "buyer-ok"
 
 
 # ---------------------------------------------------------------------------
@@ -438,8 +454,8 @@ class TestEndToEnd:
             # Phase 3 exists
             assert "## Phase 3" in content
             # Phase 4 with sub-phases
-            assert "## Phase 4 — DealJockey" in content
-            assert "### Phase 4A — MVP DealJockey" in content
+            assert "## Phase 4 — Deal Library & External Hooks" in content
+            assert "### Phase 4A — Deal Library MVP" in content
             assert "### Phase 4B — Templates & Seller Integration" in content
 
             # All Campaign Automation gap beads are present
@@ -450,7 +466,6 @@ class TestEndToEnd:
 
             # No bead appears twice (check the ID column specifically)
             # Table format: | icon | ID | Task | ... — ID is in column index 2
-            import re
             bead_ids = []
             for line in content.split("\n"):
                 if not line.startswith("|") or "buyer-" not in line:

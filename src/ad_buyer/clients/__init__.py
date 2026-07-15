@@ -8,6 +8,7 @@ from .deals_client import DealsClient, DealsClientError
 from .mcp_client import IABMCPClient, MCPClientError, MCPToolResult
 from .mixpeek_client import MixpeekClient, MixpeekError
 from .opendirect_client import OpenDirectClient
+from .sgp_client import SGPAuthError, SGPClient, SGPClientError
 from .ucp_client import UCPClient, UCPExchangeResult
 from .unified_client import Protocol, UnifiedClient, UnifiedResult
 
@@ -35,4 +36,8 @@ __all__ = [
     # Mixpeek contextual enrichment
     "MixpeekClient",
     "MixpeekError",
+    # IAB Diligence Platform (SGP) approval gate
+    "SGPClient",
+    "SGPClientError",
+    "SGPAuthError",
 ]

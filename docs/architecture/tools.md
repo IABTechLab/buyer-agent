@@ -2,7 +2,7 @@
 
 The buyer agent provides 13 tools that agents use to interact with sellers, plan audiences, execute bookings, and retrieve performance data. All tools extend CrewAI's `BaseTool` and expose both synchronous (`_run`) and asynchronous (`_arun`) interfaces.
 
-Tools are how AI agents take action in the real world. While agents reason about strategy and make decisions, tools are the concrete operations they invoke --- searching a seller's product catalog, checking inventory availability, or confirming a booking. Each tool wraps a single, well-defined API call so that agents do not need to construct raw HTTP requests. Tools fall into four categories: **Audience** (understanding who to target), **Research** (finding what to buy), **DSP** (obtaining Deal IDs for programmatic activation), and **Execution** (placing and confirming orders).
+Tools are how AI agents take action in the real world. While agents reason about strategy and make decisions, tools are the concrete operations they invoke --- searching a seller's product catalog, checking inventory availability, or confirming a booking. Each tool wraps a single, well-defined API call so that agents do not need to construct raw HTTP requests. Tools fall into four categories: **Audience** (understanding who to target), **Research** (finding what to buy), **Buyer Deals** (obtaining Deal IDs for programmatic activation), and **Execution** (placing and confirming orders).
 
 ### Typical Tool Flow
 
@@ -11,7 +11,7 @@ In a standard booking, tools are used in this order:
 ```
 1. AudienceDiscovery / AudienceMatching / CoverageEstimation  (plan audience)
 2. ProductSearch / AvailsCheck                                  (find inventory)
-3. DiscoverInventory / GetPricing / RequestDeal                 (DSP deal path, if applicable)
+3. DiscoverInventory / GetPricing / RequestDeal                 (buyer deal path, if applicable)
 4. CreateOrder → CreateLine → ReserveLine → BookLine            (execute booking)
 5. GetStats                                                     (monitor delivery, coming soon)
 ```
@@ -26,7 +26,7 @@ graph LR
         CE[CoverageEstimationTool]
     end
 
-    subgraph DSP["DSP Tools"]
+    subgraph DSP["Buyer Deal Tools"]
         DI[DiscoverInventoryTool]
         GP[GetPricingTool]
         RD[RequestDealTool]
@@ -52,7 +52,7 @@ graph LR
 | Category | Tools | Used By |
 |----------|-------|---------|
 | **Audience** | AudienceDiscovery, AudienceMatching, CoverageEstimation | Audience Planner, Research Agent |
-| **DSP** | DiscoverInventory, GetPricing, RequestDeal | DSP Specialist |
+| **Buyer Deals** | DiscoverInventory, GetPricing, RequestDeal | Buyer Deal Specialist |
 | **Execution** | CreateOrder, CreateLine, ReserveLine, BookLine | Execution Agent |
 | **Research** | ProductSearch, AvailsCheck | Research Agent |
 | **Reporting** | GetStats | Reporting Agent (Coming Soon) |
@@ -183,11 +183,11 @@ result = tool._run(
 
 ---
 
-## DSP Tools
+## Buyer Deal Tools
 
-DSP tools enable programmatic deal workflows where Deal IDs are obtained from sellers and activated in traditional DSP platforms. All three tools require a `UnifiedClient` and `BuyerContext` at initialization.
+Buyer deal tools enable programmatic deal workflows where Deal IDs are obtained from sellers and activated in traditional DSP platforms. All three tools require a `UnifiedClient` and `BuyerContext` at initialization.
 
-**Package:** `src/ad_buyer/tools/dsp/`
+**Package:** `src/ad_buyer/tools/buyer_deals/`
 
 ### DiscoverInventoryTool
 
@@ -207,7 +207,7 @@ Queries sellers for available inventory with identity-based access and tiered pr
 **Returns:** List of products with tiered pricing based on buyer identity, availability, and targeting capabilities.
 
 ```python
-from ad_buyer.tools.dsp import DiscoverInventoryTool
+from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
 from ad_buyer.clients.unified_client import UnifiedClient
 from ad_buyer.models.buyer_identity import BuyerContext, BuyerIdentity
 
@@ -250,7 +250,7 @@ Retrieves tier-specific pricing for a product, including volume discounts and de
 **Returns:** Full pricing breakdown with base CPM, tier discount, volume discount, final CPM, cost projection, and available deal types.
 
 ```python
-from ad_buyer.tools.dsp import GetPricingTool
+from ad_buyer.tools.buyer_deals import GetPricingTool
 
 tool = GetPricingTool(client=client, buyer_context=buyer_context)
 result = tool._run(
@@ -289,7 +289,7 @@ Requests a Deal ID from a seller for programmatic activation in a DSP platform.
 **Returns:** Deal ID, pricing details, and platform-specific activation instructions for The Trade Desk, DV360, Amazon DSP, Xandr, and Yahoo DSP.
 
 ```python
-from ad_buyer.tools.dsp import RequestDealTool
+from ad_buyer.tools.buyer_deals import RequestDealTool
 
 tool = RequestDealTool(client=client, buyer_context=buyer_context)
 result = tool._run(
@@ -508,12 +508,12 @@ audience_tools = [
     CoverageEstimationTool(),
 ]
 
-# DSP tools -- require UnifiedClient + BuyerContext
-from ad_buyer.tools.dsp import (
+# Buyer deal tools -- require UnifiedClient + BuyerContext
+from ad_buyer.tools.buyer_deals import (
     DiscoverInventoryTool, GetPricingTool, RequestDealTool,
 )
 
-dsp_tools = [
+buyer_deal_tools = [
     DiscoverInventoryTool(client=unified_client, buyer_context=buyer_ctx),
     GetPricingTool(client=unified_client, buyer_context=buyer_ctx),
     RequestDealTool(client=unified_client, buyer_context=buyer_ctx),
@@ -525,6 +525,6 @@ dsp_tools = [
 ## Related
 
 - [Agent Hierarchy](agent-hierarchy.md) --- Which agents use which tools
-- [DSP Deal Flow](dsp-deal-flow.md) --- How DSP tools work together in a flow
+- [Buyer Deal Flow](buyer-deal-flow.md) --- How buyer deal tools work together in a flow
 - [Booking Flow](booking-flow.md) --- How execution tools drive the booking lifecycle
 - [Configuration](../guides/configuration.md) --- Tool-related settings

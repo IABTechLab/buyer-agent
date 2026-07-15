@@ -6,13 +6,13 @@
 These tests verify that the PricingCalculator produces identical results
 to the duplicated pricing logic previously in:
 - unified_client.py (get_pricing, request_deal)
-- tools/dsp/request_deal.py (_create_deal_response)
-- tools/dsp/get_pricing.py (_format_pricing)
+- tools/buyer_deals/request_deal.py (_create_deal_response)
+- tools/buyer_deals/get_pricing.py (_format_pricing)
 """
 
 import pytest
 
-from ad_buyer.booking.pricing import PricingCalculator, PricingResult
+from ad_buyer.booking.pricing import PricingCalculator
 from ad_buyer.models.buyer_identity import AccessTier
 
 
@@ -211,8 +211,8 @@ class TestPricingCalculatorNegotiation:
 class TestPricingCalculatorEdgeCases:
     """Test edge cases and data integrity."""
 
-    def test_non_numeric_base_price_defaults_to_fallback(self):
-        """Non-numeric base price falls back to 0."""
+    def test_zero_base_price_produces_zero_output(self):
+        """Zero base price correctly produces zero pricing output."""
         calc = PricingCalculator()
         result = calc.calculate(
             base_price=0,

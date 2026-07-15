@@ -83,7 +83,7 @@ endpoints = settings.get_seller_endpoints()
 | `LLM_TEMPERATURE` | `float` | `0.3` | Default temperature for LLM calls. Individual agents may override this. |
 | `LLM_MAX_TOKENS` | `int` | `4096` | Maximum token output for LLM responses. |
 
-Models are specified in [litellm](https://docs.litellm.ai/) format: `provider/model-name`. This allows swapping providers without code changes.
+Models are specified in `provider/model-name` format using CrewAI's native provider integrations. Install the matching extra (e.g., `pip install "crewai[anthropic]"`) and set the API key. No code changes required to switch providers.
 
 ```bash
 # Use a different model provider
@@ -106,35 +106,36 @@ While `LLM_TEMPERATURE` sets the global default, each agent type uses a tuned te
 
 ---
 
-### Database
+### Storage Backend
+
+The pluggable storage backend (used by campaigns, orders, sessions, conversions, optimization, experiments, pacing) is selected with `STORAGE_TYPE`. The legacy DealStore always uses SQLite directly via `DATABASE_URL`. See [Storage Backends](../architecture/storage-backends.md) for the full reference.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `DATABASE_URL` | `str` | `sqlite:///./ad_buyer.db` | SQLAlchemy connection string for the deal store and local persistence. |
-
-Supports any SQLAlchemy-compatible database. SQLite is the default for development; use PostgreSQL or MySQL for production.
+| `STORAGE_TYPE` | `str` | `sqlite` | Backend selector — `sqlite`, `redis`, or `hybrid` (Postgres + Redis). |
+| `DATABASE_URL` | `str` | `sqlite:///./ad_buyer.db` | SQLite or PostgreSQL connection string. For `hybrid`, use `postgresql+asyncpg://user:pass@host/db`. |
+| `REDIS_URL` | `str` | `None` | Redis connection URL — required for `redis` and `hybrid`; optional otherwise. |
+| `POSTGRES_POOL_MIN` | `int` | `2` | Minimum asyncpg connection pool size (hybrid only). |
+| `POSTGRES_POOL_MAX` | `int` | `10` | Maximum asyncpg connection pool size (hybrid only). |
 
 ```bash
-# PostgreSQL
-DATABASE_URL=postgresql://user:pass@localhost:5432/ad_buyer
-
-# SQLite (default)
+# SQLite (default — single-instance, dev/demos)
+STORAGE_TYPE=sqlite
 DATABASE_URL=sqlite:///./ad_buyer.db
-```
 
----
-
-### Redis
-
-| Variable | Type | Default | Description |
-|----------|------|---------|-------------|
-| `REDIS_URL` | `str` | `None` | Redis connection URL for caching and session management. Optional. |
-
-When set, Redis is used for CrewAI memory persistence and session caching. When `None`, in-memory storage is used.
-
-```bash
+# Redis (ephemeral-heavy, no durable Postgres)
+STORAGE_TYPE=redis
 REDIS_URL=redis://localhost:6379/0
+
+# Hybrid (recommended for production multi-instance)
+STORAGE_TYPE=hybrid
+DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
+REDIS_URL=redis://cache.example.com:6379/0
 ```
+
+Redis is also used for CrewAI memory persistence and session caching whenever `REDIS_URL` is set, regardless of `STORAGE_TYPE`. When `REDIS_URL` is unset, CrewAI uses in-memory storage.
+
+The Redis (`pip install -e ".[redis]"`) and asyncpg (`pip install -e ".[postgres]"`) drivers are optional extras. Install `".[production]"` to get both.
 
 ---
 
@@ -172,6 +173,22 @@ origins = settings.get_cors_origins()
 # Production
 CORS_ALLOWED_ORIGINS=https://dashboard.example.com,https://app.example.com
 ```
+
+---
+
+### IAB Diligence Platform Approval
+
+Optional integration that gates deal requests against the buyer's [IAB Diligence Platform](https://safeguardprivacy.com/iab-diligence-platform/) vendor portfolio. Inert when `SGP_API_KEY` is empty.
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `SGP_API_KEY` | `str` | `""` | API key with the `iab:buyerAgent` scope. Empty = integration disabled. |
+| `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | SGP base URL. Staging: `https://api.safeguardprivacy-demo.com`. |
+| `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery and Deal ID generation is blocked for them. SGP transport errors halt the flow. |
+| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `block` | Behavior when the vendor is not in the buyer's SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. |
+| `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime for approval lookups. |
+
+See the [IAB Diligence Platform Approval](../integration/iab-diligence-platform.md) integration guide for endpoint contract, behavior matrix, and troubleshooting.
 
 ---
 

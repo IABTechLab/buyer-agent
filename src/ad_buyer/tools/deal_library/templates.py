@@ -33,8 +33,6 @@ from typing import Any
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
-from ...storage.deal_store import DealStore
-
 logger = logging.getLogger(__name__)
 
 # Valid actions for both tools
@@ -50,8 +48,7 @@ class ManageDealTemplateInput(BaseModel):
     action: str = Field(
         ...,
         description=(
-            "The CRUD action to perform: 'create', 'read', 'list', "
-            "'update', or 'delete'."
+            "The CRUD action to perform: 'create', 'read', 'list', 'update', or 'delete'."
         ),
     )
     params_json: str = Field(
@@ -76,8 +73,7 @@ class ManageSupplyPathTemplateInput(BaseModel):
     action: str = Field(
         ...,
         description=(
-            "The CRUD action to perform: 'create', 'read', 'list', "
-            "'update', or 'delete'."
+            "The CRUD action to perform: 'create', 'read', 'list', 'update', or 'delete'."
         ),
     )
     params_json: str = Field(
@@ -263,9 +259,7 @@ def _format_supply_path_template(tmpl: dict[str, Any]) -> str:
         lines.append(f"  Max Reseller Hops: {tmpl['max_reseller_hops']}")
 
     if tmpl.get("require_sellers_json") is not None:
-        lines.append(
-            f"  Require sellers.json: {'Yes' if tmpl['require_sellers_json'] else 'No'}"
-        )
+        lines.append(f"  Require sellers.json: {'Yes' if tmpl['require_sellers_json'] else 'No'}")
 
     # JSON array fields
     for field_name, label in [
@@ -368,33 +362,21 @@ class ManageDealTemplateTool(BaseTool):
                 name=name,
                 deal_type_pref=params.get("deal_type_pref"),
                 inventory_types=_serialize_list_field(params.get("inventory_types")),
-                preferred_publishers=_serialize_list_field(
-                    params.get("preferred_publishers")
-                ),
-                excluded_publishers=_serialize_list_field(
-                    params.get("excluded_publishers")
-                ),
-                targeting_defaults=_serialize_dict_field(
-                    params.get("targeting_defaults")
-                ),
+                preferred_publishers=_serialize_list_field(params.get("preferred_publishers")),
+                excluded_publishers=_serialize_list_field(params.get("excluded_publishers")),
+                targeting_defaults=_serialize_dict_field(params.get("targeting_defaults")),
                 default_price=params.get("default_price"),
                 max_cpm=params.get("max_cpm"),
                 min_impressions=params.get("min_impressions"),
                 default_flight_days=params.get("default_flight_days"),
-                supply_path_prefs=_serialize_dict_field(
-                    params.get("supply_path_prefs")
-                ),
+                supply_path_prefs=_serialize_dict_field(params.get("supply_path_prefs")),
                 advertiser_id=params.get("advertiser_id"),
                 agency_id=params.get("agency_id"),
             )
         except Exception as exc:
             return f"Error creating deal template: {exc}"
 
-        return (
-            f"Deal template created successfully.\n"
-            f"  ID: {template_id}\n"
-            f"  Name: {name}"
-        )
+        return f"Deal template created successfully.\n  ID: {template_id}\n  Name: {name}"
 
     def _read(self, params: dict[str, Any]) -> str:
         """Read a deal template by ID."""
@@ -554,33 +536,22 @@ class ManageSupplyPathTemplateTool(BaseTool):
                 name=name,
                 scoring_weights=_serialize_dict_field(scoring_weights),
                 max_reseller_hops=params.get("max_reseller_hops"),
-                require_sellers_json=(
-                    1 if params.get("require_sellers_json") else None
-                ),
+                require_sellers_json=(1 if params.get("require_sellers_json") else None),
                 preferred_ssps=_serialize_list_field(params.get("preferred_ssps")),
                 blocked_ssps=_serialize_list_field(params.get("blocked_ssps")),
-                preferred_curators=_serialize_list_field(
-                    params.get("preferred_curators")
-                ),
+                preferred_curators=_serialize_list_field(params.get("preferred_curators")),
                 rules=_serialize_list_field(params.get("rules")),
             )
         except Exception as exc:
             return f"Error creating supply path template: {exc}"
 
-        return (
-            f"Supply path template created successfully.\n"
-            f"  ID: {template_id}\n"
-            f"  Name: {name}"
-        )
+        return f"Supply path template created successfully.\n  ID: {template_id}\n  Name: {name}"
 
     def _read(self, params: dict[str, Any]) -> str:
         """Read a supply path template by ID."""
         template_id = params.get("template_id")
         if not template_id:
-            return (
-                "Error: 'template_id' is required for reading a "
-                "supply path template."
-            )
+            return "Error: 'template_id' is required for reading a supply path template."
 
         tmpl = self.deal_store.get_supply_path_template(template_id)
         if tmpl is None:
@@ -610,9 +581,7 @@ class ManageSupplyPathTemplateTool(BaseTool):
             if weights_raw:
                 try:
                     weights = (
-                        json.loads(weights_raw)
-                        if isinstance(weights_raw, str)
-                        else weights_raw
+                        json.loads(weights_raw) if isinstance(weights_raw, str) else weights_raw
                     )
                     weight_parts = [
                         f"{k}={weights.get(k, 0):.1f}"
@@ -630,10 +599,7 @@ class ManageSupplyPathTemplateTool(BaseTool):
         """Update a supply path template."""
         template_id = params.pop("template_id", None)
         if not template_id:
-            return (
-                "Error: 'template_id' is required for updating a "
-                "supply path template."
-            )
+            return "Error: 'template_id' is required for updating a supply path template."
 
         # Validate scoring weights if being updated
         scoring_weights = params.get("scoring_weights")
@@ -659,9 +625,7 @@ class ManageSupplyPathTemplateTool(BaseTool):
             else:
                 update_kwargs[key] = val
 
-        result = self.deal_store.update_supply_path_template(
-            template_id, **update_kwargs
-        )
+        result = self.deal_store.update_supply_path_template(template_id, **update_kwargs)
         if not result:
             return f"Supply path template not found: {template_id}"
 
@@ -671,10 +635,7 @@ class ManageSupplyPathTemplateTool(BaseTool):
         """Delete a supply path template."""
         template_id = params.get("template_id")
         if not template_id:
-            return (
-                "Error: 'template_id' is required for deleting a "
-                "supply path template."
-            )
+            return "Error: 'template_id' is required for deleting a supply path template."
 
         result = self.deal_store.delete_supply_path_template(template_id)
         if not result:

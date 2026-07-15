@@ -4,6 +4,7 @@
 """Test SSE connection directly to understand what's happening."""
 
 import asyncio
+
 import httpx
 
 

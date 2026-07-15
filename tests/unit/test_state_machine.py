@@ -432,7 +432,7 @@ class TestMappingHelpers:
         assert result == BuyerCampaignStatus.INITIALIZED
 
     def test_from_dsp_flow_status_deal_created(self):
-        """Map DSPFlowStatus values to deal states."""
+        """Map BuyerDealFlowStatus values to deal states."""
         result = from_dsp_flow_status("deal_created")
         assert result == BuyerDealStatus.BOOKED
 
@@ -556,7 +556,7 @@ class TestCampaignAutomationStateMachine:
     """Test the full campaign automation state machine with READY state."""
 
     def test_happy_path_draft_to_completed(self):
-        """Walk the full happy path: DRAFT -> PLANNING -> BOOKING -> READY -> ACTIVE -> COMPLETED."""
+        """Walk the full happy path: DRAFT -> PLANNING -> BOOKING -> READY -> ACTIVE -> COMPLETED."""  # noqa: E501
         sm = CampaignAutomationStateMachine("campaign-auto-001")
         assert sm.status == CampaignStatus.DRAFT
 

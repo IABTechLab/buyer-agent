@@ -5,6 +5,7 @@
 
 import asyncio
 import sys
+
 sys.path.insert(0, "/Users/bjt/Documents/crewaiTest/ad_buyer_system/src")
 
 from mcp import ClientSession
@@ -36,15 +37,15 @@ async def main():
 
                 # Initialize the session
                 result = await session.initialize()
-                print(f"Session initialized!")
-                print(f"Server info: {result.serverInfo if hasattr(result, 'serverInfo') else result}")
+                print("Session initialized!")
+                print(f"Server info: {result.serverInfo if hasattr(result, 'serverInfo') else result}")  # noqa: E501
 
                 # List available tools
                 print("\n[1] Listing tools...")
                 tools_result = await session.list_tools()
                 print(f"  Found {len(tools_result.tools)} tools:")
                 for tool in tools_result.tools[:8]:
-                    desc = (tool.description[:40] + '...') if tool.description and len(tool.description) > 40 else (tool.description or 'No description')
+                    desc = (tool.description[:40] + '...') if tool.description and len(tool.description) > 40 else (tool.description or 'No description')  # noqa: E501
                     print(f"    - {tool.name}: {desc}")
                 if len(tools_result.tools) > 8:
                     print(f"    ... and {len(tools_result.tools) - 8} more")
@@ -63,7 +64,7 @@ async def main():
                     "name": "MCP Direct Test Account",
                     "type": "advertiser",
                 })
-                print(f"  Success!")
+                print("  Success!")
 
                 # Parse account ID
                 account_id = None
@@ -85,7 +86,7 @@ async def main():
                         "name": "MCP Direct Test Order",
                         "budget": 20000,
                     })
-                    print(f"  Success!")
+                    print("  Success!")
                     for content in result.content:
                         if content.type == "text":
                             print(f"  Order: {content.text}")

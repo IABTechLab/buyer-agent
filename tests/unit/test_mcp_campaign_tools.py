@@ -15,14 +15,12 @@ from datetime import UTC, datetime
 import pytest
 
 from ad_buyer.interfaces.mcp_server import mcp
-from ad_buyer.storage.campaign_store import CampaignStore
-from ad_buyer.storage.pacing_store import PacingStore
 from ad_buyer.models.campaign import (
     ChannelSnapshot,
-    DealSnapshot,
     PacingSnapshot,
 )
-
+from ad_buyer.storage.campaign_store import CampaignStore
+from ad_buyer.storage.pacing_store import PacingStore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -61,10 +59,12 @@ def _seed_campaign(store: CampaignStore, **overrides) -> str:
         "currency": "USD",
         "flight_start": "2026-03-01",
         "flight_end": "2026-03-31",
-        "channels": json.dumps([
-            {"channel": "CTV", "budget_pct": 0.6},
-            {"channel": "DISPLAY", "budget_pct": 0.4},
-        ]),
+        "channels": json.dumps(
+            [
+                {"channel": "CTV", "budget_pct": 0.6},
+                {"channel": "DISPLAY", "budget_pct": 0.4},
+            ]
+        ),
     }
     defaults.update(overrides)
     return store.save_campaign(**defaults)
@@ -154,9 +154,7 @@ class TestListCampaigns:
     async def test_no_campaigns_returns_empty(self, monkeypatch):
         """list_campaigns should return empty list when no campaigns exist."""
         store = _make_campaign_store()
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
 
         result = await mcp.call_tool("list_campaigns", {})
         data = json.loads(_extract_text(result))
@@ -169,9 +167,7 @@ class TestListCampaigns:
         store = _make_campaign_store()
         _seed_campaign(store, campaign_name="Campaign A", status="ACTIVE")
         _seed_campaign(store, campaign_name="Campaign B", status="DRAFT")
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
 
         result = await mcp.call_tool("list_campaigns", {})
         data = json.loads(_extract_text(result))
@@ -186,9 +182,7 @@ class TestListCampaigns:
         _seed_campaign(store, campaign_name="Active One", status="ACTIVE")
         _seed_campaign(store, campaign_name="Draft One", status="DRAFT")
         _seed_campaign(store, campaign_name="Active Two", status="ACTIVE")
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
 
         result = await mcp.call_tool("list_campaigns", {"status": "ACTIVE"})
         data = json.loads(_extract_text(result))
@@ -201,9 +195,7 @@ class TestListCampaigns:
         """Filtering by a status with no matches should return empty."""
         store = _make_campaign_store()
         _seed_campaign(store, status="ACTIVE")
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
 
         result = await mcp.call_tool("list_campaigns", {"status": "COMPLETED"})
         data = json.loads(_extract_text(result))
@@ -215,17 +207,19 @@ class TestListCampaigns:
         """Each campaign in the list should include key fields."""
         store = _make_campaign_store()
         _seed_campaign(store)
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
 
         result = await mcp.call_tool("list_campaigns", {})
         data = json.loads(_extract_text(result))
         campaign = data["campaigns"][0]
 
         required_fields = [
-            "campaign_id", "campaign_name", "status",
-            "total_budget", "flight_start", "flight_end",
+            "campaign_id",
+            "campaign_name",
+            "status",
+            "total_budget",
+            "flight_start",
+            "flight_end",
         ]
         for field in required_fields:
             assert field in campaign, f"Missing field: {field}"
@@ -234,9 +228,7 @@ class TestListCampaigns:
     async def test_returns_valid_json(self, monkeypatch):
         """list_campaigns should return valid JSON."""
         store = _make_campaign_store()
-        monkeypatch.setattr(
-            "ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store
-        )
+        monkeypatch.setattr("ad_buyer.interfaces.mcp_server._get_campaign_store", lambda: store)
 
         result = await mcp.call_tool("list_campaigns", {})
         data = json.loads(_extract_text(result))
@@ -283,9 +275,12 @@ class TestGetCampaignStatus:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
-            total_spend=30000.0, expected_spend=50000.0,
-            pacing_pct=60.0, deviation_pct=-40.0,
+            pacing_store,
+            cid,
+            total_spend=30000.0,
+            expected_spend=50000.0,
+            pacing_pct=60.0,
+            deviation_pct=-40.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -337,9 +332,7 @@ class TestGetCampaignStatus:
             lambda: pacing_store,
         )
 
-        result = await mcp.call_tool(
-            "get_campaign_status", {"campaign_id": "nonexistent-id"}
-        )
+        result = await mcp.call_tool("get_campaign_status", {"campaign_id": "nonexistent-id"})
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -378,9 +371,12 @@ class TestCheckPacing:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
-            total_spend=50000.0, expected_spend=50000.0,
-            pacing_pct=100.0, deviation_pct=0.0,
+            pacing_store,
+            cid,
+            total_spend=50000.0,
+            expected_spend=50000.0,
+            pacing_pct=100.0,
+            deviation_pct=0.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -404,9 +400,12 @@ class TestCheckPacing:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
-            total_spend=30000.0, expected_spend=50000.0,
-            pacing_pct=60.0, deviation_pct=-40.0,
+            pacing_store,
+            cid,
+            total_spend=30000.0,
+            expected_spend=50000.0,
+            pacing_pct=60.0,
+            deviation_pct=-40.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -430,9 +429,12 @@ class TestCheckPacing:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
-            total_spend=70000.0, expected_spend=50000.0,
-            pacing_pct=140.0, deviation_pct=40.0,
+            pacing_store,
+            cid,
+            total_spend=70000.0,
+            expected_spend=50000.0,
+            pacing_pct=140.0,
+            deviation_pct=40.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -483,9 +485,7 @@ class TestCheckPacing:
             lambda: pacing_store,
         )
 
-        result = await mcp.call_tool(
-            "check_pacing", {"campaign_id": "nonexistent-id"}
-        )
+        result = await mcp.call_tool("check_pacing", {"campaign_id": "nonexistent-id"})
         data = json.loads(_extract_text(result))
         assert "error" in data
 
@@ -496,9 +496,13 @@ class TestCheckPacing:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store, total_budget=200000.0)
         _seed_pacing_snapshot(
-            pacing_store, cid,
-            total_budget=200000.0, total_spend=90000.0,
-            expected_spend=100000.0, pacing_pct=90.0, deviation_pct=-10.0,
+            pacing_store,
+            cid,
+            total_budget=200000.0,
+            total_spend=90000.0,
+            expected_spend=100000.0,
+            pacing_pct=90.0,
+            deviation_pct=-10.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -523,15 +527,20 @@ class TestCheckPacing:
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(campaign_store)
         _seed_pacing_snapshot(
-            pacing_store, cid,
+            pacing_store,
+            cid,
             channel_snapshots=[
                 ChannelSnapshot(
-                    channel="CTV", allocated_budget=60000.0,
-                    spend=30000.0, pacing_pct=100.0,
+                    channel="CTV",
+                    allocated_budget=60000.0,
+                    spend=30000.0,
+                    pacing_pct=100.0,
                 ),
                 ChannelSnapshot(
-                    channel="DISPLAY", allocated_budget=40000.0,
-                    spend=15000.0, pacing_pct=75.0,
+                    channel="DISPLAY",
+                    allocated_budget=40000.0,
+                    spend=15000.0,
+                    pacing_pct=75.0,
                 ),
             ],
         )
@@ -586,22 +595,34 @@ class TestReviewBudgets:
         campaign_store = _make_campaign_store()
         pacing_store = _make_pacing_store()
         cid1 = _seed_campaign(
-            campaign_store, campaign_name="Campaign A",
-            total_budget=100000.0, status="ACTIVE",
+            campaign_store,
+            campaign_name="Campaign A",
+            total_budget=100000.0,
+            status="ACTIVE",
         )
         cid2 = _seed_campaign(
-            campaign_store, campaign_name="Campaign B",
-            total_budget=50000.0, status="ACTIVE",
+            campaign_store,
+            campaign_name="Campaign B",
+            total_budget=50000.0,
+            status="ACTIVE",
         )
         _seed_pacing_snapshot(
-            pacing_store, cid1,
-            total_budget=100000.0, total_spend=40000.0,
-            expected_spend=50000.0, pacing_pct=80.0, deviation_pct=-20.0,
+            pacing_store,
+            cid1,
+            total_budget=100000.0,
+            total_spend=40000.0,
+            expected_spend=50000.0,
+            pacing_pct=80.0,
+            deviation_pct=-20.0,
         )
         _seed_pacing_snapshot(
-            pacing_store, cid2,
-            total_budget=50000.0, total_spend=30000.0,
-            expected_spend=25000.0, pacing_pct=120.0, deviation_pct=20.0,
+            pacing_store,
+            cid2,
+            total_budget=50000.0,
+            total_spend=30000.0,
+            expected_spend=25000.0,
+            pacing_pct=120.0,
+            deviation_pct=20.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -625,13 +646,18 @@ class TestReviewBudgets:
         campaign_store = _make_campaign_store()
         pacing_store = _make_pacing_store()
         cid = _seed_campaign(
-            campaign_store, campaign_name="My Campaign",
+            campaign_store,
+            campaign_name="My Campaign",
             total_budget=100000.0,
         )
         _seed_pacing_snapshot(
-            pacing_store, cid,
-            total_budget=100000.0, total_spend=45000.0,
-            expected_spend=50000.0, pacing_pct=90.0, deviation_pct=-10.0,
+            pacing_store,
+            cid,
+            total_budget=100000.0,
+            total_spend=45000.0,
+            expected_spend=50000.0,
+            pacing_pct=90.0,
+            deviation_pct=-10.0,
         )
         monkeypatch.setattr(
             "ad_buyer.interfaces.mcp_server._get_campaign_store",
@@ -657,7 +683,8 @@ class TestReviewBudgets:
         campaign_store = _make_campaign_store()
         pacing_store = _make_pacing_store()
         _seed_campaign(
-            campaign_store, campaign_name="No Pacing",
+            campaign_store,
+            campaign_name="No Pacing",
             total_budget=50000.0,
         )
         monkeypatch.setattr(

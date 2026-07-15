@@ -4,11 +4,10 @@
 """Simple mock OpenDirect REST server for testing."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
 app = FastAPI(title="Mock OpenDirect Server", version="2.1.0")
 
@@ -278,7 +277,7 @@ def get_line_stats(account_id: str, order_id: str, line_id: str):
         "vcr": 78.5,
         "viewability": 72.3,
         "ctr": 0.08,
-        "lastUpdated": datetime.now(timezone.utc).isoformat(),
+        "lastUpdated": datetime.now(UTC).isoformat(),
     }
 
 

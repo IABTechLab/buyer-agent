@@ -4,6 +4,7 @@
 """Application settings loaded from environment variables."""
 
 from functools import lru_cache
+from typing import Literal
 
 from dotenv import find_dotenv
 from pydantic_settings import BaseSettings
@@ -35,6 +36,21 @@ class Settings(BaseSettings):
     opendirect_token: str | None = None
     opendirect_api_key: str | None = None
 
+    # IAB Diligence Platform — vendor approval gate.
+    # The integration is inert when ``sgp_api_key`` is empty; enforcement
+    # only activates once an SGP API key is supplied AND ``sgp_enforce``
+    # is true. When enforcing, NOT APPROVED vendors are filtered out at
+    # discovery and the request-stage gate acts as a safety net.
+    sgp_api_key: str = ""
+    # Production endpoint. For testing, use the demo environment:
+    # https://api.safeguardprivacy-demo.com
+    sgp_base_url: str = "https://api.safeguardprivacy.com"
+    sgp_enforce: bool = False
+    # Behavior when IAB Diligence Platform returns 404 for a seller domain (vendor
+    # not in the buyer's SGP portfolio). One of: "block", "warn", "allow".
+    sgp_unknown_vendor_policy: str = "block"
+    sgp_cache_ttl_seconds: int = 900
+
     def get_seller_endpoints(self) -> list[str]:
         """Parse seller endpoints from comma-separated string.
 
@@ -51,11 +67,17 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
 
-    # Database
+    # Database / Storage Configuration
     database_url: str = "sqlite:///./ad_buyer.db"
-
-    # Optional Redis
     redis_url: str | None = None
+    storage_type: str = "sqlite"  # sqlite, redis, hybrid
+    postgres_pool_min: int = 2
+    postgres_pool_max: int = 10
+
+    # Durable fallback for audit-class events (see events/audit_fallback.py).
+    # When the event bus fails for an audit-class event, the event is appended
+    # to this JSONL file (fsynced per write) instead of being dropped.
+    audit_fallback_path: str = "data/audit_fallback.jsonl"
 
     # CrewAI Settings
     crew_memory_enabled: bool = True
@@ -63,7 +85,7 @@ class Settings(BaseSettings):
     crew_max_iterations: int = 15
 
     # CORS
-    cors_allowed_origins: str = "http://localhost:3000,http://localhost:8080"
+    cors_allowed_origins: str = "*"
 
     def get_cors_origins(self) -> list[str]:
         """Parse CORS allowed origins from comma-separated string."""
@@ -80,6 +102,22 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
 
+    # Feature flag (proposal §6 row 15 / wire-format spec §9):
+    # When True, the buyer's OpenRTB builder emits the temporary
+    # `user.ext.iab_agentic_audiences.refs[]` extension carrying agentic
+    # audience refs. Default off until IAB ratifies an extension shape;
+    # see the 90-day dual-emit migration policy in the wire-format spec.
+    enable_agentic_openrtb_ext: bool = False
+
+    # Embedding mode for the buyer's UCP query embeddings.
+    # Locked decision in docs/decisions/EMBEDDING_STRATEGY_2026-04-25.md (E2-1):
+    # - "mock": SHA256-seeded deterministic vector (legacy; CI fallback)
+    # - "local": sentence-transformers all-MiniLM-L6-v2 (384-dim)
+    # - "advertiser": use advertiser-supplied vector verbatim
+    # - "hybrid": prefer advertiser-supplied; else local; else mock
+    # Override via EMBEDDING_MODE env var.
+    embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
+
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,
         "env_file_encoding": "utf-8",
@@ -93,4 +131,26 @@ def get_settings() -> Settings:
     return Settings()
 
 
-settings = get_settings()
+class _LazySettings:
+    """Lazy proxy that defers Settings() construction until first attribute access.
+
+    Many modules import the module-level `settings` symbol at import time.
+    Constructing Settings() eagerly at import time freezes env vars before
+    tests can override them. This proxy delegates all attribute access to a
+    cached Settings instance built on first use, so tests that patch env vars
+    before any settings.X read see the correct values.
+    """
+
+    __slots__ = ()
+
+    def __getattr__(self, name: str):
+        return getattr(get_settings(), name)
+
+    def __setattr__(self, name: str, value) -> None:
+        setattr(get_settings(), name, value)
+
+    def __repr__(self) -> str:
+        return f"_LazySettings(proxy_to={get_settings()!r})"
+
+
+settings = _LazySettings()

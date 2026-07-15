@@ -71,9 +71,9 @@ class OrderStore:
     def _parse_url(url: str) -> str:
         """Extract the file path from a sqlite:/// URL."""
         if url.startswith("sqlite:///"):
-            return url[len("sqlite:///"):]
+            return url[len("sqlite:///") :]
         if url.startswith("sqlite://"):
-            path = url[len("sqlite://"):]
+            path = url[len("sqlite://") :]
             return path if path else ":memory:"
         return url
 
@@ -149,9 +149,7 @@ class OrderStore:
         """
         key = self._make_key(order_id)
         with self._lock:
-            cursor = self._conn.execute(
-                "SELECT data FROM orders WHERE key = ?", (key,)
-            )
+            cursor = self._conn.execute("SELECT data FROM orders WHERE key = ?", (key,))
             row = cursor.fetchone()
         if row is None:
             return None

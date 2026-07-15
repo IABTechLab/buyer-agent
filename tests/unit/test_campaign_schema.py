@@ -447,7 +447,7 @@ class TestPacingSnapshotCRUD:
         assert snaps == []
 
     def test_pacing_snapshot_optional_fields(self, campaign_store, sample_campaign_data):
-        """Optional fields (channel_snapshots, deal_snapshots, recommendations) should be storable."""
+        """Optional fields (channel_snapshots, deal_snapshots, recommendations) should be storable."""  # noqa: E501
         cid = campaign_store.save_campaign(**sample_campaign_data)
         sid = campaign_store.save_pacing_snapshot(
             campaign_id=cid,

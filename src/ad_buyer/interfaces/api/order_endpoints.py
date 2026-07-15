@@ -14,7 +14,6 @@ bead: buyer-nz9 (Order Status & Audit API Integration)
 """
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -35,7 +34,7 @@ def create_order_router(order_store: OrderStore) -> APIRouter:
     router = APIRouter(prefix="/api/v1/buyer", tags=["Buyer Orders"])
 
     @router.get("/orders")
-    async def list_buyer_orders(status: Optional[str] = None):
+    async def list_buyer_orders(status: str | None = None):
         """List buyer's orders from local DB with optional status filter.
 
         Args:

@@ -31,11 +31,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
+from ..clients.capability_client import (
+    CapabilityClient,
+    CapabilityDiscoveryResult,
+)
+from ..clients.deals_client import DealsClientError
 from ..events.models import Event, EventType
+from ..models.audience_plan import AudiencePlan, AudienceStrictness
 from ..models.deals import (
     DealBookingRequest,
     DealResponse,
@@ -43,8 +50,129 @@ from ..models.deals import (
     QuoteResponse,
 )
 from ..registry.models import AgentCard, TrustLevel
+from ..storage import audience_audit_log
+from .audience_degradation import (
+    CannotFulfillPlan,
+    DegradationLog,
+    DegradationLogEntry,
+    degrade_plan_for_seller,
+    synthesize_capabilities_from_unsupported,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# Error code emitted by the seller per proposal §5.7 layer 3 when the
+# AudiencePlan carries parts the seller can't honor. Used by the retry-on-
+# rejection path in `select_and_book` to detect the structured rejection.
+_AUDIENCE_PLAN_UNSUPPORTED_CODE = "audience_plan_unsupported"
+
+
+class _SellerIncompatibleForCampaign(Exception):
+    """Internal signal: seller cannot fulfill the campaign's audience plan.
+
+    Raised inside `_book_with_audience_retry` after the degrade-and-retry
+    path has been exhausted. Caught by `select_and_book`, which records
+    the seller in `DealSelection.incompatible_sellers`. NOT a public type
+    -- the higher-level orchestrator surfaces incompatibility via the
+    selection result, not by exception type.
+    """
+
+
+def _is_audience_plan_unsupported(exc: DealsClientError) -> bool:
+    """True when the seller error is the structured audience-plan rejection.
+
+    The check is forgiving: we accept a 400 with `error_code` matching the
+    spec's code, OR a 400 whose payload contained an `unsupported` list (in
+    case a seller variant emits a different top-level code but still carries
+    the structured list). Either way, we have a list of `{path, reason}`
+    entries to drive `degrade_plan_for_seller`.
+    """
+
+    if exc.status_code != 400:
+        return False
+    if exc.error_code == _AUDIENCE_PLAN_UNSUPPORTED_CODE:
+        return True
+    return bool(exc.unsupported)
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight strictness gating helpers (proposal §5.7 layer 2)
+# ---------------------------------------------------------------------------
+
+# Map the path prefix in a `DegradationLogEntry` to the role whose strictness
+# governs whether the orchestrator skips the seller. Anything that isn't a
+# top-level role (e.g., "primary.taxonomy") is treated as "primary" so a
+# version-mismatch on the primary triggers the primary's strictness.
+_ROLE_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("primary", "primary"),
+    ("constraints", "constraints"),
+    ("extensions", "extensions"),
+    ("exclusions", "exclusions"),
+)
+
+
+def _entry_role(entry: DegradationLogEntry) -> str:
+    """Return the top-level role name from a degradation entry's path.
+
+    "primary" -> "primary"; "primary.taxonomy" -> "primary";
+    "extensions[0]" -> "extensions"; "constraints[2]" -> "constraints".
+    Falls back to "primary" if the path doesn't match a known role -- the
+    safest interpretation, since unrecognized drops shouldn't silently
+    pass through a relaxed role's policy.
+    """
+
+    path = entry.path or ""
+    for prefix, role in _ROLE_PREFIXES:
+        if path == prefix or path.startswith(f"{prefix}.") or path.startswith(f"{prefix}["):
+            return role
+    return "primary"
+
+
+def _entry_is_agentic(entry: DegradationLogEntry) -> bool:
+    """True when the dropped ref had `type=agentic`.
+
+    Agentic refs are governed by their own strictness key (regardless of
+    which role they sat in) per proposal §5.7's policy table.
+    """
+
+    if entry.original_ref is None:
+        return False
+    return entry.original_ref.get("type") == "agentic"
+
+
+def _strictness_skip_required(
+    log: DegradationLog, strictness: AudienceStrictness
+) -> tuple[bool, str | None]:
+    """Decide whether to skip a seller given a pre-flight degradation log.
+
+    Walks each `DegradationLogEntry`, classifies it (agentic vs. role),
+    looks up the matching strictness level, and returns True if any entry
+    has its level set to "required". Per proposal §5.7's recommendation:
+
+    - `primary=required` and primary got dropped -> skip seller.
+    - `constraints=preferred` and constraints got dropped -> proceed (log).
+    - `extensions=optional` and extensions got dropped -> proceed.
+    - `agentic=optional` and agentic ref got dropped -> proceed.
+
+    Returns (skip, reason). `reason` is set when skip=True so the caller
+    can surface a human-readable cause into the failed_bookings list.
+    """
+
+    for entry in log:
+        if _entry_is_agentic(entry):
+            level = strictness.agentic
+            role_label = "agentic"
+        else:
+            role = _entry_role(entry)
+            level = getattr(strictness, role, "optional")
+            role_label = role
+        if level == "required":
+            return True, (
+                f"audience_strictness.{role_label}=required but seller dropped "
+                f"{entry.path} ({entry.reason})"
+            )
+    return False, None
 
 
 # ---------------------------------------------------------------------------
@@ -66,14 +194,27 @@ class InventoryRequirements:
         excluded_sellers: Seller IDs to exclude from discovery.
         min_impressions: Minimum impression volume needed.
         max_cpm: Maximum acceptable CPM for filtering quotes.
+        audience_plan: Typed audience plan from the brief / Audience Planner.
+            None on legacy paths that have not yet been wired through.
+            Threaded onto DealParams / QuoteRequest / DealBookingRequest so
+            the audience surface survives all the way to the seller. See
+            proposal §5.2 + §5.3.
+        audience_strictness: Per-role strictness policy (`primary`,
+            `constraints`, `extensions`, `agentic`). Defaults to None;
+            `select_and_book` falls back to `AudienceStrictness()` defaults
+            when None. Threaded from the campaign brief so the
+            orchestrator's pre-flight gate (§5.7 layer 2 + §13) knows
+            which roles must be preserved when degrading per seller.
     """
 
     media_type: str
     deal_types: list[str]
     content_categories: list[str] = field(default_factory=list)
     excluded_sellers: list[str] = field(default_factory=list)
-    min_impressions: Optional[int] = None
-    max_cpm: Optional[float] = None
+    min_impressions: int | None = None
+    max_cpm: float | None = None
+    audience_plan: AudiencePlan | None = None
+    audience_strictness: AudienceStrictness | None = None
 
 
 @dataclass
@@ -90,6 +231,10 @@ class DealParams:
         flight_end: Campaign end date (ISO string).
         target_cpm: Optional target CPM to include in the request.
         media_type: Media type (digital, ctv, linear_tv).
+        audience_plan: Typed audience plan threaded from
+            InventoryRequirements / CampaignPlan. None on legacy paths
+            that have not yet been wired through. Forwarded to QuoteRequest
+            so the seller receives the campaign's audience targeting.
     """
 
     product_id: str
@@ -97,8 +242,9 @@ class DealParams:
     impressions: int
     flight_start: str
     flight_end: str
-    target_cpm: Optional[float] = None
+    target_cpm: float | None = None
     media_type: str = "digital"
+    audience_plan: AudiencePlan | None = None
 
 
 @dataclass
@@ -118,9 +264,9 @@ class SellerQuoteResult:
 
     seller_id: str
     seller_url: str
-    quote: Optional[QuoteResponse]
+    quote: QuoteResponse | None
     deal_type: str
-    error: Optional[str]
+    error: str | None
 
 
 @dataclass
@@ -132,12 +278,23 @@ class DealSelection:
         failed_bookings: List of dicts with quote_id and error details.
         total_spend: Total estimated spend across booked deals.
         remaining_budget: Budget remaining after booking.
+        incompatible_sellers: Seller IDs the orchestrator decided not to
+            route this campaign to because their audience-plan capabilities
+            cannot be reconciled even after degradation+retry. Surfaced for
+            the higher-level error path; this orchestrator does not auto-
+            route to a different seller (that's a higher-level concern).
+        degradation_logs: Per-deal degradation logs produced when
+            `degrade_plan_for_seller` fired during a retry-on-rejection.
+            Keyed by quote_id; absent when the original plan booked
+            cleanly. Surfaced into the audit-trail surface (proposal §13a).
     """
 
     booked_deals: list[DealResponse]
     failed_bookings: list[dict[str, Any]]
     total_spend: float
     remaining_budget: float
+    incompatible_sellers: list[str] = field(default_factory=list)
+    degradation_logs: dict[str, DegradationLog] = field(default_factory=dict)
 
 
 @dataclass
@@ -214,15 +371,21 @@ class MultiSellerOrchestrator:
         self,
         registry_client: Any,
         deals_client_factory: Callable[..., Any],
-        event_bus: Optional[Any] = None,
-        quote_normalizer: Optional[QuoteNormalizer] = None,
+        event_bus: Any | None = None,
+        quote_normalizer: QuoteNormalizer | None = None,
         quote_timeout: float = 30.0,
+        capability_client: CapabilityClient | None = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
         self._event_bus = event_bus
         self._normalizer = quote_normalizer or QuoteNormalizer()
         self._quote_timeout = quote_timeout
+        # Optional pre-flight capability client. When provided alongside an
+        # `audience_plan` and `audience_strictness` on `select_and_book`,
+        # the orchestrator runs the §5.7 layer 1+2 pre-flight before booking.
+        # When None, it falls back to the layer-3 retry-only path.
+        self._capability_client = capability_client
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -231,7 +394,7 @@ class MultiSellerOrchestrator:
     async def _emit(
         self,
         event_type: EventType,
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """Emit an event to the event bus.  Fail-open."""
@@ -245,17 +408,13 @@ class MultiSellerOrchestrator:
             )
             await self._event_bus.publish(event)
         except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
-            logger.warning(
-                "Failed to emit event %s: %s", event_type, exc
-            )
+            logger.warning("Failed to emit event %s: %s", event_type, exc)
 
     # ------------------------------------------------------------------
     # Stage 1: Discover sellers
     # ------------------------------------------------------------------
 
-    async def discover_sellers(
-        self, requirements: InventoryRequirements
-    ) -> list[AgentCard]:
+    async def discover_sellers(self, requirements: InventoryRequirements) -> list[AgentCard]:
         """Discover qualifying sellers from the agent registry.
 
         Queries the registry for sellers matching the media type and
@@ -278,16 +437,10 @@ class MultiSellerOrchestrator:
 
         # Filter out excluded sellers
         excluded_set = set(requirements.excluded_sellers)
-        sellers = [
-            s for s in sellers
-            if s.agent_id not in excluded_set
-        ]
+        sellers = [s for s in sellers if s.agent_id not in excluded_set]
 
         # Filter out blocked sellers
-        sellers = [
-            s for s in sellers
-            if s.trust_level != TrustLevel.BLOCKED
-        ]
+        sellers = [s for s in sellers if s.trust_level != TrustLevel.BLOCKED]
 
         # Emit discovery event
         await self._emit(
@@ -345,6 +498,7 @@ class MultiSellerOrchestrator:
                     flight_end=deal_params.flight_end,
                     target_cpm=deal_params.target_cpm,
                     media_type=deal_params.media_type,
+                    audience_plan=deal_params.audience_plan,
                 )
 
                 # Apply timeout
@@ -353,11 +507,16 @@ class MultiSellerOrchestrator:
                     timeout=self._quote_timeout,
                 )
 
+                cpm_display = (
+                    f"{quote.pricing.final_cpm:.2f}"
+                    if quote.pricing.final_cpm is not None
+                    else "unavailable"
+                )  # noqa: E501
                 logger.info(
-                    "Received quote %s from seller %s (CPM: %.2f)",
+                    "Received quote %s from seller %s (CPM: %s)",
                     quote.quote_id,
                     seller.agent_id,
-                    quote.pricing.final_cpm,
+                    cpm_display,
                 )
 
                 return SellerQuoteResult(
@@ -368,11 +527,9 @@ class MultiSellerOrchestrator:
                     error=None,
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 msg = f"Quote request timed out after {self._quote_timeout}s"
-                logger.warning(
-                    "Seller %s timed out on quote request", seller.agent_id
-                )
+                logger.warning("Seller %s timed out on quote request", seller.agent_id)
                 return SellerQuoteResult(
                     seller_id=seller.agent_id,
                     seller_url=seller_url,
@@ -429,7 +586,7 @@ class MultiSellerOrchestrator:
     async def evaluate_and_rank(
         self,
         quote_results: list[SellerQuoteResult],
-        max_cpm: Optional[float] = None,
+        max_cpm: float | None = None,
     ) -> list[NormalizedQuote]:
         """Normalize and rank collected quotes.
 
@@ -445,9 +602,7 @@ class MultiSellerOrchestrator:
             (best quote first).
         """
         # Filter to successful quotes only
-        valid_results = [
-            r for r in quote_results if r.quote is not None
-        ]
+        valid_results = [r for r in quote_results if r.quote is not None]
 
         if not valid_results:
             return []
@@ -460,11 +615,10 @@ class MultiSellerOrchestrator:
         # Normalize and rank
         ranked = self._normalizer.compare_quotes(quote_tuples)
 
-        # Apply max CPM filter
+        # Apply max CPM filter (skip unpriced quotes — they have effective_cpm=None)
         if max_cpm is not None:
             ranked = [
-                nq for nq in ranked
-                if nq.effective_cpm <= max_cpm
+                nq for nq in ranked if nq.effective_cpm is not None and nq.effective_cpm <= max_cpm
             ]
 
         logger.info(
@@ -484,6 +638,8 @@ class MultiSellerOrchestrator:
         budget: float,
         count: int,
         quote_seller_map: dict[str, str],
+        audience_plan: AudiencePlan | None = None,
+        audience_strictness: AudienceStrictness | None = None,
     ) -> DealSelection:
         """Select and book optimal deals from ranked quotes.
 
@@ -491,19 +647,40 @@ class MultiSellerOrchestrator:
         minimum_spend exceeds the remaining budget, and books up to
         ``count`` deals.
 
+        When `audience_plan` and a configured `capability_client` are both
+        present, the orchestrator runs the §5.7 layer 1+2 pre-flight before
+        each booking: discover capabilities, degrade the plan, and decide
+        whether to skip the seller per `audience_strictness`. The §5.7
+        layer-3 retry path remains in place to catch stale-cache cases.
+
         Args:
             ranked_quotes: Quotes sorted by score (best first), from
                 evaluate_and_rank.
             budget: Total budget available for booking.
             count: Maximum number of deals to book.
             quote_seller_map: Mapping of quote_id to seller URL, needed
-                to create the correct DealsClient for booking.
+                to create the correct DealsClient for booking AND to
+                pre-flight the seller's capability discovery.
+            audience_plan: Optional typed audience plan to attach to each
+                DealBookingRequest. Forwarded as deal-level targeting
+                metadata so the seller can enforce audience targeting at
+                impression-fulfillment time. See proposal §5.1 Step 1.
+            audience_strictness: Optional per-role strictness policy from
+                the campaign brief. When omitted, defaults are applied
+                (primary=required, constraints=preferred, extensions=
+                optional, agentic=optional) per proposal §5.7.
 
         Returns:
             DealSelection with booked deals, failures, and budget info.
         """
+        # Default strictness if the caller didn't pass one. Matches
+        # `AudienceStrictness()`'s pydantic defaults so unwired callers and
+        # explicit-default callers behave identically.
+        effective_strictness = audience_strictness or AudienceStrictness()
         booked_deals: list[DealResponse] = []
         failed_bookings: list[dict[str, Any]] = []
+        incompatible_sellers: list[str] = []
+        degradation_logs: dict[str, DegradationLog] = {}
         remaining_budget = budget
         total_spend = 0.0
 
@@ -514,8 +691,7 @@ class MultiSellerOrchestrator:
             # Skip if minimum spend exceeds remaining budget
             if nq.minimum_spend > 0 and nq.minimum_spend > remaining_budget:
                 logger.info(
-                    "Skipping quote %s: minimum spend %.2f exceeds "
-                    "remaining budget %.2f",
+                    "Skipping quote %s: minimum spend %.2f exceeds remaining budget %.2f",
                     nq.quote_id,
                     nq.minimum_spend,
                     remaining_budget,
@@ -524,21 +700,36 @@ class MultiSellerOrchestrator:
 
             seller_url = quote_seller_map.get(nq.quote_id)
             if seller_url is None:
-                logger.warning(
-                    "No seller URL for quote %s, skipping", nq.quote_id
+                logger.warning("No seller URL for quote %s, skipping", nq.quote_id)
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": "No seller URL mapping found",
+                    }
                 )
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": "No seller URL mapping found",
-                })
                 continue
 
             try:
                 client = self._deals_client_factory(seller_url)
-                booking_request = DealBookingRequest(quote_id=nq.quote_id)
-
-                deal = await client.book_deal(booking_request)
+                if self._capability_client is not None and audience_plan is not None:
+                    deal, deg_log = await self._book_with_preflight_then_retry(
+                        client=client,
+                        quote_id=nq.quote_id,
+                        seller_id=nq.seller_id,
+                        seller_url=seller_url,
+                        audience_plan=audience_plan,
+                        audience_strictness=effective_strictness,
+                    )
+                else:
+                    deal, deg_log = await self._book_with_audience_retry(
+                        client=client,
+                        quote_id=nq.quote_id,
+                        seller_id=nq.seller_id,
+                        audience_plan=audience_plan,
+                    )
                 booked_deals.append(deal)
+                if deg_log:
+                    degradation_logs[nq.quote_id] = deg_log
 
                 # Track spend
                 deal_spend = nq.minimum_spend if nq.minimum_spend > 0 else 0.0
@@ -557,11 +748,38 @@ class MultiSellerOrchestrator:
                     },
                 )
 
+                deal_cpm_display = (
+                    f"{deal.pricing.final_cpm:.2f}"
+                    if deal.pricing.final_cpm is not None
+                    else "unavailable"
+                )  # noqa: E501
                 logger.info(
-                    "Booked deal %s from seller %s (CPM: %.2f)",
+                    "Booked deal %s from seller %s (CPM: %s)",
                     deal.deal_id,
                     nq.seller_id,
-                    deal.pricing.final_cpm,
+                    deal_cpm_display,
+                )
+
+            except _SellerIncompatibleForCampaign as exc:
+                # Audience-plan negotiation exhausted -- the seller stays in the
+                # ranked list for other campaigns but is marked incompatible
+                # for this one. The orchestrator does NOT auto-route to a
+                # different seller; that's a higher-level concern.
+                logger.warning(
+                    "Seller %s incompatible for quote %s: %s",
+                    nq.seller_id,
+                    nq.quote_id,
+                    exc,
+                )
+                if nq.seller_id not in incompatible_sellers:
+                    incompatible_sellers.append(nq.seller_id)
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": str(exc),
+                        "error_code": "audience_plan_unsupported",
+                        "seller_id": nq.seller_id,
+                    }
                 )
 
             except Exception as exc:  # noqa: BLE001 - per-deal isolation; continue booking remaining deals
@@ -570,17 +788,316 @@ class MultiSellerOrchestrator:
                     nq.quote_id,
                     exc,
                 )
-                failed_bookings.append({
-                    "quote_id": nq.quote_id,
-                    "error": str(exc),
-                })
+                failed_bookings.append(
+                    {
+                        "quote_id": nq.quote_id,
+                        "error": str(exc),
+                    }
+                )
 
         return DealSelection(
             booked_deals=booked_deals,
             failed_bookings=failed_bookings,
             total_spend=total_spend,
             remaining_budget=remaining_budget,
+            incompatible_sellers=incompatible_sellers,
+            degradation_logs=degradation_logs,
         )
+
+    # ------------------------------------------------------------------
+    # Internal: retry-on-audience_plan_unsupported wrapper around book_deal
+    # ------------------------------------------------------------------
+
+    async def _book_with_audience_retry(
+        self,
+        *,
+        client: Any,
+        quote_id: str,
+        seller_id: str,
+        audience_plan: AudiencePlan | None,
+    ) -> tuple[DealResponse, DegradationLog]:
+        """Book a deal with one retry on `audience_plan_unsupported`.
+
+        Implements proposal §5.7 layer 2's retry path. On the first attempt,
+        the buyer's plan goes to the seller as-is. If the seller responds
+        with the structured ``audience_plan_unsupported`` error, the buyer
+        synthesizes a downgraded capability view from the rejection,
+        runs ``degrade_plan_for_seller``, and retries ONCE with the
+        degraded plan. Other errors propagate unchanged.
+
+        If the retry also fails (any reason -- second
+        ``audience_plan_unsupported``, primary stripped, network error,
+        etc.) the seller is marked incompatible for this campaign by
+        raising `_SellerIncompatibleForCampaign`. The caller surfaces it
+        to `DealSelection.incompatible_sellers`.
+
+        Returns (deal_response, degradation_log). The log is empty when
+        the original plan booked cleanly (no retry needed).
+        """
+
+        # First attempt with the original plan.
+        booking_request = DealBookingRequest(
+            quote_id=quote_id,
+            audience_plan=audience_plan,
+        )
+        unsupported: list[dict[str, Any]]
+        try:
+            deal = await client.book_deal(booking_request)
+            return deal, []
+        except DealsClientError as exc:
+            if not _is_audience_plan_unsupported(exc):
+                # Not an audience-negotiation rejection -- surface as-is.
+                raise
+
+            # Cannot retry without a plan to degrade.
+            if audience_plan is None:
+                raise
+
+            logger.info(
+                "Seller %s rejected audience_plan on quote %s; degrading and "
+                "retrying once. Unsupported parts: %s",
+                seller_id,
+                quote_id,
+                exc.unsupported,
+            )
+            # Stash the unsupported list so the post-except block can use it
+            # (Python does not preserve `except` variable bindings outside
+            # the block).
+            unsupported = list(exc.unsupported)
+
+            # Surface the seller's structured rejection into the audit trail
+            # (proposal §13a). Keyed by the plan id so a reviewer can pull
+            # this event alongside the matching `degradation` entry.
+            if audience_plan is not None:
+                audience_audit_log.log_event(
+                    plan_id=audience_plan.audience_plan_id,
+                    event_type=audience_audit_log.EVENT_CAPABILITY_REJECTION,
+                    payload={
+                        "seller_id": seller_id,
+                        "quote_id": quote_id,
+                        "unsupported": unsupported,
+                        "error_code": exc.error_code,
+                        "status_code": exc.status_code,
+                    },
+                )
+
+        # Synthesize what the seller doesn't support, run degradation, retry.
+        try:
+            caps = synthesize_capabilities_from_unsupported(unsupported)
+            degraded_plan, degradation_log = degrade_plan_for_seller(audience_plan, caps)
+        except CannotFulfillPlan as cfp:
+            # Degradation stripped the primary -- no usable plan to retry.
+            # Record the would-be degradation log so the audit trail still
+            # captures what was attempted before the seller was marked
+            # incompatible (proposal §13a).
+            if cfp.log:
+                audience_audit_log.log_event(
+                    plan_id=audience_plan.audience_plan_id,
+                    event_type=audience_audit_log.EVENT_DEGRADATION,
+                    payload={
+                        "seller_id": seller_id,
+                        "quote_id": quote_id,
+                        "deal_id": None,
+                        "outcome": "cannot_fulfill",
+                        "reason": cfp.reason,
+                        "log": [entry.model_dump(mode="json") for entry in cfp.log],
+                    },
+                )
+            raise _SellerIncompatibleForCampaign(
+                f"Cannot reconcile audience_plan with seller {seller_id}: {cfp.reason}"
+            ) from cfp
+
+        retry_request = DealBookingRequest(
+            quote_id=quote_id,
+            audience_plan=degraded_plan,
+        )
+        try:
+            deal = await client.book_deal(retry_request)
+        except DealsClientError as retry_exc:
+            # The retry failed too. Per scope: mark seller incompatible for
+            # this campaign so the higher-level error path can route around
+            # it. We do NOT auto-route here.
+            raise _SellerIncompatibleForCampaign(
+                f"Seller {seller_id} rejected even the degraded plan: {retry_exc}"
+            ) from retry_exc
+
+        logger.info(
+            "Booked deal from seller %s on retry after degrading audience_plan (%d log entries)",
+            seller_id,
+            len(degradation_log),
+        )
+
+        # Audit-trail entry for the degradation that produced the retry.
+        # We key the entry by the ORIGINAL plan id (what the user briefed)
+        # rather than the degraded plan's id so a reviewer can find every
+        # event for a campaign by looking up the planner's plan id. The
+        # degraded plan id is recorded in the payload for traceability.
+        if degradation_log:
+            audience_audit_log.log_event(
+                plan_id=audience_plan.audience_plan_id,
+                event_type=audience_audit_log.EVENT_DEGRADATION,
+                payload={
+                    "seller_id": seller_id,
+                    "quote_id": quote_id,
+                    "deal_id": deal.deal_id,
+                    "degraded_plan_id": degraded_plan.audience_plan_id,
+                    "log": [entry.model_dump(mode="json") for entry in degradation_log],
+                },
+            )
+
+        return deal, degradation_log
+
+    # ------------------------------------------------------------------
+    # Internal: pre-flight capability discovery + degradation + retry
+    # ------------------------------------------------------------------
+
+    async def _book_with_preflight_then_retry(
+        self,
+        *,
+        client: Any,
+        quote_id: str,
+        seller_id: str,
+        seller_url: str,
+        audience_plan: AudiencePlan,
+        audience_strictness: AudienceStrictness,
+    ) -> tuple[DealResponse, DegradationLog]:
+        """Pre-flight a seller's capabilities, degrade the plan, then book.
+
+        Implements proposal §5.7 layer 1+2 and composes with layer 3
+        (the existing retry-on-rejection path):
+
+        1. Call `capability_client.discover_capabilities(seller_url)` to
+           get the seller's `audience_capabilities` (cached up to 1h,
+           honoring `Cache-Control: max-age`).
+        2. Run `degrade_plan_for_seller(plan, capabilities)` to produce
+           a degraded plan + structured log of what was stripped.
+        3. Apply `audience_strictness`: if any role marked "required"
+           was dropped, raise `_SellerIncompatibleForCampaign` so the
+           caller marks the seller incompatible. Otherwise proceed with
+           the degraded plan.
+        4. Delegate to `_book_with_audience_retry` with the degraded plan.
+           If the seller still rejects (e.g., the cache was stale and
+           the seller's caps tightened), the §12 retry path catches it
+           and applies a second degradation pass against the seller's
+           structured rejection.
+
+        Audit-trail emissions (§13a):
+
+        - One `EVENT_PREFLIGHT_CACHE` event per call with the cache
+          status, seller, and capability summary.
+        - One `EVENT_DEGRADATION` event when the pre-flight degraded
+          the plan (separate from the retry's own degradation event).
+
+        Args:
+            client: Per-seller `DealsClient`.
+            quote_id / seller_id: Booking identifiers.
+            seller_url: Seller's base URL for capability discovery.
+            audience_plan: Original plan from the campaign.
+            audience_strictness: Per-role strictness policy.
+
+        Returns:
+            (deal_response, combined_degradation_log). The combined log
+            stitches together pre-flight + retry-time entries so the
+            caller's audit surface sees both.
+
+        Raises:
+            _SellerIncompatibleForCampaign: When pre-flight degradation
+                strips a role marked "required" in the strictness
+                policy, or when `degrade_plan_for_seller` cannot keep a
+                primary at all.
+        """
+
+        assert self._capability_client is not None  # narrowed by select_and_book
+
+        # ---- 1. capability discovery ----
+        discovery: CapabilityDiscoveryResult = await self._capability_client.discover_capabilities(
+            seller_url
+        )
+
+        # Audit: every pre-flight call lands in the trail keyed by plan id.
+        # Failures here MUST NOT fail the booking -- audience_audit_log is
+        # already fail-open, so we just call it and move on.
+        audience_audit_log.log_event(
+            plan_id=audience_plan.audience_plan_id,
+            event_type=audience_audit_log.EVENT_PREFLIGHT_CACHE,
+            payload={
+                "seller_id": seller_id,
+                "seller_url": seller_url,
+                "quote_id": quote_id,
+                "cache_status": discovery.cache_status,
+                "fetched_at": discovery.fetched_at,
+                "capabilities": discovery.capabilities.model_dump(mode="json"),
+            },
+        )
+
+        # ---- 2. degrade per pre-flight caps ----
+        try:
+            degraded_plan, preflight_log = degrade_plan_for_seller(
+                audience_plan, discovery.capabilities
+            )
+        except CannotFulfillPlan as cfp:
+            # Pre-flight stripped the primary entirely. No retry would help;
+            # the seller advertises caps that can't carry this campaign.
+            raise _SellerIncompatibleForCampaign(
+                f"Pre-flight: seller {seller_id} cannot fulfill plan: {cfp.reason}"
+            ) from cfp
+
+        # ---- 3. apply strictness gate ----
+        skip, reason = _strictness_skip_required(preflight_log, audience_strictness)
+        if skip:
+            logger.info(
+                "Pre-flight strictness skip seller=%s quote=%s reason=%s",
+                seller_id,
+                quote_id,
+                reason,
+            )
+            raise _SellerIncompatibleForCampaign(f"Pre-flight strictness gate: {reason}")
+
+        # Audit: when the pre-flight produced any drops we record them.
+        # The retry path emits its own degradation event keyed by the same
+        # plan id, so a reviewer pulling events for a plan sees both.
+        if preflight_log:
+            audience_audit_log.log_event(
+                plan_id=audience_plan.audience_plan_id,
+                event_type=audience_audit_log.EVENT_DEGRADATION,
+                payload={
+                    "phase": "preflight",
+                    "seller_id": seller_id,
+                    "seller_url": seller_url,
+                    "quote_id": quote_id,
+                    "degraded_plan_id": degraded_plan.audience_plan_id,
+                    "log": [entry.model_dump(mode="json") for entry in preflight_log],
+                },
+            )
+            logger.info(
+                "Pre-flight degraded plan for seller=%s quote=%s (%d log entries)",
+                seller_id,
+                quote_id,
+                len(preflight_log),
+            )
+
+        # ---- 4. book with retry on stale-cache rejection ----
+        # §12's retry path takes care of layer 3: if the seller still
+        # rejects (cache went stale between pre-flight and booking), it
+        # synthesizes a tighter cap view, runs another degradation, and
+        # retries once.
+        try:
+            deal, retry_log = await self._book_with_audience_retry(
+                client=client,
+                quote_id=quote_id,
+                seller_id=seller_id,
+                audience_plan=degraded_plan,
+            )
+        except _SellerIncompatibleForCampaign:
+            # The retry path already decided incompatibility. Surface
+            # unchanged so the caller marks the seller.
+            raise
+
+        # The combined log: pre-flight drops first, then retry-time drops
+        # (if any). This is what the caller surfaces as `degradation_logs`
+        # so the audit-trail downstream sees the full sequence of strips.
+        combined_log: DegradationLog = list(preflight_log) + list(retry_log)
+        return deal, combined_log
 
     # ------------------------------------------------------------------
     # End-to-end orchestration
@@ -662,6 +1179,8 @@ class MultiSellerOrchestrator:
             budget=budget,
             count=max_deals,
             quote_seller_map=quote_seller_map,
+            audience_plan=deal_params.audience_plan,
+            audience_strictness=inventory_requirements.audience_strictness,
         )
 
         # Emit campaign booking completed event

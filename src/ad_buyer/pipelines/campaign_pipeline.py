@@ -27,13 +27,13 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional, Union
+from typing import Any
 
 from ..events.bus import EventBus
 from ..events.models import Event, EventType
+from ..models.audience_plan import AudiencePlan, coerce_audience_field
 from ..models.campaign_brief import (
     CampaignBrief,
-    ChannelAllocation,
     ChannelType,
     parse_campaign_brief,
 )
@@ -44,6 +44,10 @@ from ..orchestration.multi_seller import (
     InventoryRequirements,
     MultiSellerOrchestrator,
     OrchestrationResult,
+)
+from .audience_planner_step import (
+    AudiencePlannerResult,
+    run_audience_planner_step,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,7 +115,9 @@ class CampaignPlan:
         total_budget: Total campaign budget.
         flight_start: Campaign start date (ISO string).
         flight_end: Campaign end date (ISO string).
-        target_audience: Audience segment IDs from the brief.
+        target_audience: Typed AudiencePlan from the brief (may be None
+            when the brief omitted audience targeting; the Audience
+            Planner agent fills it in downstream per proposal §5.3).
     """
 
     campaign_id: str
@@ -119,7 +125,7 @@ class CampaignPlan:
     total_budget: float
     flight_start: str
     flight_end: str
-    target_audience: list[str] = field(default_factory=list)
+    target_audience: AudiencePlan | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +151,7 @@ class CampaignPipeline:
         self,
         store: Any,  # CampaignStore or compatible fake
         orchestrator: MultiSellerOrchestrator,
-        event_bus: Optional[EventBus] = None,
+        event_bus: EventBus | None = None,
     ) -> None:
         self._store = store
         self._orchestrator = orchestrator
@@ -157,6 +163,11 @@ class CampaignPipeline:
         self._plans: dict[str, CampaignPlan] = {}
         self._booking_results: dict[str, dict[str, OrchestrationResult]] = {}
 
+        # Audience Planner outputs per campaign. Populated by
+        # `plan_campaign` and exposed via `get_audience_planner_result`
+        # for tests / observability. Bead ar-fgyq §6 wiring.
+        self._audience_planners: dict[str, AudiencePlannerResult] = {}
+
     # ------------------------------------------------------------------
     # Event helpers
     # ------------------------------------------------------------------
@@ -165,7 +176,7 @@ class CampaignPipeline:
         self,
         event_type: EventType,
         campaign_id: str = "",
-        payload: Optional[dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ) -> None:
         """Emit an event to the event bus. Fail-open."""
         if self._event_bus is None:
@@ -178,17 +189,13 @@ class CampaignPipeline:
             )
             await self._event_bus.publish(event)
         except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
-            logger.warning(
-                "Failed to emit event %s: %s", event_type, exc
-            )
+            logger.warning("Failed to emit event %s: %s", event_type, exc)
 
     # ------------------------------------------------------------------
     # Stage 1: Ingest brief
     # ------------------------------------------------------------------
 
-    async def ingest_brief(
-        self, brief_input: Union[str, dict[str, Any]]
-    ) -> str:
+    async def ingest_brief(self, brief_input: str | dict[str, Any]) -> str:
         """Parse and validate a campaign brief, create campaign in DRAFT.
 
         Args:
@@ -211,7 +218,14 @@ class CampaignPipeline:
         )
 
         # Build the dict for CampaignStore.create_campaign
-        # Serialize complex fields to JSON strings for SQLite storage
+        # Serialize complex fields to JSON strings for SQLite storage.
+        # `target_audience` is now a typed AudiencePlan (or None); we
+        # persist it as a dict so future loads see the new shape and
+        # legacy rows lazily migrate as briefs are touched.
+        if brief.target_audience is None:
+            target_audience_json = json.dumps(None)
+        else:
+            target_audience_json = json.dumps(brief.target_audience.model_dump(mode="json"))
         store_brief = {
             "advertiser_id": brief.advertiser_id,
             "campaign_name": brief.campaign_name,
@@ -219,10 +233,8 @@ class CampaignPipeline:
             "currency": brief.currency,
             "flight_start": brief.flight_start.isoformat(),
             "flight_end": brief.flight_end.isoformat(),
-            "channels": json.dumps(
-                [ch.model_dump(mode="json") for ch in brief.channels]
-            ),
-            "target_audience": json.dumps(brief.target_audience),
+            "channels": json.dumps([ch.model_dump(mode="json") for ch in brief.channels]),
+            "target_audience": target_audience_json,
         }
 
         # Include optional fields if present
@@ -231,13 +243,9 @@ class CampaignPipeline:
                 [g.model_dump(mode="json") for g in brief.target_geo]
             )
         if brief.kpis:
-            store_brief["kpis"] = json.dumps(
-                [k.model_dump(mode="json") for k in brief.kpis]
-            )
+            store_brief["kpis"] = json.dumps([k.model_dump(mode="json") for k in brief.kpis])
         if brief.brand_safety:
-            store_brief["brand_safety"] = json.dumps(
-                brief.brand_safety.model_dump(mode="json")
-            )
+            store_brief["brand_safety"] = json.dumps(brief.brand_safety.model_dump(mode="json"))
         if brief.approval_config:
             store_brief["approval_config"] = json.dumps(
                 brief.approval_config.model_dump(mode="json")
@@ -304,14 +312,27 @@ class CampaignPipeline:
             deal_types = _CHANNEL_DEAL_TYPES.get(ch.channel, ["PD"])
             budget = round(brief.total_budget * ch.budget_pct / 100.0, 2)
 
-            channel_plans.append(ChannelPlan(
-                channel=ch.channel,
-                budget=budget,
-                budget_pct=ch.budget_pct,
-                media_type=media_type,
-                deal_types=deal_types,
-                format_prefs=ch.format_prefs,
-            ))
+            channel_plans.append(
+                ChannelPlan(
+                    channel=ch.channel,
+                    budget=budget,
+                    budget_pct=ch.budget_pct,
+                    media_type=media_type,
+                    deal_types=deal_types,
+                    format_prefs=ch.format_prefs,
+                )
+            )
+
+        # Run the Audience Planner step BEFORE building the CampaignPlan
+        # so the resolved plan rides on `target_audience` from this point
+        # forward (per proposal §5.3). This is the keystone bead ar-fgyq
+        # wiring -- the planner is a stub passthrough today; bead §7
+        # replaces the stub with the full reasoning loop.
+        planner_result = run_audience_planner_step(brief)
+        # Cache the agent for tests/introspection -- the agent's `tools`
+        # attribute is the source of truth for the §6 tool-relocation
+        # invariant (3 UCP tools + TaxonomyLookup + EmbeddingMint).
+        self._audience_planners[campaign_id] = planner_result
 
         plan = CampaignPlan(
             campaign_id=campaign_id,
@@ -319,7 +340,7 @@ class CampaignPipeline:
             total_budget=brief.total_budget,
             flight_start=brief.flight_start.isoformat(),
             flight_end=brief.flight_end.isoformat(),
-            target_audience=brief.target_audience,
+            target_audience=planner_result.plan,
         )
 
         # Cache the plan for execute_booking
@@ -354,9 +375,7 @@ class CampaignPipeline:
     # Stage 3: Execute booking
     # ------------------------------------------------------------------
 
-    async def execute_booking(
-        self, campaign_id: str
-    ) -> dict[str, OrchestrationResult]:
+    async def execute_booking(self, campaign_id: str) -> dict[str, OrchestrationResult]:
         """Transition to BOOKING and orchestrate deals for each channel.
 
         For each channel in the plan, invokes MultiSellerOrchestrator
@@ -387,10 +406,7 @@ class CampaignPipeline:
         # Get the cached plan
         plan = self._plans.get(campaign_id)
         if plan is None:
-            raise KeyError(
-                f"No plan found for campaign {campaign_id}. "
-                "Call plan_campaign() first."
-            )
+            raise KeyError(f"No plan found for campaign {campaign_id}. Call plan_campaign() first.")
 
         # Get the brief for excluded_sellers and other params
         brief = self._briefs.get(campaign_id)
@@ -402,16 +418,18 @@ class CampaignPipeline:
         for cp in plan.channel_plans:
             channel_key = cp.channel.value
 
-            # Build inventory requirements for this channel
+            # Build inventory requirements for this channel.
+            # `audience_plan` is forwarded from the planner step's output
+            # (proposal §5.3 / bead ar-fgyq §6); §5 wired the
+            # `audience_plan` field on InventoryRequirements / DealParams.
             inv_req = InventoryRequirements(
                 media_type=cp.media_type,
                 deal_types=cp.deal_types,
                 excluded_sellers=excluded_sellers,
                 max_cpm=(
-                    brief.deal_preferences.max_cpm
-                    if brief and brief.deal_preferences
-                    else None
+                    brief.deal_preferences.max_cpm if brief and brief.deal_preferences else None
                 ),
+                audience_plan=plan.target_audience,
             )
 
             # Build deal params
@@ -422,6 +440,7 @@ class CampaignPipeline:
                 flight_start=plan.flight_start,
                 flight_end=plan.flight_end,
                 media_type=cp.media_type,
+                audience_plan=plan.target_audience,
             )
 
             try:
@@ -441,9 +460,7 @@ class CampaignPipeline:
                 )
 
             except Exception as exc:  # noqa: BLE001 - per-channel isolation; one failure must not abort pipeline
-                logger.warning(
-                    "Channel %s booking failed: %s", channel_key, exc
-                )
+                logger.warning("Channel %s booking failed: %s", channel_key, exc)
                 # Record empty result for failed channels rather than
                 # aborting the entire pipeline
                 results[channel_key] = OrchestrationResult(
@@ -462,12 +479,8 @@ class CampaignPipeline:
         self._booking_results[campaign_id] = results
 
         # Emit booking completed event
-        total_deals = sum(
-            len(r.selection.booked_deals) for r in results.values()
-        )
-        total_spend = sum(
-            r.selection.total_spend for r in results.values()
-        )
+        total_deals = sum(len(r.selection.booked_deals) for r in results.values())
+        total_spend = sum(r.selection.total_spend for r in results.values())
 
         await self._emit(
             EventType.CAMPAIGN_BOOKING_COMPLETED,
@@ -533,9 +546,7 @@ class CampaignPipeline:
     # End-to-end: run
     # ------------------------------------------------------------------
 
-    async def run(
-        self, brief_input: Union[str, dict[str, Any]]
-    ) -> dict[str, Any]:
+    async def run(self, brief_input: str | dict[str, Any]) -> dict[str, Any]:
         """Run the complete pipeline: ingest -> plan -> book -> finalize.
 
         Args:
@@ -565,9 +576,7 @@ class CampaignPipeline:
         for ch_key, result in booking_results.items():
             channels_summary[ch_key] = {
                 "deals_booked": len(result.selection.booked_deals),
-                "deal_ids": [
-                    d.deal_id for d in result.selection.booked_deals
-                ],
+                "deal_ids": [d.deal_id for d in result.selection.booked_deals],
                 "total_spend": result.selection.total_spend,
                 "remaining_budget": result.selection.remaining_budget,
                 "sellers_discovered": len(result.discovered_sellers),
@@ -584,13 +593,26 @@ class CampaignPipeline:
         }
 
         logger.info(
-            "Pipeline complete: campaign %s is READY "
-            "(%d channels, %d total deals)",
+            "Pipeline complete: campaign %s is READY (%d channels, %d total deals)",
             campaign_id,
             len(channels_summary),
             sum(ch["deals_booked"] for ch in channels_summary.values()),
         )
         return summary
+
+    # ------------------------------------------------------------------
+    # Public accessors (Audience Planner introspection)
+    # ------------------------------------------------------------------
+
+    def get_audience_planner_result(self, campaign_id: str) -> AudiencePlannerResult | None:
+        """Return the Audience Planner output for `campaign_id`, if any.
+
+        Populated by `plan_campaign`. Returns None when planning has not
+        yet run for the campaign. Tests use this to introspect the
+        agent's bound tools and the stub flag (bead ar-fgyq §6).
+        """
+
+        return self._audience_planners.get(campaign_id)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -600,7 +622,9 @@ class CampaignPipeline:
         """Reconstruct a CampaignBrief from stored campaign data.
 
         Used when the brief was not cached (e.g., pipeline stages
-        called independently across different instances).
+        called independently across different instances). Applies the
+        legacy-list compat shim on the way in so existing SQLite rows
+        carrying `list[str]` audiences keep working without a migration.
         """
         channels_raw = campaign.get("channels")
         if isinstance(channels_raw, str):
@@ -608,32 +632,55 @@ class CampaignPipeline:
 
         audience_raw = campaign.get("target_audience")
         if isinstance(audience_raw, str):
-            audience_raw = json.loads(audience_raw)
+            try:
+                audience_raw = json.loads(audience_raw)
+            except (json.JSONDecodeError, TypeError):
+                audience_raw = None
 
-        return parse_campaign_brief({
-            "advertiser_id": campaign["advertiser_id"],
-            "campaign_name": campaign["campaign_name"],
-            "objective": "AWARENESS",  # default when not stored
-            "total_budget": campaign["total_budget"],
-            "currency": campaign.get("currency", "USD"),
-            "flight_start": campaign["flight_start"],
-            "flight_end": campaign["flight_end"],
-            "channels": channels_raw or [],
-            "target_audience": audience_raw or ["default"],
-        })
+        # Legacy rows store list[str]; new rows store an AudiencePlan
+        # dict. The shim handles both via coerce_audience_field. Empty
+        # legacy lists fall through to None so the brief schema treats
+        # the campaign as audience-less rather than rejecting it on
+        # reconstruction (different from the ingestion path, which
+        # rejects a fresh empty list).
+        if isinstance(audience_raw, list) and not audience_raw:
+            audience_raw = None
+        else:
+            audience_raw = coerce_audience_field(
+                audience_raw,
+                source_context="campaign_pipeline._reconstruct_brief",
+            )
+
+        return parse_campaign_brief(
+            {
+                "advertiser_id": campaign["advertiser_id"],
+                "campaign_name": campaign["campaign_name"],
+                "objective": "AWARENESS",  # default when not stored
+                "total_budget": campaign["total_budget"],
+                "currency": campaign.get("currency", "USD"),
+                "flight_start": campaign["flight_start"],
+                "flight_end": campaign["flight_end"],
+                "channels": channels_raw or [],
+                "target_audience": audience_raw,
+            }
+        )
 
     @staticmethod
-    def _estimate_impressions(budget: float, assumed_cpm: float = 15.0) -> int:
-        """Estimate impression count from budget and assumed CPM.
+    def _estimate_impressions(budget: float, assumed_cpm: float | None = None) -> int:
+        """Estimate impression count from budget and CPM.
+
+        When no CPM is available (assumed_cpm is None), returns 0
+        rather than fabricating impressions from a made-up price.
 
         Args:
             budget: Channel budget in currency units.
-            assumed_cpm: Assumed CPM for estimation (default $15).
+            assumed_cpm: CPM to use for estimation. Must be explicitly
+                provided — no default is assumed.
 
         Returns:
-            Estimated number of impressions.
+            Estimated number of impressions, or 0 if no CPM available.
         """
-        if budget <= 0 or assumed_cpm <= 0:
+        if assumed_cpm is None or budget <= 0 or assumed_cpm <= 0:
             return 0
         # impressions = (budget / CPM) * 1000
         return int((budget / assumed_cpm) * 1000)

@@ -7,6 +7,8 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
+from .audience_plan import AudiencePlan
+
 
 class AccessTier(str, Enum):
     """Access tier levels for tiered pricing."""
@@ -227,6 +229,20 @@ class DealRequest(BaseModel):
     notes: str | None = Field(
         default=None,
         description="Additional notes or requirements for the deal",
+    )
+
+    # Typed audience plan threaded from BuyerDealFlow (formerly BuyerDealFlow).
+    # Mirrors the field added to QuoteRequest / DealBookingRequest in
+    # `models/deals.py` per proposal §5.2 + §5.3 / bead ar-vp4q §5.
+    # None on legacy paths that have not yet been wired through; populated
+    # by the Audience Planner step running inside BuyerDealFlow per §18.
+    audience_plan: AudiencePlan | None = Field(
+        default=None,
+        description=(
+            "Typed AudiencePlan from the brief / Audience Planner. "
+            "Threaded onto seller-bound calls so the seller can match each "
+            "ref against package capabilities (proposal §5.1)."
+        ),
     )
 
 

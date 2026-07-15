@@ -51,6 +51,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
 COPY --from=builder /build/src ./src
 COPY --from=builder /build/pyproject.toml ./
+COPY --from=builder /build/README.md ./
 
 # Install the package in the runtime venv
 RUN pip install --no-cache-dir -e .

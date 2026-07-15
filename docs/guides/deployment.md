@@ -120,10 +120,11 @@ Both options deploy the same architecture:
 - **Secrets**: SSM Parameter Store (SecureString)
 - **Logging**: CloudWatch Logs
 
-!!! note "Single-Task Deployment"
-    The buyer agent uses SQLite, which supports only one concurrent writer.
-    AWS deployments run a single ECS task (`desired_count=1`) with EFS-backed
-    persistence. For horizontal scaling, a PostgreSQL migration is planned.
+!!! note "Single-Task Deployment with SQLite"
+    The default `STORAGE_TYPE=sqlite` supports only one concurrent writer, so AWS deployments
+    run a single ECS task (`desired_count=1`) with EFS-backed persistence. For horizontal
+    scaling, set `STORAGE_TYPE=hybrid` and provide `DATABASE_URL` (PostgreSQL) plus `REDIS_URL`.
+    See [Storage Backends](../architecture/storage-backends.md) for the full reference.
 
 ---
 

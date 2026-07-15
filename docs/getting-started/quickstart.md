@@ -49,7 +49,7 @@ ANTHROPIC_API_KEY=sk-ant-...
     # Multi-seller mode (comma-separated URLs)
     SELLER_ENDPOINTS=
 
-    # LLM model overrides — uses litellm provider/model format (any provider works)
+    # LLM model overrides — uses provider/model format (native Anthropic, OpenAI, Gemini, Azure, Bedrock)
     DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
     MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
     # DEFAULT_LLM_MODEL=openai/gpt-4o         # OpenAI example
@@ -63,7 +63,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 All settings are loaded from environment variables or the `.env` file via `pydantic-settings`.
 
 !!! info "LLM Provider Flexibility"
-    The buyer agent uses [litellm](https://docs.litellm.ai/) under the hood, supporting **100+ LLM providers** --- OpenAI, Azure, Cohere, Ollama, Vertex AI, Bedrock, and more. Set `DEFAULT_LLM_MODEL` and `MANAGER_LLM_MODEL` using `provider/model-name` format and provide the matching API key environment variable. Agent prompts are tuned for Claude but work with any capable model. See the [litellm provider docs](https://docs.litellm.ai/docs/providers) for the full list.
+    CrewAI supports native integrations with Anthropic (default), OpenAI, Google Gemini, Azure OpenAI, and AWS Bedrock. Set `DEFAULT_LLM_MODEL` and `MANAGER_LLM_MODEL` using `provider/model-name` format and provide the matching API key. Install the matching extra: `pip install "crewai[anthropic]"`. Agent prompts are tuned for Claude but work with any capable model. See the [CrewAI LLM docs](https://docs.crewai.com/en/learn/litellm-removal-guide) for provider details.
 
 ## Run the Server
 

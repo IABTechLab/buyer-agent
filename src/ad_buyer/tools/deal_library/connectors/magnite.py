@@ -145,11 +145,7 @@ class MagniteConnector(SSPConnector):
 
     def __init__(self, *, platform: str | None = None) -> None:
         # Resolve platform: constructor arg > env var > default
-        resolved_platform = (
-            platform
-            or os.environ.get("MAGNITE_PLATFORM", "")
-            or PLATFORM_STREAMING
-        )
+        resolved_platform = platform or os.environ.get("MAGNITE_PLATFORM", "") or PLATFORM_STREAMING
 
         if resolved_platform not in _VALID_PLATFORMS:
             raise ValueError(
@@ -256,7 +252,9 @@ class MagniteConnector(SSPConnector):
         # The session cookie is set by the server; httpx stores it in the
         # client's cookie jar automatically.  Return it for logging/debug.
         session_cookie = response.cookies.get("SESSION", "")
-        logger.debug("Magnite: authentication successful (session cookie present: %s)", bool(session_cookie))
+        logger.debug(
+            "Magnite: authentication successful (session cookie present: %s)", bool(session_cookie)
+        )  # noqa: E501
         return session_cookie
 
     # ------------------------------------------------------------------
@@ -296,7 +294,7 @@ class MagniteConnector(SSPConnector):
                 retry_after_str = exc.response.headers.get("Retry-After", "")
                 retry_after = int(retry_after_str) if retry_after_str.isdigit() else None
                 raise SSPRateLimitError(
-                    f"Magnite API rate limit exceeded (HTTP 429).",
+                    "Magnite API rate limit exceeded (HTTP 429).",
                     retry_after=retry_after,
                 ) from exc
             raise SSPConnectionError(

@@ -8,6 +8,12 @@ identity, contextual, and reinforcement signals for real-time audience
 matching between buyer and seller agents.
 
 Transport: HTTPS JSON with Content-Type: application/vnd.ucp.embedding+json; v=1
+
+NOTE: This module implements IAB Agentic Audiences (formerly User Context
+Protocol / UCP). Public-surface naming uses "Agentic Audiences (UCP)" per
+proposal AUDIENCE_PLANNER_3TYPE_EXTENSION_2026-04-25.md §5.6 -- the code
+keeps `ucp_*` names internally to avoid a churning rename of a still-DRAFT
+spec, but readers searching for either term land here.
 """
 
 from datetime import UTC, datetime
@@ -15,6 +21,8 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from ..time_utils import utc_now
 
 
 class EmbeddingType(str, Enum):
@@ -139,7 +147,7 @@ class UCPEmbedding(BaseModel):
     context: UCPContextDescriptor | None = Field(default=None, description="Contextual metadata")
     consent: UCPConsent = Field(..., description="Consent information (required)")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utc_now,
         description="When the embedding was generated",
     )
     ttl_seconds: int = Field(
@@ -260,7 +268,7 @@ class AudienceValidationResult(BaseModel):
         description="Additional notes from validation",
     )
     validated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utc_now,
         alias="validatedAt",
         description="Validation timestamp",
     )
@@ -335,7 +343,7 @@ class AudiencePlan(BaseModel):
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utc_now,
         alias="createdAt",
     )
 

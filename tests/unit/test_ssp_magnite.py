@@ -19,8 +19,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -294,9 +293,7 @@ class TestMagniteNormalizeDeal:
         assert result["fixed_price_cpm"] is None
         assert result["bid_floor_cpm"] == 8.00
 
-    def test_normalize_null_dates_become_none(
-        self, streaming_connector, raw_open_auction_deal
-    ):
+    def test_normalize_null_dates_become_none(self, streaming_connector, raw_open_auction_deal):
         """Null dates in the Magnite response map to None."""
         result = streaming_connector._normalize_deal(raw_open_auction_deal)
         assert result["flight_start"] is None
@@ -372,9 +369,7 @@ class TestMagniteNormalizeDeal:
         result = streaming_connector._normalize_deal(raw)
         assert result["deal_type"] == "PD"
 
-    def test_normalized_deal_has_all_required_fields(
-        self, streaming_connector, raw_ctv_deal
-    ):
+    def test_normalized_deal_has_all_required_fields(self, streaming_connector, raw_ctv_deal):
         """Normalized deal contains all fields required by DealStore.save_deal()."""
         result = streaming_connector._normalize_deal(raw_ctv_deal)
         required_fields = [
@@ -415,9 +410,7 @@ class TestMagniteConnectorFetchDeals:
         mock_resp.raise_for_status = MagicMock()
         return mock_resp
 
-    def test_fetch_deals_returns_ssp_fetch_result(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fetch_deals_returns_ssp_fetch_result(self, streaming_connector, magnite_api_response):
         """fetch_deals() returns an SSPFetchResult instance."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -430,9 +423,7 @@ class TestMagniteConnectorFetchDeals:
 
         assert isinstance(result, SSPFetchResult)
 
-    def test_fetch_deals_returns_correct_count(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fetch_deals_returns_correct_count(self, streaming_connector, magnite_api_response):
         """fetch_deals() returns all 3 deals from the fixture."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -448,9 +439,7 @@ class TestMagniteConnectorFetchDeals:
         assert result.total_fetched == 3
         assert result.raw_response_count == 3
 
-    def test_fetch_deals_sets_ssp_name(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fetch_deals_sets_ssp_name(self, streaming_connector, magnite_api_response):
         """fetch_deals() sets ssp_name to 'Magnite' in the result."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -463,9 +452,7 @@ class TestMagniteConnectorFetchDeals:
 
         assert result.ssp_name == "Magnite"
 
-    def test_fetch_deals_normalizes_all_deals(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fetch_deals_normalizes_all_deals(self, streaming_connector, magnite_api_response):
         """fetch_deals() normalizes all deals in the response."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -481,9 +468,7 @@ class TestMagniteConnectorFetchDeals:
         assert "MAG-CTV-002" in deal_ids
         assert "MAG-CTV-003" in deal_ids
 
-    def test_fetch_deals_posts_to_login_endpoint(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fetch_deals_posts_to_login_endpoint(self, streaming_connector, magnite_api_response):
         """fetch_deals() calls the Magnite login endpoint for session auth."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -517,9 +502,7 @@ class TestMagniteConnectorFetchDeals:
         body = post_kwargs[1].get("json", {})
         assert "access-key" in body or "access_key" in body or "accessKey" in body
 
-    def test_fetch_deals_uses_seat_id_in_url(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fetch_deals_uses_seat_id_in_url(self, streaming_connector, magnite_api_response):
         """fetch_deals() uses the seat ID in the deals endpoint URL."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -577,9 +560,7 @@ class TestMagniteConnectorFetchDeals:
             with pytest.raises(SSPRateLimitError):
                 streaming_connector.fetch_deals()
 
-    def test_fetch_deals_connection_error_raises_ssp_connection_error(
-        self, streaming_connector
-    ):
+    def test_fetch_deals_connection_error_raises_ssp_connection_error(self, streaming_connector):
         """fetch_deals() raises SSPConnectionError on network failure."""
         import httpx
 
@@ -592,21 +573,32 @@ class TestMagniteConnectorFetchDeals:
             with pytest.raises(SSPConnectionError):
                 streaming_connector.fetch_deals()
 
-    def test_fetch_deals_bad_deal_captured_as_error(
-        self, streaming_connector
-    ):
+    def test_fetch_deals_bad_deal_captured_as_error(self, streaming_connector):
         """fetch_deals() captures normalization errors without crashing."""
         bad_response = {
             "data": {
                 "deals": [
-                    {"id": "VALID-001", "name": "Good Deal", "dealType": "PD",
-                     "publisherName": "Test Publisher", "publisherDomain": "test.com",
-                     "currency": "USD", "price": {"type": "floor"}, "floor": 5.0,
-                     "mediaType": "CTV", "status": "active", "seatId": "seat-12345",
-                     "impressions": None, "startDate": None, "endDate": None,
-                     "description": None,
-                     "targeting": {"geo": [], "contentCategories": [], "audiences": []},
-                     "formats": [], "publisherId": "pub-001", "buyerSeatId": "bseat"},
+                    {
+                        "id": "VALID-001",
+                        "name": "Good Deal",
+                        "dealType": "PD",
+                        "publisherName": "Test Publisher",
+                        "publisherDomain": "test.com",
+                        "currency": "USD",
+                        "price": {"type": "floor"},
+                        "floor": 5.0,
+                        "mediaType": "CTV",
+                        "status": "active",
+                        "seatId": "seat-12345",
+                        "impressions": None,
+                        "startDate": None,
+                        "endDate": None,
+                        "description": None,
+                        "targeting": {"geo": [], "contentCategories": [], "audiences": []},
+                        "formats": [],
+                        "publisherId": "pub-001",
+                        "buyerSeatId": "bseat",
+                    },
                     {"name": "Missing ID", "dealType": "PD"},  # Missing required id
                 ],
                 "totalCount": 2,
@@ -634,9 +626,7 @@ class TestMagniteConnectorFetchDeals:
 
     def test_fetch_deals_empty_response(self, streaming_connector):
         """fetch_deals() handles an empty deals list gracefully."""
-        empty_response = {
-            "data": {"deals": [], "totalCount": 0, "page": 1, "pageSize": 100}
-        }
+        empty_response = {"data": {"deals": [], "totalCount": 0, "page": 1, "pageSize": 100}}
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
             mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
@@ -745,9 +735,7 @@ class TestMagniteFixtureDriven:
         assert errors == [], f"Normalization errors: {errors}"
         assert len(normalized) == 3
 
-    def test_fixture_pg_deal_has_fixed_price(
-        self, streaming_connector, magnite_deals_list
-    ):
+    def test_fixture_pg_deal_has_fixed_price(self, streaming_connector, magnite_deals_list):
         """The PG deal in the fixture has fixed_price_cpm set."""
         pg_deal = next(d for d in magnite_deals_list if d["dealType"] == "PG")
         normalized = streaming_connector._normalize_deal(pg_deal)
@@ -761,25 +749,19 @@ class TestMagniteFixtureDriven:
         normalized = streaming_connector._normalize_deal(oa_deal)
         assert normalized["fixed_price_cpm"] is None
 
-    def test_fixture_all_deals_have_ctv_media_type(
-        self, streaming_connector, magnite_deals_list
-    ):
+    def test_fixture_all_deals_have_ctv_media_type(self, streaming_connector, magnite_deals_list):
         """All fixture deals normalize to CTV media type."""
         for deal in magnite_deals_list:
             normalized = streaming_connector._normalize_deal(deal)
             assert normalized["media_type"] == "CTV"
 
-    def test_fixture_all_deals_have_seller_type_ssp(
-        self, streaming_connector, magnite_deals_list
-    ):
+    def test_fixture_all_deals_have_seller_type_ssp(self, streaming_connector, magnite_deals_list):
         """All fixture deals have seller_type set to SSP."""
         for deal in magnite_deals_list:
             normalized = streaming_connector._normalize_deal(deal)
             assert normalized["seller_type"] == "SSP"
 
-    def test_fixture_fetch_full_flow(
-        self, streaming_connector, magnite_api_response
-    ):
+    def test_fixture_fetch_full_flow(self, streaming_connector, magnite_api_response):
         """Full fetch flow using fixture returns 3 successful deals."""
         with patch("httpx.Client") as mock_client_cls:
             mock_client = MagicMock()
@@ -826,4 +808,5 @@ class TestMagniteModuleExports:
     def test_magnite_is_ssp_connector_subclass(self):
         """MagniteConnector is a subclass of SSPConnector."""
         from ad_buyer.tools.deal_library.ssp_connector_base import SSPConnector
+
         assert issubclass(MagniteConnector, SSPConnector)

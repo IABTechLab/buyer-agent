@@ -369,9 +369,7 @@ class PubMaticConnector(SSPConnector):
         try:
             response = self._client.get(url, params=params, headers=headers)
         except httpx.TransportError as exc:
-            raise SSPConnectionError(
-                f"PubMatic API network error: {exc}"
-            ) from exc
+            raise SSPConnectionError(f"PubMatic API network error: {exc}") from exc
 
         if response.status_code in (401, 403):
             raise SSPAuthError(
@@ -389,14 +387,13 @@ class PubMaticConnector(SSPConnector):
                 except ValueError:
                     pass
             raise SSPRateLimitError(
-                f"PubMatic API rate limit exceeded (HTTP 429)",
+                "PubMatic API rate limit exceeded (HTTP 429)",
                 retry_after=retry_after,
             )
 
         if response.status_code >= 500:
             raise SSPConnectionError(
-                f"PubMatic API server error (HTTP {response.status_code}): "
-                f"{response.text}",
+                f"PubMatic API server error (HTTP {response.status_code}): {response.text}",
                 status_code=response.status_code,
             )
 

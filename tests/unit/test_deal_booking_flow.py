@@ -15,7 +15,7 @@ Covers:
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -209,7 +209,7 @@ class TestReceiveCampaignBrief:
     def test_updated_at_is_set(self, flow, valid_campaign_brief):
         """updated_at timestamp is refreshed on success."""
         flow.state.campaign_brief = valid_campaign_brief
-        before = flow.state.updated_at
+        _before = flow.state.updated_at
 
         flow.receive_campaign_brief()
 
@@ -359,12 +359,17 @@ class TestPlanAudience:
 
 
 # ===========================================================================
-# 3. _parse_allocations (private helper)
+# 3. JSON-block extraction + default allocation helpers
 # ===========================================================================
+# Per ar-jbod, the old _parse_allocations was split into:
+#   _extract_json_block(text) -> dict | None
+#   _default_allocations() -> dict
+# The combined behaviour (parse-or-default) now lives in the
+# _extract_allocations() pipeline (see test_allocate_budget_extraction.py).
 
 
-class TestParseAllocations:
-    """Tests for allocation JSON parsing."""
+class TestExtractJsonBlock:
+    """Tests for the JSON-block extraction helper."""
 
     def test_valid_json_parsed(self, flow_with_brief):
         """Valid JSON string is parsed correctly."""
@@ -375,45 +380,56 @@ class TestParseAllocations:
             }
         )
 
-        result = flow_with_brief._parse_allocations(json_str)
+        result = flow_with_brief._extract_json_block(json_str)
 
+        assert result is not None
         assert result["branding"]["budget"] == 40000
         assert result["ctv"]["percentage"] == 20
 
     def test_json_embedded_in_text(self, flow_with_brief):
         """JSON embedded in surrounding text is extracted."""
-        text = 'Here is my analysis:\n{"branding": {"budget": 50000, "percentage": 50, "rationale": "Test"}}\nDone.'
+        text = (
+            "Here is my analysis:\n"
+            '{"branding": {"budget": 50000, "percentage": 50, "rationale": "Test"}}\nDone.'
+        )
 
-        result = flow_with_brief._parse_allocations(text)
+        result = flow_with_brief._extract_json_block(text)
 
+        assert result is not None
         assert result["branding"]["budget"] == 50000
 
-    def test_invalid_json_returns_defaults(self, flow_with_brief):
-        """Invalid JSON falls back to default allocation."""
-        result = flow_with_brief._parse_allocations("This is not JSON at all")
+    def test_invalid_json_returns_none(self, flow_with_brief):
+        """Invalid JSON returns None (callers decide how to fall back)."""
+        assert flow_with_brief._extract_json_block("This is not JSON at all") is None
 
-        assert "branding" in result
-        assert "performance" in result
-        assert "ctv" in result
-        assert "mobile_app" in result
-        # Defaults should sum to 100%
-        total_pct = sum(v["percentage"] for v in result.values())
-        assert total_pct == 100
+    def test_empty_string_returns_none(self, flow_with_brief):
+        """Empty string returns None."""
+        assert flow_with_brief._extract_json_block("") is None
+
+
+class TestDefaultAllocations:
+    """Tests for the default allocation split used as a last-resort fallback."""
 
     def test_default_allocation_uses_budget(self, flow_with_brief):
-        """Default allocation uses campaign budget from state."""
+        """Default allocation distributes the full campaign budget."""
         budget = flow_with_brief.state.campaign_brief["budget"]
 
-        result = flow_with_brief._parse_allocations("garbage")
+        defaults = flow_with_brief._default_allocations()
 
-        total_budget = sum(v["budget"] for v in result.values())
+        total_budget = sum(v["budget"] for v in defaults.values())
         assert total_budget == budget
 
-    def test_empty_string_returns_defaults(self, flow_with_brief):
-        """Empty string falls back to defaults."""
-        result = flow_with_brief._parse_allocations("")
+    def test_default_allocation_percentages_sum_to_100(self, flow_with_brief):
+        """Default percentages add up to 100%."""
+        defaults = flow_with_brief._default_allocations()
+        total_pct = sum(v["percentage"] for v in defaults.values())
+        assert total_pct == 100
 
-        assert "branding" in result
+    def test_default_allocation_has_all_channels(self, flow_with_brief):
+        """Default split includes every channel name expected by downstream listeners."""
+        defaults = flow_with_brief._default_allocations()
+        for ch in ("branding", "performance", "ctv", "mobile_app"):
+            assert ch in defaults
 
 
 # ===========================================================================
@@ -433,16 +449,25 @@ class TestAllocateBudget:
     @patch("ad_buyer.flows.deal_booking_flow.create_portfolio_crew")
     def test_successful_allocation(self, mock_create_crew, flow_with_brief):
         """Valid crew result populates budget_allocations in state."""
-        allocation_json = json.dumps(
-            {
-                "branding": {"budget": 40000, "percentage": 40, "rationale": "Awareness"},
-                "performance": {"budget": 30000, "percentage": 30, "rationale": "Conversions"},
-                "ctv": {"budget": 20000, "percentage": 20, "rationale": "Video reach"},
-                "mobile_app": {"budget": 10000, "percentage": 10, "rationale": "App installs"},
-            }
+        from types import SimpleNamespace
+
+        from ad_buyer.crews.portfolio_crew import (
+            BudgetAllocationOutput,
+            _ChannelAllocationOut,
+        )
+
+        pyd = BudgetAllocationOutput(
+            branding=_ChannelAllocationOut(budget=40000, percentage=40, rationale="Awareness"),
+            performance=_ChannelAllocationOut(budget=30000, percentage=30, rationale="Conversions"),
+            ctv=_ChannelAllocationOut(budget=20000, percentage=20, rationale="Video reach"),
+            mobile_app=_ChannelAllocationOut(budget=10000, percentage=10, rationale="App installs"),
+        )
+        crew_output = SimpleNamespace(
+            tasks_output=[SimpleNamespace(pydantic=pyd, json_dict=None, raw="")],
+            raw="",
         )
         mock_crew = MagicMock()
-        mock_crew.kickoff.return_value = allocation_json
+        mock_crew.kickoff.return_value = crew_output
         mock_create_crew.return_value = mock_crew
 
         result = flow_with_brief.allocate_budget({"status": "success"})
@@ -454,19 +479,28 @@ class TestAllocateBudget:
     @patch("ad_buyer.flows.deal_booking_flow.create_portfolio_crew")
     def test_zero_budget_channels_excluded(self, mock_create_crew, flow_with_brief):
         """Channels with 0 budget are not stored in allocations."""
-        allocation_json = json.dumps(
-            {
-                "branding": {"budget": 50000, "percentage": 50, "rationale": "Main"},
-                "ctv": {"budget": 50000, "percentage": 50, "rationale": "Video"},
-                "performance": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
-                "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not needed"},
-            }
+        from types import SimpleNamespace
+
+        from ad_buyer.crews.portfolio_crew import (
+            BudgetAllocationOutput,
+            _ChannelAllocationOut,
+        )
+
+        pyd = BudgetAllocationOutput(
+            branding=_ChannelAllocationOut(budget=50000, percentage=50, rationale="Main"),
+            ctv=_ChannelAllocationOut(budget=50000, percentage=50, rationale="Video"),
+            performance=_ChannelAllocationOut(budget=0, percentage=0, rationale="Not needed"),
+            mobile_app=_ChannelAllocationOut(budget=0, percentage=0, rationale="Not needed"),
+        )
+        crew_output = SimpleNamespace(
+            tasks_output=[SimpleNamespace(pydantic=pyd, json_dict=None, raw="")],
+            raw="",
         )
         mock_crew = MagicMock()
-        mock_crew.kickoff.return_value = allocation_json
+        mock_crew.kickoff.return_value = crew_output
         mock_create_crew.return_value = mock_crew
 
-        result = flow_with_brief.allocate_budget({"status": "success"})
+        _result = flow_with_brief.allocate_budget({"status": "success"})
 
         assert "branding" in flow_with_brief.state.budget_allocations
         assert "ctv" in flow_with_brief.state.budget_allocations
@@ -725,7 +759,7 @@ class TestParseRecommendations:
 
     def test_json_in_surrounding_text(self, flow):
         """JSON array embedded in text is still parsed."""
-        text = 'Recommendations:\n[{"product_id": "x", "product_name": "Test", "publisher": "P", "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'
+        text = 'Recommendations:\n[{"product_id": "x", "product_name": "Test", "publisher": "P", "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'  # noqa: E501
 
         recs = flow._parse_recommendations(text, "ctv")
 
@@ -961,7 +995,7 @@ class TestGetStatus:
                 impressions=100000,
                 cost=1500,
                 booking_status="booked",
-                booked_at=datetime.now(timezone.utc),
+                booked_at=datetime.now(UTC),
             )
         ]
         flow.state.execution_status = ExecutionStatus.COMPLETED
@@ -1051,3 +1085,51 @@ class TestEdgeCases:
         estimates = result["coverage_estimates"]
         for val in estimates.values():
             assert val >= 10.0
+
+
+# ===========================================================================
+# Regression: CrewAI 1.10.1 read-only flow.state setter (ar-x34o)
+# ===========================================================================
+
+
+class TestCrewAI110FlowStateRegression:
+    """Regression tests for CrewAI 1.10.1 Flow.state read-only change.
+
+    CrewAI 1.10.1 removed the ``flow.state = ...`` setter.  Initial state
+    must be passed via the constructor.  These tests verify the fix so that
+    the broken pattern never silently regresses.
+    """
+
+    def test_deal_booking_flow_construction_no_state(self, mock_opendirect_client):
+        """DealBookingFlow can be constructed without initial state kwargs."""
+        flow = DealBookingFlow(client=mock_opendirect_client)
+        # State should be initialised with defaults
+        assert flow.state is not None
+        assert flow.state.campaign_brief == {}
+
+    def test_deal_booking_flow_construction_with_campaign_brief(
+        self, mock_opendirect_client, valid_campaign_brief
+    ):
+        """DealBookingFlow accepts initial campaign_brief via constructor.
+
+        This is the pattern that replaced the broken ``flow.state = BookingState(...)``
+        assignment used in the API and CLI entry points.
+        """
+        # Must NOT raise ValueError: property 'state' of 'DealBookingFlow' object has no setter
+        flow = DealBookingFlow(
+            client=mock_opendirect_client,
+            campaign_brief=valid_campaign_brief,
+        )
+        assert flow.state.campaign_brief == valid_campaign_brief
+
+    def test_deal_booking_flow_state_setter_raises(self, mock_opendirect_client):
+        """Assigning to flow.state raises AttributeError (CrewAI 1.10.1 guard).
+
+        Pinning this behaviour so we notice if CrewAI ever re-adds the setter,
+        which would silently allow the old broken pattern to return.
+        """
+        flow = DealBookingFlow(client=mock_opendirect_client)
+        with pytest.raises((AttributeError, ValueError)):
+            from ad_buyer.models.flow_state import BookingState
+
+            flow.state = BookingState(campaign_brief={"name": "should_fail"})

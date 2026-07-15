@@ -58,9 +58,10 @@ class NormalizedQuote:
         quote_id: The original quote identifier.
         raw_cpm: The CPM as quoted by the seller (final_cpm from the
             quote response, after any tier/volume discounts the seller
-            already applied).
+            already applied).  None when pricing is unavailable.
         effective_cpm: The true cost-per-mille after deal-type
-            adjustment and estimated fees.
+            adjustment and estimated fees.  None when pricing is
+            unavailable.
         deal_type: Deal type string (PG, PD, PA).
         fee_estimate: Estimated intermediary + tech fees added to
             raw_cpm, in currency units per mille.
@@ -68,17 +69,20 @@ class NormalizedQuote:
         score: Composite ranking score (0-100, higher is better).
         fill_rate_estimate: Optional fill-rate from seller availability
             data, if provided.
+        pricing_source: Provenance of the pricing value.  One of
+            "seller_quoted", "negotiated", or "unavailable".
     """
 
     seller_id: str
     quote_id: str
-    raw_cpm: float
-    effective_cpm: float
+    raw_cpm: float | None
+    effective_cpm: float | None
     deal_type: str
     fee_estimate: float
     minimum_spend: float
     score: float
     fill_rate_estimate: float | None = None
+    pricing_source: str = "seller_quoted"
 
 
 # ---------------------------------------------------------------------------
@@ -164,10 +168,33 @@ class QuoteNormalizer:
 
         Returns:
             NormalizedQuote with effective CPM and a preliminary score.
+            When the quote has no pricing (final_cpm is None), returns
+            an unpriced NormalizedQuote with pricing_source="unavailable".
         """
         raw_cpm = quote.pricing.final_cpm
         seller_id = quote.seller_id or "unknown"
         quote_id = quote.quote_id
+
+        # Short-circuit: when final_cpm is None the seller has not
+        # provided pricing.  Return an unpriced NormalizedQuote instead
+        # of crashing on arithmetic with None.
+        if raw_cpm is None:
+            fill_rate: float | None = None
+            if quote.availability and quote.availability.estimated_fill_rate is not None:
+                fill_rate = quote.availability.estimated_fill_rate
+
+            return NormalizedQuote(
+                seller_id=seller_id,
+                quote_id=quote_id,
+                raw_cpm=None,
+                effective_cpm=None,
+                deal_type=deal_type,
+                fee_estimate=0.0,
+                minimum_spend=minimum_spend,
+                score=0.0,
+                fill_rate_estimate=fill_rate,
+                pricing_source="unavailable",
+            )
 
         # Step 1: Deal-type adjustment
         adjusted_cpm = self._apply_deal_type_adjustment(raw_cpm, deal_type)
@@ -179,7 +206,7 @@ class QuoteNormalizer:
         effective_cpm = adjusted_cpm + fee_estimate
 
         # Step 4: Extract fill-rate if available
-        fill_rate: float | None = None
+        fill_rate = None
         if quote.availability and quote.availability.estimated_fill_rate is not None:
             fill_rate = quote.availability.estimated_fill_rate
 
@@ -197,6 +224,7 @@ class QuoteNormalizer:
             minimum_spend=minimum_spend,
             score=score,
             fill_rate_estimate=fill_rate,
+            pricing_source="seller_quoted",
         )
 
     def compare_quotes(
@@ -206,6 +234,10 @@ class QuoteNormalizer:
     ) -> list[NormalizedQuote]:
         """Normalize and rank multiple quotes.
 
+        Unpriced quotes (pricing_source="unavailable") are separated from
+        the ranked set and appended at the end so they do not interfere
+        with the relative scoring of priced quotes.
+
         Args:
             quotes: List of (QuoteResponse, deal_type) tuples.
             minimum_spends: Optional mapping of quote_id to minimum
@@ -213,7 +245,7 @@ class QuoteNormalizer:
 
         Returns:
             List of NormalizedQuote sorted by score descending
-            (best quote first).
+            (best quote first), with unpriced quotes appended at the end.
         """
         if not quotes:
             return []
@@ -221,20 +253,26 @@ class QuoteNormalizer:
         minimum_spends = minimum_spends or {}
 
         # Normalize all quotes
-        normalized: list[NormalizedQuote] = []
+        priced: list[NormalizedQuote] = []
+        unpriced: list[NormalizedQuote] = []
         for quote, deal_type in quotes:
             min_spend = minimum_spends.get(quote.quote_id, 0.0)
             nq = self.normalize_quote(quote, deal_type, minimum_spend=min_spend)
-            normalized.append(nq)
+            if nq.pricing_source == "unavailable":
+                unpriced.append(nq)
+            else:
+                priced.append(nq)
 
         # Re-score relative to the set (best effective CPM gets highest
-        # CPM sub-score)
-        if len(normalized) > 1:
-            self._rescore_relative(normalized)
+        # CPM sub-score) — only for priced quotes
+        if len(priced) > 1:
+            self._rescore_relative(priced)
 
-        # Sort by score descending (best first)
-        normalized.sort(key=lambda nq: nq.score, reverse=True)
-        return normalized
+        # Sort priced by score descending (best first)
+        priced.sort(key=lambda nq: nq.score, reverse=True)
+
+        # Append unpriced quotes at the end
+        return priced + unpriced
 
     # ------------------------------------------------------------------
     # Internal helpers

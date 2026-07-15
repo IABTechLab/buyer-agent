@@ -84,7 +84,7 @@ Instantiation:
 
 ### Supply Path Templates
 
-Supply path templates (`supply_path_templates` table) codify SPO (supply path optimization) routing preferences. They record scoring weights, preferred SSPs, blocked SSPs, and maximum reseller hop counts. Supply path templates are used by the DSP deal flow to evaluate and rank inventory sources.
+Supply path templates (`supply_path_templates` table) codify SPO (supply path optimization) routing preferences. They record scoring weights, preferred SSPs, blocked SSPs, and maximum reseller hop counts. Supply path templates are used by the buyer deal flow to evaluate and rank inventory sources.
 
 ---
 

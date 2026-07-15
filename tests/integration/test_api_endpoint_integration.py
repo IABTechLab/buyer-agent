@@ -8,6 +8,7 @@ verifying request routing, authentication middleware, job lifecycle,
 and error propagation from API through to business logic.
 """
 
+from datetime import UTC
 from unittest.mock import patch
 
 import httpx
@@ -105,8 +106,15 @@ class TestBookingEndpointLifecycle:
         assert status_resp.status_code == 200
         status_data = status_resp.json()
         assert status_data["job_id"] == job_id
-        # Status should be pending or running (background task may or may not have started)
-        assert status_data["status"] in ("pending", "running", "failed", "completed")
+        # Status should be any valid job state (background task may or may not have started;
+        # awaiting_approval is valid when auto_approve=False and flow ran to completion)
+        assert status_data["status"] in (
+            "pending",
+            "running",
+            "failed",
+            "completed",
+            "awaiting_approval",
+        )
 
         jobs.pop(job_id, None)
 
@@ -261,7 +269,7 @@ class TestApiValidationIntegration:
     async def test_approve_wrong_status_returns_400(self):
         """Approving a job not in awaiting_approval status should return 400."""
         # Manually insert a job in 'running' state
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         job_id = "test-job-running"
         jobs[job_id] = {
@@ -273,8 +281,8 @@ class TestApiValidationIntegration:
             "recommendations": [],
             "booked_lines": [],
             "errors": [],
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
         try:

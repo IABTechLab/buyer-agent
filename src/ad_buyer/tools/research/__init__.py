@@ -6,6 +6,7 @@
 from .avails_check import AvailsCheckTool
 from .contextual_enrichment import BrandSafetyTool, ClassifyContentTool, ContextualSearchTool
 from .product_search import ProductSearchTool
+from .sgp_vendor_approval import SGPVendorApprovalTool
 
 __all__ = [
     "ProductSearchTool",
@@ -13,4 +14,5 @@ __all__ = [
     "ClassifyContentTool",
     "ContextualSearchTool",
     "BrandSafetyTool",
+    "SGPVendorApprovalTool",
 ]
