@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     postgres_pool_min: int = 2
     postgres_pool_max: int = 10
 
+    # Durable fallback for audit-class events (see events/audit_fallback.py).
+    # When the event bus fails for an audit-class event, the event is appended
+    # to this JSONL file (fsynced per write) instead of being dropped.
+    audit_fallback_path: str = "data/audit_fallback.jsonl"
+
     # CrewAI Settings
     crew_memory_enabled: bool = True
     crew_verbose: bool = True

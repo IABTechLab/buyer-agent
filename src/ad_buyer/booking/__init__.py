@@ -13,12 +13,15 @@ Public API:
     QuoteFlowClient - Quote-then-book flow for deal creation
     QuoteNormalizer - Normalizes quotes from different sellers for comparison
     TemplateFlowClient - Template-based booking (stub)
+    enforce_spend_ceiling - Deterministic budget/CPM ceiling guard
+    SpendCeilingExceeded - Raised when a spend limit would be breached
 """
 
 from .deal_id import generate_deal_id
 from .pricing import PricingCalculator, PricingResult
 from .quote_flow import QuoteFlowClient
 from .quote_normalizer import NormalizedQuote, QuoteNormalizer, SupplyPathInfo
+from .spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
 from .template_flow import TemplateFlowClient
 
 __all__ = [
@@ -27,7 +30,9 @@ __all__ = [
     "PricingResult",
     "QuoteFlowClient",
     "QuoteNormalizer",
+    "SpendCeilingExceeded",
     "SupplyPathInfo",
     "TemplateFlowClient",
+    "enforce_spend_ceiling",
     "generate_deal_id",
 ]
