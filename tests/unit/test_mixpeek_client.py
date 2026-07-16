@@ -5,10 +5,8 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 
 from ad_buyer.clients.mixpeek_client import (
@@ -65,7 +63,9 @@ class TestClassifyContent:
             ]
         }
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await client.classify_content(
                 retriever_id="ret-123", text="NFL football scores"
             )
@@ -78,11 +78,11 @@ class TestClassifyContent:
         mock_resp.status_code = 401
         mock_resp.text = "Unauthorized"
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             with pytest.raises(MixpeekError, match="401"):
-                await client.classify_content(
-                    retriever_id="ret-123", text="test"
-                )
+                await client.classify_content(retriever_id="ret-123", text="test")
 
 
 class TestBrandSafety:
@@ -101,7 +101,9 @@ class TestBrandSafety:
             ]
         }
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await client.check_brand_safety(
                 retriever_id="ret-123", text="local basketball game"
             )
@@ -131,7 +133,9 @@ class TestBrandSafety:
             ]
         }
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await client.check_brand_safety(
                 retriever_id="ret-123", text="poker casino betting"
             )
@@ -155,7 +159,9 @@ class TestBrandSafety:
             ]
         }
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await client.check_brand_safety(
                 retriever_id="ret-123",
                 text="card games",
@@ -177,10 +183,10 @@ class TestSearchContent:
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"documents": []}
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp) as mock_req:
-            await client.search_content(
-                retriever_id="ret-456", query="sports news", limit=5
-            )
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ) as mock_req:
+            await client.search_content(retriever_id="ret-456", query="sports news", limit=5)
 
         call_args = mock_req.call_args
         body = call_args.kwargs.get("json") or call_args[1].get("json")
@@ -194,12 +200,12 @@ class TestListRetrievers:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "results": [
-                {"retriever_id": "r1", "retriever_name": "iab_text_search"}
-            ]
+            "results": [{"retriever_id": "r1", "retriever_name": "iab_text_search"}]
         }
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await client.list_retrievers()
 
         assert len(result) == 1
@@ -215,7 +221,9 @@ class TestListTaxonomies:
             "results": [{"taxonomy_id": "t1", "taxonomy_name": "IAB v3.0"}]
         }
 
-        with patch.object(client._client, "request", new_callable=AsyncMock, return_value=mock_resp):
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
             result = await client.list_taxonomies()
 
         assert len(result) == 1
