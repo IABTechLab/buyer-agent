@@ -17,7 +17,7 @@ dependencies = [
     { name = "crewai", extra = ["anthropic", "bedrock", "tools"] },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "iab-agentic-primitives" },
+    { name = "iab-agentic-primitives", extra = ["client"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "python-dotenv" },
@@ -62,7 +62,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "flask", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "iab-agentic-primitives", git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.1.0" },
+    { name = "iab-agentic-primitives", extras = ["client"], git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.3.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocs-mermaid2-plugin", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.0" },
@@ -1585,9 +1585,14 @@ wheels = [
 [[package]]
 name = "iab-agentic-primitives"
 version = "0.1.0"
-source = { git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.1.0#0e65288a88991cfcceed0fffdc1d9b73ef98fb01" }
+source = { git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.3.0#8709e79ae34100b54d0b6e63f37a9baeaa619471" }
 dependencies = [
     { name = "pydantic" },
+]
+
+[package.optional-dependencies]
+client = [
+    { name = "httpx" },
 ]
 
 [[package]]
