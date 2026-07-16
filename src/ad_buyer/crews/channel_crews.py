@@ -61,11 +61,13 @@ def _create_research_tools(client: OpenDirectClient) -> list[Any]:
 
     # Add Mixpeek contextual enrichment tools when configured
     if settings.mixpeek_api_key:
-        tools.extend([
-            ClassifyContentTool(),
-            BrandSafetyTool(),
-            ContextualSearchTool(),
-        ])
+        tools.extend(
+            [
+                ClassifyContentTool(),
+                BrandSafetyTool(),
+                ContextualSearchTool(),
+            ]
+        )
 
     return tools
 

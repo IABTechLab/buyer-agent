@@ -61,9 +61,7 @@ class TestClassifyContentTool:
             "ad_buyer.tools.research.contextual_enrichment._get_mixpeek_client",
             return_value=mock_client,
         ):
-            result = await classify_tool._arun(
-                text="NFL scores", retriever_id="ret-123"
-            )
+            result = await classify_tool._arun(text="NFL scores", retriever_id="ret-123")
 
         data = json.loads(result)
         assert data["categories"][0]["category"] == "Sports"
@@ -83,10 +81,12 @@ class TestClassifyContentTool:
             "ad_buyer.tools.research.contextual_enrichment._get_mixpeek_client",
             return_value=mock_client,
         ):
-            result = await classify_tool._arun(text="test content")
+            await classify_tool._arun(text="test content")
 
         mock_client.classify_content.assert_called_once_with(
-            retriever_id="ret-1", text="test content", limit=10,
+            retriever_id="ret-1",
+            text="test content",
+            limit=10,
         )
 
     @pytest.mark.asyncio
@@ -141,9 +141,7 @@ class TestBrandSafetyTool:
         mock_client.check_brand_safety.return_value = {
             "safe": False,
             "risk_level": "high",
-            "flagged_categories": [
-                {"category": "Casinos & Gambling", "score": 0.88}
-            ],
+            "flagged_categories": [{"category": "Casinos & Gambling", "score": 0.88}],
             "categories": [],
         }
         mock_client.close = AsyncMock()
@@ -175,13 +173,13 @@ class TestContextualSearchTool:
             "ad_buyer.tools.research.contextual_enrichment._get_mixpeek_client",
             return_value=mock_client,
         ):
-            result = await search_tool._arun(
-                query="sports news", retriever_id="ret-1", limit=5
-            )
+            result = await search_tool._arun(query="sports news", retriever_id="ret-1", limit=5)
 
         data = json.loads(result)
         assert data["documents"][0]["score"] == 0.85
         mock_client.search_content.assert_called_once_with(
-            retriever_id="ret-1", query="sports news", limit=5,
+            retriever_id="ret-1",
+            query="sports news",
+            limit=5,
         )
         mock_client.close.assert_called_once()

@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
@@ -30,6 +29,7 @@ def _get_mixpeek_client() -> MixpeekClient:
 # -----------------------------------------------------------------------
 # 1. Content Classification (IAB Taxonomy)
 # -----------------------------------------------------------------------
+
 
 class ClassifyContentInput(BaseModel):
     """Input for contextual content classification."""
@@ -97,14 +97,18 @@ class ClassifyContentTool(BaseTool):
             if not rid:
                 rid = await _discover_iab_retriever(client)
                 if not rid:
-                    return json.dumps({
-                        "error": "No IAB retriever found in this namespace. "
-                        "Set MIXPEEK_NAMESPACE to a namespace with IAB data, "
-                        "or pass retriever_id explicitly."
-                    })
+                    return json.dumps(
+                        {
+                            "error": "No IAB retriever found in this namespace. "
+                            "Set MIXPEEK_NAMESPACE to a namespace with IAB data, "
+                            "or pass retriever_id explicitly."
+                        }
+                    )
 
             result = await client.classify_content(
-                retriever_id=rid, text=text, limit=limit,
+                retriever_id=rid,
+                text=text,
+                limit=limit,
             )
 
             # Simplify output for the agent
@@ -129,6 +133,7 @@ class ClassifyContentTool(BaseTool):
 # -----------------------------------------------------------------------
 # 2. Brand Safety Check
 # -----------------------------------------------------------------------
+
 
 class BrandSafetyInput(BaseModel):
     """Input for brand-safety evaluation."""
@@ -174,9 +179,7 @@ class BrandSafetyTool(BaseTool):
         retriever_id: str | None = None,
         threshold: float = 0.80,
     ) -> str:
-        return run_async(
-            self._arun(text=text, retriever_id=retriever_id, threshold=threshold)
-        )
+        return run_async(self._arun(text=text, retriever_id=retriever_id, threshold=threshold))
 
     async def _arun(
         self,
@@ -193,12 +196,12 @@ class BrandSafetyTool(BaseTool):
             if not rid:
                 rid = await _discover_iab_retriever(client)
                 if not rid:
-                    return json.dumps({
-                        "error": "No IAB retriever found in this namespace."
-                    })
+                    return json.dumps({"error": "No IAB retriever found in this namespace."})
 
             result = await client.check_brand_safety(
-                retriever_id=rid, text=text, threshold=threshold,
+                retriever_id=rid,
+                text=text,
+                threshold=threshold,
             )
             return json.dumps(result, indent=2)
 
@@ -211,6 +214,7 @@ class BrandSafetyTool(BaseTool):
 # -----------------------------------------------------------------------
 # 3. Contextual Search (inventory enrichment)
 # -----------------------------------------------------------------------
+
 
 class ContextualSearchInput(BaseModel):
     """Input for contextual inventory search."""
@@ -253,9 +257,7 @@ class ContextualSearchTool(BaseTool):
         retriever_id: str = "",
         limit: int = 10,
     ) -> str:
-        return run_async(
-            self._arun(query=query, retriever_id=retriever_id, limit=limit)
-        )
+        return run_async(self._arun(query=query, retriever_id=retriever_id, limit=limit))
 
     async def _arun(
         self,
@@ -280,6 +282,7 @@ class ContextualSearchTool(BaseTool):
 # -----------------------------------------------------------------------
 # Helpers
 # -----------------------------------------------------------------------
+
 
 async def _discover_iab_retriever(client: MixpeekClient) -> str | None:
     """Find an IAB text search retriever in the current namespace."""

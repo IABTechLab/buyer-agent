@@ -18,22 +18,24 @@ _DEFAULT_TIMEOUT = 30.0
 
 # Brand-safety sensitive IAB categories that advertisers typically
 # want to avoid or require explicit opt-in for.
-BRAND_UNSAFE_CATEGORIES = frozenset({
-    "Poker and Professional Gambling",
-    "Casinos & Gambling",
-    "Casino Games",
-    "Lotteries and Scratchcards",
-    "Sensitive Topics",
-    "Adult Content",
-    "Illegal Content",
-    "Debated Sensitive Social Topics",
-    "Terrorism",
-    "Crime",
-    "Drugs",
-    "Tobacco",
-    "Arms & Ammunition",
-    "Death & Grieving",
-})
+BRAND_UNSAFE_CATEGORIES = frozenset(
+    {
+        "Poker and Professional Gambling",
+        "Casinos & Gambling",
+        "Casino Games",
+        "Lotteries and Scratchcards",
+        "Sensitive Topics",
+        "Adult Content",
+        "Illegal Content",
+        "Debated Sensitive Social Topics",
+        "Terrorism",
+        "Crime",
+        "Drugs",
+        "Tobacco",
+        "Arms & Ammunition",
+        "Death & Grieving",
+    }
+)
 
 
 class MixpeekError(Exception):
@@ -127,16 +129,12 @@ class MixpeekClient:
 
     async def list_taxonomies(self, namespace: str | None = None) -> list[dict]:
         """List available taxonomies in the namespace."""
-        data = await self._request(
-            "POST", "/v1/taxonomies/list", namespace=namespace, json={}
-        )
+        data = await self._request("POST", "/v1/taxonomies/list", namespace=namespace, json={})
         return data.get("results", [])
 
     async def list_retrievers(self, namespace: str | None = None) -> list[dict]:
         """List available retriever pipelines in the namespace."""
-        data = await self._request(
-            "POST", "/v1/retrievers/list", namespace=namespace, json={}
-        )
+        data = await self._request("POST", "/v1/retrievers/list", namespace=namespace, json={})
         return data.get("results", [])
 
     async def classify_content(

@@ -32,9 +32,7 @@ BASE_URL = os.environ.get("MIXPEEK_BASE_URL", "https://api.mixpeek.com")
 NAMESPACE = os.environ.get("MIXPEEK_NAMESPACE", "golden_adtech_iab")
 
 # Known retriever in golden_adtech_iab namespace
-IAB_TEXT_RETRIEVER = os.environ.get(
-    "MIXPEEK_IAB_RETRIEVER_ID", "ret_f7fbefced358bd"
-)
+IAB_TEXT_RETRIEVER = os.environ.get("MIXPEEK_IAB_RETRIEVER_ID", "ret_f7fbefced358bd")
 
 pytestmark = [
     pytest.mark.e2e,
@@ -45,6 +43,7 @@ pytestmark = [
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def client():
@@ -60,6 +59,7 @@ async def client():
 # ---------------------------------------------------------------------------
 # 1. Health & Discovery
 # ---------------------------------------------------------------------------
+
 
 class TestHealthAndDiscovery:
     @pytest.mark.asyncio
@@ -85,14 +85,13 @@ class TestHealthAndDiscovery:
         retrievers = await client.list_retrievers()
         assert len(retrievers) > 0
         names = {r["retriever_name"] for r in retrievers}
-        assert any("iab" in n.lower() for n in names), (
-            f"No IAB retriever found. Available: {names}"
-        )
+        assert any("iab" in n.lower() for n in names), f"No IAB retriever found. Available: {names}"
 
 
 # ---------------------------------------------------------------------------
 # 2. IAB Content Classification
 # ---------------------------------------------------------------------------
+
 
 class TestIABClassification:
     @pytest.mark.asyncio
@@ -113,7 +112,9 @@ class TestIABClassification:
         assert "Sports" in top["iab_path"]
         # Top result should be American Football or Sports
         assert top["iab_category_name"] in (
-            "American Football", "Sports", "College Football",
+            "American Football",
+            "Sports",
+            "College Football",
         )
 
     @pytest.mark.asyncio
@@ -153,9 +154,7 @@ class TestIABClassification:
         top = docs[0]
         assert top["score"] > 0.80
         # Should be in Food & Drink or Cooking
-        paths_flat = [
-            cat for d in docs[:3] for cat in d.get("iab_path", [])
-        ]
+        paths_flat = [cat for d in docs[:3] for cat in d.get("iab_path", [])]
         assert "Food & Drink" in paths_flat or "Cooking" in paths_flat
 
     @pytest.mark.asyncio
@@ -195,6 +194,7 @@ class TestIABClassification:
 # ---------------------------------------------------------------------------
 # 3. Brand Safety
 # ---------------------------------------------------------------------------
+
 
 class TestBrandSafety:
     @pytest.mark.asyncio
@@ -255,6 +255,7 @@ class TestBrandSafety:
 # 4. Contextual Search
 # ---------------------------------------------------------------------------
 
+
 class TestContextualSearch:
     @pytest.mark.asyncio
     async def test_search_returns_results(self, client: MixpeekClient):
@@ -304,6 +305,7 @@ class TestContextualSearch:
 # ---------------------------------------------------------------------------
 # 5. Error Handling
 # ---------------------------------------------------------------------------
+
 
 class TestErrorHandling:
     @pytest.mark.asyncio

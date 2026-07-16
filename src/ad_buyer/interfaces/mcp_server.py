@@ -44,6 +44,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts.base import Message
 
 from ..auth.key_store import ApiKeyStore
+from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 from ..config.settings import Settings
 from ..media_kit.client import MediaKitClient
 from ..media_kit.models import MediaKitError
@@ -69,7 +70,6 @@ from ..tools.deal_library.deal_entry import (
     ManualDealEntry,
     create_manual_deal,
 )
-from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 
 logger = logging.getLogger(__name__)
 
@@ -2982,13 +2982,17 @@ async def classify_content(
         if not rid:
             rid = await _discover_iab_retriever(client)
             if not rid:
-                return json.dumps({
-                    "error": "No IAB retriever found in this namespace. "
-                    "Set MIXPEEK_NAMESPACE or pass retriever_id explicitly."
-                })
+                return json.dumps(
+                    {
+                        "error": "No IAB retriever found in this namespace. "
+                        "Set MIXPEEK_NAMESPACE or pass retriever_id explicitly."
+                    }
+                )
 
         result = await client.classify_content(
-            retriever_id=rid, text=text, limit=limit,
+            retriever_id=rid,
+            text=text,
+            limit=limit,
         )
         docs = result.get("documents", [])
         categories = [
@@ -3031,12 +3035,12 @@ async def check_brand_safety(
         if not rid:
             rid = await _discover_iab_retriever(client)
             if not rid:
-                return json.dumps({
-                    "error": "No IAB retriever found in this namespace."
-                })
+                return json.dumps({"error": "No IAB retriever found in this namespace."})
 
         result = await client.check_brand_safety(
-            retriever_id=rid, text=text, threshold=threshold,
+            retriever_id=rid,
+            text=text,
+            threshold=threshold,
         )
         return json.dumps(result, indent=2)
     except MixpeekError as exc:
