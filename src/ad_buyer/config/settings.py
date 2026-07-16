@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     # Override via IAB_SERVER_URL env var or .env file
     iab_server_url: str = "http://localhost:8001"
 
+    # Real IAB AAMP agent registry (EP-5.1). When aamp_registry_url is set
+    # (env AAMP_REGISTRY_URL), seller discovery and agent-card fetch go
+    # through the shared contract library's RegistryClient against the real
+    # /api/agents API; when empty (the default), the legacy in-process /
+    # sandbox discovery path is used. The swap is config, not code.
+    # AAMP_REGISTRY_AUTH_TOKEN carries the bearer JWT — never log it.
+    aamp_registry_url: str = ""
+    aamp_registry_auth_token: str = ""
+
     # Seller Agent Endpoints (comma-separated list of MCP/A2A server URLs)
     # Each endpoint should implement IAB Tech Lab OpenDirect/AdCOM standards
     seller_endpoints: str = ""

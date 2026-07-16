@@ -76,16 +76,17 @@ _CHANNEL_DEAL_TYPES: dict[str, list[str]] = {
 def build_default_orchestrator() -> MultiSellerOrchestrator:
     """Build the production MultiSellerOrchestrator from settings.
 
-    Registry discovery uses the IAB server URL (same wiring as the MCP
-    server's registry client); per-seller DealsClients are created for
-    whichever seller URLs discovery returns.
+    Registry discovery uses the same config-driven wiring as the MCP
+    server's registry client (real AAMP registry when AAMP_REGISTRY_URL is
+    set, legacy IAB server URL otherwise); per-seller DealsClients are
+    created for whichever seller URLs discovery returns.
     """
     from ..clients.deals_client import DealsClient
-    from ..config.settings import settings
-    from ..registry.client import RegistryClient
+    from ..config.settings import get_settings
+    from ..registry import create_registry_client
 
     return MultiSellerOrchestrator(
-        registry_client=RegistryClient(registry_url=settings.iab_server_url),
+        registry_client=create_registry_client(get_settings()),
         deals_client_factory=lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs),
     )
 

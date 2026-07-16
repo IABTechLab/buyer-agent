@@ -43,7 +43,7 @@ from mcp.server.fastmcp.prompts.base import Message
 from ..auth.key_store import ApiKeyStore
 from ..config.settings import Settings
 from ..media_kit.client import MediaKitClient
-from ..registry.client import RegistryClient
+from ..registry import AampRegistryClient, RegistryClient, create_registry_client
 from ..services import deal_service, discovery_service
 from ..services.setup_wizard import SetupWizard
 from ..storage import health as storage_health
@@ -143,14 +143,14 @@ def _set_deal_store(store: DealStore | None) -> None:
     _deal_store_override = store
 
 
-def _get_registry_client() -> RegistryClient:
-    """Get a RegistryClient instance.
+def _get_registry_client() -> RegistryClient | AampRegistryClient:
+    """Get a registry client instance.
 
-    Uses the IAB server URL from settings as the registry URL.
+    Config-swap (EP-5.1): the real AAMP agent registry when
+    AAMP_REGISTRY_URL is set, otherwise the legacy IAB-server-URL path.
     Returns a new instance each time so that test patches are reflected.
     """
-    settings = _get_settings()
-    return RegistryClient(registry_url=settings.iab_server_url)
+    return create_registry_client(_get_settings())
 
 
 def _get_api_key_store() -> ApiKeyStore:
