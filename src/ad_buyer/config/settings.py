@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     # API Keys
     anthropic_api_key: str = ""
+    openai_api_key: str | None = None
+    google_api_key: str | None = None
 
     # Inbound API key for authenticating requests to this service.
     # When empty/not set, authentication is disabled (development mode).
@@ -62,10 +64,25 @@ class Settings(BaseSettings):
         return [url.strip() for url in self.seller_endpoints.split(",") if url.strip()]
 
     # LLM Settings
+    # Supported providers: anthropic (default), openai, gemini, bedrock
+    # Set DEFAULT_LLM_MODEL to switch provider, e.g.:
+    #   anthropic/claude-sonnet-4-5-20250929  (requires ANTHROPIC_API_KEY)
+    #   openai/gpt-4o                          (requires OPENAI_API_KEY)
+    #   gemini/gemini-2.5-flash                (requires GOOGLE_API_KEY)
+    #   bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0 (requires AWS creds)
     default_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
     manager_llm_model: str = "anthropic/claude-opus-4-20250514"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
+
+    # Alternative: any OpenAI-wire-compatible endpoint (NVIDIA NIM, Ollama,
+    # HuggingFace TGI, vLLM, ...). Set OPENAI_COMPATIBLE_LLM_API_BASE_URL
+    # alongside DEFAULT_LLM_MODEL/MANAGER_LLM_MODEL (using the raw model id
+    # the endpoint expects) to route through that endpoint instead of a named
+    # provider above. OPENAI_COMPATIBLE_LLM_API_KEY is optional — omit it for
+    # endpoints like a local Ollama server that don't require one.
+    openai_compatible_llm_api_key: str | None = None
+    openai_compatible_llm_api_base_url: str | None = None
 
     # Database / Storage Configuration
     database_url: str = "sqlite:///./ad_buyer.db"
