@@ -259,3 +259,61 @@ class TestFilterWireProducts:
         ]
         result = _filter_wire_products(products, {})
         assert result == products
+
+    # -- ad_format VOCABULARY reconciliation (bead ar-mxsp) ------------------
+    # The buyer's research crew searches with OpenRTB-ish placement terms
+    # ("banner", "interstitial", "video") while the seller declares the IAB
+    # inventory_type taxonomy in ad_formats ("display", "video", "ctv", ...).
+    # An exact-match filter silently drops ALL display inventory for a
+    # "banner" search, which is what walked scenario S1. The filter must
+    # normalize both sides to a shared taxonomy before comparing.
+
+    def test_banner_matches_display_product(self):
+        """adFormat='banner' must keep a product declaring ['display'].
+
+        This is the exact real-run failure: display inventory was filtered
+        out client-side before the LLM ever saw it.
+        """
+        display = self._wire_product("display_1", ["display"])
+        result = _filter_wire_products([display], {"adFormat": "banner"})
+        assert [p.product_id for p in result] == ["display_1"]
+
+    def test_interstitial_matches_display_product(self):
+        """interstitial is a display placement -> matches ['display']."""
+        display = self._wire_product("display_1", ["display"])
+        result = _filter_wire_products([display], {"adFormat": "interstitial"})
+        assert [p.product_id for p in result] == ["display_1"]
+
+    def test_banner_does_not_match_video_product(self):
+        """Normalization must NOT become match-everything: banner != video."""
+        video = self._wire_product("video_1", ["video"])
+        result = _filter_wire_products([video], {"adFormat": "banner"})
+        assert result == []
+
+    def test_empty_ad_formats_survives_normalized_filter(self):
+        """ar-mkq5 'undeclared = do not exclude' still holds under banner."""
+        undeclared = self._wire_product("undeclared_1", [])
+        result = _filter_wire_products([undeclared], {"adFormat": "banner"})
+        assert [p.product_id for p in result] == ["undeclared_1"]
+
+    def test_same_vocabulary_exact_match_still_works(self):
+        """A seller declaring OpenRTB 'banner' still matches adFormat='banner'."""
+        banner = self._wire_product("banner_1", ["banner"])
+        result = _filter_wire_products([banner], {"adFormat": "banner"})
+        assert [p.product_id for p in result] == ["banner_1"]
+
+    def test_video_request_matches_video_product(self):
+        """Shared-vocabulary video still matches (regression guard)."""
+        video = self._wire_product("video_1", ["video"])
+        result = _filter_wire_products([video], {"adFormat": "video"})
+        assert [p.product_id for p in result] == ["video_1"]
+
+    def test_ctv_kept_distinct_from_video(self):
+        """CTV is its own buying context: a plain video search must not pull
+        CTV-only inventory, and a ctv search must not pull generic video."""
+        ctv = self._wire_product("ctv_1", ["ctv"])
+        video = self._wire_product("video_1", ["video"])
+        assert _filter_wire_products([ctv], {"adFormat": "video"}) == []
+        assert _filter_wire_products([video], {"adFormat": "ctv"}) == []
+        kept = _filter_wire_products([ctv], {"adFormat": "ctv"})
+        assert [p.product_id for p in kept] == ["ctv_1"]

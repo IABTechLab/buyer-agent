@@ -26,6 +26,57 @@ from ..models.opendirect import (
 )
 from .contract_mappers import from_wire_product
 
+# ad_format vocabulary reconciliation (bead ar-mxsp).
+#
+# The buyer's research crew searches with OpenRTB-style *placement* terms
+# ("banner", "interstitial", "video", "rewarded"), while sellers declare the
+# IAB inventory_type *channel* taxonomy in ``Product.ad_formats`` ("display",
+# "video", "ctv", "native", "audio", "mobile_app", "linear_tv"). An exact-match
+# filter therefore dropped ALL display inventory for a "banner" search — the
+# root cause of the real-mode S1 walk (every display product, including an
+# under-ceiling $8 CPM one, was filtered out client-side before the LLM saw it;
+# only shared-vocabulary "video" survived, and the sole video product busted the
+# buyer's CPM ceiling).
+#
+# Both the requested format and each product's declared formats are normalized
+# to the shared canonical category below before comparison. This is an EXPLICIT
+# reconciliation, not a loose "match everything": unknown terms fall through to
+# themselves (lowercased), so filtering still discriminates.
+#
+# Judgment calls (documented deliberately):
+#   * banner / interstitial -> "display": both are display *placements*; the
+#     seller taxonomy expresses this as the "display" channel.
+#   * rewarded -> "video": rewarded video is the dominant reading of the
+#     "rewarded" placement advertised in the product-search tool's vocabulary.
+#   * ctv is kept DISTINCT from "video" (NOT folded in): CTV is a separate
+#     buying context (pricing, creative specs), so a plain "video" search must
+#     not pull CTV-only inventory and a "ctv" search must not pull generic
+#     online video.
+#   * native / audio / mobile_app / linear_tv map to themselves (identity) —
+#     listed for documentation; unknown terms would normalize to themselves
+#     anyway.
+_AD_FORMAT_ALIASES: dict[str, str] = {
+    "banner": "display",
+    "interstitial": "display",
+    "display": "display",
+    "video": "video",
+    "rewarded": "video",
+    "ctv": "ctv",
+    "native": "native",
+    "audio": "audio",
+    "mobile_app": "mobile_app",
+    "linear_tv": "linear_tv",
+}
+
+
+def _normalize_ad_format(term: str) -> str:
+    """Map a buyer/seller ad_format term onto the shared canonical category.
+
+    Unknown terms normalize to themselves (lowercased) so exact-match
+    discrimination is preserved for any vocabulary not in the alias table.
+    """
+    return _AD_FORMAT_ALIASES.get(term.strip().lower(), term.strip().lower())
+
 
 def _filter_wire_products(
     products: list[WireProduct], filters: dict[str, Any]
@@ -44,12 +95,34 @@ def _filter_wire_products(
     excluded. Some sellers serve ``ad_formats: []`` (their taxonomy living
     in ``ext``), and excluding undeclared products made every
     adFormat-filtered search deterministically return zero results.
+
+    adFormat vocabulary: the requested format and each declared product format
+    are normalized through ``_normalize_ad_format`` before comparison, so the
+    buyer's placement vocabulary ("banner", "interstitial") reconciles with the
+    seller's IAB channel taxonomy ("display"). See ``_AD_FORMAT_ALIASES`` for
+    the mapping and its judgment calls.
+
+    Note on ``channel``: the tools also pass a ``channel`` filter (e.g.
+    "display"), which is intentionally NOT used here — format normalization
+    already resolves the vocabulary mismatch, and treating ``channel`` as an
+    ad_format would conflate two distinct taxonomies and risk re-introducing
+    over-filtering. ``channel`` remains an unknown/ignored key by design.
     """
     result = products
 
     ad_format = filters.get("adFormat")
     if ad_format:
-        result = [p for p in result if not p.ad_formats or ad_format in p.ad_formats]
+        # Normalize BOTH sides to the shared canonical taxonomy so the buyer's
+        # placement vocabulary ("banner") reconciles with the seller's channel
+        # taxonomy ("display"). Empty/absent ad_formats still means "undeclared
+        # — do not exclude" (ar-mkq5 semantics preserved).
+        requested = _normalize_ad_format(ad_format)
+        result = [
+            p
+            for p in result
+            if not p.ad_formats
+            or requested in {_normalize_ad_format(f) for f in p.ad_formats}
+        ]
 
     delivery_type = filters.get("deliveryType")
     if delivery_type:
