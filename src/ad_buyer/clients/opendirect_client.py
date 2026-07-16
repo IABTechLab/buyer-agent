@@ -74,11 +74,11 @@ class OpenDirectClient:
             timeout: Request timeout in seconds
         """
         self.base_url = base_url.rstrip("/")
-        self._client = httpx.AsyncClient(
-            base_url=self.base_url,
-            headers=self._build_headers(api_key, oauth_token),
-            timeout=timeout,
-        )
+        self._headers = self._build_headers(api_key, oauth_token)
+        self._timeout = timeout
+        # Test seam: when set, injected into each per-request client (e.g.
+        # ``httpx.MockTransport``). Never set in production.
+        self._transport: httpx.AsyncBaseTransport | None = None
 
     def _build_headers(self, api_key: str | None, oauth_token: str | None) -> dict[str, str]:
         """Build request headers."""
@@ -88,6 +88,29 @@ class OpenDirectClient:
         elif api_key:
             headers["X-API-Key"] = api_key
         return headers
+
+    def _make_client(self) -> httpx.AsyncClient:
+        """Create a fresh ``httpx.AsyncClient`` scoped to a single request.
+
+        The client is deliberately NOT persistent: the sync CrewAI tools drive
+        this class through ``ad_buyer.async_utils.run_async``, which runs each
+        coroutine on a fresh event loop that is closed afterwards. A persistent
+        AsyncClient binds its connection pool to the first loop and every later
+        call then fails with ``RuntimeError: Event loop is closed``. A
+        per-request client always lives and dies on the loop that is actually
+        running the call.
+        """
+        return httpx.AsyncClient(
+            base_url=self.base_url,
+            headers=self._headers,
+            timeout=self._timeout,
+            transport=self._transport,
+        )
+
+    async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        """Perform one HTTP request on a fresh per-request client."""
+        async with self._make_client() as client:
+            return await client.request(method, url, **kwargs)
 
     # -------------------------------------------------------------------------
     # Products
@@ -101,7 +124,7 @@ class OpenDirectClient:
         envelope. Filtering is done client-side by the callers.
         """
         params = {"limit": limit, "offset": offset}
-        response = await self._client.get("/products", params=params)
+        response = await self._request("GET", "/products", params=params)
         response.raise_for_status()
         wire = WireProductListResponse.model_validate(response.json())
         return list(wire.products)
@@ -138,7 +161,7 @@ class OpenDirectClient:
         Returns:
             Product object
         """
-        response = await self._client.get(f"/products/{product_id}")
+        response = await self._request("GET", f"/products/{product_id}")
         response.raise_for_status()
         wire_product = WireProduct.model_validate(response.json())
         return from_wire_product(wire_product)
@@ -171,8 +194,8 @@ class OpenDirectClient:
         Returns:
             AvailsResponse with availability and pricing info
         """
-        response = await self._client.post(
-            "/products/avails", json=request.model_dump(by_alias=True, exclude_none=True)
+        response = await self._request(
+            "POST", "/products/avails", json=request.model_dump(by_alias=True, exclude_none=True)
         )
         response.raise_for_status()
         return AvailsResponse.model_validate(response.json())
@@ -190,8 +213,8 @@ class OpenDirectClient:
         Returns:
             Created Account with ID
         """
-        response = await self._client.post(
-            "/accounts", json=account.model_dump(by_alias=True, exclude_none=True)
+        response = await self._request(
+            "POST", "/accounts", json=account.model_dump(by_alias=True, exclude_none=True)
         )
         response.raise_for_status()
         return Account.model_validate(response.json())
@@ -205,7 +228,7 @@ class OpenDirectClient:
         Returns:
             Account object
         """
-        response = await self._client.get(f"/accounts/{account_id}")
+        response = await self._request("GET", f"/accounts/{account_id}")
         response.raise_for_status()
         return Account.model_validate(response.json())
 
@@ -220,7 +243,7 @@ class OpenDirectClient:
             List of Account objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get("/accounts", params=params)
+        response = await self._request("GET", "/accounts", params=params)
         response.raise_for_status()
         data = response.json()
         accounts = data.get("accounts", data) if isinstance(data, dict) else data
@@ -240,7 +263,8 @@ class OpenDirectClient:
         Returns:
             Created Order with ID
         """
-        response = await self._client.post(
+        response = await self._request(
+            "POST",
             f"/accounts/{account_id}/orders",
             json=order.model_dump(by_alias=True, exclude_none=True),
         )
@@ -257,7 +281,7 @@ class OpenDirectClient:
         Returns:
             Order object
         """
-        response = await self._client.get(f"/accounts/{account_id}/orders/{order_id}")
+        response = await self._request("GET", f"/accounts/{account_id}/orders/{order_id}")
         response.raise_for_status()
         return Order.model_validate(response.json())
 
@@ -273,7 +297,7 @@ class OpenDirectClient:
             List of Order objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(f"/accounts/{account_id}/orders", params=params)
+        response = await self._request("GET", f"/accounts/{account_id}/orders", params=params)
         response.raise_for_status()
         data = response.json()
         orders = data.get("orders", data) if isinstance(data, dict) else data
@@ -290,7 +314,8 @@ class OpenDirectClient:
         Returns:
             Updated Order object
         """
-        response = await self._client.patch(
+        response = await self._request(
+            "PATCH",
             f"/accounts/{account_id}/orders/{order_id}",
             json=order.model_dump(by_alias=True, exclude_none=True),
         )
@@ -312,7 +337,8 @@ class OpenDirectClient:
         Returns:
             Created Line with ID
         """
-        response = await self._client.post(
+        response = await self._request(
+            "POST",
             f"/accounts/{account_id}/orders/{order_id}/lines",
             json=line.model_dump(by_alias=True, exclude_none=True),
         )
@@ -330,8 +356,8 @@ class OpenDirectClient:
         Returns:
             Line object
         """
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}"
+        response = await self._request(
+            "GET", f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}"
         )
         response.raise_for_status()
         return Line.model_validate(response.json())
@@ -351,8 +377,8 @@ class OpenDirectClient:
             List of Line objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders/{order_id}/lines", params=params
+        response = await self._request(
+            "GET", f"/accounts/{account_id}/orders/{order_id}/lines", params=params
         )
         response.raise_for_status()
         data = response.json()
@@ -370,7 +396,8 @@ class OpenDirectClient:
         Returns:
             Updated Line with Reserved status
         """
-        response = await self._client.patch(
+        response = await self._request(
+            "PATCH",
             f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
             params={"action": "reserve"},
         )
@@ -388,7 +415,8 @@ class OpenDirectClient:
         Returns:
             Updated Line with Booked status
         """
-        response = await self._client.patch(
+        response = await self._request(
+            "PATCH",
             f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
             params={"action": "book"},
         )
@@ -406,7 +434,8 @@ class OpenDirectClient:
         Returns:
             Updated Line with Cancelled status
         """
-        response = await self._client.patch(
+        response = await self._request(
+            "PATCH",
             f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}",
             params={"action": "cancel"},
         )
@@ -424,8 +453,8 @@ class OpenDirectClient:
         Returns:
             LineStats with delivery and performance metrics
         """
-        response = await self._client.get(
-            f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}/stats"
+        response = await self._request(
+            "GET", f"/accounts/{account_id}/orders/{order_id}/lines/{line_id}/stats"
         )
         response.raise_for_status()
         return LineStats.model_validate(response.json())
@@ -444,7 +473,8 @@ class OpenDirectClient:
         Returns:
             Created Creative with ID
         """
-        response = await self._client.post(
+        response = await self._request(
+            "POST",
             f"/accounts/{account_id}/creatives",
             json=creative.model_dump(by_alias=True, exclude_none=True),
         )
@@ -461,7 +491,7 @@ class OpenDirectClient:
         Returns:
             Creative object
         """
-        response = await self._client.get(f"/accounts/{account_id}/creatives/{creative_id}")
+        response = await self._request("GET", f"/accounts/{account_id}/creatives/{creative_id}")
         response.raise_for_status()
         return Creative.model_validate(response.json())
 
@@ -477,7 +507,7 @@ class OpenDirectClient:
             List of Creative objects
         """
         params = {"$skip": skip, "$top": top}
-        response = await self._client.get(f"/accounts/{account_id}/creatives", params=params)
+        response = await self._request("GET", f"/accounts/{account_id}/creatives", params=params)
         response.raise_for_status()
         data = response.json()
         creatives = data.get("creatives", data) if isinstance(data, dict) else data
@@ -488,8 +518,13 @@ class OpenDirectClient:
     # -------------------------------------------------------------------------
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        await self._client.aclose()
+        """Close the client.
+
+        No-op retained for API compatibility: HTTP clients are opened
+        per-request (see ``_make_client``), so there is no persistent
+        connection pool to close.
+        """
+        return None
 
     async def __aenter__(self) -> "OpenDirectClient":
         """Async context manager entry."""

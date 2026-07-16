@@ -35,17 +35,12 @@ class TestClientErrorPropagation:
     async def test_opendirect_http_error_propagates(self):
         """HTTP errors from OpenDirectClient should raise to callers."""
         client = OpenDirectClient(base_url="http://fake.test")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Server Error", request=MagicMock(), response=mock_response
+        client._transport = httpx.MockTransport(
+            lambda request: httpx.Response(500, json={"error": "Server Error"})
         )
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
-            with pytest.raises(httpx.HTTPStatusError):
-                await client.list_products()
+        with pytest.raises(httpx.HTTPStatusError):
+            await client.list_products()
 
     @pytest.mark.asyncio
     async def test_unified_client_error_in_result(self):

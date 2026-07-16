@@ -71,17 +71,18 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+            mock_request.return_value = mock_response
             products = await client.list_products(skip=0, top=10)
 
         assert len(products) == 1
         assert products[0].id == "prod_1"
         assert products[0].name == "Test Product"
         assert products[0].base_price == 15.00
-        mock_get.assert_called_once()
+        mock_request.assert_called_once()
+        assert mock_request.call_args.args == ("GET", "/products")
         # Wire pagination now matches the shared ProductListRequest (limit/offset).
-        assert mock_get.call_args.kwargs["params"] == {"limit": 10, "offset": 0}
+        assert mock_request.call_args.kwargs["params"] == {"limit": 10, "offset": 0}
 
     @pytest.mark.asyncio
     async def test_get_product(self, client):
@@ -97,8 +98,8 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, "get", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_response
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+            mock_request.return_value = mock_response
             product = await client.get_product("prod_123")
 
         assert product.id == "prod_123"
@@ -130,16 +131,14 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with (
-            patch.object(client._client, "get", new_callable=AsyncMock) as mock_get,
-            patch.object(client._client, "post", new_callable=AsyncMock) as mock_post,
-        ):
-            mock_get.return_value = mock_response
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+            mock_request.return_value = mock_response
             results = await client.search_products({"adFormat": "video"})
 
-        # The retired POST /products/search route is never called.
-        mock_post.assert_not_called()
-        assert mock_get.call_args.args[0] == "/products"
+        # The retired POST /products/search route is never called: the only
+        # request is GET /products.
+        mock_request.assert_called_once()
+        assert mock_request.call_args.args == ("GET", "/products")
         # Client-side format filter kept only the matching product.
         assert [p.id for p in results] == ["video_1"]
 
@@ -170,8 +169,8 @@ class TestOpenDirectClient:
             end_date=datetime(2025, 2, 28),
         )
 
-        with patch.object(client._client, "post", new_callable=AsyncMock) as mock_post:
-            mock_post.return_value = mock_response
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+            mock_request.return_value = mock_response
             result = await client.create_order("acct_123", order)
 
         assert result.id == "order_new"
@@ -195,8 +194,8 @@ class TestOpenDirectClient:
         }
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(client._client, "patch", new_callable=AsyncMock) as mock_patch:
-            mock_patch.return_value = mock_response
+        with patch.object(client, "_request", new_callable=AsyncMock) as mock_request:
+            mock_request.return_value = mock_response
             result = await client.book_line("acct_123", "order_456", "line_123")
 
         assert result.id == "line_123"
