@@ -6,8 +6,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from iab_agentic_primitives.primitives import Product as WireProduct
 
-from ad_buyer.clients.opendirect_client import OpenDirectClient
+from ad_buyer.clients.opendirect_client import OpenDirectClient, _filter_wire_products
 from ad_buyer.models.opendirect import DeliveryType, Order
 
 
@@ -206,3 +207,55 @@ class TestOpenDirectClient:
         """Test client as async context manager."""
         async with OpenDirectClient(base_url="http://localhost:3000") as client:
             assert client is not None
+
+
+class TestFilterWireProducts:
+    """Semantics of the client-side adFormat filter.
+
+    Regression for the catalog contract seam that walked real-mode scenarios
+    with no_booking: sellers may serve products with ``ad_formats: []`` (the
+    taxonomy living only in ``ext.inventory_type``), and the old filter
+    excluded every such product, so ANY adFormat-filtered search returned
+    zero products. Empty/absent ``ad_formats`` means "undeclared — do not
+    exclude"; only products that DECLARE formats not matching the requested
+    one are excluded.
+    """
+
+    @staticmethod
+    def _wire_product(pid: str, ad_formats: list[str]) -> WireProduct:
+        return WireProduct(
+            product_id=pid,
+            seller_organization_id="pub_1",
+            name=pid,
+            ad_formats=ad_formats,
+        )
+
+    def test_empty_ad_formats_survives_ad_format_filter(self):
+        """A product with ad_formats=[] is undeclared, not a mismatch."""
+        undeclared = self._wire_product("undeclared_1", [])
+        result = _filter_wire_products([undeclared], {"adFormat": "display"})
+        assert [p.product_id for p in result] == ["undeclared_1"]
+
+    def test_declared_mismatch_is_excluded(self):
+        """A product declaring only ["video"] is excluded by adFormat=display."""
+        video_only = self._wire_product("video_1", ["video"])
+        result = _filter_wire_products([video_only], {"adFormat": "display"})
+        assert result == []
+
+    def test_declared_match_is_kept(self):
+        """A product declaring the requested format is kept."""
+        display = self._wire_product("display_1", ["display"])
+        video = self._wire_product("video_1", ["video"])
+        undeclared = self._wire_product("undeclared_1", [])
+        result = _filter_wire_products(
+            [display, video, undeclared], {"adFormat": "display"}
+        )
+        assert [p.product_id for p in result] == ["display_1", "undeclared_1"]
+
+    def test_no_ad_format_filter_keeps_everything(self):
+        products = [
+            self._wire_product("a", []),
+            self._wire_product("b", ["video"]),
+        ]
+        result = _filter_wire_products(products, {})
+        assert result == products

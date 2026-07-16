@@ -37,12 +37,19 @@ def _filter_wire_products(
     -> ``delivery_type``, ``publisherIds`` -> ``seller_organization_id``);
     unknown keys (e.g. free-text/targeting) are ignored here — rich discovery
     remains the media-kit search surface, not the catalog.
+
+    adFormat semantics: a product with EMPTY/absent ``ad_formats`` is
+    "undeclared — do not exclude" and always survives the filter; only
+    products that DECLARE formats not matching the requested one are
+    excluded. Some sellers serve ``ad_formats: []`` (their taxonomy living
+    in ``ext``), and excluding undeclared products made every
+    adFormat-filtered search deterministically return zero results.
     """
     result = products
 
     ad_format = filters.get("adFormat")
     if ad_format:
-        result = [p for p in result if ad_format in (p.ad_formats or [])]
+        result = [p for p in result if not p.ad_formats or ad_format in p.ad_formats]
 
     delivery_type = filters.get("deliveryType")
     if delivery_type:
