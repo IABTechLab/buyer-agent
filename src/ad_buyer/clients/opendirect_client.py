@@ -274,8 +274,17 @@ class OpenDirectClient:
         Returns:
             AvailsResponse with availability and pricing info
         """
+        # mode="json" renders the datetime start_date/end_date fields as
+        # ISO-8601 strings so the request body is JSON-serializable at the httpx
+        # boundary. Without it the raw datetime objects hit Python's default
+        # json encoder and the POST crashes with "Object of type datetime is not
+        # JSON serializable" before the request ever reaches the seller (bead
+        # ar-rs25). by_alias keeps the seller's camelCase field names
+        # (startDate/endDate/productId).
         response = await self._request(
-            "POST", "/products/avails", json=request.model_dump(by_alias=True, exclude_none=True)
+            "POST",
+            "/products/avails",
+            json=request.model_dump(mode="json", by_alias=True, exclude_none=True),
         )
         response.raise_for_status()
         return AvailsResponse.model_validate(response.json())
