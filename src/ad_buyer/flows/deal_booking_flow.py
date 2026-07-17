@@ -632,7 +632,17 @@ class DealBookingFlow(Flow[BookingState]):
             return {"channel": "performance", "status": "failed", "error": str(e)}
 
     def _create_channel_brief(self, channel: str, allocation: ChannelAllocation) -> dict[str, Any]:
-        """Create a channel-specific brief from campaign brief and allocation."""
+        """Create a channel-specific brief from campaign brief and allocation.
+
+        The dict is dumped with snake_case keys (``by_alias=False``) because
+        its sole consumer, ``channel_crews._build_channel_crew``, reads the
+        Python field names (``start_date``/``end_date``/``target_audience``)
+        when rendering the research task the crew agents see. Dumping
+        ``by_alias=True`` emitted camelCase keys (``startDate``/``endDate``)
+        that the consumer's ``.get("start_date")`` missed, so the flight
+        window rendered as "Flight: None to None" and the LLM crew reported
+        the dates as missing and refused to finalize (ar-kedz).
+        """
         return ChannelBrief(
             channel=channel,
             budget=allocation.budget,
@@ -641,7 +651,7 @@ class DealBookingFlow(Flow[BookingState]):
             target_audience=self.state.campaign_brief.get("target_audience", {}),
             objectives=self.state.campaign_brief.get("objectives", []),
             kpis=self.state.campaign_brief.get("kpis", {}),
-        ).model_dump(by_alias=True)
+        ).model_dump()
 
     def _recommendation_bounds(self, channel: str) -> RecommendationBounds:
         """Build the deterministic clamp bounds for a channel's LLM output.

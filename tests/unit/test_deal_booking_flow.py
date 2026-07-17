@@ -769,9 +769,38 @@ class TestCreateChannelBrief:
 
         assert brief["channel"] == "branding"
         assert brief["budget"] == 40000
-        assert brief["startDate"] == "2026-04-01"
-        assert brief["endDate"] == "2026-04-30"
-        assert "target_audience" in brief or "targetAudience" in brief
+        # The channel brief is consumed by channel_crews._build_channel_crew,
+        # which reads snake_case keys (start_date/end_date/target_audience).
+        # It must therefore be dumped WITHOUT by_alias so producer and
+        # consumer agree (ar-kedz).
+        assert brief["start_date"] == "2026-04-01"
+        assert brief["end_date"] == "2026-04-30"
+        assert brief["target_audience"] == flow_with_allocations.state.campaign_brief[
+            "target_audience"
+        ]
+
+    def test_channel_brief_flight_dates_reach_crew_research_task(self, flow_with_allocations):
+        """Flight dates must thread into the channel crew's research task text.
+
+        Regression for ar-kedz: the POST /bookings brief carries
+        start_date/end_date, but _create_channel_brief dumped the ChannelBrief
+        with by_alias=True (startDate/endDate) while _build_channel_crew reads
+        snake_case (start_date/end_date). The mismatch rendered the research
+        task's "Flight:" line as "Flight: None to None", so the real LLM crew
+        agents reported "Flight Dates Missing" and refused to finalize. This
+        asserts the dates reach the exact text the research agent reads.
+        """
+        from ad_buyer.crews.channel_crews import create_branding_crew
+
+        alloc = flow_with_allocations.state.budget_allocations["branding"]
+        channel_brief = flow_with_allocations._create_channel_brief("branding", alloc)
+
+        crew = create_branding_crew(flow_with_allocations._client, channel_brief)
+        research_description = crew.tasks[0].description
+
+        assert "2026-04-01" in research_description
+        assert "2026-04-30" in research_description
+        assert "None to None" not in research_description
 
 
 # ===========================================================================
