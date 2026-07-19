@@ -126,7 +126,7 @@ class _FakeRecommendation:
     def __init__(self, product_id: str = "prod-1"):
         self.product_id = product_id
 
-    def model_dump(self):
+    def model_dump(self, mode: str = "python"):
         return {"product_id": self.product_id}
 
 
@@ -329,3 +329,63 @@ class TestZeroRecommendationVisibility:
 
         assert job["status"] == "awaiting_approval"
         assert job["errors"] == []
+
+
+@pytest.mark.asyncio
+class TestBookedLinePersistSerialization:
+    """Persisting a real BookedLine must survive json.dumps (ar-ogrq).
+
+    Run #16: the FIRST real seller deal booked, then approve() 500'd —
+    BookedLine.model_dump() emitted a datetime `booked_at` and
+    persist_job's json.dumps raised. Every model_dump feeding persist
+    must use mode="json".
+    """
+
+    @staticmethod
+    def _flow_with_real_booked_line():
+        from datetime import UTC, datetime
+
+        from ad_buyer.models.flow_state import BookedLine
+
+        flow = _FakeFlow()
+        flow.state.booked_lines = [
+            BookedLine(
+                deal_id="DEMO-23993C1327C7",
+                product_id="prod-a2d9d5a6",
+                product_name="Premium Display - Homepage",
+                channel="branding",
+                impressions=1_666_666,
+                cpm=15.0,
+                cost=24_999.99,
+                booking_status="booked",
+                booked_at=datetime.now(UTC),
+            )
+        ]
+        return flow
+
+    async def test_approve_persists_booked_lines_with_datetimes(self, store):
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        job["_flow"] = self._flow_with_real_booked_line()
+        result = await booking_service.approve(
+            "j-ser-1",
+            job,
+            ["prod-a2d9d5a6"],
+            store=store,
+            persist=lambda jid, j: booking_service.persist_job(store, jid, j),
+        )
+        assert result["status"] == "success"
+        assert job["status"] == "completed"
+        assert job["booked_lines"][0]["deal_id"] == "DEMO-23993C1327C7"
+        assert isinstance(job["booked_lines"][0]["booked_at"], str)
+
+    async def test_approve_all_persists_booked_lines_with_datetimes(self, store):
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        job["_flow"] = self._flow_with_real_booked_line()
+        result = await booking_service.approve_all(
+            "j-ser-2",
+            job,
+            store=store,
+            persist=lambda jid, j: booking_service.persist_job(store, jid, j),
+        )
+        assert result["status"] == "success"
+        assert isinstance(job["booked_lines"][0]["booked_at"], str)

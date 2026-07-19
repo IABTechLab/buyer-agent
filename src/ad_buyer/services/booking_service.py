@@ -139,15 +139,15 @@ async def execute_booking(
 
         job["progress"] = 0.8
         job["budget_allocations"] = {
-            k: v.model_dump() for k, v in flow.state.budget_allocations.items()
+            k: v.model_dump(mode="json") for k, v in flow.state.budget_allocations.items()
         }
-        job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
+        job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
 
         if auto_approve:
             # buyer-1g4: same reason as kickoff -- offload sync work.
             await asyncio.to_thread(flow.approve_all)
             _merge_flow_errors(job, flow)
-            job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+            job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
             job["status"] = "completed"
         else:
             job["status"] = "awaiting_approval"
@@ -188,7 +188,7 @@ async def approve(
     _merge_flow_errors(job, flow)
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
     persist(job_id, job)
@@ -219,7 +219,7 @@ async def approve_all(
     _merge_flow_errors(job, flow)
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump() for b in flow.state.booked_lines]
+    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
     persist(job_id, job)
