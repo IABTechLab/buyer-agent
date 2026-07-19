@@ -71,6 +71,21 @@ _CHANNEL_MEDIA_TYPE_MAP: dict[str, str] = {
     "performance": "display",
 }
 
+# Maps discovery/inventory media types onto the SHARED pricing MediaType
+# enum (digital | ctv | linear_tv) that QuoteRequest/DealRequest validate
+# against. Discovery speaks inventory vocabulary ("display", "mobile");
+# the quote/deal wire speaks the contract library's — one string cannot
+# serve both (bead ar-9iw5).
+_PRICING_MEDIA_TYPE_MAP: dict[str, str] = {
+    "display": "digital",
+    "mobile": "digital",
+    "video": "digital",
+    "digital": "digital",
+    "ctv": "ctv",
+    "linear": "linear_tv",
+    "linear_tv": "linear_tv",
+}
+
 # Default deal types to request per channel.
 _CHANNEL_DEAL_TYPES: dict[str, list[str]] = {
     "branding": ["PD", "PA"],
@@ -1091,7 +1106,10 @@ class DealBookingFlow(Flow[BookingState]):
                 flight_start=brief.get("start_date", ""),
                 flight_end=brief.get("end_date", ""),
                 target_cpm=rec.cpm if rec.cpm > 0 else None,
-                media_type=media_type,
+                # DealParams.media_type reaches QuoteRequest/DealRequest,
+                # which validate against the shared pricing MediaType enum —
+                # translate from discovery vocabulary (ar-9iw5).
+                media_type=_PRICING_MEDIA_TYPE_MAP.get(media_type, "digital"),
                 audience_plan=audience_plan,
             )
 
