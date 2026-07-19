@@ -10,6 +10,8 @@ module interactions.
 """
 
 import json
+import time
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from ad_buyer.clients.opendirect_client import OpenDirectClient
@@ -19,6 +21,65 @@ from ad_buyer.models.flow_state import (
     ExecutionStatus,
     ProductRecommendation,
 )
+
+# Faithful shape of the branding crew's real final output from paid rig
+# run #13 (2026-07-19, brand-direct-real.log ~3540-3690): prose, then a
+# ```json fence containing an OBJECT whose "recommendations" key holds the
+# array, then trailing prose. Abbreviated but structurally identical.
+REAL_CREW_OUTPUT = """Based on my comprehensive review of the research findings, I'm presenting \
+my final recommendations for this branding campaign:
+
+```json
+{
+    "recommendations": [
+        {
+            "priority": 1,
+            "product_id": "prod-b41e2339",
+            "product_name": "Premium Display - Homepage",
+            "publisher": "seller-premium-pub-001",
+            "format": "Display - Banner",
+            "impressions": 1666666,
+            "cpm": 15.00,
+            "cost": 24999.99,
+            "rationale": "Optimal choice for the branding campaign."
+        },
+        {
+            "priority": 2,
+            "product_id": "prod-6fa6d961",
+            "product_name": "Standard Display - ROS",
+            "publisher": "seller-premium-pub-001",
+            "format": "Display - Banner",
+            "impressions": 3125000,
+            "cpm": 8.00,
+            "cost": 25000.00,
+            "rationale": "Alternative option that maximizes impression volume."
+        },
+        {
+            "priority": 3,
+            "product_id": "prod-d22919d3",
+            "product_name": "Pre-Roll Video",
+            "publisher": "seller-premium-pub-001",
+            "format": "Video",
+            "impressions": 1000000,
+            "cpm": 25.00,
+            "cost": 25000.00,
+            "rationale": "Premium video placement exceeds the CPM ceiling."
+        }
+    ],
+    "total_impressions": 1666666,
+    "total_cost": 24999.99,
+    "summary": "FINAL RECOMMENDATION: Book prod-b41e2339."
+}
+```
+
+**CRITICAL NOTES:**
+
+1. **Inventory Scarcity**: The marketplace research revealed extremely
+limited programmatic guaranteed inventory.
+
+This recommendation prioritizes campaign quality and alignment with
+branding objectives.
+"""
 
 
 def _set_flow_brief(flow: DealBookingFlow, campaign_brief: dict) -> None:
@@ -376,6 +437,135 @@ class TestRecommendationConsolidation:
         assert result["status"] == "success"
         assert result["booked"] == 0
         assert flow.state.execution_status == ExecutionStatus.COMPLETED
+
+
+def _branding_only_portfolio_output() -> SimpleNamespace:
+    """CrewOutput-shaped portfolio result funding ONLY the branding channel.
+
+    ``_extract_allocations`` reads ``tasks_output[0].json_dict`` (the typed
+    first-task output); a bare string would fall through to the default
+    40/40/20 split and fund channels this test must keep unfunded.
+    """
+    allocations = {
+        "branding": {"budget": 25000, "percentage": 100, "rationale": "Brand direct"},
+        "performance": {"budget": 0, "percentage": 0, "rationale": "Not allocated"},
+        "ctv": {"budget": 0, "percentage": 0, "rationale": "Not allocated"},
+        "mobile_app": {"budget": 0, "percentage": 0, "rationale": "Not allocated"},
+    }
+    first_task = SimpleNamespace(pydantic=None, json_dict=allocations, raw="")
+    return SimpleNamespace(tasks_output=[first_task], raw="")
+
+
+class TestKickoffConsolidationHandoff:
+    """kickoff()-level reproduction of the real-mode no_booking bug (ar-h2o6).
+
+    The unit tests above call the flow methods directly and never exercise
+    the CrewAI flow ENGINE. In CrewAI >=1.14 the engine (a) treats the four
+    ``research_*`` methods as a racing group for the multi-source ``or_``
+    consolidate listener -- once the FIRST one completes the others are
+    CANCELLED -- and (b) fires a multi-source OR listener only ONCE per run.
+    A fast no-budget channel therefore wins the race while the real crew is
+    still researching; ``consolidate_recommendations`` fires exactly once,
+    sees the funded channel still pending, returns "waiting", and never
+    fires again. ``pending_approvals`` stays empty, approval approves an
+    empty set, and the job "completes" with nothing booked.
+    """
+
+    def _kickoff_with_slow_branding_crew(self, brief: dict) -> DealBookingFlow:
+        """Run a real flow.kickoff() with mocked crews.
+
+        Portfolio crew allocates 100% to branding; the branding crew takes
+        ~0.5s (like a real LLM crew, which takes minutes) so every
+        no-budget channel research method finishes first.
+        """
+        portfolio_crew = MagicMock()
+        portfolio_crew.kickoff.return_value = _branding_only_portfolio_output()
+
+        def _slow_branding_kickoff():
+            time.sleep(0.5)
+            return REAL_CREW_OUTPUT
+
+        branding_crew = MagicMock()
+        branding_crew.kickoff.side_effect = _slow_branding_kickoff
+
+        client = OpenDirectClient(base_url="http://fake.test")
+        flow = DealBookingFlow(client, campaign_brief=brief)
+
+        with (
+            patch(
+                "ad_buyer.flows.deal_booking_flow.create_portfolio_crew",
+                return_value=portfolio_crew,
+            ),
+            patch(
+                "ad_buyer.flows.deal_booking_flow.create_branding_crew",
+                return_value=branding_crew,
+            ),
+        ):
+            flow.kickoff()
+        return flow
+
+    def test_kickoff_slow_funded_channel_reaches_pending_approvals(
+        self, sample_campaign_brief: dict
+    ):
+        """The funded channel's recommendations MUST become pending approvals.
+
+        Failing-first proof of the ar-h2o6 root cause: with the or_
+        consolidate trigger, this kickoff ends with pending_approvals == []
+        because a no-budget channel wins the racing group and the OR
+        listener has already fired by the time branding research lands.
+        """
+        brief = dict(sample_campaign_brief)
+        brief["budget"] = 25000
+
+        flow = self._kickoff_with_slow_branding_crew(brief)
+
+        assert flow.state.channel_recommendations.get("branding"), (
+            "branding research results never landed in state"
+        )
+        assert len(flow.state.pending_approvals) == 3, (
+            f"research recommendations never became pending approvals (errors={flow.state.errors})"
+        )
+        assert flow.state.execution_status == ExecutionStatus.AWAITING_APPROVAL
+        for rec in flow.state.pending_approvals:
+            assert rec.status == "pending_approval"
+
+    def test_kickoff_then_approval_books_the_recommendation(
+        self, sample_campaign_brief: dict, fake_booking_orchestrator
+    ):
+        """Approving after kickoff must book, not silently approve nothing."""
+        brief = dict(sample_campaign_brief)
+        brief["budget"] = 25000
+
+        portfolio_crew = MagicMock()
+        portfolio_crew.kickoff.return_value = _branding_only_portfolio_output()
+
+        def _slow_branding_kickoff():
+            time.sleep(0.5)
+            return REAL_CREW_OUTPUT
+
+        branding_crew = MagicMock()
+        branding_crew.kickoff.side_effect = _slow_branding_kickoff
+
+        client = OpenDirectClient(base_url="http://fake.test")
+        flow = DealBookingFlow(client, orchestrator=fake_booking_orchestrator, campaign_brief=brief)
+
+        with (
+            patch(
+                "ad_buyer.flows.deal_booking_flow.create_portfolio_crew",
+                return_value=portfolio_crew,
+            ),
+            patch(
+                "ad_buyer.flows.deal_booking_flow.create_branding_crew",
+                return_value=branding_crew,
+            ),
+        ):
+            flow.kickoff()
+            # Approve the affordable top pick (approving all three would trip
+            # the deterministic spend ceiling, which is correct behavior).
+            result = flow.approve_recommendations(["prod-b41e2339"])
+
+        assert result["booked"] > 0, f"approval booked nothing: {result}"
+        assert flow.state.booked_lines
 
 
 class TestFlowStatusTracking:

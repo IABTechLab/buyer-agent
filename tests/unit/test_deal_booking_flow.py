@@ -775,9 +775,10 @@ class TestCreateChannelBrief:
         # consumer agree (ar-kedz).
         assert brief["start_date"] == "2026-04-01"
         assert brief["end_date"] == "2026-04-30"
-        assert brief["target_audience"] == flow_with_allocations.state.campaign_brief[
-            "target_audience"
-        ]
+        assert (
+            brief["target_audience"]
+            == flow_with_allocations.state.campaign_brief["target_audience"]
+        )
 
     def test_channel_brief_flight_dates_reach_crew_research_task(self, flow_with_allocations):
         """Flight dates must thread into the channel crew's research task text.
@@ -880,6 +881,116 @@ class TestParseRecommendations:
 
         assert len(recs) == 1
         assert recs[0].format is None
+
+
+class TestExtractRecommendationItems:
+    """Tests for _extract_recommendation_items on real crew-output shapes.
+
+    The hierarchical channel crews return prose + a ```json fence holding
+    an OBJECT with a "recommendations" array (see rig run #13, ar-h2o6),
+    sometimes with bracketed echoes (objectives lists) in the surrounding
+    prose. Extraction must be deterministic and survive all of these.
+    """
+
+    ITEMS = [
+        {
+            "product_id": "prod-b41e2339",
+            "product_name": "Premium Display - Homepage",
+            "publisher": "seller-premium-pub-001",
+            "impressions": 1666666,
+            "cpm": 15.0,
+            "cost": 24999.99,
+        },
+        {
+            "product_id": "prod-6fa6d961",
+            "product_name": "Standard Display - ROS",
+            "publisher": "seller-premium-pub-001",
+            "impressions": 3125000,
+            "cpm": 8.0,
+            "cost": 25000.00,
+        },
+    ]
+
+    def _fenced_object(self, items):
+        payload = json.dumps({"recommendations": items, "summary": "s"}, indent=2)
+        return "```json\n" + payload + "\n```"
+
+    def test_fenced_object_with_recommendations_array(self, flow):
+        """Prose + fenced object + trailing prose: the real run #13 shape."""
+        text = (
+            "Based on my comprehensive review, here are my recommendations:\n\n"
+            + self._fenced_object(self.ITEMS)
+            + "\n\n**CRITICAL NOTES:**\n\n1. Inventory scarcity.\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+        assert items[0]["product_id"] == "prod-b41e2339"
+
+    def test_objectives_echo_before_fence_does_not_poison_extraction(self, flow):
+        """A Python-repr list echo before the fence must not break extraction.
+
+        The manager agent can echo the brief's objectives as a Python list
+        repr (single quotes) before its final answer. The legacy
+        first-"[" / last-"]" slice starts at that echo, json.loads fails,
+        and extraction silently yields ZERO recommendations (ar-h2o6).
+        """
+        text = (
+            "Objectives: ['Book programmatic_guaranteed deals for August 2026']\n\n"
+            "Final recommendations:\n\n"
+            + self._fenced_object(self.ITEMS)
+            + "\n\nProceed to approval.\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+        assert items[0]["product_id"] == "prod-b41e2339"
+
+    def test_last_parsing_fenced_block_wins(self, flow):
+        """With several fenced blocks, the LAST parseable one is the answer."""
+        first = "```json\n" + json.dumps([{"product_id": "draft", "cpm": 1}]) + "\n```"
+        text = (
+            "Draft findings:\n"
+            + first
+            + "\n\nRevised final answer:\n"
+            + self._fenced_object(self.ITEMS)
+            + "\nDone.\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+        assert items[0]["product_id"] == "prod-b41e2339"
+
+    def test_fenced_bare_array(self, flow):
+        """A fenced bare array (the documented expected_output shape) works."""
+        text = "Here you go:\n```json\n" + json.dumps(self.ITEMS) + "\n```\n"
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+
+    def test_unfenced_object_with_recommendations(self, flow):
+        """A bare top-level object with a recommendations list is handled."""
+        text = (
+            "Result:\n"
+            + json.dumps({"recommendations": self.ITEMS, "total_cost": 49999.99})
+            + "\n(see item [1] above)\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+
+    def test_bare_array_slice_fallback_still_works(self, flow):
+        """Legacy behavior: an unfenced array in prose still extracts."""
+        text = "Recommendations:\n" + json.dumps(self.ITEMS) + "\nEnd."
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+
+    def test_no_json_returns_empty(self, flow):
+        assert DealBookingFlow._extract_recommendation_items("No products found.") == []
+
+    def test_malformed_fence_falls_back_to_slice(self, flow):
+        """An unparseable fence must not mask a valid bare array elsewhere."""
+        text = (
+            "```json\n{not valid json}\n```\n"
+            "But the final list is:\n" + json.dumps(self.ITEMS) + "\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
 
 
 # ===========================================================================
