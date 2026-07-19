@@ -120,6 +120,16 @@ class _FakeFlow:
         return {"status": "success", "booked": len(ids), "total_cost": 0}
 
 
+class _FakeRecommendation:
+    """Minimal pending-approval stand-in with a model_dump()."""
+
+    def __init__(self, product_id: str = "prod-1"):
+        self.product_id = product_id
+
+    def model_dump(self):
+        return {"product_id": self.product_id}
+
+
 @pytest.mark.asyncio
 class TestExecuteBooking:
     async def test_holds_for_approval(self, store, monkeypatch):
@@ -216,3 +226,106 @@ class TestApproval:
         assert result["status"] == "success"
         assert result["approved_count"] == 2
         assert job["status"] == "completed"
+
+    async def test_approve_all_propagates_flow_errors(self, store):
+        """Execution failures during approval must land in job['errors'] (ar-h2o6).
+
+        Mirrors the kickoff-path propagation (ar-jbod): a booking failure
+        recorded on flow.state.errors during approve_all() was previously
+        dropped, so pollers saw a failed job with no reason.
+        """
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        flow = _FakeFlow()
+
+        def _failing_approve_all():
+            flow.state.errors.append("Booking failed for prod-1: seller 502")
+            return {"status": "failed", "booked": 0}
+
+        flow.approve_all = _failing_approve_all
+        job["_flow"] = flow
+
+        result = await booking_service.approve_all(
+            "j6", job, store=store, persist=lambda jid, j: None
+        )
+
+        assert result["status"] == "failed"
+        assert job["status"] == "failed"
+        assert any("Booking failed for prod-1" in e for e in job["errors"])
+
+    async def test_approve_propagates_flow_errors(self, store):
+        """approve() must propagate flow.state.errors like approve_all()."""
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        flow = _FakeFlow()
+
+        def _failing_approve(ids):
+            flow.state.errors.append("Booking failed for prod-9: no viable quotes")
+            return {"status": "failed", "booked": 0, "total_cost": 0}
+
+        flow.approve_recommendations = _failing_approve
+        job["_flow"] = flow
+
+        result = await booking_service.approve(
+            "j7", job, ["prod-9"], store=store, persist=lambda jid, j: None
+        )
+
+        assert result["status"] == "failed"
+        assert any("Booking failed for prod-9" in e for e in job["errors"])
+
+    async def test_approval_does_not_duplicate_kickoff_errors(self, store):
+        """Errors already propagated at kickoff must not be duplicated."""
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        flow = _FakeFlow()
+        flow.state.errors.append("Branding research failed: boom")
+        # Kickoff path (ar-jbod) already copied it onto the job.
+        job["errors"].append("Branding research failed: boom")
+        job["_flow"] = flow
+
+        await booking_service.approve_all("j8", job, store=store, persist=lambda jid, j: None)
+
+        assert job["errors"].count("Branding research failed: boom") == 1
+
+
+@pytest.mark.asyncio
+class TestZeroRecommendationVisibility:
+    """A job held for approval with nothing to approve must say so (ar-h2o6)."""
+
+    async def test_awaiting_approval_with_zero_recommendations_records_error(
+        self, store, monkeypatch
+    ):
+        monkeypatch.setattr(booking_service, "DealBookingFlow", lambda *a, **k: _FakeFlow())
+
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        await booking_service.execute_booking(
+            "j9",
+            job,
+            _brief(),
+            auto_approve=False,
+            client=object(),
+            store=store,
+            persist=lambda jid, j: booking_service.persist_job(store, jid, j),
+        )
+
+        # Status flow unchanged -- the job still holds for approval...
+        assert job["status"] == "awaiting_approval"
+        # ...but the empty result is now visible to pollers.
+        assert any("no bookable recommendations" in e for e in job["errors"])
+        assert any("no bookable recommendations" in e for e in store.get_job("j9")["errors"])
+
+    async def test_no_error_when_recommendations_exist(self, store, monkeypatch):
+        flow = _FakeFlow()
+        flow.state.pending_approvals = [_FakeRecommendation()]
+        monkeypatch.setattr(booking_service, "DealBookingFlow", lambda *a, **k: flow)
+
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        await booking_service.execute_booking(
+            "j10",
+            job,
+            _brief(),
+            auto_approve=False,
+            client=object(),
+            store=store,
+            persist=lambda jid, j: booking_service.persist_job(store, jid, j),
+        )
+
+        assert job["status"] == "awaiting_approval"
+        assert job["errors"] == []

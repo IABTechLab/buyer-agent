@@ -5,12 +5,13 @@
 
 import json
 import logging
+import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from crewai.flow.flow import Flow, listen, or_, start
+from crewai.flow.flow import Flow, and_, listen, start
 from pydantic import ValidationError
 
 from ..async_utils import run_async
@@ -48,6 +49,12 @@ from ..orchestration.multi_seller import (
 from ..storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
+
+# Fenced code blocks (``` or ```json) in crew output. DOTALL body match;
+# the closing fence is required so a dangling fence is not over-matched.
+# Module-level because ``Flow`` is a pydantic model: an underscore-prefixed
+# class attribute would be wrapped as a ModelPrivateAttr.
+_FENCED_BLOCK_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
@@ -703,32 +710,109 @@ class DealBookingFlow(Flow[BookingState]):
         return recommendations
 
     @staticmethod
-    def _extract_recommendation_items(result_str: str) -> list[Any]:
-        """Extract the JSON array of raw recommendation items from crew text.
+    def _items_from_parsed(parsed: Any) -> list[Any] | None:
+        """Interpret one parsed JSON candidate as a recommendation-item list.
 
-        Returns an empty list when no JSON array is present or it does not
-        parse -- non-JSON free text yields no recommendations.
+        A bare list IS the items; an object carries them under its
+        ``recommendations`` key (the hierarchical crews' final-answer shape).
+        Anything else is not a candidate.
         """
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            recommendations = parsed.get("recommendations")
+            if isinstance(recommendations, list):
+                return recommendations
+        return None
+
+    @classmethod
+    def _extract_recommendation_items(cls, result_str: str) -> list[Any]:
+        """Extract the raw recommendation items from crew output text.
+
+        Deterministic (no LLM) extraction, in order of preference
+        (bead ar-h2o6):
+
+        1. Each fenced ``````json`` block, parsed as JSON. A block that
+           parses to a list, or to an object with a ``recommendations``
+           list, is a candidate; the LAST successful candidate wins (the
+           final answer supersedes drafts).
+        2. Legacy fallback: the first-``[`` to last-``]`` slice of the whole
+           text, parsed as a JSON array. This is easily poisoned by
+           bracketed prose (e.g. a Python-repr objectives echo before the
+           JSON, or ``[1]``-style references after it), which is why the
+           fenced pass runs first.
+        3. A bare top-level object: the first-``{`` to last-``}`` slice,
+           accepted when it parses to an object with a ``recommendations``
+           list.
+
+        Returns an empty list when nothing parses -- non-JSON free text
+        yields no recommendations. Item-level validation/clamping stays in
+        ``validate_and_clamp_recommendation``.
+        """
+        # 1. Fenced blocks -- last successfully-parsing candidate wins.
+        fenced_items: list[Any] | None = None
+        for match in _FENCED_BLOCK_RE.finditer(result_str):
+            try:
+                parsed = json.loads(match.group(1))
+            except json.JSONDecodeError:
+                continue
+            items = cls._items_from_parsed(parsed)
+            if items is not None:
+                fenced_items = items
+        if fenced_items is not None:
+            return fenced_items
+
+        # 2. Legacy bracket slice across the whole text.
         start_idx = result_str.find("[")
         end_idx = result_str.rfind("]") + 1
-        if start_idx < 0 or end_idx <= start_idx:
-            return []
-        try:
-            items = json.loads(result_str[start_idx:end_idx])
-        except json.JSONDecodeError:
-            return []
-        return items if isinstance(items, list) else []
+        if start_idx >= 0 and end_idx > start_idx:
+            try:
+                parsed = json.loads(result_str[start_idx:end_idx])
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                return parsed
 
-    @listen(or_(research_branding, research_ctv, research_mobile, research_performance))
+        # 3. Bare top-level object carrying a "recommendations" list.
+        obj_start = result_str.find("{")
+        obj_end = result_str.rfind("}") + 1
+        if obj_start >= 0 and obj_end > obj_start:
+            try:
+                parsed = json.loads(result_str[obj_start:obj_end])
+            except json.JSONDecodeError:
+                return []
+            if isinstance(parsed, dict):
+                recommendations = parsed.get("recommendations")
+                if isinstance(recommendations, list):
+                    return recommendations
+
+        return []
+
+    @listen(and_(research_branding, research_ctv, research_mobile, research_performance))
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
-        """Consolidate all channel recommendations for approval."""
+        """Consolidate all channel recommendations for approval.
+
+        Trigger note (bead ar-h2o6): this MUST be ``and_``, not ``or_``.
+        Every research method always returns (success / no_budget / skipped /
+        failed all return dicts), so ``and_`` fires exactly once, after ALL
+        four have completed. With ``or_``, CrewAI >=1.14 (a) treats the four
+        research methods as a "racing group" -- the first to complete WINS
+        and the still-running ones are CANCELLED -- and (b) fires a
+        multi-source OR listener only ONCE per run. A fast no-budget channel
+        therefore triggered consolidation while the funded channel's crew
+        was still researching; the "waiting" branch returned, the listener
+        never fired again, and ``pending_approvals`` stayed empty -- so
+        approval silently approved nothing and jobs "completed" unbooked.
+        """
         # Check if all active channels have reported
         active_channels = [
             ch for ch, alloc in self.state.budget_allocations.items() if alloc.budget > 0
         ]
         completed_channels = list(self.state.channel_recommendations.keys())
 
-        # Check if we're still waiting for channels
+        # Defensive: with the and_ trigger all research methods have
+        # completed, so an active channel can only be missing here if its
+        # research failed (the failure is already recorded on state.errors).
         pending = set(active_channels) - set(completed_channels)
         if pending:
             return {"status": "waiting", "pending": list(pending)}
