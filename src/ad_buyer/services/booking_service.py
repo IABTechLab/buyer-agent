@@ -189,6 +189,9 @@ async def approve(
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
+    # Refresh recommendations so pollers see live approved/rejected
+    # statuses instead of the stale pending snapshot (main PR #87).
+    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
     persist(job_id, job)
@@ -220,6 +223,9 @@ async def approve_all(
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
     job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
+    # Refresh recommendations so pollers see live approved/rejected
+    # statuses instead of the stale pending snapshot (main PR #87).
+    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
     job["updated_at"] = utc_now().isoformat()
     job["progress"] = 1.0
     persist(job_id, job)

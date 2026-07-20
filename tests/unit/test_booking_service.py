@@ -227,6 +227,30 @@ class TestApproval:
         assert result["approved_count"] == 2
         assert job["status"] == "completed"
 
+    async def test_approve_refreshes_recommendation_statuses(self, store):
+        """Approval must re-dump recommendations so pollers see live
+        approved/rejected statuses, not the stale pending snapshot (main PR #87)."""
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        flow = _FakeFlow()
+        flow.state.pending_approvals = [_FakeRecommendation("p1")]
+        job["_flow"] = flow
+        job["recommendations"] = [{"product_id": "stale"}]
+
+        await booking_service.approve("j5b", job, ["p1"], store=store, persist=lambda jid, j: None)
+
+        assert job["recommendations"] == [{"product_id": "p1"}]
+
+    async def test_approve_all_refreshes_recommendation_statuses(self, store):
+        job = booking_service.new_job_record(_brief(), auto_approve=False)
+        flow = _FakeFlow()
+        flow.state.pending_approvals = [_FakeRecommendation("p2")]
+        job["_flow"] = flow
+        job["recommendations"] = [{"product_id": "stale"}]
+
+        await booking_service.approve_all("j4b", job, store=store, persist=lambda jid, j: None)
+
+        assert job["recommendations"] == [{"product_id": "p2"}]
+
     async def test_approve_all_propagates_flow_errors(self, store):
         """Execution failures during approval must land in job['errors'] (ar-h2o6).
 

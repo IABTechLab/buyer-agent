@@ -6,7 +6,7 @@
 Routes registered on the FastAPI application
 (`ad_buyer.interfaces.api.main:app`), enumerated from the router table.
 
-**Total: 11 endpoints**
+**Total: 14 endpoints**
 
 | Method | Path | Handler |
 | --- | --- | --- |
@@ -20,4 +20,7 @@ Routes registered on the FastAPI application
 | `GET` | `/events` | `list_events` |
 | `GET` | `/events/{event_id}` | `get_event` |
 | `GET` | `/health` | `health_check` |
+| `GET` | `/meta/campaigns` | `meta_list_campaigns` |
+| `GET` | `/meta/report` | `meta_direct_report` |
 | `POST` | `/products/search` | `search_products` |
+| `GET` | `/reports/{job_id}` | `get_campaign_report` |
