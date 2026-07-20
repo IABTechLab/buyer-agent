@@ -678,21 +678,26 @@ class DealBookingFlow(Flow[BookingState]):
     def _recommendation_bounds(self, channel: str) -> RecommendationBounds:
         """Build the deterministic clamp bounds for a channel's LLM output.
 
-        The CPM ceiling comes from the campaign brief's ``max_cpm`` (when
-        supplied and positive); the per-line cost ceiling is the channel's
-        allocated budget, falling back to the campaign's total budget. A
-        limit that is absent or non-positive disables the corresponding
-        clamp (None), preserving behavior for briefs without configured
-        limits. Bead ar-1ow7 (EP-4.3).
+        The CPM ceiling comes from the brief's ``kpis.max_cpm_usd`` — the
+        CampaignBrief/real-driver shape, where constraints ride in the kpis
+        dict — falling back to the legacy top-level ``max_cpm`` key (bead
+        ar-0wev: reading only the top-level key left the clamp inert on the
+        real path). The per-line cost ceiling is the channel's allocated
+        budget, falling back to the campaign's total budget (``budget`` is a
+        required top-level field, validated at flow entry, so it has no kpis
+        analog). A limit that is absent or non-positive disables the
+        corresponding clamp (None), preserving behavior for briefs without
+        configured limits. Bead ar-1ow7 (EP-4.3).
         """
         brief = self.state.campaign_brief or {}
+        kpis = brief.get("kpis")
+        kpis = kpis if isinstance(kpis, dict) else {}
 
-        raw_max_cpm = brief.get("max_cpm")
-        max_cpm = (
-            float(raw_max_cpm)
-            if isinstance(raw_max_cpm, (int, float)) and raw_max_cpm > 0
-            else None
-        )
+        max_cpm: float | None = None
+        for raw in (kpis.get("max_cpm_usd"), brief.get("max_cpm")):
+            if isinstance(raw, (int, float)) and raw > 0:
+                max_cpm = float(raw)
+                break
 
         allocation = self.state.budget_allocations.get(channel)
         max_cost: float | None = None

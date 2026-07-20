@@ -175,6 +175,80 @@ class TestParseClampsAndRejects:
 
 
 # ---------------------------------------------------------------------------
+# 2b. Bounds derived from kpis-shaped briefs (real-driver path, bead ar-0wev)
+# ---------------------------------------------------------------------------
+
+
+def _flow_with_kpis_brief(
+    kpis: dict | None,
+    top_level_max_cpm: float | None = None,
+    budget: float = 100_000.0,
+) -> DealBookingFlow:
+    """Flow whose brief carries constraints the way the rig real_driver does:
+    inside the ``kpis`` dict (``max_cpm_usd``), not as top-level ``max_cpm``."""
+    brief: dict = {
+        "objectives": ["awareness"],
+        "budget": budget,
+        "start_date": "2026-04-01",
+        "end_date": "2026-04-30",
+        "target_audience": {"geo": ["US"]},
+    }
+    if kpis is not None:
+        brief["kpis"] = kpis
+    if top_level_max_cpm is not None:
+        brief["max_cpm"] = top_level_max_cpm
+    flow = DealBookingFlow(client=MagicMock(), orchestrator=MagicMock(), campaign_brief=brief)
+    flow.state.budget_allocations = {
+        "branding": ChannelAllocation(
+            channel="branding", budget=50_000.0, percentage=50.0, rationale="x"
+        )
+    }
+    return flow
+
+
+class TestBoundsFromKpisShapedBrief:
+    """The CPM clamp must engage for briefs that carry the ceiling in
+    ``kpis.max_cpm_usd`` (the CampaignBrief / rig shape). Run #13 regression:
+    a $25-CPM item sailed past an $18 ceiling because bounds only read the
+    top-level ``max_cpm`` key. Bead ar-0wev."""
+
+    def test_kpis_max_cpm_usd_engages_cpm_clamp(self):
+        flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": 18.0})
+        bounds = flow._recommendation_bounds("branding")
+        assert bounds.max_cpm == 18.0
+
+    def test_run13_shape_25_cpm_item_clamped_to_18_ceiling(self):
+        flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": 18.0})
+        payload = json.dumps(
+            [{"product_id": "prod-b41e2339", "product_name": "N", "publisher": "P",
+              "impressions": 1_666_666, "cpm": 25.0, "cost": 24_999.99}]
+        )
+        recs = flow._parse_recommendations(payload, "branding")
+        assert len(recs) == 1
+        assert recs[0].cpm == 18.0  # clamped, not sailed through unbounded
+
+    def test_top_level_max_cpm_still_honored_as_fallback(self):
+        flow = _flow_with_kpis_brief(kpis={"viewability": 70}, top_level_max_cpm=18.0)
+        bounds = flow._recommendation_bounds("branding")
+        assert bounds.max_cpm == 18.0
+
+    def test_kpis_value_takes_precedence_over_top_level(self):
+        flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": 18.0}, top_level_max_cpm=30.0)
+        bounds = flow._recommendation_bounds("branding")
+        assert bounds.max_cpm == 18.0
+
+    def test_non_positive_or_garbage_kpis_value_falls_back(self):
+        flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": 0}, top_level_max_cpm=18.0)
+        assert flow._recommendation_bounds("branding").max_cpm == 18.0
+        flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": "cheap"}, top_level_max_cpm=18.0)
+        assert flow._recommendation_bounds("branding").max_cpm == 18.0
+
+    def test_no_ceiling_anywhere_disables_cpm_clamp(self):
+        flow = _flow_with_kpis_brief(kpis={"viewability": 70})
+        assert flow._recommendation_bounds("branding").max_cpm is None
+
+
+# ---------------------------------------------------------------------------
 # 3. End-to-end: the clamped ceiling -- not the inflated LLM value --
 #    is what reaches the booking orchestrator.
 # ---------------------------------------------------------------------------
