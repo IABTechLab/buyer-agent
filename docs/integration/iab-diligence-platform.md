@@ -98,7 +98,8 @@ SGP enforcement filtered 2 product(s): 1 not approved, 1 unknown to SGP
 `RequestDealTool` checks the seller's vendor approval after fetching product details and before generating a Deal ID. The gate acts as a safety net behind discovery filtering — it runs only when an `SGPClient` is wired in and `sgp_enforce=True`:
 
 ```python
-# Injected automatically by BuyerDealFlow from settings
+# Construct the tool with SGP wiring from settings
+# (see examples/dsp_deal_discovery.py for a complete workflow)
 RequestDealTool(
     client=unified_client,
     buyer_context=ctx,
@@ -150,7 +151,10 @@ tool = SGPVendorApprovalTool(client=sgp)
 # Returns a formatted APPROVED / NOT APPROVED / UNKNOWN summary.
 ```
 
-`BuyerDealFlow` injects this tool into the Buyer Deal Specialist automatically when an SGP client is configured, so the agent can consult approval status during product selection (before commitment), not only at Deal ID generation time.
+Give this tool to an agent alongside the discovery and deal-request tools so it can consult approval status during product selection (before commitment), not only at Deal ID generation time.
+
+!!! warning "Not wired into the canonical booking flow"
+    The SGP gating tools are fully implemented, but the canonical `DealBookingFlow` does not currently construct them. Today they are exercised by the example workflow in `examples/dsp_deal_discovery.py`; to enforce SGP gating in your own workflow, wire an `SGPClient` into `DiscoverInventoryTool` / `RequestDealTool` as shown above.
 
 The class is prefixed `SGP` so future vendor-approval integrations can coexist under their own class names and CrewAI `name` attributes without colliding.
 
@@ -167,5 +171,4 @@ The class is prefixed `SGP` so future vendor-approval integrations can coexist u
 ## Related
 
 - [Configuration reference](../guides/configuration.md) — all env vars including SGP
-- [Buyer Deal Flow](../architecture/buyer-deal-flow.md) — the flow the gate plugs into
 - [Seller Agent Integration](seller-agent.md) — the seller side of the deal request

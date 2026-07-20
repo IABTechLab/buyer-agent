@@ -12,7 +12,8 @@ Get the buyer agent running locally, verify it works, and optionally connect to 
 Clone the repository and install dependencies:
 
 ```bash
-cd ad_buyer_system
+git clone https://github.com/IABTechLab/buyer-agent.git
+cd buyer-agent
 pip install -e ".[dev]"
 ```
 
@@ -136,7 +137,7 @@ Verify: `curl http://localhost:3000/health`
 **2. Start the buyer agent** (in another terminal):
 
 ```bash
-cd ad_buyer_system
+cd buyer-agent
 uvicorn ad_buyer.interfaces.api.main:app --reload --port 8001
 ```
 

@@ -1,6 +1,6 @@
 # Deal Library
 
-The deal library is your portfolio of deals -- imports from SSPs, manually entered deals, and deals booked directly with sellers. This guide covers how to add, search, and manage deals using the MCP tools or the REST API.
+The deal library is your portfolio of deals -- imports from SSPs, manually entered deals, and deals booked directly with sellers. This guide covers how to add, search, and manage deals using the buyer's MCP tools.
 
 ## Overview
 
@@ -132,45 +132,44 @@ Deal templates let you define a standard set of terms -- deal type, max CPM, pre
 
 ### Create a Template
 
+Use the `create_template` MCP tool. It creates either a deal template or a supply path template:
+
 ```
-manage_deal_template(
-  action="create",
-  params_json='{
-    "name": "Sports PG Standard",
-    "deal_type_pref": "PG",
-    "max_cpm": 40.0,
-    "inventory_types": ["CTV", "DIGITAL"],
-    "preferred_publishers": ["espn.com", "nfl.com"],
-    "default_flight_days": 90,
-    "advertiser_id": "coca-cola"
-  }'
+create_template(
+  template_type="deal",
+  name="Sports PG Standard",
+  deal_type_pref="PG",
+  max_cpm=40.0,
+  default_flight_days=90,
+  advertiser_id="coca-cola"
 )
 ```
 
 A template can be agency-wide (no `advertiser_id`) or scoped to a specific advertiser.
 
-### List and Read Templates
+### List Templates
+
+`list_templates` returns both deal templates and supply path templates, optionally filtered by type:
 
 ```
-manage_deal_template(action="list", params_json='{}')
-manage_deal_template(action="read", params_json='{"template_id": "tmpl-001"}')
+list_templates(template_type="deal")
 ```
 
-### Update or Delete
+### Instantiate a Deal from a Template
+
+`instantiate_from_template` creates a new deal in the library from a deal template, with optional field overrides:
 
 ```
-manage_deal_template(
-  action="update",
-  params_json='{"template_id": "tmpl-001", "max_cpm": 45.0}'
-)
-
-manage_deal_template(
-  action="delete",
-  params_json='{"template_id": "tmpl-001"}'
+instantiate_from_template(
+  template_id="tmpl-001",
+  overrides='{"price": 25.0, "product_name": "Custom CTV"}'
 )
 ```
 
 Templates are not deals -- they don't appear in `list_deals`. Use them as starting points when creating deals manually or when the buyer agent is building a campaign plan.
+
+!!! note "MCP surface"
+    Template create/list/instantiate are the operations exposed over MCP. Reading, updating, or deleting an existing template is not currently exposed as an MCP tool.
 
 ---
 
@@ -185,32 +184,19 @@ A deal in the library moves through these statuses:
 | `active` | Deal is live and should be trafficked |
 | `paused` | Temporarily inactive (SSP-inactive deals land here) |
 
-To update a deal's status, use `create_deal_manual` with the `status` field, or update it via the REST API at `PATCH /api/deals/{deal_id}`.
+To update a deal's status, use `create_deal_manual` with the `status` field.
 
 ---
 
-## Using via the REST API
+## Access Method
 
-All deal library operations are also available over HTTP if you're integrating programmatically rather than through an MCP client.
-
-| Operation | Endpoint |
-|-----------|----------|
-| List deals | `GET /api/deals` |
-| Inspect deal | `GET /api/deals/{deal_id}` |
-| Create manual | `POST /api/deals` |
-| Import CSV | `POST /api/deals/import/csv` |
-| Import SSP | `POST /api/deals/import/ssp/{ssp_name}` |
-| Portfolio summary | `GET /api/deals/summary` |
-| List templates | `GET /api/deal-templates` |
-| Create template | `POST /api/deal-templates` |
-
-See [Deals API](../api/deals.md) for the full request/response schemas.
+The deal library is an **MCP-only** surface: all operations in this guide are [MCP tools](../ai-assistant/mcp-tools.md) on the buyer's MCP server (`/mcp`), usable from Claude Desktop, other MCP clients, or your own MCP integration. There are no REST endpoints for the deal library.
 
 ---
 
 ## Related
 
 - [SSP Connector Setup](ssp-connectors.md) -- Credential setup for PubMatic, Magnite, Index Exchange
-- [Deals API](../api/deals.md) -- REST API reference
+- [MCP Tools Reference](../ai-assistant/mcp-tools.md) -- Full catalog of buyer MCP tools
 - [Deal Store Architecture](../architecture/deal-store.md) -- How the deal library stores data
 - [Deal Booking](deal-booking.md) -- Booking new deals with sellers

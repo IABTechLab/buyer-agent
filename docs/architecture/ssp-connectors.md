@@ -224,7 +224,7 @@ class MySSPConnector(SSPConnector):
         }
 ```
 
-Register the new connector in `connectors/__init__.py` and wire it into the MCP tools (`sync_ssp_deals`, `test_ssp_connection`) in `interfaces/mcp_server.py`.
+Register the new connector in `connectors/__init__.py` and wire it into the MCP tools (`import_deals_ssp`, `test_ssp_connection`) in `interfaces/mcp_server.py`.
 
 ---
 

@@ -121,10 +121,9 @@ Both options deploy the same architecture:
 - **Logging**: CloudWatch Logs
 
 !!! note "Single-Task Deployment with SQLite"
-    The default `STORAGE_TYPE=sqlite` supports only one concurrent writer, so AWS deployments
-    run a single ECS task (`desired_count=1`) with EFS-backed persistence. For horizontal
-    scaling, set `STORAGE_TYPE=hybrid` and provide `DATABASE_URL` (PostgreSQL) plus `REDIS_URL`.
-    See [Storage Backends](../architecture/storage-backends.md) for the full reference.
+    The SQLite storage layer supports only one concurrent writer, so AWS deployments
+    must run a single ECS task (`desired_count=1`) with EFS-backed persistence.
+    See [Storage Layer](../architecture/storage-backends.md) for the full reference.
 
 ---
 
@@ -150,11 +149,11 @@ For end-to-end testing, run both agents:
 
 ```bash
 # Terminal 1 — Seller agent
-cd ../ad_seller_system/infra/docker
+cd ../seller-agent/infra/docker
 docker compose up
 
 # Terminal 2 — Buyer agent (pointing at seller)
-cd ../ad_buyer_system
+cd ../buyer-agent
 SELLER_ENDPOINTS=http://host.docker.internal:8000 docker compose -f infra/docker/docker-compose.yml up
 ```
 

@@ -117,8 +117,7 @@ sequenceDiagram
     Note over Buyer,Seller: 2. Product Search
     Buyer->>Seller: GET /products
     Seller-->>Buyer: Available products
-    Buyer->>Seller: POST /products/search
-    Seller-->>Buyer: Filtered products
+    Note over Buyer: Filters products client-side
     Buyer->>Seller: POST /products/avails
     Seller-->>Buyer: Availability, pricing, confidence
 
@@ -134,12 +133,13 @@ sequenceDiagram
     Buyer->>Seller: PATCH .../lines/{id}?action=book
     Seller-->>Buyer: Line (Booked)
 
-    Note over Buyer,Seller: 5. Creative Assignment
+    Note over Buyer,Seller: 5. Creative Upload
     Buyer->>Seller: POST /accounts/{id}/creatives
     Seller-->>Buyer: Creative (pending approval)
-    Buyer->>Seller: POST assignment (creative -> line)
-    Seller-->>Buyer: Assignment confirmed
 ```
+
+!!! note "Creative-to-line assignment"
+    The `Assignment` model (`models/opendirect.py`) defines the creative-to-line binding, but the `OpenDirectClient` does not yet expose a `create_assignment()` method — only `create_creative()`. Assignment happens on the seller side today.
 
 ## Line Booking Status Lifecycle
 
@@ -164,7 +164,7 @@ The `OpenDirectClient` (`clients/opendirect_client.py`) provides typed async met
 | Operation | Client Method | HTTP Call |
 |-----------|--------------|-----------|
 | List products | `list_products()` | `GET /products` |
-| Search products | `search_products()` | `POST /products/search` |
+| Search products | `search_products()` | `GET /products` + client-side filtering |
 | Check availability | `check_avails()` | `POST /products/avails` |
 | Create account | `create_account()` | `POST /accounts` |
 | Create order | `create_order()` | `POST /accounts/{id}/orders` |

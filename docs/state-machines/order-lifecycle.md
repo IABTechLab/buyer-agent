@@ -425,7 +425,7 @@ Two helper functions bridge the old enum values to the new `BuyerDealStatus` and
 
 ### `from_dsp_flow_status(value) -> BuyerDealStatus`
 
-Maps legacy `BuyerDealFlowStatus` values used in `BuyerDealFlow`:
+Maps legacy `BuyerDealFlowStatus` values (from the retired single-deal flow) to current statuses:
 
 | Legacy Value | Maps To |
 |-------------|---------|

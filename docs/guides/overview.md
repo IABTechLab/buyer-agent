@@ -31,14 +31,11 @@ flowchart LR
 | **Deal Booking** | Approved deals are booked via the seller's MCP or OpenDirect API | [Deal Booking](deal-booking.md) |
 | **Delivery & Tracking** | Booked deals move through the order state machine; events are logged for observability | [Architecture: State Machine](../state-machines/order-lifecycle.md), [Architecture: Event Bus](../event-bus/overview.md) |
 
-## Two Flow Entry Points
+## The Flow Entry Point
 
-The buyer supports two distinct entry points depending on your use case:
+The canonical workflow is **DealBookingFlow** --- the full multi-channel path. It starts from a campaign brief, allocates budget, researches across channels in parallel, builds recommendations, and books multiple deals after approval. This is the primary workflow for campaign managers. For single, targeted deals you can call the `DealsClient` quote-then-book API directly instead (see [Deal Booking](deal-booking.md)).
 
-- **DealBookingFlow** (campaign flow) --- The full multi-channel path. Starts from a campaign brief, allocates budget, researches across channels in parallel, builds recommendations, and books multiple deals after approval. This is the primary workflow for campaign managers.
-- **BuyerDealFlow** (deal flow) --- The lightweight single-deal path. Discovers inventory and books one deal directly. Designed for programmatic DSP integration where the campaign planning happens externally.
-
-Both flows share the same [deal state machine](../state-machines/order-lifecycle.md), [event bus](../event-bus/overview.md), and DealStore persistence. For architectural details, see [Architecture Overview](../architecture/overview.md).
+The flow uses the [deal state machine](../state-machines/order-lifecycle.md), [event bus](../event-bus/overview.md), and DealStore persistence. For architectural details, see [Architecture Overview](../architecture/overview.md).
 
 ## Cross-Cutting Concerns
 
@@ -67,14 +64,12 @@ Your [identity tier](identity.md) determines what the buyer can do with a given 
 | Guide | When to Read It |
 |-------|----------------|
 | [Deal Booking](deal-booking.md) | You want to understand the core booking lifecycle from brief to confirmed deal |
-| [Campaign Pipeline](campaign-pipeline.md) | You want to automate the full campaign lifecycle from brief to booked deals |
 | [Multi-Seller Orchestration](multi-seller-orchestration.md) | You need to coordinate deal booking across multiple sellers with quote normalization |
 | [Budget Pacing](budget-pacing.md) | You need to monitor spend against plan and manage mid-flight budget reallocations |
 | [Creative Management](creative-management.md) | You need to manage creative assets, validation, and ad server integration |
 | [Negotiation](negotiation.md) | You want to configure or customize how the buyer negotiates pricing |
-| [Identity Strategy](identity.md) | You need to understand access tiers and how they affect pricing and capabilities |
+| [Identity & Access Tiers](identity.md) | You need to understand access tiers and how they affect pricing and capabilities |
 | [Media Kit Browsing](media-kit.md) | You want to explore seller inventory before or outside of a booking flow |
-| [Sessions](sessions.md) | You need to understand how conversation state persists across interactions |
 | [Multi-Seller Discovery](multi-seller.md) | You are connecting to multiple sellers and need to understand the AAMP registry |
 | [Linear TV Buying](linear-tv.md) | You are buying linear TV inventory with DMA targeting and scatter/upfront pricing |
 | [Configuration](configuration.md) | You need to set environment variables, seller connections, or feature flags |

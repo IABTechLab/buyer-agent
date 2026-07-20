@@ -1,6 +1,6 @@
 # API Overview
 
-The Ad Buyer Agent API exposes **7 endpoints** across **3 tags**. All endpoints are served from a single FastAPI application.
+The Ad Buyer Agent API exposes **14 endpoints** across **6 tags**. All endpoints are served from a single FastAPI application. The [auto-generated endpoint inventory](../reference/endpoints.md) is the byte-exact source of truth.
 
 **Base URL:** `http://localhost:8001`
 **OpenAPI docs:** `http://localhost:8001/docs`
@@ -31,6 +31,28 @@ The buyer agent is primarily a **client** that consumes seller APIs, not a serve
 |--------|------|---------|
 | `POST` | `/products/search` | Search seller product catalog |
 
+## Events
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `GET` | `/events` | List events from the in-memory event bus |
+| `GET` | `/events/{event_id}` | Get a single event by ID |
+
+## Buyer Orders
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `GET` | `/api/v1/buyer/orders` | List buyer-side order records |
+| `GET` | `/api/v1/buyer/orders/{order_id}/audit` | Order status-transition audit trail |
+
+## Reporting
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `GET` | `/reports/{job_id}` | Campaign delivery report for a booking job |
+| `GET` | `/meta/campaigns` | List Meta Ads campaigns directly from the ad account |
+| `GET` | `/meta/report` | Pull Meta Ads insights by campaign ID(s) |
+
 ---
 
 ## Seller Endpoints Consumed
@@ -56,9 +78,8 @@ The [`OpenDirectClient`](../integration/opendirect.md) implements the IAB OpenDi
 
 | Method | Seller Endpoint | Purpose |
 |--------|----------------|---------|
-| `GET` | `/products` | List products |
+| `GET` | `/products` | List products (search filters applied client-side by `search_products()`) |
 | `GET` | `/products/{id}` | Get product detail |
-| `POST` | `/products/search` | Search products with filters |
 | `POST` | `/products/avails` | Check inventory availability |
 | `POST/GET` | `/accounts` | Create / list accounts |
 | `GET` | `/accounts/{id}` | Get account detail |

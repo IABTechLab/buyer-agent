@@ -13,7 +13,7 @@ This guide walks through the process of discovering multiple sellers, comparing 
 
 **Risk diversification** --- Spreading spend across sellers protects against delivery shortfalls. If one seller under-delivers, the others can absorb the gap.
 
-**Negotiation leverage** --- When sellers know you are shopping competitively, they are more likely to offer favorable terms. The buyer agent's identity strategy lets you control exactly how much you reveal to each seller.
+**Negotiation leverage** --- When sellers know you are shopping competitively, they are more likely to offer favorable terms. The buyer agent's identity tiers let you control exactly how much you reveal to each seller.
 
 ## Step-by-Step Workflow
 
@@ -219,7 +219,7 @@ for result in results:
 ```
 
 !!! warning "Negotiation Tier Requirement"
-    Only **Agency** and **Advertiser** tier buyers can negotiate. If your identity is at Public or Seat tier, the seller will reject negotiation attempts. See [Identity Strategy Across Sellers](#identity-strategy-across-sellers) below.
+    Only **Agency** and **Advertiser** tier buyers can negotiate. If your identity is at Public or Seat tier, the seller will reject negotiation attempts. See [Identity Across Sellers](#identity-across-sellers) below.
 
 ### Step 6: Evaluate and Select Optimal Portfolio
 
@@ -338,9 +338,9 @@ async def poll_and_approve(seller_url: str, job_id: str):
             await asyncio.sleep(2)
 ```
 
-## Identity Strategy Across Sellers
+## Identity Across Sellers
 
-The `IdentityStrategy` class decides how much buyer identity to reveal to each seller. Revealing more identity unlocks better pricing, but it also exposes your buying patterns. When shopping multiple sellers, the strategy becomes especially important.
+How much buyer identity to reveal is a per-seller decision. Revealing more identity unlocks better pricing, but it also exposes your buying patterns. When shopping multiple sellers, this tradeoff becomes especially important.
 
 **Discount tiers:**
 
@@ -351,19 +351,13 @@ The `IdentityStrategy` class decides how much buyer identity to reveal to each s
 | AGENCY | Seat + agency ID | 10% |
 | ADVERTISER | Seat + agency + advertiser ID | 15% |
 
-### Use the Strategy to Decide Per Seller
+The tier a seller grants is determined by which fields you populate on the `BuyerIdentity` you send — build a different identity per seller:
 
 ```python
-from ad_buyer.identity.strategy import IdentityStrategy, DealContext, SellerRelationship, CampaignGoal
-from ad_buyer.models.buyer_identity import BuyerIdentity, AccessTier, DealType
+from ad_buyer.models.buyer_identity import BuyerIdentity
 
-strategy = IdentityStrategy(
-    high_value_threshold_usd=100_000,
-    mid_value_threshold_usd=25_000,
-)
-
-# Full identity (reveal all we have)
-full_identity = BuyerIdentity(
+# Trusted seller, high-value PG deal: reveal everything (ADVERTISER tier)
+identity_for_a = BuyerIdentity(
     seat_id="ttd-seat-123",
     seat_name="The Trade Desk",
     agency_id="omnicom-456",
@@ -374,28 +368,11 @@ full_identity = BuyerIdentity(
     advertiser_industry="CPG",
 )
 
-# Different context for each seller
-seller_a_context = DealContext(
-    deal_value_usd=150_000,
-    deal_type=DealType.PROGRAMMATIC_GUARANTEED,
-    seller_relationship=SellerRelationship.TRUSTED,
-    campaign_goal=CampaignGoal.PERFORMANCE,
+# Unknown seller, small deal: reveal only the seat (SEAT tier)
+identity_for_b = BuyerIdentity(
+    seat_id="ttd-seat-123",
+    seat_name="The Trade Desk",
 )
-
-seller_b_context = DealContext(
-    deal_value_usd=10_000,
-    deal_type=DealType.PREFERRED_DEAL,
-    seller_relationship=SellerRelationship.UNKNOWN,
-    campaign_goal=CampaignGoal.AWARENESS,
-)
-
-# Strategy recommends different tiers
-tier_a = strategy.recommend_tier(seller_a_context)  # ADVERTISER (high value + trusted + PG)
-tier_b = strategy.recommend_tier(seller_b_context)  # SEAT (low value + unknown)
-
-# Build masked identities
-identity_for_a = strategy.build_identity(full_identity, tier_a)
-identity_for_b = strategy.build_identity(full_identity, tier_b)
 
 print(f"Seller A sees: {identity_for_a.get_access_tier().value}")
 # "advertiser" -- full identity, 15% discount
@@ -403,19 +380,7 @@ print(f"Seller B sees: {identity_for_b.get_access_tier().value}")
 # "seat" -- only seat ID, 5% discount
 ```
 
-### Estimate Savings from Upgrading Tier
-
-Before deciding to reveal more identity to a seller, estimate the savings:
-
-```python
-savings = strategy.estimate_savings(
-    base_price=35.0,        # $35 CPM base
-    current_tier=AccessTier.SEAT,      # Currently at seat tier
-    target_tier=AccessTier.AGENCY,     # Considering agency tier
-)
-print(f"Estimated savings: ${savings:.2f} per CPM")
-# $1.75 per CPM (5% incremental discount on $35)
-```
+See [Identity & Access Tiers](identity.md) for the full tier model.
 
 ### Guidelines for Multi-Seller Identity
 
@@ -554,10 +519,7 @@ from ad_buyer.media_kit.client import MediaKitClient
 from ad_buyer.media_kit.models import MediaKitError
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.identity.strategy import (
-    IdentityStrategy, DealContext, SellerRelationship, CampaignGoal,
-)
-from ad_buyer.models.buyer_identity import BuyerIdentity, DealType
+from ad_buyer.models.buyer_identity import BuyerIdentity
 
 
 async def multi_seller_workflow():
@@ -567,18 +529,13 @@ async def multi_seller_workflow():
     target_cpm = 22.0
     max_cpm = 35.0
 
-    full_identity = BuyerIdentity(
+    # New sellers, modest allocations: reveal only the seat (SEAT tier).
+    # Escalate to agency/advertiser fields for trusted sellers or large deals.
+    identity = BuyerIdentity(
         seat_id="ttd-seat-123",
         seat_name="The Trade Desk",
-        agency_id="omnicom-456",
-        agency_name="OMD",
-        agency_holding_company="Omnicom",
-        advertiser_id="coca-cola-789",
-        advertiser_name="Coca-Cola",
-        advertiser_industry="CPG",
     )
 
-    id_strategy = IdentityStrategy()
     neg_strategy = SimpleThresholdStrategy(
         target_cpm=target_cpm,
         max_cpm=max_cpm,
@@ -670,13 +627,6 @@ async def multi_seller_workflow():
 
     # --- Step 7: Book deals ---
     for pkg, result, price, allocation in selected:
-        tier = id_strategy.recommend_tier(DealContext(
-            deal_value_usd=allocation,
-            deal_type=DealType.PREFERRED_DEAL,
-            seller_relationship=SellerRelationship.NEW,
-            campaign_goal=CampaignGoal.AWARENESS,
-        ))
-        identity = id_strategy.build_identity(full_identity, tier)
         print(f"  Booking {pkg.name} @ ${price} CPM")
         print(f"    Seller: {pkg.seller_url}")
         print(f"    Identity tier: {identity.get_access_tier().value}")
