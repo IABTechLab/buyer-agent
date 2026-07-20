@@ -56,10 +56,12 @@ The server exposes 12 tool categories implemented in `interfaces/mcp_server.py`.
 | Negotiation | buyer-r0j | `start_negotiation`, `get_negotiation_status`, `list_active_negotiations` | Price negotiation lifecycle |
 | Orders | buyer-r0j | `list_orders`, `get_order_status`, `transition_order` | Order management and state transitions |
 | Approvals | buyer-j7f | `list_pending_approvals`, `approve_or_reject` | Approval gate management |
-| API Keys | buyer-j7f | `list_api_keys`, `add_api_key`, `remove_api_key`, `test_seller_connection` | Seller API credential management |
-| SSP Connectors | buyer-4ds | `list_ssp_connectors`, `sync_ssp_deals`, `test_ssp_connection` | SSP deal import and sync |
+| API Keys | buyer-j7f | `list_api_keys`, `create_api_key`, `revoke_api_key` | Seller API credential management |
+| SSP Connectors | buyer-4ds | `list_ssp_connectors`, `import_deals_ssp`, `test_ssp_connection` | SSP deal import and connectivity checks |
 | Templates | buyer-4ds | `list_templates`, `create_template`, `instantiate_from_template` | Deal and supply path templates |
-| SSP Sync | buyer-4ds | `import_ssp_deals` | Bulk deal import from SSP connectors |
+| Reporting | — | `get_deal_performance`, `get_campaign_report`, `get_pacing_report` | Deal, campaign, and pacing reports |
+
+See the [auto-generated inventory](../reference/mcp-tools.md) for the byte-exact 40-tool catalog.
 
 ---
 
@@ -119,7 +121,7 @@ graph TB
         FastAPI["FastAPI"]
         StreamableHTTP["/mcp<br/>(FastMCP Streamable HTTP — canonical)"]
         SSE["/mcp-sse/sse<br/>(FastMCP SSE — legacy fallback)"]
-        Tools["MCP Tool Functions<br/>(12 categories, 40+ tools)"]
+        Tools["MCP Tool Functions<br/>(12 categories, 40 tools)"]
         Stores["Store Accessors<br/>DealStore / CampaignStore / OrderStore"]
         DB[(SQLite)]
     end

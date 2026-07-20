@@ -4,7 +4,7 @@ Set up the buyer agent infrastructure, connect to seller agents and SSPs, and ge
 
 ## Prerequisites
 
-- Python 3.13
+- Python 3.11+
 - Docker (for deployment)
 - Seller agent URLs (at least one seller must be reachable)
 - SSP API keys (optional: PubMatic, Magnite, Index Exchange)
@@ -34,7 +34,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 # Buyer Identity
 IAB_SERVER_URL=http://localhost:8001
 
-# Storage (SQLite for dev, Postgres for prod)
+# Storage (SQLite)
 DATABASE_URL=sqlite:///./ad_buyer.db
 
 # Environment
@@ -64,26 +64,23 @@ After starting the buyer agent, run:
 curl http://localhost:8001/health
 ```
 
-You should see all configured seller endpoints listed under `seller_connections`.
+This returns `{"status": "healthy", "version": "1.0.0"}` when the service is up. To see per-service detail — including how many seller endpoints are configured — call the `health_check` MCP tool from your connected MCP client (it reports `database`, `seller_connections` with an endpoint count, and `event_bus`).
 
 ## Step 4: Configure SSP Connectors (Optional)
 
-If your media buyers need to import deals from SSPs directly, configure the connector credentials:
+If your media buyers need to import deals from SSPs directly, configure the connector credentials (see [SSP Connector Setup](../guides/ssp-connectors.md) for the per-SSP variables):
 
 ```env
-# OpenDirect legacy mode (if using a single OpenDirect server)
-OPENDIRECT_BASE_URL=http://localhost:3000/api/v2.1
-OPENDIRECT_API_KEY=your-opendirect-key
+# Example: PubMatic
+PUBMATIC_API_TOKEN=your-bearer-token
+PUBMATIC_SEAT_ID=your-seat-id
 ```
 
-The buyer agent's SSP connector tools (`import_from_pubmatic`, `import_from_magnite`, `import_from_index_exchange`) can be called by the business team once credentials are in place.
+The buyer agent's SSP connector tools (`list_ssp_connectors`, `import_deals_ssp`, `test_ssp_connection`) can be called by the business team once credentials are in place.
 
 ## Step 5: Configure Optional Services
 
 ```env
-# Redis (for event bus — optional, falls back to in-memory)
-REDIS_URL=redis://localhost:6379
-
 # CORS (if browser clients need access)
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 
@@ -112,7 +109,7 @@ API_KEY=sk-operator-XXXXX
 
 > Generate a strong random key: `python -c "import secrets; print('sk-operator-' + secrets.token_urlsafe(32))"`
 
-Restart the server after setting `API_KEY`. All incoming MCP requests (from Claude Desktop, ChatGPT, Cursor, etc.) will now require this key.
+Restart the server after setting `API_KEY`. All incoming requests (REST and MCP alike) must now carry the key in the **`X-API-Key` header** — the buyer agent does not accept `Authorization: Bearer` tokens.
 
 ## Step 8: Hand Off
 
@@ -129,10 +126,7 @@ They'll connect Claude Desktop using the [Claude Desktop Setup Guide](../claude-
 # Health check
 curl http://localhost:8001/health
 
-# Setup status (shows what's configured and what's missing)
-curl http://localhost:8001/api/v1/setup/status
-
-# MCP tools list (requires running SSE client — use Claude Desktop or curl with SSE)
+# MCP smoke test (add -H "X-API-Key: $API_KEY" if API_KEY is set)
 curl -s -X POST http://localhost:8001/mcp \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
@@ -145,9 +139,8 @@ Expected health response:
 ```json
 {
   "status": "healthy",
-  "version": "1.0.0",
-  "database": "healthy",
-  "seller_connections": "configured (2 endpoints)",
-  "event_bus": "healthy"
+  "version": "1.0.0"
 }
 ```
+
+For a configured/missing breakdown of the setup itself, call the `get_setup_status` MCP tool from a connected client (there is no REST setup-status route). For per-service health detail, call the `health_check` MCP tool.

@@ -55,11 +55,13 @@ For buyer agents running on `localhost`:
 
 ## Step 2: First-Run Setup Wizard
 
-When you first connect, the buyer agent detects that configuration is incomplete and offers to walk you through it:
+The wizard has 8 steps in two phases: developer steps 1–3 (Deploy & Environment, Seller Connections, Generate Operator Credentials) are typically already done by your developer, and the wizard auto-detects them from existing configuration. You complete the business phase, steps 4–8. Any step except step 8 can be skipped to accept defaults. See [Setup Wizard](ai-assistant/setup-wizard.md) for the full reference.
 
-> **Claude**: "Welcome! Your buyer agent is deployed and connected. Let's finish the business setup. I'll walk you through the key steps — you can skip any step to accept defaults."
+When you first connect, ask Claude to run the wizard (or use `/setup`):
 
-### Step 1: Buyer Identity
+> **Claude**: "Welcome! Your buyer agent is deployed and connected — steps 1–3 are already complete. Let's finish the business setup."
+
+### Step 4: Buyer Identity
 
 > **You**: "We're Havas Media Group"
 >
@@ -67,33 +69,29 @@ When you first connect, the buyer agent detects that configuration is incomplete
 >
 > **You**: "havas-na-001"
 
-### Step 2: Seller Connections
+### Step 5: Deal Preferences
 
-> **Claude**: "I see seller endpoints are configured. Let me verify connectivity."
+> **Claude**: "What are your default deal preferences — preferred deal types and price ceilings?"
 >
-> **Claude**: "Connected to 2 seller agents: ESPN Digital (espn.example.com) and Condé Nast (conde.example.com). Both are healthy."
+> **You**: "Prefer PMP deals. CTV at $28 max CPM and Video at $18 max CPM to start"
 
-### Step 3: Deal Templates
+### Step 6: Campaign Defaults
 
-> **Claude**: "Want to set up deal templates for common buy types? I can pre-configure CTV, Video, and Display templates."
+> **Claude**: "Any campaign defaults? I can set the budget currency, pacing strategy, and default flight duration."
 >
-> **You**: "Yes — CTV at $28 max CPM and Video at $18 max CPM to start"
+> **You**: "USD, even pacing, 90-day flights"
 
-### Step 4: Approval Gates
+### Step 7: Approval Gates
 
 > **Claude**: "Should deals require approval before they go live? What's your threshold?"
 >
 > **You**: "Auto-approve deals under $10,000 total value. Require approval for larger deals."
 
-### Step 5: SSP Connectors
-
-> **Claude**: "I see PubMatic credentials are configured. Want me to run an initial deal import?"
->
-> **You**: "Yes, pull in all active deals"
-
-### Step 6: Review & Launch
+### Step 8: Review & Launch
 
 > **Claude**: "Here's your setup summary: [summary]. Your buyer agent is ready. Try 'List active campaigns' or 'Show me available inventory from ESPN' to get started."
+
+(Step 8 cannot be skipped — it confirms the full configuration.)
 
 ## Available Slash Commands
 

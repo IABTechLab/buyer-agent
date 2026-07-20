@@ -37,7 +37,7 @@ Portfolio metadata is saved with `import_source="MANUAL"`.
 
 ### SSP Connectors
 
-The `sync_ssp_deals` and `import_ssp_deals` tools trigger a connector fetch. Each connector normalizes SSP deal objects into `DealStore.save_deal()` kwargs and returns an `SSPFetchResult`. Portfolio metadata is saved with `import_source=<SSP_TAG>` (e.g., `"PUBMATIC"`, `"MAGNITE"`, `"INDEX_EXCHANGE"`).
+The `import_deals_ssp` tool triggers a connector fetch (`list_ssp_connectors` and `test_ssp_connection` cover discovery and connectivity checks). Each connector normalizes SSP deal objects into `DealStore.save_deal()` kwargs and returns an `SSPFetchResult`. Portfolio metadata is saved with `import_source=<SSP_TAG>` (e.g., `"PUBMATIC"`, `"MAGNITE"`, `"INDEX_EXCHANGE"`).
 
 See [SSP Connectors](ssp-connectors.md) for the full connector architecture.
 
@@ -119,7 +119,9 @@ The deal library is surfaced entirely through the MCP server's Deal Library tool
 | `list_templates` | List deal and supply path templates |
 | `create_template` | Create a new template |
 | `instantiate_from_template` | Create a deal from a template |
-| `sync_ssp_deals` | Trigger SSP connector fetch |
+| `import_deals_ssp` | Trigger SSP connector fetch |
+| `list_ssp_connectors` | List connectors and configuration status |
+| `test_ssp_connection` | Test connectivity to a connector |
 
 ---
 

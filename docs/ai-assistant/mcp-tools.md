@@ -1,6 +1,6 @@
 # MCP Tools Reference
 
-Complete catalog of all MCP tools exposed by the buyer agent at `/mcp/sse`. Tools are organized by category. All tools return JSON.
+Complete catalog of all MCP tools exposed by the buyer agent at `/mcp` (Streamable HTTP; legacy SSE clients use `/mcp-sse/sse`). Tools are organized by category. All tools return JSON.
 
 ---
 
@@ -52,7 +52,7 @@ Browse, search, and manage the deal portfolio.
 | `search_deals` | `query` (string) | Free-text search across display name, description, seller org, and seller domain. Returns matching deals with the fields they matched in. |
 | `inspect_deal` | `deal_id` (string) | Full deal detail: all fields, portfolio metadata (import source, advertiser, tags), cross-platform activations, and cached performance metrics. |
 | `import_deals_csv` | `csv_data` (string), `default_seller_url` (string, optional), `default_product_id` (string, optional) | Import deals from CSV text. Auto-detects column mapping. Returns counts of successful, failed, and skipped rows, plus any per-row errors. |
-| `create_deal_manual` | `display_name` (string), `seller_url` (string), `deal_type` (string, default `PD`), `status` (string, default `draft`), plus optional: `media_type`, `price`, `impressions`, `flight_start`, `flight_end`, `seller_deal_id`, `seller_org`, `seller_domain`, `price_model`, `fixed_price_cpm`, `bid_floor_cpm`, `currency`, `description`, `advertiser_id`, `tags` | Create a single deal manually. Validates input and saves with `import_source=MANUAL` metadata. |
+| `create_deal_manual` | `display_name` (string), `seller_url` (string), `deal_type` (string, default `PD`), `status` (string, default `draft`), plus optional: `media_type`, `price`, `impressions`, `flight_start`, `flight_end`, `seller_deal_id`, `seller_org`, `seller_domain`, `seller_type`, `buyer_org`, `buyer_id`, `price_model`, `fixed_price_cpm`, `bid_floor_cpm`, `currency`, `description`, `advertiser_id`, `tags` | Create a single deal manually. Validates input and saves with `import_source=MANUAL` metadata. |
 | `get_portfolio_summary` | `top_sellers_count` (int, default 5), `expiring_within_days` (int, default 30) | Portfolio-wide stats: total deals, estimated value, counts by status/deal type/media type, top sellers by deal count, and deals expiring soon. |
 
 ---
