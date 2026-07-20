@@ -279,8 +279,8 @@ class OpenDirectClient:
         # boundary. Without it the raw datetime objects hit Python's default
         # json encoder and the POST crashes with "Object of type datetime is not
         # JSON serializable" before the request ever reaches the seller (bead
-        # ar-rs25). by_alias keeps the seller's camelCase field names
-        # (startDate/endDate/productId).
+        # ar-rs25). by_alias keeps the spec-lowercase wire field names
+        # (startdate/enddate/productid) the seller's avails endpoint expects.
         response = await self._request(
             "POST",
             "/products/avails",
@@ -521,7 +521,7 @@ class OpenDirectClient:
             line_id: The line ID
 
         Returns:
-            Updated Line with Cancelled status
+            Updated Line with Canceled status
         """
         response = await self._request(
             "PATCH",

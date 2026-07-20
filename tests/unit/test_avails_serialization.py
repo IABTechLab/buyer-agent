@@ -16,8 +16,8 @@ walked with no_booking.
 The fix mirrors the working wire-serialization pattern used elsewhere in the
 codebase (deals_client, negotiation/client, ucp_client): ``mode="json"`` so
 ``date``/``datetime`` fields go on the wire as ISO-8601 strings, while
-``by_alias=True`` keeps the camelCase field names (``startDate``/``endDate``)
-the seller's avails endpoint expects.
+``by_alias=True`` keeps the spec-lowercase field names
+(``startdate``/``enddate``) the seller's avails endpoint expects.
 
 Uses the client's ``httpx.MockTransport`` injection seam so the FULL wire
 serialization path runs deterministically with no network/credits.
@@ -33,7 +33,7 @@ from ad_buyer.clients.opendirect_client import OpenDirectClient
 from ad_buyer.models.opendirect import AvailsRequest
 
 AVAILS_RESPONSE_PAYLOAD = {
-    "productId": "prod_1",
+    "productid": "prod_1",
     "availableImpressions": 1_000_000,
     "guaranteedImpressions": 900_000,
     "estimatedCpm": 8.5,
@@ -80,13 +80,13 @@ class TestAvailsRequestSerialization:
         # The body httpx put on the wire is valid JSON...
         body = json.loads(captured["content"])
 
-        # ...with the seller's camelCase field names (by_alias)...
-        assert "startDate" in body
-        assert "endDate" in body
-        assert "productId" in body
+        # ...with the spec-lowercase field names (by_alias)...
+        assert "startdate" in body
+        assert "enddate" in body
+        assert "productid" in body
 
         # ...and ISO-8601 STRING dates (not datetime objects).
-        assert isinstance(body["startDate"], str)
-        assert isinstance(body["endDate"], str)
-        assert body["startDate"].startswith("2025-02-01")
-        assert body["endDate"].startswith("2025-02-28")
+        assert isinstance(body["startdate"], str)
+        assert isinstance(body["enddate"], str)
+        assert body["startdate"].startswith("2025-02-01")
+        assert body["enddate"].startswith("2025-02-28")

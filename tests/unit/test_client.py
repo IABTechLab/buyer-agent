@@ -152,12 +152,12 @@ class TestOpenDirectClient:
         mock_response.json.return_value = {
             "id": "order_new",
             "name": "Test Order",
-            "accountId": "acct_123",
+            "accountid": "acct_123",
             "budget": 25000,
             "currency": "USD",
-            "startDate": "2025-02-01T00:00:00Z",
-            "endDate": "2025-02-28T23:59:59Z",
-            "orderStatus": "PENDING",
+            "startdate": "2025-02-01T00:00:00Z",
+            "enddate": "2025-02-28T23:59:59Z",
+            "orderstatus": "PENDING",
         }
         mock_response.raise_for_status = MagicMock()
 
@@ -183,15 +183,15 @@ class TestOpenDirectClient:
         mock_response = MagicMock()
         mock_response.json.return_value = {
             "id": "line_123",
-            "orderId": "order_456",
-            "productId": "prod_789",
+            "orderid": "order_456",
+            "productid": "prod_789",
             "name": "Test Line",
-            "startDate": "2025-02-01T00:00:00Z",
-            "endDate": "2025-02-28T23:59:59Z",
-            "rateType": "CPM",
+            "startdate": "2025-02-01T00:00:00Z",
+            "enddate": "2025-02-28T23:59:59Z",
+            "ratetype": "CPM",
             "rate": 15.00,
-            "quantity": 500000,
-            "bookingStatus": "Booked",
+            "qty": 500000,
+            "bookingstatus": "Booked",
         }
         mock_response.raise_for_status = MagicMock()
 

@@ -21,10 +21,15 @@ class RateType(str, Enum):
 
 
 class DeliveryType(str, Enum):
-    """Delivery type for products."""
+    """Delivery type for products.
 
-    EXCLUSIVE = "Exclusive"
-    GUARANTEED = "Guaranteed"
+    ``exclusive``/``guaranteed`` follow the OpenDirect 2.1 spec spellings
+    (Object: Product, ``deliverytype``). ``PMP`` is a project extension
+    value with no spec equivalent.
+    """
+
+    EXCLUSIVE = "exclusive"
+    GUARANTEED = "guaranteed"
     PMP = "PMP"
 
 
@@ -47,7 +52,8 @@ class LineBookingStatus(str, Enum):
     IN_FLIGHT = "InFlight"
     FINISHED = "Finished"
     STOPPED = "Stopped"
-    CANCELLED = "Cancelled"
+    # Spec spelling is "Canceled" (Object: Line, 'bookingstatus').
+    CANCELLED = "Canceled"
     EXPIRED = "Expired"
 
 
@@ -66,8 +72,8 @@ class Account(BaseModel):
     """Account resource - buyer-advertiser relationship."""
 
     id: str | None = None
-    advertiser_id: str = Field(..., alias="advertiserId")
-    buyer_id: str = Field(..., alias="buyerId")
+    advertiser_id: str = Field(..., alias="advertiserid")
+    buyer_id: str = Field(..., alias="buyerid")
     name: str = Field(..., max_length=36)
     ext: dict[str, Any] | None = None
 
@@ -78,15 +84,15 @@ class Product(BaseModel):
     """Product resource - publisher inventory item."""
 
     id: str | None = None
-    publisher_id: str = Field(..., alias="publisherId")
+    publisher_id: str = Field(..., alias="publisherid")
     name: str = Field(..., max_length=38)
     description: str | None = None
     currency: str = Field(default="USD", description="ISO-4217 currency code")
-    base_price: float = Field(..., alias="basePrice", ge=0)
-    rate_type: RateType = Field(..., alias="rateType")
-    delivery_type: DeliveryType = Field(default=DeliveryType.GUARANTEED, alias="deliveryType")
+    base_price: float = Field(..., alias="baseprice", ge=0)
+    rate_type: RateType = Field(..., alias="ratetype")
+    delivery_type: DeliveryType = Field(default=DeliveryType.GUARANTEED, alias="deliverytype")
     domain: str | None = None
-    ad_unit: dict[str, Any] | None = Field(default=None, alias="adUnit")
+    ad_unit: dict[str, Any] | None = Field(default=None, alias="adunit")
     targeting: dict[str, Any] | None = None
     available_impressions: int | None = Field(default=None, alias="availableImpressions")
     ext: dict[str, Any] | None = None
@@ -99,14 +105,14 @@ class Order(BaseModel):
 
     id: str | None = None
     name: str = Field(..., max_length=100)
-    account_id: str = Field(..., alias="accountId")
-    publisher_id: str | None = Field(default=None, alias="publisherId")
+    account_id: str = Field(..., alias="accountid")
+    publisher_id: str | None = Field(default=None, alias="publisherid")
     brand_id: str | None = Field(default=None, alias="brandId")
     currency: str = Field(default="USD", description="ISO-4217 currency code")
     budget: float = Field(..., ge=0, description="Estimated budget")
-    start_date: datetime = Field(..., alias="startDate")
-    end_date: datetime = Field(..., alias="endDate")
-    order_status: OrderStatus = Field(default=OrderStatus.PENDING, alias="orderStatus")
+    start_date: datetime = Field(..., alias="startdate")
+    end_date: datetime = Field(..., alias="enddate")
+    order_status: OrderStatus = Field(default=OrderStatus.PENDING, alias="orderstatus")
     ext: dict[str, Any] | None = None
 
     model_config = {"populate_by_name": True}
@@ -116,17 +122,17 @@ class Line(BaseModel):
     """Line resource - individual product booking."""
 
     id: str | None = None
-    order_id: str = Field(..., alias="orderId")
-    product_id: str = Field(..., alias="productId")
+    order_id: str = Field(..., alias="orderid")
+    product_id: str = Field(..., alias="productid")
     name: str = Field(..., max_length=200)
-    start_date: datetime = Field(..., alias="startDate")
-    end_date: datetime = Field(..., alias="endDate")
-    rate_type: RateType = Field(..., alias="rateType")
+    start_date: datetime = Field(..., alias="startdate")
+    end_date: datetime = Field(..., alias="enddate")
+    rate_type: RateType = Field(..., alias="ratetype")
     rate: float = Field(..., ge=0)
-    quantity: int = Field(..., ge=0, description="Target impressions or units")
+    quantity: int = Field(..., alias="qty", ge=0, description="Target impressions or units")
     cost: float | None = Field(default=None, ge=0, description="Calculated cost (read-only)")
     booking_status: LineBookingStatus = Field(
-        default=LineBookingStatus.DRAFT, alias="bookingStatus"
+        default=LineBookingStatus.DRAFT, alias="bookingstatus"
     )
     targeting: dict[str, Any] | None = None
     ext: dict[str, Any] | None = None
@@ -138,12 +144,12 @@ class Creative(BaseModel):
     """Creative resource - ad asset."""
 
     id: str | None = None
-    account_id: str = Field(..., alias="accountId")
+    account_id: str = Field(..., alias="accountid")
     name: str = Field(..., max_length=255)
     language: str | None = Field(default=None, description="ISO-639-1 language code")
     click_url: str | None = Field(default=None, alias="clickUrl")
     creative_asset: dict[str, Any] | None = Field(default=None, alias="creativeAsset")
-    creative_approvals: list[dict[str, Any]] | None = Field(default=None, alias="creativeApprovals")
+    creative_approvals: list[dict[str, Any]] | None = Field(default=None, alias="creativeapprovals")
     ext: dict[str, Any] | None = None
 
     model_config = {"populate_by_name": True}
@@ -153,7 +159,7 @@ class Assignment(BaseModel):
     """Assignment resource - creative-to-line binding."""
 
     id: str | None = None
-    creative_id: str = Field(..., alias="creativeId")
+    creative_id: str = Field(..., alias="creativeid")
     line_id: str = Field(..., alias="lineId")
     status: str | None = None
     ext: dict[str, Any] | None = None
@@ -162,11 +168,16 @@ class Assignment(BaseModel):
 
 
 class AvailsRequest(BaseModel):
-    """Request for availability check."""
+    """Request for availability check.
 
-    product_id: str = Field(..., alias="productId")
-    start_date: datetime = Field(..., alias="startDate")
-    end_date: datetime = Field(..., alias="endDate")
+    ``productid`` is still scalar (the spec's ``productids`` array is the
+    Tier-2 structural change); the alias follows the spec-lowercase
+    dialect so the field set stays case-consistent on the wire.
+    """
+
+    product_id: str = Field(..., alias="productid")
+    start_date: datetime = Field(..., alias="startdate")
+    end_date: datetime = Field(..., alias="enddate")
     requested_impressions: int | None = Field(default=None, alias="requestedImpressions")
     budget: float | None = None
     targeting: dict[str, Any] | None = None
@@ -177,7 +188,7 @@ class AvailsRequest(BaseModel):
 class AvailsResponse(BaseModel):
     """Response from availability check."""
 
-    product_id: str = Field(..., alias="productId")
+    product_id: str = Field(..., alias="productid")
     available_impressions: int = Field(..., alias="availableImpressions")
     guaranteed_impressions: int | None = Field(default=None, alias="guaranteedImpressions")
     estimated_cpm: float = Field(..., alias="estimatedCpm")

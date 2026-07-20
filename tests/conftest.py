@@ -80,12 +80,12 @@ def sample_product() -> dict:
     """Sample product for testing."""
     return {
         "id": "prod_123",
-        "publisherId": "pub_abc",
+        "publisherid": "pub_abc",
         "name": "Homepage Banner",
         "currency": "USD",
-        "basePrice": 15.00,
-        "rateType": "CPM",
-        "deliveryType": "Guaranteed",
+        "baseprice": 15.00,
+        "ratetype": "CPM",
+        "deliverytype": "guaranteed",
         "availableImpressions": 1000000,
     }
 
@@ -96,10 +96,10 @@ def sample_order() -> dict:
     return {
         "id": "order_456",
         "name": "Test Order",
-        "accountId": "acct_789",
+        "accountid": "acct_789",
         "budget": 25000,
         "currency": "USD",
-        "startDate": "2025-02-01T00:00:00Z",
-        "endDate": "2025-02-28T23:59:59Z",
-        "orderStatus": "PENDING",
+        "startdate": "2025-02-01T00:00:00Z",
+        "enddate": "2025-02-28T23:59:59Z",
+        "orderstatus": "PENDING",
     }
