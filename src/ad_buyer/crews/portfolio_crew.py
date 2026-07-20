@@ -37,6 +37,7 @@ class BudgetAllocationOutput(BaseModel):
     mobile_app: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
     ctv: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
     performance: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
+    social: _ChannelAllocationOut = Field(default_factory=_ChannelAllocationOut)
 
 
 def create_portfolio_crew(
@@ -62,6 +63,35 @@ def create_portfolio_crew(
     ctv_agent = create_ctv_agent()
     performance_agent = create_performance_agent()
 
+    # Build channel constraint section from brief
+    requested_channels = [c.lower() for c in campaign_brief.get("channels", []) if c.strip()]
+    total_budget = campaign_brief.get("budget", 0)
+
+    if requested_channels:
+        channel_instruction = (
+            f"IMPORTANT: The campaign brief specifies these channels ONLY: "
+            f"{requested_channels}.\n"
+            f"You MUST allocate the full budget of ${total_budget:,.2f} "
+            f"across ONLY these channels.\n"
+            f"Do NOT include any other channels in your response."
+        )
+        channel_keys = requested_channels
+    else:
+        channel_instruction = (
+            "Determine the optimal budget split across available channels:\n"
+            "1. branding (display/video) - for awareness objectives\n"
+            "2. mobile_app - if app promotion is needed\n"
+            "3. ctv (Connected TV) - for premium video reach\n"
+            "4. performance - for conversion objectives\n"
+            "5. social - for Facebook/Instagram campaigns\n"
+            "Not all channels may be needed - allocate $0 to channels that don't fit."
+        )
+        channel_keys = ["branding", "mobile_app", "ctv", "performance", "social"]
+
+    expected_output_example = "\n".join(
+        f'    "{ch}": {{"budget": X, "percentage": Y, "rationale": "..."}}' for ch in channel_keys
+    )
+
     # Define budget allocation task
     budget_allocation_task = Task(
         description=f"""
@@ -69,58 +99,55 @@ Analyze the campaign brief and allocate budget across channels:
 
 Campaign Name: {campaign_brief.get("name", "Unnamed Campaign")}
 Campaign Objectives: {campaign_brief.get("objectives", [])}
-Total Budget: ${campaign_brief.get("budget", 0):,.2f}
+Total Budget: ${total_budget:,.2f}
 Flight Dates: {campaign_brief.get("start_date")} to {campaign_brief.get("end_date")}
 Target Audience: {campaign_brief.get("target_audience", {})}
 KPIs: {campaign_brief.get("kpis", {})}
 
-Determine the optimal budget split across:
-1. Branding (display/video) - for awareness objectives
-2. Mobile App Install - if app promotion is needed
-3. CTV (Connected TV) - for premium video reach
-4. Performance/Remarketing - for conversion objectives
+{channel_instruction}
 
-Consider the campaign objectives and provide channel allocations with rationale.
-Not all channels may be needed - allocate $0 to channels that don't fit the objectives.
+Allocate budget based on campaign objectives and audience fit. Provide a rationale
+for each channel's allocation. Percentages must sum to 100.
 """,
-        expected_output="""A JSON object with channel allocations:
-{
-    "branding": {"budget": X, "percentage": Y, "rationale": "..."},
-    "mobile_app": {"budget": X, "percentage": Y, "rationale": "..."},
-    "ctv": {"budget": X, "percentage": Y, "rationale": "..."},
-    "performance": {"budget": X, "percentage": Y, "rationale": "..."}
-}""",
+        expected_output=f"""A JSON object with channel allocations:
+{{
+{expected_output_example}
+}}""",
         agent=portfolio_manager,
         output_pydantic=BudgetAllocationOutput,
     )
 
-    # Define channel coordination task
-    channel_coordination_task = Task(
-        description="""
-Based on the budget allocation, provide high-level guidance for each
-active channel specialist:
-
-For each channel with budget > $0:
-1. Key objectives for that channel
-2. Targeting priorities
-3. Quality requirements (viewability, brand safety, etc.)
-4. Any specific constraints or preferences
-
-This guidance will be used by channel specialists to research and
-recommend specific inventory.
-""",
-        expected_output="""Channel guidance for each active channel:
-{
-    "channel_name": {
-        "objectives": ["..."],
-        "targeting_priorities": ["..."],
-        "quality_requirements": {...},
-        "constraints": ["..."]
-    }
-}""",
-        agent=portfolio_manager,
-        context=[budget_allocation_task],
-    )
+    # Legacy: channel_coordination_task was the final task, so kickoff() returned
+    # guidance JSON (no "budget" field). _parse_allocations() found nothing and
+    # budget_allocations stayed empty, skipping all channel research crews.
+    # Commented out so budget_allocation_task is the sole output of kickoff().
+    #
+    # channel_coordination_task = Task(
+    #     description="""
+    # Based on the budget allocation, provide high-level guidance for each
+    # active channel specialist:
+    #
+    # For each channel with budget > $0:
+    # 1. Key objectives for that channel
+    # 2. Targeting priorities
+    # 3. Quality requirements (viewability, brand safety, etc.)
+    # 4. Any specific constraints or preferences
+    #
+    # This guidance will be used by channel specialists to research and
+    # recommend specific inventory.
+    # """,
+    #     expected_output="""Channel guidance for each active channel:
+    # {
+    #     "channel_name": {
+    #         "objectives": ["..."],
+    #         "targeting_priorities": ["..."],
+    #         "quality_requirements": {...},
+    #         "constraints": ["..."]
+    #     }
+    # }""",
+    #     agent=portfolio_manager,
+    #     context=[budget_allocation_task],
+    # )
 
     return Crew(
         agents=[
@@ -129,7 +156,7 @@ recommend specific inventory.
             ctv_agent,
             performance_agent,
         ],
-        tasks=[budget_allocation_task, channel_coordination_task],
+        tasks=[budget_allocation_task],
         process=Process.hierarchical,
         manager_agent=portfolio_manager,
         memory=settings.crew_memory_enabled,

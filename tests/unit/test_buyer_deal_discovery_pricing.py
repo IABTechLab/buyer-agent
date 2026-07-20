@@ -11,7 +11,7 @@ Covers:
 - Cross-tier pricing consistency across tools and client
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -763,7 +763,7 @@ class TestRequestDealOutput:
         mock_client.get_product.return_value = MagicMock(success=True, data=_product())
         tool = RequestDealTool(client=mock_client, buyer_context=agency_context)
         result = await tool._arun(product_id="prod_001")
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         assert today in result
 
     @pytest.mark.asyncio

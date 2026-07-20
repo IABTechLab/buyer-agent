@@ -4,6 +4,7 @@
 """Tests for DealLibrary L2 agent creation."""
 
 import os
+from unittest.mock import patch
 
 from crewai.tools import BaseTool
 
@@ -58,7 +59,10 @@ class TestDealLibraryAgent:
 
     def test_deal_library_agent_has_memory(self):
         """Test DealLibrary agent has memory enabled."""
-        agent = create_deal_library_agent(verbose=False)
+        with patch("ad_buyer.agents.level2.deal_library_agent.settings") as mock_settings:
+            mock_settings.crew_memory_enabled = True
+            mock_settings.default_llm_model = "anthropic/claude-haiku-4-5-20251001"
+            agent = create_deal_library_agent(verbose=False)
         # CrewAI converts memory=True into a Memory object
         assert agent.memory is not None
 
