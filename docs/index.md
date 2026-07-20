@@ -20,7 +20,7 @@ Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https:/
 **Negotiation & Pricing**
 
 - Tiered identity strategy with 4 access tiers (public, seat, agency, advertiser) and progressive rate discounts
-- Multi-turn negotiation with pluggable strategies (threshold, adaptive, competitive) over A2A conversations
+- Multi-turn negotiation with a pluggable strategy interface — threshold strategy today; adaptive and competitive strategies are planned
 - Human-in-the-loop approval gate before committing spend
 
 **Execution & Booking**

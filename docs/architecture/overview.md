@@ -97,7 +97,7 @@ The buyer has one canonical flow entry point: **DealBookingFlow** (campaign flow
 | **IABMCPClient** | MCP SDK client with Streamable HTTP transport | `clients/mcp_client.py` |
 | **A2AClient** | JSON-RPC 2.0 client for conversational agent-to-agent requests | `clients/a2a_client.py` |
 | **OpenDirectClient** | Async HTTP client for IAB OpenDirect 2.1 seller APIs | `clients/opendirect_client.py` |
-| **NegotiationClient** | Multi-turn price negotiation with seller agents via A2A/proposals | `clients/negotiation_client.py` |
+| **NegotiationClient** | Multi-turn price negotiation with seller agents | `negotiation/client.py` |
 | **BookingState** | Pydantic state model tracking the full flow lifecycle | `models/flow_state.py` |
 | **Settings** | Environment-based configuration via pydantic-settings | `config/settings.py` |
 

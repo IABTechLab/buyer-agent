@@ -78,9 +78,8 @@ The [`OpenDirectClient`](../integration/opendirect.md) implements the IAB OpenDi
 
 | Method | Seller Endpoint | Purpose |
 |--------|----------------|---------|
-| `GET` | `/products` | List products |
+| `GET` | `/products` | List products (search filters applied client-side by `search_products()`) |
 | `GET` | `/products/{id}` | Get product detail |
-| `POST` | `/products/search` | Search products with filters |
 | `POST` | `/products/avails` | Check inventory availability |
 | `POST/GET` | `/accounts` | Create / list accounts |
 | `GET` | `/accounts/{id}` | Get account detail |

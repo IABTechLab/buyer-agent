@@ -149,11 +149,11 @@ For end-to-end testing, run both agents:
 
 ```bash
 # Terminal 1 — Seller agent
-cd ../ad_seller_system/infra/docker
+cd ../seller-agent/infra/docker
 docker compose up
 
 # Terminal 2 — Buyer agent (pointing at seller)
-cd ../ad_buyer_system
+cd ../buyer-agent
 SELLER_ENDPOINTS=http://host.docker.internal:8000 docker compose -f infra/docker/docker-compose.yml up
 ```
 
