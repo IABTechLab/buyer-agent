@@ -34,7 +34,7 @@ mount_mcp(app)  # Creates /mcp (Streamable HTTP) and /mcp-sse (legacy SSE)
 ```
 
 `mount_mcp` calls `mcp.streamable_http_app()` (canonical) and `mcp.sse_app()` (legacy fallback).
-The canonical client URL is `http://<host>:8001/mcp`. For legacy SSE clients, use `http://<host>:8001/mcp-sse/sse`.
+The canonical client URL is `http://<host>:8001/mcp/`. For legacy SSE clients, use `http://<host>:8001/mcp-sse/sse`.
 
 ### Auth middleware note
 

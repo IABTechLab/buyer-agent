@@ -6,7 +6,7 @@ Connect your buyer agent to ChatGPT, OpenAI Codex, Cursor, Windsurf, or any MCP-
 
 Same as [Claude Desktop Setup](claude-desktop-setup.md) — your developer must have deployed the buyer agent and generated credentials.
 
-Your buyer agent MCP endpoint: `https://your-buyer.example.com/mcp` (Streamable HTTP — canonical)
+Your buyer agent MCP endpoint: `https://your-buyer.example.com/mcp/` (Streamable HTTP — canonical)
 
 > **Legacy SSE fallback**: Older MCP clients that require SSE transport can connect to `https://your-buyer.example.com/mcp-sse/sse` instead.
 
@@ -31,7 +31,7 @@ ChatGPT natively supports MCP servers via Developer Mode.
 
 1. Go to **Settings > Connectors** (or **Settings > Apps**)
 2. Click **Create**
-3. Enter your MCP server URL: `https://your-buyer.example.com/mcp`
+3. Enter your MCP server URL: `https://your-buyer.example.com/mcp/`
 
     > ChatGPT connectors cannot send a custom `X-API-Key` header. Connect to a deployment running without `API_KEY` (trusted network), or front the agent with a proxy that injects the header.
 
@@ -57,7 +57,7 @@ Codex supports MCP servers via its config file.
 ### Option A: CLI
 
 ```bash
-codex mcp add buyer-agent --url https://your-buyer.example.com/mcp
+codex mcp add buyer-agent --url https://your-buyer.example.com/mcp/
 ```
 
 ### Option B: Config File
@@ -66,7 +66,7 @@ Edit `~/.codex/config.toml` (global) or `.codex/config.toml` (project):
 
 ```toml
 [mcp_servers.buyer-agent]
-url = "https://your-buyer.example.com/mcp"
+url = "https://your-buyer.example.com/mcp/"
 
 [mcp_servers.buyer-agent.http_headers]
 X-API-Key = "sk-operator-XXXXX"
@@ -92,7 +92,7 @@ Create `.cursor/mcp.json` in your project root:
 {
   "mcpServers": {
     "buyer-agent": {
-      "url": "https://your-buyer.example.com/mcp",
+      "url": "https://your-buyer.example.com/mcp/",
       "headers": {
         "X-API-Key": "sk-operator-XXXXX"
       }
@@ -111,7 +111,7 @@ Create `~/.cursor/mcp.json` with the same format.
 {
   "mcpServers": {
     "buyer-agent": {
-      "url": "https://your-buyer.example.com/mcp",
+      "url": "https://your-buyer.example.com/mcp/",
       "headers": {
         "X-API-Key": "${env:BUYER_AGENT_API_KEY}"
       }
@@ -140,7 +140,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 {
   "mcpServers": {
     "buyer-agent": {
-      "serverUrl": "https://your-buyer.example.com/mcp",
+      "serverUrl": "https://your-buyer.example.com/mcp/",
       "headers": {
         "X-API-Key": "sk-operator-XXXXX"
       }

@@ -115,7 +115,7 @@ Restart the server after setting `API_KEY`. All incoming requests (REST and MCP 
 
 Give your media buying team:
 
-1. **MCP URL**: `http://your-server:8001/mcp` (Streamable HTTP, canonical — or your public URL)
+1. **MCP URL**: `http://your-server:8001/mcp/` (Streamable HTTP, canonical — or your public URL)
 2. **API key**: the value you set in `API_KEY`
 
 They'll connect Claude Desktop using the [Claude Desktop Setup Guide](../claude-desktop-setup.md) and complete the business configuration (deal templates, approval thresholds, seller API keys) through the interactive setup wizard.
@@ -127,7 +127,7 @@ They'll connect Claude Desktop using the [Claude Desktop Setup Guide](../claude-
 curl http://localhost:8001/health
 
 # MCP smoke test (add -H "X-API-Key: $API_KEY" if API_KEY is set)
-curl -s -X POST http://localhost:8001/mcp \
+curl -s -X POST http://localhost:8001/mcp/ \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","method":"initialize","id":1,"params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke","version":"1"}}}'
