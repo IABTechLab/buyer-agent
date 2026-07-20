@@ -476,7 +476,7 @@ class TestExecutionAgent:
         assert "Draft" in backstory
         assert "Reserved" in backstory
         assert "Booked" in backstory
-        assert "Cancelled" in backstory
+        assert "Canceled" in backstory
 
 
 class TestReportingAgent:

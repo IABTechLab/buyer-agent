@@ -397,6 +397,16 @@ def from_wire_deal_booking_response(wire: WireDealBookingResponse) -> DealRespon
 # Catalog surface
 # ---------------------------------------------------------------------------
 
+# The shared catalog library's DeliveryType keeps its own spellings
+# ('Exclusive'/'Guaranteed'/'PMP'); the buyer's OpenDirect enum follows the
+# spec-lowercase spellings ('exclusive'/'guaranteed'). Map explicitly at the
+# boundary — the values no longer coincide (bead ar-kzi0).
+_WIRE_DELIVERY_TO_OD: dict[str, ODDeliveryType] = {
+    "Exclusive": ODDeliveryType.EXCLUSIVE,
+    "Guaranteed": ODDeliveryType.GUARANTEED,
+    "PMP": ODDeliveryType.PMP,
+}
+
 _PRICING_MODEL_TO_RATE_TYPE: dict[WirePricingModel, RateType] = {
     WirePricingModel.CPM: RateType.CPM,
     WirePricingModel.CPMV: RateType.CPMV,
@@ -437,15 +447,15 @@ def from_wire_product(product: WireProduct) -> ODProduct:
 
     return ODProduct(
         id=product.product_id,
-        publisherId=product.seller_organization_id,
+        publisher_id=product.seller_organization_id,
         name=product.name,
         description=product.description,
         currency=currency,
-        basePrice=base_price if base_price is not None else 0.0,
-        rateType=_to_rate_type(product.pricing_model),
-        deliveryType=ODDeliveryType(product.delivery_type.value),
+        base_price=base_price if base_price is not None else 0.0,
+        rate_type=_to_rate_type(product.pricing_model),
+        delivery_type=_WIRE_DELIVERY_TO_OD[product.delivery_type.value],
         domain=product.domain,
-        availableImpressions=product.available_impressions,
+        available_impressions=product.available_impressions,
         targeting=targeting or None,
         ext=ext or None,
     )

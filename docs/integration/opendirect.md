@@ -34,41 +34,41 @@ erDiagram
     }
     Account {
         string id
-        string advertiserId
-        string buyerId
+        string advertiserid
+        string buyerid
     }
     Product {
         string id
-        string publisherId
+        string publisherid
         string name
-        float basePrice
-        string rateType
-        string deliveryType
+        float baseprice
+        string ratetype
+        string deliverytype
     }
     Order {
         string id
-        string accountId
+        string accountid
         float budget
-        datetime startDate
-        datetime endDate
-        string orderStatus
+        datetime startdate
+        datetime enddate
+        string orderstatus
     }
     Line {
         string id
-        string orderId
-        string productId
+        string orderid
+        string productid
         float rate
-        int quantity
-        string bookingStatus
+        int qty
+        string bookingstatus
     }
     Creative {
         string id
-        string accountId
+        string accountid
         string name
     }
     Assignment {
         string id
-        string creativeId
+        string creativeid
         string lineId
     }
 ```
@@ -83,7 +83,7 @@ Links a buyer (agency/advertiser) to a publisher. All orders and creatives live 
 
 ### Product
 
-A sellable inventory item defined by the publisher. Products have a base price, rate type (CPM, CPC, CPD, FlatRate), delivery type (Exclusive, Guaranteed, PMP), and optional targeting capabilities.
+A sellable inventory item defined by the publisher. Products have a base price, rate type (CPM, CPC, CPD, FlatRate), delivery type (exclusive, guaranteed, PMP), and optional targeting capabilities.
 
 ### Order
 
@@ -152,8 +152,8 @@ stateDiagram-v2
     PendingBooking --> Booked: confirmed
     Booked --> InFlight: campaign starts
     InFlight --> Finished: campaign ends
-    Booked --> Cancelled: buyer cancels
-    Reserved --> Cancelled: buyer cancels
+    Booked --> Canceled: buyer cancels
+    Reserved --> Canceled: buyer cancels
     Reserved --> Expired: hold expired
 ```
 
