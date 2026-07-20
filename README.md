@@ -237,13 +237,15 @@ docker compose up
 
 ## API Reference
 
-7 endpoints across 3 groups:
+11 endpoints across 5 groups:
 
 | Group | Endpoints | Description |
 |-------|-----------|-------------|
 | Health | 1 | Service health check |
-| Bookings | 4 | Create, poll, approve, complete bookings |
-| Products | 2 | Search and list products |
+| Bookings | 5 | Create, list, poll, and approve bookings |
+| Products | 1 | Search seller product catalog |
+| Events | 2 | Query the in-memory event bus |
+| Buyer Orders | 2 | Order records and status-transition audit trail |
 
 → [Full API Reference](https://iabtechlab.github.io/buyer-agent/api/overview/)
 

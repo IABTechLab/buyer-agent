@@ -20,7 +20,7 @@ Without persistent storage, all deal state lives in memory and is lost on proces
 
 ## SQLite Schema
 
-The schema consists of five relational tables managed by a versioned migration system. All tables use ISO 8601 timestamps and are created automatically on first connection.
+The shared SQLite schema (`storage/schema.py`) defines 17 domain tables plus a `schema_version` table, managed by a versioned migration system. All tables use ISO 8601 timestamps and are created automatically on first connection. This page documents the five tables at the heart of the DealStore (`deals`, `negotiation_rounds`, `booking_records`, `jobs`, `status_transitions`); the remaining tables belong to the other [storage-layer](storage-backends.md) stores.
 
 ### Entity-Relationship Diagram
 

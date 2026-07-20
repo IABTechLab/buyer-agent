@@ -75,7 +75,7 @@ The Architecture section covers these topics:
 | **[Agent Hierarchy](agent-hierarchy.md)** | Three-level agent structure: portfolio manager, channel specialists, and tool-level agents |
 | **[Booking Flow](booking-flow.md)** | Detailed sequence diagram of the DealBookingFlow --- the campaign-level orchestration |
 | **[Order State Machine](../state-machines/order-lifecycle.md)** | 12 deal states and 9 campaign states with guard conditions and audit trail |
-| **[Event Bus](../event-bus/overview.md)** | 13 event types providing structured observability across all flows |
+| **[Event Bus](../event-bus/overview.md)** | 38 event types providing structured observability across all flows |
 | **[Deal Store](deal-store.md)** | Synchronous SQLite persistence for deal lifecycle, negotiation history, and audit trail |
 | **[Storage Layer](storage-backends.md)** | The SQLite-backed domain stores that persist all buyer state |
 | **[Models](models.md)** | Pydantic data models for API requests, flow state, and deal records |

@@ -121,7 +121,7 @@ graph TB
         FastAPI["FastAPI"]
         StreamableHTTP["/mcp<br/>(FastMCP Streamable HTTP — canonical)"]
         SSE["/mcp-sse/sse<br/>(FastMCP SSE — legacy fallback)"]
-        Tools["MCP Tool Functions<br/>(12 categories, 40 tools)"]
+        Tools["MCP Tool Functions<br/>(13 categories, 43 tools)"]
         Stores["Store Accessors<br/>DealStore / CampaignStore / OrderStore"]
         DB[(SQLite)]
     end

@@ -153,7 +153,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`:
 
 ## Available Tools (All Platforms)
 
-Once connected, all platforms have access to the same 40 MCP tools:
+Once connected, all platforms have access to the same 43 MCP tools:
 
 | Category | Examples |
 |----------|---------|
@@ -169,6 +169,7 @@ Once connected, all platforms have access to the same 40 MCP tools:
 | **Approvals** | `list_pending_approvals`, `approve_or_reject` |
 | **API Keys** | `list_api_keys`, `create_api_key`, `revoke_api_key` |
 | **SSP Connectors** | `list_ssp_connectors`, `import_deals_ssp`, `test_ssp_connection` |
+| **Contextual Enrichment (Mixpeek)** | `classify_content`, `contextual_search`, `check_brand_safety` |
 
 See the [MCP Tools Reference](ai-assistant/mcp-tools.md) for the full tool catalog.
 

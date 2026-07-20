@@ -17,7 +17,9 @@ graph TB
         CTV["CTV Specialist<br/>(streaming)"]
         MOB["Mobile App Specialist<br/>(app install)"]
         PERF["Performance Specialist<br/>(remarketing)"]
+        LTV["Linear TV Specialist<br/>(dayparts / DMA)"]
         DSP["Buyer Deal Specialist<br/>(deal discovery)"]
+        DL["Deal Library Agent<br/>(portfolio management)"]
     end
 
     subgraph Level3["Level 3 — Functional Agents"]
@@ -157,6 +159,24 @@ Maximizes conversions and ROAS through lower-funnel tactics.
 | Optimization | CPA/ROAS targets, bid optimization, pacing |
 | Creative | Dynamic creative optimization, A/B testing |
 | Tracking | Pixel implementation, cross-device attribution |
+
+### Linear TV Specialist
+
+**File:** `src/ad_buyer/agents/level2/linear_tv_agent.py`
+
+Handles traditional linear television buying.
+
+| Area | Focus |
+|------|-------|
+| Pricing | Daypart-based CPP/CPM, scatter deal structures |
+| Targeting | DMA / local market, target demographics (GRPs) |
+| Inventory | Broadcast and cable dayparts, spot lengths |
+
+### Deal Library Agent
+
+**File:** `src/ad_buyer/agents/level2/deal_library_agent.py`
+
+Manages the deal portfolio: importing, cataloging, inspecting, organizing, and optimizing deals. Works with the seven deal-library CrewAI tools (portfolio inspection, templates, manual entry).
 
 ### Buyer Deal Discovery Specialist
 

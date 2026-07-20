@@ -86,7 +86,7 @@ Events can be correlated across a workflow using three keys:
 
 ## Event Types
 
-The `EventType` enum defines 13 event types organized by domain.
+The `EventType` enum defines **38 event types** organized by domain — see the [auto-generated inventory](../reference/event-types.md) for the byte-exact list. The tables below annotate the core deal-flow types. The remaining domains follow the same payload conventions: approval (`approval.*`, 3), campaign lifecycle (`campaign.*`, 10 total — only `campaign.created` is annotated below), creative (`creative.*`, 5), pacing (`pacing.*`, 4), and deal-library/portfolio types (`deal.imported`, `deal.template_created`, `deal.manual_action_required`, `portfolio.inspected`).
 
 ### Quote Lifecycle
 

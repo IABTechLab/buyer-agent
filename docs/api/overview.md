@@ -1,6 +1,6 @@
 # API Overview
 
-The Ad Buyer Agent API exposes **7 endpoints** across **3 tags**. All endpoints are served from a single FastAPI application.
+The Ad Buyer Agent API exposes **14 endpoints** across **6 tags**. All endpoints are served from a single FastAPI application. The [auto-generated endpoint inventory](../reference/endpoints.md) is the byte-exact source of truth.
 
 **Base URL:** `http://localhost:8001`
 **OpenAPI docs:** `http://localhost:8001/docs`
@@ -30,6 +30,28 @@ The buyer agent is primarily a **client** that consumes seller APIs, not a serve
 | Method | Path | Summary |
 |--------|------|---------|
 | `POST` | `/products/search` | Search seller product catalog |
+
+## Events
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `GET` | `/events` | List events from the in-memory event bus |
+| `GET` | `/events/{event_id}` | Get a single event by ID |
+
+## Buyer Orders
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `GET` | `/api/v1/buyer/orders` | List buyer-side order records |
+| `GET` | `/api/v1/buyer/orders/{order_id}/audit` | Order status-transition audit trail |
+
+## Reporting
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `GET` | `/reports/{job_id}` | Campaign delivery report for a booking job |
+| `GET` | `/meta/campaigns` | List Meta Ads campaigns directly from the ad account |
+| `GET` | `/meta/report` | Pull Meta Ads insights by campaign ID(s) |
 
 ---
 

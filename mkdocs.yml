@@ -111,4 +111,8 @@ nav:
       - Tools Reference: ai-assistant/mcp-tools.md
       - Slash Commands: ai-assistant/slash-commands.md
       - Setup Wizard: ai-assistant/setup-wizard.md
+  - Generated Inventories:
+      - REST Endpoints: reference/endpoints.md
+      - MCP Tools: reference/mcp-tools.md
+      - Event Types: reference/event-types.md
   - "Seller Agent Docs →": https://iabtechlab.github.io/seller-agent/
