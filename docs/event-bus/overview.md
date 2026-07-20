@@ -18,12 +18,11 @@ Standard Python logging captures text messages. The event bus captures structure
 
 ## Architecture
 
-The diagram below shows how events flow from the buyer's deal and campaign flows through helper functions into the event bus, and from there to subscribers and the persistence layer. Flows emit events via sync or async helpers; the bus dispatches to subscribers and the API layer exposes events for external queries.
+The diagram below shows how events flow from the buyer's flows through helper functions into the event bus, and from there to subscribers and the persistence layer. Flows emit events via sync or async helpers; the bus dispatches to subscribers and the API layer exposes events for external queries.
 
 ```mermaid
 graph TB
     subgraph Flows
-        DSP["BuyerDealFlow"]
         DBF["DealBookingFlow"]
     end
 
@@ -394,7 +393,7 @@ This sequence diagram shows how events flow through the system during a typical 
 
 ```mermaid
 sequenceDiagram
-    participant Flow as BuyerDealFlow
+    participant Flow as DealBookingFlow
     participant Helper as emit_event_sync()
     participant Bus as InMemoryEventBus
     participant Sub as Subscribers

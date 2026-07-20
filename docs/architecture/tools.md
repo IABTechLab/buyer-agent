@@ -525,6 +525,5 @@ buyer_deal_tools = [
 ## Related
 
 - [Agent Hierarchy](agent-hierarchy.md) --- Which agents use which tools
-- [Buyer Deal Flow](buyer-deal-flow.md) --- How buyer deal tools work together in a flow
 - [Booking Flow](booking-flow.md) --- How execution tools drive the booking lifecycle
 - [Configuration](../guides/configuration.md) --- Tool-related settings

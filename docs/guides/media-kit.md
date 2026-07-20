@@ -279,8 +279,8 @@ sequenceDiagram
 
 This approach minimizes identity exposure --- you only reveal who you are when you are ready to transact.
 
-!!! info "Identity Strategy Automation"
-    The `IdentityStrategy` class can automate tier selection based on deal value, seller trust, and campaign goals. See the [Identity Strategy Guide](identity.md) for details.
+!!! info "Choosing a tier"
+    Tier selection is driven by which fields you populate on `BuyerIdentity` --- weigh deal value, seller trust, and campaign goals. See the [Identity & Access Tiers guide](identity.md) for guidance.
 
 ## From Browsing to Buying
 
@@ -343,7 +343,7 @@ if isinstance(pkg, PackageDetail) and pkg.negotiation_enabled:
 
 **Watch for `negotiation_enabled`.** Not all packages support negotiation. Check this flag before investing time in a negotiation strategy. If it is `False`, you must accept the posted price or look elsewhere.
 
-**Leverage identity strategically.** Use the `IdentityStrategy` to decide when revealing more identity is worth the pricing benefit. For low-value browsing, stay public. For serious purchases, escalate to get the best rates. See the [Identity Strategy Guide](identity.md) for the automation.
+**Leverage identity strategically.** Decide per seller when revealing more identity is worth the pricing benefit. For low-value browsing, stay public. For serious purchases, escalate to get the best rates. See the [Identity & Access Tiers guide](identity.md) for guidance.
 
 ## Related
 

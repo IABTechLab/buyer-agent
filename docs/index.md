@@ -34,7 +34,6 @@ Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https:/
 
 - Formal order state machine with 12 deal states, guard conditions, and audit trail
 - Event bus with 13 event types, fail-open emission, subscriber dispatch, and SQLite persistence
-- Persistent session management tracking conversation state, negotiation history, and deal context
 - Severity-based change request management for post-deal modifications
 
 ## Access Methods
@@ -85,9 +84,8 @@ See the [API Overview](api/overview.md) for full details.
 - [AgentCore Deployment](guides/agentcore-deployment.md) --- Bedrock AgentCore managed runtime
 - [Deal Booking](guides/deal-booking.md) --- end-to-end quote-then-book workflow
 - [Negotiation](guides/negotiation.md) --- multi-turn negotiation strategies and deal flow
-- [Identity Strategy](guides/identity.md) --- tiered pricing and buyer identity resolution
+- [Identity & Access Tiers](guides/identity.md) --- tiered pricing and buyer identity resolution
 - [Media Kit Browsing](guides/media-kit.md) --- progressive disclosure of seller inventory
-- [Sessions](guides/sessions.md) --- persistent session management across interactions
 - [Multi-Seller Discovery](guides/multi-seller.md) --- AAMP registry and trust verification
 - [Linear TV Buying](guides/linear-tv.md) --- scatter, upfront, DMA targeting, and CPP/CPM pricing
 

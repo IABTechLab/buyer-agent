@@ -172,7 +172,7 @@ Discovers inventory and obtains Deal IDs for activation in traditional DSP platf
 | Negotiation | Price negotiation for agency/advertiser tiers |
 
 !!! tip "Buyer Deal Specialist vs. other specialists"
-    The Buyer Deal Specialist works alongside the channel specialists, not in place of them. Channel specialists decide *what* inventory to buy; the Buyer Deal Specialist handles the mechanics of obtaining Deal IDs for programmatic activation. See [Buyer Deal Flow](buyer-deal-flow.md) for the full workflow.
+    The Buyer Deal Specialist works alongside the channel specialists, not in place of them. Channel specialists decide *what* inventory to buy; the Buyer Deal Specialist handles the mechanics of obtaining Deal IDs for programmatic activation.
 
 ---
 
@@ -443,6 +443,5 @@ sequenceDiagram
 
 - [Architecture Overview](overview.md) --- Full system architecture
 - [Tools Reference](tools.md) --- All CrewAI tools available to agents
-- [Buyer Deal Flow](buyer-deal-flow.md) --- Buyer deal discovery workflow
 - [Booking Flow](booking-flow.md) --- Detailed booking sequence
 - [Configuration](../guides/configuration.md) --- LLM and agent settings

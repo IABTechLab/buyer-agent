@@ -244,14 +244,14 @@ The `DealSelection` inside captures the booking outcome:
 
 ---
 
-## Integration with the Campaign Pipeline
+## Integration with DealBookingFlow
 
-You don't need to call `MultiSellerOrchestrator` directly for most use cases. The [Campaign Pipeline](campaign-pipeline.md) calls it internally during its **execute_booking** stage --- once per channel in the campaign plan. The pipeline:
+You don't need to call `MultiSellerOrchestrator` directly for most use cases. The canonical [`DealBookingFlow`](../architecture/booking-flow.md) calls it internally when executing approved recommendations. The flow:
 
-1. Builds `InventoryRequirements` from each channel's media type
-2. Constructs `DealParams` from the channel plan and flight dates
-3. Calls `orchestrator.orchestrate()` with the channel budget
-4. Collects per-channel `OrchestrationResult` objects
+1. Builds `InventoryRequirements` from each approved recommendation's media type
+2. Constructs `DealParams` from the recommendation and flight dates
+3. Calls the orchestrator with the recommendation's budget (after a spend-ceiling check)
+4. Collects the resulting bookings, keyed on seller-issued deal IDs
 
 If you need finer control --- for example, to use a custom `QuoteNormalizer` with supply-path data, or to orchestrate outside of a campaign --- use the orchestrator directly as shown in this guide.
 
@@ -288,4 +288,4 @@ The orchestrator is designed to be **resilient to partial failures**:
 - [Negotiation](negotiation.md) --- Individual negotiation strategies (SimpleThreshold, and planned Adaptive/Competitive)
 - [Architecture Overview](../architecture/overview.md) --- Agent hierarchy including Portfolio Manager
 - [Deals API](../api/deals.md) --- Quote-then-book flow used by the orchestrator
-- [Campaign Brief to Deal Pipeline](campaign-pipeline.md) --- End-to-end campaign execution (uses orchestration internally)
+- [Booking Flow](../architecture/booking-flow.md) --- End-to-end campaign execution (uses orchestration internally)
