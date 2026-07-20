@@ -6,14 +6,17 @@
 Tools exposed by the buyer MCP server (`ad_buyer.interfaces.mcp_server`),
 enumerated from the live FastMCP registry.
 
-**Total: 40 tools**
+**Total: 43 tools**
 
 | Tool | Description |
 | --- | --- |
 | `approve_or_reject` | Approve or reject a pending approval request. |
+| `check_brand_safety` | Evaluate page or ad-creative content for brand-safety risk. Classifies content into IAB categories and flags sensitive categories (gambling, adult, etc.). Returns safe/unsafe verdict, risk level (low/medium/high), and flagged categories. |
 | `check_pacing` | Check budget pacing for a campaign. |
+| `classify_content` | Classify page or ad-creative content into IAB v3.0 taxonomy categories using Mixpeek. Supply text content to classify. Returns ranked IAB category matches with hierarchical paths (e.g. Sports > American Football) and confidence scores for contextual targeting. |
 | `compare_sellers` | Compare pricing and capabilities across multiple sellers. |
 | `complete_wizard_step` | Complete a wizard step with the given configuration. |
+| `contextual_search` | Search indexed ad inventory using a Mixpeek retriever pipeline. Pipelines can combine multimodal search, brand-safety filtering, IAB taxonomy enrichment, and reranking. Returns matching inventory with relevance scores and enriched metadata. |
 | `create_api_key` | Store or replace an API key for a seller integration. |
 | `create_deal_manual` | Manually create a single deal entry in the portfolio. |
 | `create_template` | Create a new deal or supply path template. |

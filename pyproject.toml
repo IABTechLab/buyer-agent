@@ -95,4 +95,5 @@ testpaths = ["tests"]
 pythonpath = ["src", "."]
 markers = [
     "agentcore: tests that invoke a deployed AgentCore runtime (require AWS credentials)",
+    "e2e: tests that hit external production APIs (require provider credentials)",
 ]
