@@ -26,6 +26,7 @@ from ..crews.channel_crews import (
     create_ctv_crew,
     create_mobile_crew,
     create_performance_crew,
+    create_social_crew,
 )
 from ..crews.portfolio_crew import create_portfolio_crew
 from ..events.helpers import emit_event_sync
@@ -653,6 +654,42 @@ class DealBookingFlow(Flow[BookingState]):
             self.state.errors.append(f"Performance research failed: {e}")
             return {"channel": "performance", "status": "failed", "error": str(e)}
 
+    @listen(allocate_budget)
+    def research_social(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
+        """Social specialist researches Meta Ads inventory (port of main PR #87).
+
+        Unlike the other channels this crew does not search OpenDirect
+        catalogs — it queries the Meta Graph API for placement reach
+        estimates (``MetaInventoryTool``); recommendations use
+        ``meta:<placement>`` product ids and book via the Meta path in
+        ``_execute_bookings``.
+        """
+        if allocation_result.get("status") != "success":
+            return {"channel": "social", "status": "skipped"}
+
+        social_alloc = self.state.budget_allocations.get("social")
+        if not social_alloc or social_alloc.budget <= 0:
+            return {"channel": "social", "status": "no_budget"}
+
+        try:
+            channel_brief = self._create_channel_brief("social", social_alloc)
+            crew = create_social_crew(
+                self._client,
+                channel_brief,
+                audience_plan=self.state.audience_plan,
+            )
+            result = crew.kickoff()
+
+            recommendations = self._parse_recommendations(str(result), "social")
+            self.state.channel_recommendations["social"] = recommendations
+            self.state.updated_at = datetime.now(UTC)
+
+            return {"channel": "social", "status": "success", "count": len(recommendations)}
+
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
+            self.state.errors.append(f"Social research failed: {e}")
+            return {"channel": "social", "status": "failed", "error": str(e)}
+
     def _create_channel_brief(self, channel: str, allocation: ChannelAllocation) -> dict[str, Any]:
         """Create a channel-specific brief from campaign brief and allocation.
 
@@ -808,14 +845,18 @@ class DealBookingFlow(Flow[BookingState]):
 
         return []
 
-    @listen(and_(research_branding, research_ctv, research_mobile, research_performance))
+    @listen(
+        and_(
+            research_branding, research_ctv, research_mobile, research_performance, research_social
+        )
+    )
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
         """Consolidate all channel recommendations for approval.
 
         Trigger note (bead ar-h2o6): this MUST be ``and_``, not ``or_``.
         Every research method always returns (success / no_budget / skipped /
         failed all return dicts), so ``and_`` fires exactly once, after ALL
-        four have completed. With ``or_``, CrewAI >=1.14 (a) treats the four
+        five have completed. With ``or_``, CrewAI >=1.14 (a) treats the four
         research methods as a "racing group" -- the first to complete WINS
         and the still-running ones are CANCELLED -- and (b) fires a
         multi-source OR listener only ONCE per run. A fast no-budget channel
@@ -941,8 +982,23 @@ class DealBookingFlow(Flow[BookingState]):
         select_and_book). Booking records key on the SELLER-issued deal_id
         + quote_id + confirmed terms; the buyer never mints deal ids or
         placeholder order ids on this path.
+
+        Social/meta-channel recommendations bypass the seller orchestrator
+        and book against the Meta Graph API (``_book_via_meta_api``, port
+        of main PR #87): campaign + ad set are created PAUSED and the
+        META-issued campaign id keys the booking record.
         """
-        approved = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+        approved_all = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+
+        # Deduplicate: if the same product_id was recommended by multiple
+        # channel crews, keep the one with the highest impressions so the
+        # same inventory is never booked twice (main PR #87).
+        deduped: dict[str, ProductRecommendation] = {}
+        for rec in approved_all:
+            existing = deduped.get(rec.product_id)
+            if existing is None or rec.impressions > existing.impressions:
+                deduped[rec.product_id] = rec
+        approved = list(deduped.values())
 
         if not approved:
             self.state.execution_status = ExecutionStatus.COMPLETED
@@ -972,11 +1028,69 @@ class DealBookingFlow(Flow[BookingState]):
                 "budget": budget,
             }
 
+        # Partition by counterparty: social/meta recommendations book via
+        # the Meta Graph API; everything else goes through the seller
+        # orchestrator (quotes -> deals).
+        meta_recs = [rec for rec in approved if rec.channel in ("social", "meta")]
+        seller_recs = [rec for rec in approved if rec.channel not in ("social", "meta")]
+
+        failed_bookings: list[dict[str, Any]] = []
+
+        for rec in meta_recs:
+            store_deal_id = getattr(rec, "_store_deal_id", None)
+            try:
+                campaign_id, ad_set_id, _kind = self._book_via_meta_api(rec)
+            except Exception as e:  # noqa: BLE001 - per-recommendation isolation
+                msg = f"Booking failed for {rec.product_id}: {e}"
+                logger.warning(msg)
+                self.state.errors.append(msg)
+                failed_bookings.append({"product_id": rec.product_id, "error": str(e)})
+                if store_deal_id:
+                    self._persist_deal_status(store_deal_id, "failed")
+                continue
+
+            # The campaign id is META-issued (the buyer still never mints
+            # booking identifiers); campaign + ad set are created PAUSED.
+            booked = BookedLine(
+                deal_id=campaign_id,
+                quote_id=None,
+                product_id=rec.product_id,
+                product_name=rec.product_name,
+                channel=rec.channel,
+                impressions=rec.impressions,
+                cpm=rec.cpm if rec.cpm > 0 else None,
+                cost=rec.cost,
+                booking_status="paused",
+                booked_at=datetime.now(UTC),
+                seller_id="meta",
+                line_id=ad_set_id,
+                order_id=campaign_id,
+            )
+            self.state.booked_lines.append(booked)
+
+            if store_deal_id:
+                self._persist_booking(store_deal_id, booked)
+                self._persist_deal_status(store_deal_id, "booked")
+
+            emit_event_sync(
+                EventType.DEAL_BOOKED,
+                flow_type="deal_booking",
+                deal_id=campaign_id,
+                payload={
+                    "deal_id": campaign_id,
+                    "quote_id": None,
+                    "product_id": rec.product_id,
+                    "channel": rec.channel,
+                    "impressions": rec.impressions,
+                    "cost": rec.cost,
+                    "final_cpm": rec.cpm if rec.cpm > 0 else None,
+                },
+            )
+
         # Real handoff to the multi-seller execution engine. `run_async`
         # bridges this synchronous approval entry point (CLI/API/chat) to
         # the async orchestrator.
-        failed_bookings: list[dict[str, Any]] = []
-        booking_results = run_async(self._book_approved(approved))
+        booking_results = run_async(self._book_approved(seller_recs)) if seller_recs else []
 
         for rec, result, error in booking_results:
             store_deal_id = getattr(rec, "_store_deal_id", None)
@@ -1129,6 +1243,87 @@ class DealBookingFlow(Flow[BookingState]):
             except Exception as exc:  # noqa: BLE001 - per-recommendation isolation
                 results.append((rec, None, str(exc)))
         return results
+
+    def _book_via_meta_api(self, rec: ProductRecommendation) -> tuple[str, str, str]:
+        """Book a social recommendation as a PAUSED Meta Ads campaign + ad set.
+
+        Port of main PR #87 in v2 idiom. Steps against the Graph API:
+
+            1. create campaign  -> campaign_id  (PAUSED)
+            2. create ad set    -> ad_set_id    (PAUSED)
+
+        Creative + ad creation are intentionally skipped: they require a
+        real image asset; campaign + ad set created PAUSED are sufficient
+        to record the booking, with creative added later via Meta Ads
+        Manager or a follow-up call.
+
+        Returns:
+            (campaign_id, ad_set_id, "meta")
+
+        Raises:
+            ValueError: when Meta credentials are not configured or the
+                Graph API returns a response without an id.
+        """
+        from ..config.settings import settings as _settings
+
+        if not _settings.meta_access_token or not _settings.meta_ad_account_id:
+            raise ValueError("Meta not configured: set META_ACCESS_TOKEN + META_AD_ACCOUNT_ID")
+        if not _settings.meta_page_id:
+            raise ValueError("META_PAGE_ID required — set in .env (Business Manager → Pages)")
+
+        from ..clients.meta_ads_client import MetaAdsClient
+
+        brief = self.state.campaign_brief
+        target_audience = brief.get("target_audience", {})
+        geo_locations = target_audience.get("geo_locations", ["US"])
+
+        obj_map = {
+            "brand_awareness": "OUTCOME_AWARENESS",
+            "reach": "OUTCOME_AWARENESS",
+            "traffic": "OUTCOME_TRAFFIC",
+            "conversions": "OUTCOME_SALES",
+            "video_views": "OUTCOME_ENGAGEMENT",
+            "lead_generation": "OUTCOME_LEADS",
+        }
+        objectives = brief.get("objectives", ["brand_awareness"])
+        meta_obj = obj_map.get(
+            objectives[0] if objectives else "brand_awareness", "OUTCOME_AWARENESS"
+        )
+
+        optimization_goal = "LINK_CLICKS" if rec.channel == "performance" else "REACH"
+        daily_budget_cents = max(int((rec.cost / 30) * 100), 100)
+        bid_amount_cents = max(int((rec.cpm or 5.0) * 100), 1)
+        campaign_name = f"{brief.get('name', 'Campaign')} — {rec.product_name}"
+
+        client = MetaAdsClient(
+            access_token=_settings.meta_access_token,
+            ad_account_id=_settings.meta_ad_account_id,
+            page_id=_settings.meta_page_id,
+            api_version=_settings.meta_api_version,
+        )
+
+        camp = client.create_campaign(
+            name=campaign_name,
+            objective=meta_obj,
+            daily_budget_cents=daily_budget_cents,
+        )
+        campaign_id = camp.get("id") or camp.get("campaign_id", "")
+        if not campaign_id:
+            raise ValueError(f"Campaign creation failed — no id in response: {camp}")
+
+        adset = client.create_adset(
+            campaign_id=campaign_id,
+            name=f"{rec.product_name} Ad Set",
+            optimization_goal=optimization_goal,
+            billing_event="IMPRESSIONS",
+            bid_amount_cents=bid_amount_cents,
+            targeting_countries=geo_locations if isinstance(geo_locations, list) else ["US"],
+        )
+        ad_set_id = adset.get("id") or adset.get("adset_id", "")
+        if not ad_set_id:
+            raise ValueError(f"Ad set creation failed — no id in response: {adset}")
+
+        return campaign_id, ad_set_id, "meta"
 
     def get_status(self) -> dict[str, Any]:
         """Get current flow status.
