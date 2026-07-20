@@ -128,7 +128,6 @@ class Settings(BaseSettings):
     embedding_mode: Literal["mock", "local", "advertiser", "hybrid"] = "hybrid"
 
     # --------------------------------------------------------------------------
-    # --------------------------------------------------------------------------
     # Meta Ads API integration
     # --------------------------------------------------------------------------
     # System user access token (from Meta Business Manager → System Users)
