@@ -49,6 +49,13 @@ class EventType(str, Enum):
     # Inventory lifecycle
     INVENTORY_DISCOVERED = "inventory.discovered"
 
+    # Cross-seller product identity (bead ar-gufw): emitted once per seller
+    # when the orchestrator resolves the campaign's recommended product onto
+    # that seller's own catalog before quoting. Payload carries the outcome
+    # ("exact_id" | "name_match" | "channel_match" | "unresolved" |
+    # "catalog_error") so the rig can see WHY a seller was quoted or skipped.
+    PRODUCT_RESOLUTION = "product.resolution"
+
     # Negotiation lifecycle
     NEGOTIATION_STARTED = "negotiation.started"
     NEGOTIATION_ROUND = "negotiation.round"

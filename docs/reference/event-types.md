@@ -6,7 +6,7 @@
 Members of `ad_buyer.events.models.EventType`, the canonical set of
 event types published on the event bus.
 
-**Total: 38 event types**
+**Total: 39 event types**
 
 | Name | Value |
 | --- | --- |
@@ -44,6 +44,7 @@ event types published on the event bus.
 | `PACING_REALLOCATION_RECOMMENDED` | `pacing.reallocation_recommended` |
 | `PACING_SNAPSHOT_TAKEN` | `pacing.snapshot_taken` |
 | `PORTFOLIO_INSPECTED` | `portfolio.inspected` |
+| `PRODUCT_RESOLUTION` | `product.resolution` |
 | `QUOTE_RECEIVED` | `quote.received` |
 | `QUOTE_REQUESTED` | `quote.requested` |
 | `SESSION_CLOSED` | `session.closed` |

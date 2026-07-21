@@ -114,7 +114,22 @@ def build_default_orchestrator() -> MultiSellerOrchestrator:
         registry_client=create_registry_client(settings),
         deals_client_factory=lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs),
         negotiation_config=NegotiationConfig.from_settings(settings),
+        catalog_client_factory=(
+            _make_catalog_client if settings.product_resolution_enabled else None
+        ),
     )
+
+
+def _make_catalog_client(seller_url: str, **kwargs: Any) -> Any:
+    """Per-seller catalog client for cross-seller product resolution.
+
+    The seller serves the shared catalog surface (``GET /products``) at the
+    same base URL as its deals API, so an OpenDirect client pointed at the
+    seller's own URL reads THAT seller's catalog (bead ar-gufw).
+    """
+    from ..clients.opendirect_client import OpenDirectClient
+
+    return OpenDirectClient(seller_url, **kwargs)
 
 
 class DealBookingFlow(Flow[BookingState]):
@@ -1233,6 +1248,12 @@ class DealBookingFlow(Flow[BookingState]):
                 # translate from discovery vocabulary (ar-9iw5).
                 media_type=_PRICING_MEDIA_TYPE_MAP.get(media_type, "digital"),
                 audience_plan=audience_plan,
+                # Cross-seller product identity (ar-gufw): the recommended
+                # name + discovery-vocabulary channel let the orchestrator
+                # resolve an EQUIVALENT product on sellers whose catalogs
+                # don't contain rec.product_id.
+                product_name=rec.product_name,
+                channel=media_type,
             )
 
             try:

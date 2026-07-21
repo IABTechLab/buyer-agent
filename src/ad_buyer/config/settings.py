@@ -81,6 +81,16 @@ class Settings(BaseSettings):
     negotiation_band: float = 1.25
     negotiation_max_rounds: int = 3
 
+    # Cross-seller product resolution (bead ar-gufw). Research reads one
+    # catalog, but discovery may return OTHER sellers whose catalogs use
+    # different product IDs -- quoting them with the recommended ID 404s
+    # (product_not_found) seller-side. When enabled, the orchestrator
+    # re-resolves an equivalent product on each seller's own catalog before
+    # quoting it; sellers with no equivalent are skipped with a clear
+    # per-seller error. Set PRODUCT_RESOLUTION_ENABLED=false to restore the
+    # legacy passthrough (same product_id sent to every discovered seller).
+    product_resolution_enabled: bool = True
+
     # LLM Settings
     default_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
     manager_llm_model: str = "anthropic/claude-opus-4-20250514"
