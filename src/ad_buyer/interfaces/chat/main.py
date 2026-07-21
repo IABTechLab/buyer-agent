@@ -379,12 +379,17 @@ Provide specific, actionable recommendations based on user requirements.""",
         # them; otherwise the default registry-backed orchestrator is used.
         if self._sellers:
             from ...config.settings import get_settings
+            from ...events.bus import get_event_bus_sync
             from ...flows.deal_booking_flow import _make_catalog_client
 
             _settings = get_settings()
             self._orchestrator = MultiSellerOrchestrator(
                 registry_client=_ConfiguredSellersRegistry(self._sellers),
                 deals_client_factory=self._make_deals_client,
+                # Same singleton the API's /events surface reads (ar-nly5):
+                # without a bus, product.resolution + negotiation.* events
+                # are silently dropped.
+                event_bus=get_event_bus_sync(),
                 negotiation_config=NegotiationConfig.from_settings(_settings),
                 catalog_client_factory=(
                     _make_catalog_client if _settings.product_resolution_enabled else None

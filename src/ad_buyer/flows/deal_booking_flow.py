@@ -104,15 +104,23 @@ def build_default_orchestrator() -> MultiSellerOrchestrator:
     server's registry client (real AAMP registry when AAMP_REGISTRY_URL is
     set, legacy IAB server URL otherwise); per-seller DealsClients are
     created for whichever seller URLs discovery returns.
+
+    The orchestrator is wired to the global event bus singleton -- the
+    same bus the API's ``/events`` endpoint reads -- so
+    ``product.resolution`` and the audit-class ``negotiation.*`` events
+    are observable on the live surface (bead ar-nly5; without a bus,
+    ``_emit`` silently no-ops).
     """
     from ..clients.deals_client import DealsClient
     from ..config.settings import get_settings
+    from ..events.bus import get_event_bus_sync
     from ..registry import create_registry_client
 
     settings = get_settings()
     return MultiSellerOrchestrator(
         registry_client=create_registry_client(settings),
         deals_client_factory=lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs),
+        event_bus=get_event_bus_sync(),
         negotiation_config=NegotiationConfig.from_settings(settings),
         catalog_client_factory=(
             _make_catalog_client if settings.product_resolution_enabled else None

@@ -161,17 +161,12 @@ def emit_event_sync(
     """
     event: Event | None = None
     try:
-        from .bus import InMemoryEventBus, _event_bus_instance
+        from .bus import get_event_bus_sync
 
-        # Fast path: if the singleton is an InMemoryEventBus, call
-        # publish directly via a new event loop to avoid issues with
-        # nested loops in worker threads.
-        bus = _event_bus_instance
-        if bus is None:
-            bus = InMemoryEventBus()
-            import ad_buyer.events.bus as bus_mod
-
-            bus_mod._event_bus_instance = bus
+        # Fast path: get (or create) the shared singleton synchronously,
+        # then publish via a new event loop to avoid issues with nested
+        # loops in worker threads.
+        bus = get_event_bus_sync()
 
         event = Event(
             event_type=event_type,

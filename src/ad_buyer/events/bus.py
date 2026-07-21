@@ -114,12 +114,23 @@ async def get_event_bus() -> EventBus:
     currently have a shared storage backend like the seller, so we
     always use the in-memory implementation.
     """
+    return get_event_bus_sync()
+
+
+def get_event_bus_sync() -> EventBus:
+    """Synchronous access to the SAME global event bus singleton.
+
+    Needed by synchronous production wiring (``build_default_orchestrator``,
+    the chat interface) that must hand the bus to ``MultiSellerOrchestrator``
+    at construction time without an event loop. Constructing the orchestrator
+    with ``event_bus=None`` silently no-ops ``_emit``, dropping
+    ``product.resolution`` and the audit-class ``negotiation.*`` events from
+    the live ``/events`` surface (bead ar-nly5).
+    """
     global _event_bus_instance
 
-    if _event_bus_instance is not None:
-        return _event_bus_instance
-
-    _event_bus_instance = InMemoryEventBus()
+    if _event_bus_instance is None:
+        _event_bus_instance = InMemoryEventBus()
     return _event_bus_instance
 
 
