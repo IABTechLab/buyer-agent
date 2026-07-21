@@ -27,6 +27,7 @@ from ...orchestration.multi_seller import (
     DealParams,
     InventoryRequirements,
     MultiSellerOrchestrator,
+    NegotiationConfig,
 )
 from ...registry.models import AgentCard, TrustLevel
 
@@ -83,7 +84,6 @@ class SellerConnection:
             self.error = str(e)
             self.connected = False
         return False
-
 
 
 class _ConfiguredSellersRegistry:
@@ -378,9 +378,12 @@ Provide specific, actionable recommendations based on user requirements.""",
         # are configured via SELLER_ENDPOINTS, discovery is seeded from
         # them; otherwise the default registry-backed orchestrator is used.
         if self._sellers:
+            from ...config.settings import get_settings
+
             self._orchestrator = MultiSellerOrchestrator(
                 registry_client=_ConfiguredSellersRegistry(self._sellers),
                 deals_client_factory=self._make_deals_client,
+                negotiation_config=NegotiationConfig.from_settings(get_settings()),
             )
         else:
             self._orchestrator = build_default_orchestrator()

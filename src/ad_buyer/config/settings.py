@@ -70,6 +70,17 @@ class Settings(BaseSettings):
             return []
         return [url.strip() for url in self.seller_endpoints.split(",") if url.strip()]
 
+    # Negotiation in the real booking path (bead ar-cc3n). When a seller
+    # quote exceeds the buyer's max_cpm ceiling but sits within the
+    # negotiation band (quote <= ceiling * negotiation_band), the
+    # orchestrator attempts a deterministic negotiation before discarding
+    # the quote. Default ON; set NEGOTIATION_ENABLED=false to restore the
+    # legacy strict filter. The band default mirrors the reference SDK's
+    # negotiation_band_per_mille=1250 (1.25x).
+    negotiation_enabled: bool = True
+    negotiation_band: float = 1.25
+    negotiation_max_rounds: int = 3
+
     # LLM Settings
     default_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
     manager_llm_model: str = "anthropic/claude-opus-4-20250514"

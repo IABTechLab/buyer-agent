@@ -181,6 +181,43 @@ def _strictness_skip_required(
 
 
 @dataclass
+class NegotiationConfig:
+    """Config for the above-ceiling negotiation stage (bead ar-cc3n).
+
+    When a seller's quote exceeds the buyer's ``max_cpm`` ceiling but is
+    within the negotiation band (``effective_cpm <= max_cpm * band``),
+    the orchestrator attempts a deterministic negotiation via the
+    seller's negotiation surface before discarding the quote. No LLM is
+    in the loop for the negotiation decision itself.
+
+    Attributes:
+        enabled: Master switch. When False, the legacy strict filter is
+            restored: above-ceiling quotes are discarded without any
+            negotiation attempt.
+        band: Negotiation band as a multiplier on ``max_cpm``. Default
+            1.25 mirrors the reference SDK's
+            ``negotiation_band_per_mille=1250`` (iab-agentic-primitives
+            harness, commit 981b19d). ``band=1.0`` restores the strict
+            legacy filter behavior.
+        max_rounds: Bounded number of seller responses (the proposal's
+            round-1 counter included) before the buyer walks away.
+    """
+
+    enabled: bool = True
+    band: float = 1.25
+    max_rounds: int = 3
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> NegotiationConfig:
+        """Build from application ``Settings`` (env-driven, default ON)."""
+        return cls(
+            enabled=settings.negotiation_enabled,
+            band=settings.negotiation_band,
+            max_rounds=settings.negotiation_max_rounds,
+        )
+
+
+@dataclass
 class InventoryRequirements:
     """Describes what inventory the campaign needs.
 
@@ -306,15 +343,25 @@ class OrchestrationResult:
 
     Attributes:
         discovered_sellers: Sellers found via registry discovery.
-        quote_results: Raw results from parallel quote requests.
+        quote_results: Raw results from parallel quote requests. When a
+            negotiation concluded successfully, the fresh re-quote at the
+            agreed price appears here alongside the original results.
         ranked_quotes: Quotes after normalization and ranking.
         selection: The deal selection and booking result.
+        negotiations: One record per negotiation attempt on an
+            above-ceiling-within-band quote (bead ar-cc3n): seller,
+            original quote, opening price, per-round history, outcome
+            (``accepted`` / ``walked_away`` / ``rejected`` /
+            ``unavailable`` / ``requote_failed`` /
+            ``requote_above_ceiling``), agreed CPM, and the fresh quote
+            id when re-quoted.
     """
 
     discovered_sellers: list[AgentCard]
     quote_results: list[SellerQuoteResult]
     ranked_quotes: list[NormalizedQuote]
     selection: DealSelection
+    negotiations: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +422,8 @@ class MultiSellerOrchestrator:
         quote_normalizer: QuoteNormalizer | None = None,
         quote_timeout: float = 30.0,
         capability_client: CapabilityClient | None = None,
+        negotiation_client: Any | None = None,
+        negotiation_config: NegotiationConfig | None = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
@@ -386,6 +435,12 @@ class MultiSellerOrchestrator:
         # the orchestrator runs the §5.7 layer 1+2 pre-flight before booking.
         # When None, it falls back to the layer-3 retry-only path.
         self._capability_client = capability_client
+        # Negotiation stage (bead ar-cc3n): client speaking the seller's
+        # proposal + shared-NegotiationMessage surface. Lazily constructed
+        # from `ad_buyer.negotiation.NegotiationClient` when None and the
+        # stage is enabled; injectable for tests.
+        self._negotiation_client = negotiation_client
+        self._negotiation_config = negotiation_config or NegotiationConfig()
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -627,6 +682,372 @@ class MultiSellerOrchestrator:
             len(ranked),
         )
         return ranked
+
+    # ------------------------------------------------------------------
+    # Stage 3.5: Negotiate above-ceiling quotes within the band (ar-cc3n)
+    # ------------------------------------------------------------------
+
+    def _get_negotiation_client(self) -> Any:
+        """Return the negotiation client, constructing the default lazily."""
+        if self._negotiation_client is None:
+            from ..negotiation.client import NegotiationClient
+
+            self._negotiation_client = NegotiationClient(timeout=self._quote_timeout)
+        return self._negotiation_client
+
+    async def negotiate_above_ceiling(
+        self,
+        quote_results: list[SellerQuoteResult],
+        deal_params: DealParams,
+        max_cpm: float,
+    ) -> tuple[list[SellerQuoteResult], list[dict[str, Any]]]:
+        """Attempt negotiation for quotes above the ceiling but within band.
+
+        For each successful quote whose effective CPM lands in
+        ``(max_cpm, max_cpm * band]``, run the deterministic negotiation
+        policy (`_negotiate_quote`). Quotes at/below the ceiling and
+        quotes beyond the band are untouched (the latter are discarded by
+        the ranking filter exactly as before).
+
+        Returns:
+            (new_quote_results, negotiation_records): fresh re-quotes at
+            the agreed price for successful negotiations, plus one record
+            per attempt for observability.
+        """
+        band_limit = max_cpm * self._negotiation_config.band
+        new_results: list[SellerQuoteResult] = []
+        records: list[dict[str, Any]] = []
+
+        for result in quote_results:
+            if result.quote is None:
+                continue
+            nq = self._normalizer.normalize_quote(result.quote, result.deal_type)
+            cpm = nq.effective_cpm
+            if cpm is None or cpm <= max_cpm or cpm > band_limit:
+                continue
+
+            negotiated, record = await self._negotiate_quote(
+                seller_url=result.seller_url,
+                seller_id=result.seller_id,
+                quote=result.quote,
+                quote_cpm=cpm,
+                deal_params=deal_params,
+                max_cpm=max_cpm,
+            )
+            records.append(record)
+            if negotiated is not None:
+                new_results.append(negotiated)
+
+        return new_results, records
+
+    async def _negotiate_quote(
+        self,
+        *,
+        seller_url: str,
+        seller_id: str,
+        quote: QuoteResponse,
+        quote_cpm: float,
+        deal_params: DealParams,
+        max_cpm: float,
+    ) -> tuple[SellerQuoteResult | None, dict[str, Any]]:
+        """Deterministically negotiate one above-ceiling quote.
+
+        Policy (no LLM in the loop; mirrors the reference SDK's
+        ReferenceBuyer band pattern, iab-agentic-primitives 981b19d):
+
+        1. Open a proposal at the buyer's target CPM, clamped to never
+           exceed ``max_cpm``. The seller's proposal response is round 1
+           (its ``counter_terms.proposed_price`` is the seller's first
+           counter). The proposal-led open is required by the seller's
+           contract: its negotiation surface rejects quote-led opens.
+        2. Hold the standing offer while evaluating seller counters via
+           ``POST /api/v1/negotiations/messages``; accept the FIRST
+           seller price <= ``max_cpm``; walk after
+           ``NegotiationConfig.max_rounds`` seller responses, on a
+           terminal reject, or when the seller's final offer stays above
+           the ceiling.
+        3. On agreement at price P (always <= ``max_cpm``), re-request a
+           quote with ``target_cpm=P``. The seller's quote engine honors
+           an acceptable target as the quote's ``final_cpm``, and booking
+           strikes the deal at the fresh quote's price -- the only
+           contract-clean way to book a negotiated price today. The fresh
+           quote is verified <= ``max_cpm`` before it enters the ranked
+           list; the budget/spend-ceiling gates remain the final arbiter.
+
+        Returns:
+            (negotiated_result, record). ``negotiated_result`` is a
+            SellerQuoteResult wrapping the fresh at-agreed-price quote,
+            or None when the buyer walked (the original quote stays
+            discarded by the ceiling filter).
+        """
+        from ..negotiation.models import NegotiationSession
+
+        config = self._negotiation_config
+        target = deal_params.target_cpm
+        # Never open above the ceiling: a misconfigured target is clamped.
+        open_price = min(target, max_cpm) if target is not None else max_cpm
+
+        record: dict[str, Any] = {
+            "seller_id": seller_id,
+            "quote_id": quote.quote_id,
+            "product_id": deal_params.product_id,
+            "quote_cpm": quote_cpm,
+            "max_cpm": max_cpm,
+            "open_cpm": open_price,
+            "outcome": "walked_away",
+            "agreed_cpm": None,
+            "rounds": [],
+            "requoted_quote_id": None,
+        }
+
+        await self._emit(
+            EventType.NEGOTIATION_STARTED,
+            payload={
+                "seller_id": seller_id,
+                "quote_id": quote.quote_id,
+                "product_id": deal_params.product_id,
+                "quote_cpm": quote_cpm,
+                "max_cpm": max_cpm,
+                "band_limit": max_cpm * config.band,
+                "open_cpm": open_price,
+            },
+        )
+
+        client = self._get_negotiation_client()
+
+        # ---- Round 1: proposal-led open at the buyer's target ----
+        try:
+            proposal = await client.submit_proposal(
+                seller_url=seller_url,
+                product_id=deal_params.product_id,
+                deal_type=deal_params.deal_type,
+                price=open_price,
+                impressions=deal_params.impressions,
+                start_date=deal_params.flight_start,
+                end_date=deal_params.flight_end,
+            )
+        except Exception as exc:  # noqa: BLE001 - negotiation is best-effort; walk honestly
+            logger.warning(
+                "Negotiation unavailable for quote %s (seller %s): %s",
+                quote.quote_id,
+                seller_id,
+                exc,
+            )
+            record["outcome"] = "unavailable"
+            record["error"] = str(exc)
+            await self._emit_negotiation_concluded(record)
+            return None, record
+
+        proposal = proposal or {}
+        proposal_id = str(proposal.get("proposal_id") or f"prop-{quote.quote_id}")
+        recommendation = proposal.get("recommendation")
+        counter_terms = proposal.get("counter_terms") or {}
+        raw_price = counter_terms.get("proposed_price")
+        seller_price = float(raw_price) if raw_price is not None else None
+        rounds_used = 1
+
+        await self._record_negotiation_round(
+            record, rounds_used, open_price, seller_price, str(recommendation)
+        )
+
+        session = NegotiationSession(
+            proposal_id=proposal_id,
+            seller_url=seller_url,
+            negotiation_id=str(counter_terms.get("negotiation_id") or proposal_id),
+            current_seller_price=seller_price if seller_price is not None else 0.0,
+            our_last_offer=open_price,
+        )
+
+        agreed: float | None = None
+        terminal = False
+
+        if recommendation == "accept":
+            # Seller accepted the buyer's opening offer as-is.
+            agreed = open_price
+        elif seller_price is None:
+            # No counter to evaluate: rejected outright, or the proposal
+            # went to a pending/failed state the buyer cannot negotiate.
+            record["outcome"] = "rejected" if recommendation == "reject" else "unavailable"
+            terminal = True
+        elif seller_price <= max_cpm:
+            # Accept the FIRST seller price at/below the ceiling.
+            agreed = seller_price
+            await self._best_effort(client.accept, session)
+
+        # ---- Rounds 2..max: hold the standing offer, seller concedes ----
+        while agreed is None and not terminal and rounds_used < config.max_rounds:
+            try:
+                round_result = await client.counter_offer(session, open_price)
+            except Exception as exc:  # noqa: BLE001 - seller surface failed; walk honestly
+                logger.warning(
+                    "Negotiation round failed for proposal %s (seller %s): %s",
+                    proposal_id,
+                    seller_id,
+                    exc,
+                )
+                record["outcome"] = "unavailable"
+                record["error"] = str(exc)
+                terminal = True
+                break
+
+            rounds_used += 1
+            action = getattr(round_result, "action", "counter")
+            raw = getattr(round_result, "seller_price", None)
+            price = float(raw) if raw is not None else None
+            await self._record_negotiation_round(
+                record, rounds_used, open_price, price, str(action)
+            )
+
+            if action == "accept":
+                # Seller accepted our standing offer. Guard the invariant
+                # anyway: never treat an above-ceiling echo as agreement.
+                if price is not None and price <= max_cpm:
+                    agreed = price
+                else:
+                    await self._best_effort(client.decline, session)
+                    terminal = True
+                break
+
+            if price is not None and price <= max_cpm:
+                agreed = price
+                await self._best_effort(client.accept, session)
+                break
+
+            if action == "reject":
+                record["outcome"] = "rejected"
+                terminal = True
+                break
+
+            if action == "final_offer":
+                # The seller's best -- and it's still above the ceiling.
+                break
+
+        if agreed is None or agreed > max_cpm:
+            # Honest walk: close an abandoned-active negotiation with a
+            # recorded reject so the seller isn't left hanging.
+            if not terminal:
+                await self._best_effort(client.decline, session)
+            await self._emit_negotiation_concluded(record)
+            return None, record
+
+        record["agreed_cpm"] = agreed
+
+        # ---- Re-quote at the agreed price; booking uses the fresh quote ----
+        try:
+            deals_client = self._deals_client_factory(seller_url)
+            requote = await asyncio.wait_for(
+                deals_client.request_quote(
+                    QuoteRequest(
+                        product_id=deal_params.product_id,
+                        deal_type=deal_params.deal_type,
+                        impressions=deal_params.impressions,
+                        flight_start=deal_params.flight_start,
+                        flight_end=deal_params.flight_end,
+                        target_cpm=agreed,
+                        media_type=deal_params.media_type,
+                        audience_plan=deal_params.audience_plan,
+                    )
+                ),
+                timeout=self._quote_timeout,
+            )
+        except Exception as exc:  # noqa: BLE001 - re-quote failed; walk honestly
+            logger.warning("Post-negotiation re-quote failed for seller %s: %s", seller_id, exc)
+            record["outcome"] = "requote_failed"
+            record["error"] = str(exc)
+            await self._emit_negotiation_concluded(record)
+            return None, record
+
+        final_cpm = requote.pricing.final_cpm if requote is not None else None
+        if final_cpm is None or final_cpm > max_cpm:
+            # Money invariant: NEVER book above the ceiling, even if the
+            # seller reneges on the agreed price at re-quote time.
+            logger.warning(
+                "Re-quote from seller %s came back at %s, above ceiling %.2f; "
+                "refusing to book (negotiated %.2f)",
+                seller_id,
+                f"{final_cpm:.2f}" if final_cpm is not None else "unpriced",
+                max_cpm,
+                agreed,
+            )
+            record["outcome"] = "requote_above_ceiling"
+            await self._emit_negotiation_concluded(record)
+            return None, record
+
+        record["outcome"] = "accepted"
+        record["requoted_quote_id"] = requote.quote_id
+        await self._emit_negotiation_concluded(record)
+
+        logger.info(
+            "Negotiation succeeded with seller %s: %.2f -> %.2f (ceiling %.2f), fresh quote %s",
+            seller_id,
+            quote_cpm,
+            final_cpm,
+            max_cpm,
+            requote.quote_id,
+        )
+        return (
+            SellerQuoteResult(
+                seller_id=seller_id,
+                seller_url=seller_url,
+                quote=requote,
+                deal_type=deal_params.deal_type,
+                error=None,
+            ),
+            record,
+        )
+
+    async def _record_negotiation_round(
+        self,
+        record: dict[str, Any],
+        round_number: int,
+        buyer_price: float,
+        seller_price: float | None,
+        action: str,
+    ) -> None:
+        """Append a round to the record and emit NEGOTIATION_ROUND."""
+        entry = {
+            "round": round_number,
+            "buyer_price": buyer_price,
+            "seller_price": seller_price,
+            "action": action,
+        }
+        record["rounds"].append(entry)
+        await self._emit(
+            EventType.NEGOTIATION_ROUND,
+            payload={
+                "seller_id": record["seller_id"],
+                "quote_id": record["quote_id"],
+                **entry,
+            },
+        )
+
+    async def _emit_negotiation_concluded(self, record: dict[str, Any]) -> None:
+        """Emit NEGOTIATION_CONCLUDED for a finished attempt."""
+        await self._emit(
+            EventType.NEGOTIATION_CONCLUDED,
+            payload={
+                "seller_id": record["seller_id"],
+                "quote_id": record["quote_id"],
+                "outcome": record["outcome"],
+                "agreed_cpm": record["agreed_cpm"],
+                "rounds": len(record["rounds"]),
+                "requoted_quote_id": record["requoted_quote_id"],
+            },
+        )
+
+    @staticmethod
+    async def _best_effort(func: Callable[..., Any], *args: Any) -> None:
+        """Await a terminal negotiation move, swallowing failures.
+
+        Accept/decline messages are courtesy signals on the negotiation
+        surface; the booking commit happens on the deals surface. A
+        failure here must not abort the flow (today's real seller cannot
+        even receive them for fresh negotiations -- see contract notes).
+        """
+        try:
+            await func(*args)
+        except Exception as exc:  # noqa: BLE001 - courtesy signal only
+            logger.debug("Best-effort negotiation signal failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Stage 4: Select and book deals
@@ -1153,6 +1574,24 @@ class MultiSellerOrchestrator:
             max_cpm=inventory_requirements.max_cpm,
         )
 
+        # Stage 3.5: Negotiate above-ceiling quotes within the band
+        # (ar-cc3n). Successful negotiations yield fresh quotes at the
+        # agreed price, which join the pool and are re-ranked; the
+        # original above-ceiling quotes stay filtered out.
+        negotiations: list[dict[str, Any]] = []
+        if self._negotiation_config.enabled and inventory_requirements.max_cpm is not None:
+            negotiated_results, negotiations = await self.negotiate_above_ceiling(
+                quote_results,
+                deal_params,
+                max_cpm=inventory_requirements.max_cpm,
+            )
+            if negotiated_results:
+                quote_results = list(quote_results) + negotiated_results
+                ranked = await self.evaluate_and_rank(
+                    quote_results,
+                    max_cpm=inventory_requirements.max_cpm,
+                )
+
         if not ranked:
             logger.info("No viable quotes after evaluation")
             return OrchestrationResult(
@@ -1165,6 +1604,7 @@ class MultiSellerOrchestrator:
                     total_spend=0.0,
                     remaining_budget=budget,
                 ),
+                negotiations=negotiations,
             )
 
         # Build quote -> seller URL map from quote results
@@ -1199,4 +1639,5 @@ class MultiSellerOrchestrator:
             quote_results=quote_results,
             ranked_quotes=ranked,
             selection=selection,
+            negotiations=negotiations,
         )
