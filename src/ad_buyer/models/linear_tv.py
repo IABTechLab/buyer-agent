@@ -12,7 +12,7 @@ Design decisions (from LINEAR_TV_DEAL_FLOW_RESEARCH.md):
 - Option C (Hybrid): same endpoints, media_type branching
 - DMA-level granularity (all 210 DMAs)
 - Context-dependent deal_type: linear_tv uses ["upfront", "scatter", "opportunistic"]
-- Scatter-only for v1 (upfronts TBD, separate bead ar-gh6)
+- Scatter-only for v1 (upfronts TBD)
 - TIP-compatible, not TIP-native
 - Nielsen measurement currency only for v1
 """

@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for the chat interface's thin canonical booking wrappers (ar-j2nw).
+"""Tests for the chat interface's thin canonical booking wrappers.
 
 The chat agent's booking tools must be thin calls into the canonical
 MultiSellerOrchestrator pipeline — no bespoke seller-protocol dialect,
@@ -178,6 +178,6 @@ class TestRivalChatToolsStayDead:
             "CreatePMPDealTool",
         ):
             assert not hasattr(chat_main, name), (
-                f"{name} is a deleted rival booking path (bead ar-j2nw); "
+                f"{name} is a deleted rival booking path; "
                 "chat must book through the canonical orchestrator wrappers."
             )

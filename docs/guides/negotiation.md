@@ -271,7 +271,7 @@ if buyer_context.can_negotiate():
 ## Roadmap
 
 !!! note "Planned Improvements"
-    See [PROGRESS.md](https://github.com/IABTechLab/buyer-agent/blob/main/.beads/PROGRESS.md) for current status on:
+    The following improvements are planned:
 
     - **AdaptiveStrategy** — Dynamic concession based on seller patterns
     - **CompetitiveStrategy** — Multi-seller competitive bidding

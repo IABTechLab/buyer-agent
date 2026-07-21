@@ -9,7 +9,7 @@ Provides async methods to query the seller's order endpoints:
 
 Used to pull seller-side order state into the buyer's local database.
 
-bead: buyer-nz9 (Order Status & Audit API Integration)
+Order Status & Audit API Integration.
 """
 
 import logging

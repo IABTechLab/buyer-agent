@@ -109,3 +109,6 @@ site/
 .bedrock_agentcore.yaml
 Dockerfile
 .dockerignore
+
+# Internal issue tracker (not published)
+.beads/

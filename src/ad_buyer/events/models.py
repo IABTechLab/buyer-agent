@@ -49,7 +49,7 @@ class EventType(str, Enum):
     # Inventory lifecycle
     INVENTORY_DISCOVERED = "inventory.discovered"
 
-    # Cross-seller product identity (bead ar-gufw): emitted once per seller
+    # Cross-seller product identity: emitted once per seller
     # when the orchestrator resolves the campaign's recommended product onto
     # that seller's own catalog before quoting. Payload carries the outcome
     # ("exact_id" | "name_match" | "channel_match" | "unresolved" |
@@ -84,7 +84,7 @@ class EventType(str, Enum):
     CREATIVE_ROTATION_UPDATED = "creative.rotation_updated"
     CREATIVE_AD_SERVER_PUSHED = "creative.ad_server_pushed"
 
-    # Approval lifecycle (Campaign Automation, buyer-2qs)
+    # Approval lifecycle (Campaign Automation)
     APPROVAL_REQUESTED = "approval.requested"
     APPROVAL_GRANTED = "approval.granted"
     APPROVAL_REJECTED = "approval.rejected"

@@ -1,4 +1,4 @@
-"""ar-ei0s: reject_global_agentic brief-ingestion validator tests."""
+"""reject_global_agentic brief-ingestion validator tests."""
 
 import os
 

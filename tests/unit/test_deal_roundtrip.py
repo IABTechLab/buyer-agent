@@ -7,7 +7,6 @@ Verifies that v2 fields set via create_deal_manual survive the full
 save/load cycle and appear as first-class columns (not lost in a
 metadata JSON blob).
 
-bead: buyer-e3d5
 """
 
 import pytest

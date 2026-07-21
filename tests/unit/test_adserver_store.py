@@ -5,7 +5,7 @@
 
 All tests use in-memory SQLite (`:memory:`) for speed and isolation.
 
-bead: buyer-uoz (Ad server integration record storage)
+Ad server integration record storage.
 """
 
 import uuid

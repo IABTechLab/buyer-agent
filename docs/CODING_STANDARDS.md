@@ -1,6 +1,6 @@
 # Coding Standards: ad_buyer_system
 
-Standards derived from the code quality audit (ar-diwq, 2026-03-25).
+Standards derived from the code quality audit (2026-03-25).
 Applies to all Python source in `src/ad_buyer/` and `tests/`.
 
 ---

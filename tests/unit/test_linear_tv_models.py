@@ -7,7 +7,7 @@ Covers LinearTVParams, LinearTVQuoteDetails, CancellationTerms,
 MakegoodRequest, CancellationRequest, and extensions to
 QuoteRequest/QuoteResponse/PricingInfo/TermsInfo for linear TV support.
 
-Tests written first (TDD) per bead buyer-6io.
+Tests written first (TDD).
 """
 
 import pytest

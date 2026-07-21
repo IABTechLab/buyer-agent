@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""OpenDirect 2.1 Tier-1 wire-dialect conformance (bead ar-kzi0).
+"""OpenDirect 2.1 Tier-1 wire-dialect conformance.
 
 The OpenDirect v2.1 normative attribute tables use ALL-LOWERCASE field
 names (``productid``, ``startdate``, ``enddate``, ...); the buyer's wire

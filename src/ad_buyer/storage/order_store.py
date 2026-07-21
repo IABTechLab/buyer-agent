@@ -14,7 +14,7 @@ demand from the seller's Order API.
 Thread safety is provided by check_same_thread=False and a threading.Lock(),
 matching the DealStore pattern.
 
-bead: buyer-nz9 (Order Status & Audit API Integration), buyer-r0j (Negotiation & Orders MCP Tools)
+ (Order Status & Audit API Integration) (Negotiation & Orders MCP Tools)
 """
 
 import json

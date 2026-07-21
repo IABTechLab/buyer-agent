@@ -3,7 +3,7 @@
 
 """Unit tests for the aggregate stores extracted from DealStore.
 
-Covers the EP-2.4 god-class split (bead ar-bonx): each focused store gets
+Covers the EP-2.4 god-class split: each focused store gets
 a happy-path test plus one edge case, driven directly against the store
 class (constructed over a shared in-memory SQLite connection).  A
 structural test asserts DealStore is now a thin facade that composes the

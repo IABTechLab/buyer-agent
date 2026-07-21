@@ -25,7 +25,7 @@ orchestrator (the flow derives the orchestrator's ceiling from the approved
 recommendation's own cpm/cost, so an unclamped inflated value would be self-
 authorizing).
 
-Bead ar-1ow7 (EP-4.3).
+Part of EP-4.3.
 """
 
 import logging

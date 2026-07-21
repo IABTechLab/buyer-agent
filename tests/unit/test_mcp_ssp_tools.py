@@ -8,7 +8,6 @@ Tests three SSP connector MCP tools:
   - import_deals_ssp
   - test_ssp_connection
 
-bead: buyer-sozw
 """
 
 from __future__ import annotations

@@ -6,7 +6,6 @@
 Tests four campaign management MCP tools: list_campaigns,
 get_campaign_status, check_pacing, review_budgets.
 
-bead: buyer-3w3
 """
 
 import json

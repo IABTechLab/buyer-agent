@@ -3,8 +3,8 @@
 
 """End-to-end integration test: audience plan on the canonical pipeline.
 
-Bead ar-lk23 / proposal §6 row 16, adapted to the ONE canonical buyer
-pipeline (bead ar-j2nw -- CampaignPipeline and BuyerDealFlow were
+Proposal §6 row 16, adapted to the ONE canonical buyer
+pipeline (CampaignPipeline and BuyerDealFlow were
 retired). The brief-driven path is now:
 
     DealBookingFlow (planning + approval gate) -> approved
@@ -185,8 +185,8 @@ def mock_orchestrator() -> AsyncMock:
     """A MultiSellerOrchestrator AsyncMock that captures every orchestrate call.
 
     The canonical flow's booking handoff forwards InventoryRequirements /
-    DealParams (each with an `audience_plan` attached per proposal §5.3 /
-    bead ar-fgyq §6) into `orchestrate`. Inspecting the captured call args
+    DealParams (each with an `audience_plan` attached per proposal §5.3
+    / §6) into `orchestrate`. Inspecting the captured call args
     is how we verify the typed AudiencePlan reaches the seller boundary.
     """
 
@@ -694,7 +694,7 @@ class TestCrossRepoAudiencePlanJSONRoundTrip:
         # uses the same field names so reading the buyer's JSON dict per-ref
         # works directly.
         #
-        # Path resolution (per ar-840n / ar-e2rj): tests can override via
+        # Path resolution: tests can override via
         # the `AD_SELLER_SRC_PATH` env var (e.g., for CI runners with a
         # non-standard layout). Otherwise, walk up from this file to find
         # the buyer repo root (named `ad_buyer_system`) and its parent;

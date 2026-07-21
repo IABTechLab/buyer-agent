@@ -70,7 +70,7 @@ class Settings(BaseSettings):
             return []
         return [url.strip() for url in self.seller_endpoints.split(",") if url.strip()]
 
-    # Negotiation in the real booking path (bead ar-cc3n). When a seller
+    # Negotiation in the real booking path. When a seller
     # quote exceeds the buyer's max_cpm ceiling but sits within the
     # negotiation band (quote <= ceiling * negotiation_band), the
     # orchestrator attempts a deterministic negotiation before discarding
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     negotiation_band: float = 1.25
     negotiation_max_rounds: int = 3
     # HTTP timeout for the negotiation surface (proposal open + counter
-    # rounds), SEPARATE from the 30 s quote timeout (bead ar-vc4m). Sellers
+    # rounds), SEPARATE from the 30 s quote timeout. Sellers
     # may answer POST /proposals with a synchronous LLM crew: the live
     # rig's ProposalHandlingFlow measured ~10m46s (~646 s) per proposal
     # (S2 live proof 2026-07-21, Bug I), so the old 30 s quote-timeout
@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     # Override via NEGOTIATION_TIMEOUT_SECONDS.
     negotiation_timeout_seconds: float = 720.0
 
-    # Cross-seller product resolution (bead ar-gufw). Research reads one
+    # Cross-seller product resolution. Research reads one
     # catalog, but discovery may return OTHER sellers whose catalogs use
     # different product IDs -- quoting them with the recommended ID 404s
     # (product_not_found) seller-side. When enabled, the orchestrator

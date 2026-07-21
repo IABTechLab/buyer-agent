@@ -1,11 +1,11 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tolerant per-product catalog parsing in the resolution path (bead ar-sbej).
+"""Tolerant per-product catalog parsing in the resolution path.
 
 Wave-B rig proof 2026-07-21 (docs/reports/WAVE_B_RIG_PROOF_2026-07-21.md):
 every rig seller's 13-product catalog contains two names longer than the
-buyer OpenDirect model's 38-char ``name`` cap. ar-gufw's Stage 1.5
+buyer OpenDirect model's 38-char ``name`` cap. Cross-seller resolution's Stage 1.5
 resolution fetched the FULL catalog through the strict model, so ONE
 invalid product failed the entire fetch -> ``catalog_error`` -> seller
 skipped -> with PRODUCT_RESOLUTION_ENABLED default-on the fleet booked
@@ -172,7 +172,7 @@ class TestListProductsTolerant:
         """The strict path must STILL fail whole-catalog on an invalid item.
 
         Tolerance is scoped to the resolution path; the 38-char model
-        constraint itself is deliberately NOT loosened here (ar-sbej).
+        constraint itself is deliberately NOT loosened here.
         """
         client = _client_serving(
             _envelope(

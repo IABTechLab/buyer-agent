@@ -15,7 +15,7 @@ validation+clamp boundary and prove:
   value -- the inflated LLM CPM never authorizes a booking above the buyer's
   own max.
 
-Bead ar-1ow7 (EP-4.3).
+Part of EP-4.3.
 """
 
 from __future__ import annotations
@@ -175,7 +175,7 @@ class TestParseClampsAndRejects:
 
 
 # ---------------------------------------------------------------------------
-# 2b. Bounds derived from kpis-shaped briefs (real-driver path, bead ar-0wev)
+# 2b. Bounds derived from kpis-shaped briefs (real-driver path)
 # ---------------------------------------------------------------------------
 
 
@@ -210,7 +210,7 @@ class TestBoundsFromKpisShapedBrief:
     """The CPM clamp must engage for briefs that carry the ceiling in
     ``kpis.max_cpm_usd`` (the CampaignBrief / rig shape). Run #13 regression:
     a $25-CPM item sailed past an $18 ceiling because bounds only read the
-    top-level ``max_cpm`` key. Bead ar-0wev."""
+    top-level ``max_cpm`` key."""
 
     def test_kpis_max_cpm_usd_engages_cpm_clamp(self):
         flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": 18.0})

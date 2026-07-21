@@ -14,7 +14,6 @@ Report types:
   - DealReport: per-deal fill rate, win rate, spend
   - CampaignReport: combined full report with all sections
 
-bead: buyer-f58
 """
 
 from __future__ import annotations

@@ -3,7 +3,6 @@
 
 """Tests for CPM hallucination fix — Layer 2a: remove hardcoded price fallbacks.
 
-Bead: ar-na3i (child of epic ar-rrgw)
 
 These tests verify that the buyer agent no longer fabricates pricing
 when sellers have not provided it. Each test targets a specific
@@ -306,7 +305,7 @@ class TestQuoteFlowNoFallback:
 # 4. canonical booking path — no fabricated impressions
 # ---------------------------------------------------------------------------
 # The retired CampaignPipeline._estimate_impressions (and its assumed_cpm
-# fallback) was deleted with the pipeline (bead ar-j2nw). On the canonical
+# fallback) was deleted with the pipeline. On the canonical
 # path, impression counts flow from the approved recommendation into
 # DealParams verbatim — asserted by
 # tests/unit/test_deal_booking_flow.py::TestApprovalAndBooking::

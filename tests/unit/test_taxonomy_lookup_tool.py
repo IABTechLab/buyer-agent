@@ -1,10 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for the TaxonomyLookupTool CrewAI tool.
-
-bead: ar-50cm
-"""
+"""Tests for the TaxonomyLookupTool CrewAI tool."""
 
 from ad_buyer.tools.audience.taxonomy_lookup import (
     TaxonomyLookupInput,

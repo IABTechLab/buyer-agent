@@ -7,8 +7,6 @@ Exercises ``ad_buyer.services.booking_service`` directly: job-record
 construction, DealStore persistence, the DealBookingFlow execution
 handoff (with the sync-kickoff worker-thread offload), and approval
 execution -- happy paths and edge cases.
-
-bead: ar-22w1
 """
 
 from __future__ import annotations
@@ -155,7 +153,7 @@ class TestExecuteBooking:
 
         assert job["status"] == "awaiting_approval"
         assert job["_flow"] is created[0]
-        # buyer-1g4: kickoff must run off the main thread.
+        # kickoff must run off the main thread.
         assert created[0].kickoff_thread is not None
         assert "MainThread" not in created[0].kickoff_thread
         # Persisted snapshot exists.
@@ -252,9 +250,9 @@ class TestApproval:
         assert job["recommendations"] == [{"product_id": "p2"}]
 
     async def test_approve_all_propagates_flow_errors(self, store):
-        """Execution failures during approval must land in job['errors'] (ar-h2o6).
+        """Execution failures during approval must land in job['errors'].
 
-        Mirrors the kickoff-path propagation (ar-jbod): a booking failure
+        Mirrors the kickoff-path propagation: a booking failure
         recorded on flow.state.errors during approve_all() was previously
         dropped, so pollers saw a failed job with no reason.
         """
@@ -300,7 +298,7 @@ class TestApproval:
         job = booking_service.new_job_record(_brief(), auto_approve=False)
         flow = _FakeFlow()
         flow.state.errors.append("Branding research failed: boom")
-        # Kickoff path (ar-jbod) already copied it onto the job.
+        # Kickoff path already copied it onto the job.
         job["errors"].append("Branding research failed: boom")
         job["_flow"] = flow
 
@@ -311,7 +309,7 @@ class TestApproval:
 
 @pytest.mark.asyncio
 class TestZeroRecommendationVisibility:
-    """A job held for approval with nothing to approve must say so (ar-h2o6)."""
+    """A job held for approval with nothing to approve must say so."""
 
     async def test_awaiting_approval_with_zero_recommendations_records_error(
         self, store, monkeypatch
@@ -357,7 +355,7 @@ class TestZeroRecommendationVisibility:
 
 @pytest.mark.asyncio
 class TestBookedLinePersistSerialization:
-    """Persisting a real BookedLine must survive json.dumps (ar-ogrq).
+    """Persisting a real BookedLine must survive json.dumps.
 
     Run #16: the FIRST real seller deal booked, then approve() 500'd —
     BookedLine.model_dump() emitted a datetime `booked_at` and

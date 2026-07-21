@@ -1,4 +1,4 @@
-# Tests for the multi-turn negotiation client (buyer-llu)
+# Tests for the multi-turn negotiation client
 
 """Test suite for negotiation strategy, client, and models.
 

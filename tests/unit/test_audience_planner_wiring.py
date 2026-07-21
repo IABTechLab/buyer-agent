@@ -3,8 +3,8 @@
 
 """Tests for the Audience Planner step (run_audience_planner_step).
 
-Bead ar-fgyq §6 -- the keystone wiring bead, adapted to the canonical
-pipeline (bead ar-j2nw: CampaignPipeline was retired; the planner step is
+The keystone planner-wiring change, adapted to the canonical
+pipeline (CampaignPipeline was retired; the planner step is
 now specified directly against the brief it consumes). Verifies:
 
 1. run_audience_planner_step(brief) populates a typed AudiencePlan from
@@ -114,7 +114,7 @@ class TestPlannerStepProducesAudiencePlan:
         result = run_audience_planner_step(brief)
 
         assert result.plan is not None, (
-            "After ar-fgyq §6, the Audience Planner step MUST populate a "
+            "The Audience Planner step MUST populate a "
             "typed plan from the brief."
         )
         assert isinstance(result.plan, AudiencePlan)
@@ -265,7 +265,7 @@ class TestResearchAgentRelocation:
     """The 3 UCP audience tools moved off the Research Agent.
 
     Channel crews previously bundled `research_tools + audience_tools` into
-    `create_research_agent(...)`. After ar-fgyq §6 / proposal §5.3, the
+    `create_research_agent(...)`. Per proposal §5.3, the
     Research Agent operates on inventory only. This test introspects the
     Research Agent inside each channel crew and asserts the audience tools
     are gone.

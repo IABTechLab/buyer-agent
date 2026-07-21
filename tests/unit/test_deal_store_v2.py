@@ -376,7 +376,7 @@ class TestIntrinsicFieldsViaStore:
         )
 
         # Update using raw SQL (DealStore doesn't have setters for new
-        # fields yet — that's a separate bead)
+        # fields yet — that's separate follow-up work)
         with deal_store._lock:
             deal_store._conn.execute(
                 """UPDATE deals SET

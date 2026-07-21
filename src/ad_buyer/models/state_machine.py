@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Buyer Order State Machine (buyer-5er).
+"""Buyer Order State Machine.
 
 Formal state machine for buyer deal and campaign lifecycles, adapted from
 the seller's OrderStateMachine framework.  Provides:

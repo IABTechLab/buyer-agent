@@ -49,7 +49,7 @@ __all__ = [
     "SCHEMA_VERSION",
     "create_tables",
     "initialize_schema",
-    # Aggregate stores extracted from DealStore (ar-bonx, EP-2.4)
+    # Aggregate stores extracted from DealStore (EP-2.4)
     "BookingRecordStore",
     "CreativeAssetStore",
     "DealActivationStore",

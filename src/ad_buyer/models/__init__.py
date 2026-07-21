@@ -140,7 +140,7 @@ __all__ = [
     "AssetType",
     "CreativeAsset",
     "ValidationStatus",
-    # Campaign brief models (buyer-80k)
+    # Campaign brief models
     "ApprovalConfig",
     "ApprovalStage",
     "BrandSafety",

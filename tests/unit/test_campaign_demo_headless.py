@@ -1,4 +1,4 @@
-"""ar-jzek: campaign demo headless / JSON mode tests."""
+"""campaign demo headless / JSON mode tests."""
 
 import json
 import os
@@ -12,7 +12,7 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-unit-tests")
 def _run_module(args: list[str]) -> subprocess.CompletedProcess:
     """Run `python -m demo.campaign_demo <args>` with a fresh tmp DB."""
 
-    tmp_dir = tempfile.mkdtemp(prefix="ar-jzek-")
+    tmp_dir = tempfile.mkdtemp(prefix="campaign-demo-")
     db_path = f"sqlite:///{tmp_dir}/demo.db"
     # `src` puts ad_buyer on the path; `.` makes the top-level demo package
     # (moved out of the shipped wheel in EP-8.1) importable.

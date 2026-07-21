@@ -88,7 +88,7 @@ async def lifespan(application):
 
 app.router.lifespan_context = lifespan
 
-# Mount order status/audit router (buyer-nz9)
+# Mount order status/audit router
 from .order_endpoints import create_order_router  # noqa: E402
 
 # Lazy OrderStore singleton
@@ -407,7 +407,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
             detail="Flow state not available. Job may have expired.",
         )
 
-    # buyer-1g4: approve_all() runs sync CrewAI work; the service offloads
+    # approve_all() runs sync CrewAI work; the service offloads
     # it to a worker thread so the event loop stays responsive.
     return await booking_service.approve_all(
         job_id,
@@ -767,7 +767,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
     Thin adapter over ``booking_service.execute_booking``: wires the
     OpenDirect client, the DealStore, and the persistence callback, then
     hands off to the service which owns the canonical DealBookingFlow run
-    (including the buyer-1g4 worker-thread offload of the sync kickoff).
+    (including the worker-thread offload of the sync kickoff).
     """
     await booking_service.execute_booking(
         job_id,

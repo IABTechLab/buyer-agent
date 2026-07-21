@@ -33,7 +33,7 @@ because the fast path is read-only -- a brief race where two concurrent
 discoveries both fetch is harmless (the later one wins; both responses
 go through the same parser).
 
-Bead: ar-gkbr (proposal §5.7 layer 1 + §6 row 13).
+See proposal §5.7 layer 1 + §6 row 13.
 """
 
 from __future__ import annotations

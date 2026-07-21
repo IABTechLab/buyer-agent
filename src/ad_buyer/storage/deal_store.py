@@ -13,7 +13,7 @@ deal CRUD (save/get/list/update-status) inline.  Every other aggregate --
 negotiation rounds, booking records, jobs, events, status transitions,
 portfolio metadata, deal activations, performance cache, creative assets,
 deal templates, and supply path templates -- lives in its own focused
-store module under ``ad_buyer.storage`` (bead ar-bonx, EP-2.4 god-class
+store module under ``ad_buyer.storage`` (EP-2.4 god-class
 split).  Those stores share this facade's single connection and lock, so
 the public API, table layout, SQL, and thread-safety semantics are
 unchanged; callers that use ``deal_store.<method>()`` continue to work
@@ -609,7 +609,7 @@ class DealStore:
     # The following methods forward verbatim to the composed aggregate
     # stores wired in connect().  They preserve the historical DealStore
     # public API so existing ``deal_store.<method>()`` call sites and test
-    # fixtures keep working unchanged after the god-class split (ar-bonx).
+    # fixtures keep working unchanged after the god-class split.
     # ------------------------------------------------------------------
 
     # -- Negotiation rounds ------------------------------------------------

@@ -6,7 +6,7 @@
 TDD RED: These tests define the expected behavior of the BudgetPacingEngine
 module before implementation.
 
-bead: buyer-9zz (2C: Budget Pacing & Reallocation)
+2C: Budget Pacing & Reallocation.
 """
 
 from datetime import UTC, datetime, timedelta

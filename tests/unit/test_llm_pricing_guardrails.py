@@ -3,7 +3,6 @@
 
 """Tests for CPM hallucination fix -- Layer 3: LLM prompt guardrails.
 
-Bead: ar-8opr (child of epic ar-rrgw)
 
 These tests verify that all agent backstories contain pricing discipline
 language preventing LLM hallucination of CPM values, and that the

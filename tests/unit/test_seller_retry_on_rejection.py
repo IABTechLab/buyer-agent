@@ -10,7 +10,7 @@ view and retries the booking once with the degraded plan. Other errors
 surface unchanged. If the retry also fails, the seller is marked
 incompatible for this campaign (recorded on `DealSelection`).
 
-Bead: ar-0w48 (proposal §5.7 layer 2 + §6 row 12).
+See proposal §5.7 layer 2 + §6 row 12.
 """
 
 from __future__ import annotations

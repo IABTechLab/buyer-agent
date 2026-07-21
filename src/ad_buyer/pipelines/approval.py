@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Configurable human approval gates for the campaign pipeline (buyer-2qs).
+"""Configurable human approval gates for the campaign pipeline.
 
 Implements D-3 (Option C): configurable per campaign, default requires
 approval for plan review and booking.  Each campaign brief includes an
@@ -30,7 +30,6 @@ Storage:
 
 References:
   - Campaign Automation Strategic Plan, UC-1, D-3, Section 5.3
-  - bead: buyer-2qs
 """
 
 import asyncio

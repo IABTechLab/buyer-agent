@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Campaign Automation step-through demo app (ar-llj4, ar-uxpw).
+"""Campaign Automation step-through demo app.
 
 Interactive Flask app that lets a user step through the entire Campaign
 Automation pipeline, one stage at a time, with approval at each step.
@@ -24,8 +24,6 @@ Uses real pipeline modules:
   - CampaignReporter (campaign_report.py)
   - BudgetPacingEngine (pacing/engine.py)
   - EventBus (events/)
-
-bead: ar-llj4, ar-uxpw
 """
 
 from __future__ import annotations
@@ -213,7 +211,7 @@ class DemoPipelineHelper:
 
         # Build store-compatible dict. target_audience is now a typed
         # AudiencePlan (or None); persist as a dict so subsequent loads
-        # see the new shape (proposal §6 row 4 / bead ar-fe0h).
+        # see the new shape (proposal §6 row 4).
         if brief.target_audience is None:
             target_audience_json = json.dumps(None)
         else:
@@ -1250,7 +1248,7 @@ def _register_routes(
 
 
 def _run_headless(database_url: str, sample_index: int = 0, output: str = "json") -> int:
-    """Drive a sample campaign through all stages without Flask (ar-jzek).
+    """Drive a sample campaign through all stages without Flask.
 
     Uses the same Flask app + test client so headless output stays consistent
     with what the interactive demo would do — but never binds a port.
@@ -1356,7 +1354,7 @@ def _run_headless(database_url: str, sample_index: int = 0, output: str = "json"
 def main(argv: list[str] | None = None) -> int:
     """Run the campaign demo. Default = Flask dev server; --headless skips it.
 
-    Per ar-jzek: --headless runs through all 6 stages programmatically and
+    --headless runs through all 6 stages programmatically and
     emits JSON per stage. Useful for CI smoke tests, demo-canary scripts, and
     one-shot validation without a browser.
     """

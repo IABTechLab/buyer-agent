@@ -25,7 +25,7 @@ This module is a pure function of the plan: it does NOT mutate the plan,
 issue any HTTP, or read any global state outside the explicit
 ``enable_agentic_ext`` argument.
 
-Bead: ar-8vzg (proposal §6 row 15).
+See proposal §6 row 15.
 """
 
 from __future__ import annotations

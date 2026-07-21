@@ -3,7 +3,7 @@
 
 """Tests for the AudienceStrictness policy field on CampaignBrief.
 
-bead: ar-fe0h (proposal §5.7)
+See proposal §5.7.
 
 `audience_strictness` controls how the buyer's pre-flight degradation
 logic responds when a seller can't honor part of the AudiencePlan.

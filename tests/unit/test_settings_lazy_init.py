@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for lazy Settings instantiation (ar-le3).
+"""Tests for lazy Settings instantiation.
 
 The buyer used to instantiate `settings = Settings()` at module top, freezing
 environment variables before tests could override them. The fix replaces that

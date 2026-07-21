@@ -12,7 +12,7 @@ type (standard / contextual / agentic), taxonomy, version, and identifier.
 
 This module is additive: it does not replace the legacy `AudiencePlan`
 in `models/ucp.py`. Wiring the new shape through the pipeline is a
-follow-up bead (see proposal §6 row 4+).
+follow-up change (see proposal §6 row 4+).
 """
 
 from __future__ import annotations
@@ -315,7 +315,7 @@ def migrate_legacy_audience_list(
 ) -> AudiencePlan:
     """Convert a legacy `list[str]` audience field into a new `AudiencePlan`.
 
-    Locked default policy (per ar-fe0h scope):
+    Locked default policy:
       - First item -> primary, type=standard, taxonomy=iab-audience,
         version=1.1, source=inferred (we never had explicit type info on the
         legacy field, so we cannot honestly mark it `explicit`).
@@ -428,7 +428,7 @@ def validate_content_taxonomy_version(plan: AudiencePlan) -> list[dict[str, Any]
     to be remapped via the IAB Mapper tool before it can be matched against
     sellers running the modern taxonomy.
 
-    This function does NOT call IAB Mapper -- that's a separate bead. It
+    This function does NOT call IAB Mapper -- that's separate follow-up work. It
     returns a structured issues list that the brief-ingestion entry point
     can attach to its error response.
 
@@ -525,7 +525,7 @@ def validate_content_taxonomy_version(plan: AudiencePlan) -> list[dict[str, Any]
 
 
 def validate_no_global_agentic(plan: AudiencePlan) -> list[dict[str, Any]]:
-    """Reject agentic refs declared with `jurisdiction='GLOBAL'` (ar-ei0s).
+    """Reject agentic refs declared with `jurisdiction='GLOBAL'`.
 
     Per the consent-surface review at `docs/reports/CONSENT_SURFACE_REVIEW_2026-04-25.md`
     Gap 5: a single `compliance_context` cannot honestly express per-region

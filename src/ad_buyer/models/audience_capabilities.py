@@ -24,7 +24,7 @@ not import that across repos -- the buyer reads the seller's JSON on the
 wire and parses into this model. Field names match the seller's so the wire
 shape round-trips without translation.
 
-Bead: ar-5ufg (EP-2.3: break the clients<->orchestration cycle).
+Part of EP-2.3: break the clients<->orchestration cycle.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class SellerAudienceCapabilities(BaseModel):
     discovery responses round-trip without translation. The buyer's
     `degrade_plan_for_seller` reads from this model only -- it doesn't care
     where the values came from (a real capability discovery response in
-    bead §13, or a synthesized downgrade in the retry path).
+    §13, or a synthesized downgrade in the retry path).
 
     A seller that doesn't ship `audience_capabilities` at all is treated as
     legacy. Callers can construct a "legacy default" instance via

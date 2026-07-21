@@ -27,7 +27,7 @@ of layer 3 (forward-compatible structured rejection):
 
 The function takes a plan and a capabilities object and returns a degraded
 plan plus a structured `DegradationLog` (list of entries) the orchestrator
-uses for the audit trail (§13a) and rationale append. Composes with bead
+uses for the audit trail (§13a) and rationale append. Composes with
 §13's pre-flight integration (the two together implement full capability
 negotiation per §5.7).
 
@@ -37,7 +37,7 @@ downgraded `SellerAudienceCapabilities` from the seller's structured
 The orchestrator's retry-on-rejection path uses it to figure out which
 parts of the plan to drop before retrying once.
 
-Bead: ar-0w48 (proposal §5.7 layer 2 + §6 row 12).
+See proposal §5.7 layer 2 + §6 row 12.
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ class DegradationLogEntry(BaseModel):
             object is mutated.
         action: One of "dropped" (removed from the plan), "warned" (kept
             in the plan but flagged in the log), or "mapped" (rewritten,
-            reserved for IAB Mapper integration which is a separate bead).
+            reserved for IAB Mapper integration, which is separate follow-up work).
     """
 
     path: str = Field(..., description="JSON-path-ish location in the plan")

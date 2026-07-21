@@ -7,7 +7,6 @@ Tests six MCP tools: list_templates, create_template,
 instantiate_from_template, get_deal_performance, get_campaign_report,
 get_pacing_report.
 
-bead: buyer-5x7
 """
 
 import json

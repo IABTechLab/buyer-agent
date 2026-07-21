@@ -7,7 +7,7 @@ Tests the FastAPI endpoints with httpx AsyncClient and ASGITransport,
 verifying request routing, authentication middleware, job lifecycle,
 and error propagation from API through to business logic.
 
-Execution-boundary note (bead ar-833c): POST /bookings schedules
+Execution-boundary note: POST /bookings schedules
 ``_run_booking_flow`` as a Starlette background task, which ASGITransport
 awaits as part of the response cycle -- so, since the and_() trigger fix
 (c98ba1d), every lifecycle test that creates a booking genuinely ran
@@ -42,7 +42,7 @@ from ad_buyer.services import booking_service
 
 
 class _FakeBookingFlow:
-    """Crew-free DealBookingFlow stand-in for API lifecycle tests (ar-833c).
+    """Crew-free DealBookingFlow stand-in for API lifecycle tests.
 
     Mirrors the flow surface ``booking_service`` touches: ``kickoff()``
     populates typed state (allocations + pending approvals), the approval
@@ -66,7 +66,7 @@ class _FakeBookingFlow:
                 channel="branding",
                 budget=budget,
                 percentage=100.0,
-                rationale="mocked research (ar-833c)",
+                rationale="mocked research",
             )
         }
         self.state.pending_approvals = [
@@ -131,7 +131,7 @@ def _seal_execution_boundary(monkeypatch):
         raise AssertionError(
             "Real DealBookingFlow.kickoff() invoked from an API lifecycle test -- "
             "this spins full research crews (paid LLM calls with a key in env). "
-            "The execution boundary must stay mocked (bead ar-833c)."
+            "The execution boundary must stay mocked."
         )
 
     monkeypatch.setattr(DealBookingFlow, "kickoff", _sentinel_kickoff)
@@ -272,7 +272,7 @@ class TestBookingApprovalLifecycle:
 
     ASGITransport awaits Starlette background tasks as part of the response
     cycle, so by the time POST /bookings returns the (mocked) flow has run
-    and the job state is deterministic. Bead ar-833c.
+    and the job state is deterministic.
     """
 
     @staticmethod
@@ -396,7 +396,7 @@ class TestBookingApprovalLifecycle:
 
     @pytest.mark.asyncio
     async def test_flow_state_errors_surface_in_status(self, monkeypatch):
-        """Errors recorded on flow.state during kickoff reach pollers (ar-jbod)."""
+        """Errors recorded on flow.state during kickoff reach pollers."""
 
         class _ErroringFlow(_FakeBookingFlow):
             def kickoff(self):

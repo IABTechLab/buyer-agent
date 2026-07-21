@@ -55,8 +55,8 @@ def new_job_record(brief: dict[str, Any], auto_approve: bool) -> dict[str, Any]:
 def _merge_flow_errors(job: dict[str, Any], flow: Any) -> None:
     """Propagate flow.state.errors into job['errors'] without duplicates.
 
-    Mirrors the kickoff-path propagation (ar-jbod) on the approval paths
-    (ar-h2o6): execution failures recorded on flow state during approval
+    Mirrors the kickoff-path propagation on the approval
+    paths: execution failures recorded on flow state during approval
     must reach the job record pollers see. Errors already copied at
     kickoff time are not appended twice.
     """
@@ -112,7 +112,7 @@ async def execute_booking(
 
     The synchronous CrewAI ``flow.kickoff()`` / ``flow.approve_all()``
     calls are offloaded to worker threads via ``asyncio.to_thread`` so the
-    caller's event loop stays responsive (buyer-1g4).  The live flow is
+    caller's event loop stays responsive. The live flow is
     stashed on ``job['_flow']`` so the approval endpoints can resume it.
     """
     try:
@@ -129,12 +129,12 @@ async def execute_booking(
         job["_flow"] = flow
 
         job["progress"] = 0.2
-        # buyer-1g4: offload the sync flow.kickoff() to a worker thread so
+        # offload the sync flow.kickoff() to a worker thread so
         # the event loop stays free while the crew agents block on LLM I/O.
         _result = await asyncio.to_thread(flow.kickoff)
 
         # Propagate any errors captured by flow steps into the job response
-        # so the client sees failures instead of silent-success (ar-jbod).
+        # so the client sees failures instead of silent-success.
         _merge_flow_errors(job, flow)
 
         job["progress"] = 0.8
@@ -144,7 +144,7 @@ async def execute_booking(
         job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
 
         if auto_approve:
-            # buyer-1g4: same reason as kickoff -- offload sync work.
+            # same reason as kickoff -- offload sync work.
             await asyncio.to_thread(flow.approve_all)
             _merge_flow_errors(job, flow)
             job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
@@ -152,7 +152,7 @@ async def execute_booking(
         else:
             job["status"] = "awaiting_approval"
             if not job["recommendations"]:
-                # ar-h2o6: a job held for approval with an empty approval set
+                # a job held for approval with an empty approval set
                 # would previously "complete" silently when approved. Surface
                 # the empty research result to pollers as a job error; the
                 # status flow itself is unchanged.
@@ -183,8 +183,8 @@ async def approve(
     flow = job.get("_flow")
     result = flow.approve_recommendations(approved_product_ids)
 
-    # ar-h2o6: propagate execution failures captured on flow state during
-    # approval (mirrors the kickoff path, ar-jbod).
+    # propagate execution failures captured on flow state during
+    # approval (mirrors the kickoff path).
     _merge_flow_errors(job, flow)
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"
@@ -214,11 +214,11 @@ async def approve_all(
     """Execute approval for all recommendations on a held job."""
     flow = job.get("_flow")
 
-    # buyer-1g4: approve_all() runs sync CrewAI work; offload it.
+    # approve_all() runs sync CrewAI work; offload it.
     result = await asyncio.to_thread(flow.approve_all)
 
-    # ar-h2o6: propagate execution failures captured on flow state during
-    # approval (mirrors the kickoff path, ar-jbod).
+    # propagate execution failures captured on flow state during
+    # approval (mirrors the kickoff path).
     _merge_flow_errors(job, flow)
 
     job["status"] = "completed" if result.get("status") == "success" else "failed"

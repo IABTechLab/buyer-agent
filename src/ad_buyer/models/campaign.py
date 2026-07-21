@@ -4,10 +4,10 @@
 """Pydantic models for Campaign Automation data structures.
 
 Covers pacing snapshots (Section 6.2) and ad server integration records
-(Section 6.4) from the Campaign Automation Strategic Plan (ar-qt9).
+(Section 6.4) from the Campaign Automation Strategic Plan.
 
-bead: buyer-lna (Pacing snapshot storage)
-bead: buyer-uoz (Ad server integration record storage)
+Pacing snapshot storage.
+Ad server integration record storage.
 """
 
 import uuid

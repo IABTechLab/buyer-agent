@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for campaign lifecycle operations (buyer-0u9).
+"""Tests for campaign lifecycle operations.
 
 Tests the integration of CampaignAutomationStateMachine with CampaignStore:
 - transition_campaign_status() validates transitions before DB update

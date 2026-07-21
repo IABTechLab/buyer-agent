@@ -46,20 +46,20 @@ The FastAPI `api_key_auth_middleware` applies to all HTTP paths. Neither `/mcp` 
 
 The server exposes 12 tool categories implemented in `interfaces/mcp_server.py`.
 
-| Category | Bead | Tools | Description |
-|----------|------|-------|-------------|
-| Foundation | — | `get_setup_status`, `health_check`, `get_config` | System health and configuration |
-| Setup Wizard | buyer-byk | `run_setup_wizard`, `get_wizard_step`, `complete_wizard_step`, `skip_wizard_step` | 8-step onboarding wizard |
-| Campaign Management | buyer-3w3 | `list_campaigns`, `get_campaign_status`, `check_pacing`, `review_budgets` | Campaign status and budget pacing |
-| Deal Library | buyer-4ds | `list_deals`, `search_deals`, `inspect_deal`, `import_deals_csv`, `create_deal_manual`, `get_portfolio_summary` | Deal CRUD and portfolio analytics |
-| Seller Discovery | buyer-nob | `discover_sellers`, `get_seller_media_kit`, `compare_sellers` | IAB AAMP registry and seller media kits |
-| Negotiation | buyer-r0j | `start_negotiation`, `get_negotiation_status`, `list_active_negotiations` | Price negotiation lifecycle |
-| Orders | buyer-r0j | `list_orders`, `get_order_status`, `transition_order` | Order management and state transitions |
-| Approvals | buyer-j7f | `list_pending_approvals`, `approve_or_reject` | Approval gate management |
-| API Keys | buyer-j7f | `list_api_keys`, `create_api_key`, `revoke_api_key` | Seller API credential management |
-| SSP Connectors | buyer-4ds | `list_ssp_connectors`, `import_deals_ssp`, `test_ssp_connection` | SSP deal import and connectivity checks |
-| Templates | buyer-4ds | `list_templates`, `create_template`, `instantiate_from_template` | Deal and supply path templates |
-| Reporting | — | `get_deal_performance`, `get_campaign_report`, `get_pacing_report` | Deal, campaign, and pacing reports |
+| Category | Tools | Description |
+|----------|-------|-------------|
+| Foundation | `get_setup_status`, `health_check`, `get_config` | System health and configuration |
+| Setup Wizard | `run_setup_wizard`, `get_wizard_step`, `complete_wizard_step`, `skip_wizard_step` | 8-step onboarding wizard |
+| Campaign Management | `list_campaigns`, `get_campaign_status`, `check_pacing`, `review_budgets` | Campaign status and budget pacing |
+| Deal Library | `list_deals`, `search_deals`, `inspect_deal`, `import_deals_csv`, `create_deal_manual`, `get_portfolio_summary` | Deal CRUD and portfolio analytics |
+| Seller Discovery | `discover_sellers`, `get_seller_media_kit`, `compare_sellers` | IAB AAMP registry and seller media kits |
+| Negotiation | `start_negotiation`, `get_negotiation_status`, `list_active_negotiations` | Price negotiation lifecycle |
+| Orders | `list_orders`, `get_order_status`, `transition_order` | Order management and state transitions |
+| Approvals | `list_pending_approvals`, `approve_or_reject` | Approval gate management |
+| API Keys | `list_api_keys`, `create_api_key`, `revoke_api_key` | Seller API credential management |
+| SSP Connectors | `list_ssp_connectors`, `import_deals_ssp`, `test_ssp_connection` | SSP deal import and connectivity checks |
+| Templates | `list_templates`, `create_template`, `instantiate_from_template` | Deal and supply path templates |
+| Reporting | `get_deal_performance`, `get_campaign_report`, `get_pacing_report` | Deal, campaign, and pacing reports |
 
 See the [auto-generated inventory](../reference/mcp-tools.md) for the byte-exact 40-tool catalog.
 

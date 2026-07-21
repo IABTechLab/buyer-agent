@@ -3,7 +3,7 @@
 
 """Tests for brief-ingestion Content Taxonomy 2.x -> 3.x validation.
 
-bead: ar-fe0h (proposal §6 row 4 / §5.7 IAB Mapper hint)
+See proposal §6 row 4 / §5.7 IAB Mapper hint.
 
 A brief that arrives with a Contextual ref pinned to pre-3.x must be
 rejected with a clear error pointing at the IAB Mapper migration tool.

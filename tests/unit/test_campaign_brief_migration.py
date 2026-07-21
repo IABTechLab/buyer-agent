@@ -3,7 +3,7 @@
 
 """Tests for the legacy `list[str]` -> AudiencePlan migration shim.
 
-bead: ar-fe0h (proposal §6 row 4)
+See proposal §6 row 4.
 
 The compat shim lives on `CampaignBrief` as a `model_validator(mode='before')`
 and on `coerce_audience_field`, which is also used by the `_reconstruct_brief`

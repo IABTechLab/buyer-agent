@@ -6,7 +6,6 @@
 Tests three seller discovery MCP tools: discover_sellers,
 get_seller_media_kit, compare_sellers.
 
-bead: buyer-nob
 """
 
 import json

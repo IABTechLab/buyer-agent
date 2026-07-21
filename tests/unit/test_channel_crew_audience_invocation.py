@@ -3,7 +3,7 @@
 
 """Tests for typed `AudiencePlan` flowing through the channel-crew path.
 
-Bead ar-5y8v / proposal §5.3 / §6 row 19 -- the third deal-finding entry
+Proposal §5.3 / §6 row 19 -- the third deal-finding entry
 point: direct channel-crew invocation. Used by tests, demos, and any
 caller that bypasses the canonical DealBookingFlow pipeline.
 

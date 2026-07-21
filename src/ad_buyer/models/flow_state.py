@@ -59,7 +59,7 @@ class BookedLine(BaseModel):
 
     Booking records are keyed by the SELLER-issued ``deal_id`` plus the
     ``quote_id`` it was booked from and the confirmed terms returned by the
-    seller (bead ar-j2nw). The buyer never mints deal identifiers locally
+    seller. The buyer never mints deal identifiers locally
     on this path and never records placeholder order ids.
     """
 
@@ -79,7 +79,7 @@ class BookedLine(BaseModel):
         description=(
             "Truthful pricing audit line assembled by the BUYER from the "
             "seller's confirmed deal pricing (base vs final CPM), so the "
-            "text can never contradict the booked price (bead ar-phd7)."
+            "text can never contradict the booked price."
         ),
     )
 

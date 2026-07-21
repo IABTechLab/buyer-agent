@@ -457,7 +457,7 @@ def _branding_only_portfolio_output() -> SimpleNamespace:
 
 
 class TestKickoffConsolidationHandoff:
-    """kickoff()-level reproduction of the real-mode no_booking bug (ar-h2o6).
+    """kickoff()-level reproduction of the real-mode no_booking bug.
 
     The unit tests above call the flow methods directly and never exercise
     the CrewAI flow ENGINE. In CrewAI >=1.14 the engine (a) treats the four
@@ -509,7 +509,7 @@ class TestKickoffConsolidationHandoff:
     ):
         """The funded channel's recommendations MUST become pending approvals.
 
-        Failing-first proof of the ar-h2o6 root cause: with the or_
+        Failing-first proof of the root cause: with the or_
         consolidate trigger, this kickoff ends with pending_approvals == []
         because a no-budget channel wins the racing group and the OR
         listener has already fired by the time branding research lands.

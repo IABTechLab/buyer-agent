@@ -1,7 +1,6 @@
 # AudiencePlan Wire-Format Specification
 
 **Status:** Active  
-**Bead:** ar-g7nf  
 **Proposal refs:** §5.1, §5.6, §5.7, §6 rows 14b/15, §7  
 
 This document is the authoritative wire-format definition for `AudiencePlan` over HTTP.

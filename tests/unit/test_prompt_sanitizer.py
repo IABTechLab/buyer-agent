@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for the counterparty-text prompt sanitizer (EP-4.4, bead ar-4ycd).
+"""Tests for the counterparty-text prompt sanitizer (EP-4.4).
 
 Seller-controlled free text flows verbatim into the buyer's CrewAI
 research/selection prompts. These tests assert the sanitizer neutralizes an

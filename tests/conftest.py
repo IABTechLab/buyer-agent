@@ -12,7 +12,7 @@ import pytest
 def fake_booking_orchestrator():
     """AsyncMock MultiSellerOrchestrator booking one seller-issued deal per call.
 
-    Canonical-path test double (bead ar-j2nw): echoes the requested
+    Canonical-path test double: echoes the requested
     DealParams back as a seller-confirmed 201 DealResponse with a
     SELLER-issued deal_id and quote_id, mirroring the real
     quotes -> deals contract.

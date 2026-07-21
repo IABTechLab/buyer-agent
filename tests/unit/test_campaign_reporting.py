@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for campaign reporting module (buyer-f58).
+"""Tests for campaign reporting module.
 
 Covers:
 - Campaign status summary reports

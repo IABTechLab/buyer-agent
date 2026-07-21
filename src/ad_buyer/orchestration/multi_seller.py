@@ -18,13 +18,13 @@ multiple sellers, compare pricing on an apples-to-apples basis, and
 book the best deals for a campaign channel.
 
 Integration points:
-  - RegistryClient (buyer-f8l): seller discovery
-  - DealsClient (buyer-hu7): quote requests and deal booking
-  - QuoteNormalizer (buyer-lae): cross-seller quote comparison
-  - EventBus (buyer-ppi): event emission at each stage
+  - RegistryClient: seller discovery
+  - DealsClient: quote requests and deal booking
+  - QuoteNormalizer: cross-seller quote comparison
+  - EventBus: event emission at each stage
 
 Reference: Campaign Automation Strategic Plan, Section 7.2
-Bead: buyer-8ih (2A: Multi-Seller Deal Orchestration)
+2A: Multi-Seller Deal Orchestration.
 """
 
 from __future__ import annotations
@@ -208,7 +208,7 @@ def _strictness_skip_required(
 
 @dataclass
 class NegotiationConfig:
-    """Config for the above-ceiling negotiation stage (bead ar-cc3n).
+    """Config for the above-ceiling negotiation stage.
 
     When a seller's quote exceeds the buyer's ``max_cpm`` ceiling but is
     within the negotiation band (``effective_cpm <= max_cpm * band``),
@@ -229,7 +229,7 @@ class NegotiationConfig:
             round-1 counter included) before the buyer walks away.
         timeout_seconds: HTTP timeout for the negotiation surface
             (proposal open + counter rounds), SEPARATE from the quote
-            timeout (bead ar-vc4m). Sellers may answer ``POST /proposals``
+            timeout. Sellers may answer ``POST /proposals``
             with a synchronous LLM crew measured at ~646 s on the live
             rig, so the quote timeout (30 s, deterministic engine) must
             not bound negotiation calls. Default 720 s mirrors
@@ -308,8 +308,8 @@ class DealParams:
             InventoryRequirements / CampaignPlan. None on legacy paths
             that have not yet been wired through. Forwarded to QuoteRequest
             so the seller receives the campaign's audience targeting.
-        product_name: Human-readable name of the recommended product
-            (bead ar-gufw). Used by cross-seller product resolution to
+        product_name: Human-readable name of the recommended product.
+            Used by cross-seller product resolution to
             find an equivalent product by name on a seller whose catalog
             does not contain ``product_id``. None on legacy paths.
         channel: Discovery-vocabulary channel/media type of the
@@ -396,7 +396,7 @@ class OrchestrationResult:
         ranked_quotes: Quotes after normalization and ranking.
         selection: The deal selection and booking result.
         negotiations: One record per negotiation attempt on an
-            above-ceiling-within-band quote (bead ar-cc3n): seller,
+            above-ceiling-within-band quote: seller,
             original quote, opening price, per-round history, outcome
             (``accepted`` / ``walked_away`` / ``rejected`` /
             ``unavailable`` / ``requote_failed`` /
@@ -463,7 +463,7 @@ class MultiSellerOrchestrator:
             clients (``(seller_url) -> client`` with an async
             ``list_products``). When provided, the orchestrator resolves
             the recommended product onto EACH seller's own catalog before
-            quoting it (bead ar-gufw) -- a product ID is only ever sent to
+            quoting it -- a product ID is only ever sent to
             the seller it came from. When None, the legacy passthrough
             behavior is preserved (same product_id sent to every seller).
     """
@@ -490,13 +490,13 @@ class MultiSellerOrchestrator:
         # the orchestrator runs the §5.7 layer 1+2 pre-flight before booking.
         # When None, it falls back to the layer-3 retry-only path.
         self._capability_client = capability_client
-        # Negotiation stage (bead ar-cc3n): client speaking the seller's
+        # Negotiation stage: client speaking the seller's
         # proposal + shared-NegotiationMessage surface. Lazily constructed
         # from `ad_buyer.negotiation.NegotiationClient` when None and the
         # stage is enabled; injectable for tests.
         self._negotiation_client = negotiation_client
         self._negotiation_config = negotiation_config or NegotiationConfig()
-        # Cross-seller product resolution (bead ar-gufw). Optional, same
+        # Cross-seller product resolution. Optional, same
         # injection idiom as `capability_client`: when None, no resolution
         # runs and the quote path behaves exactly as before.
         self._catalog_client_factory = catalog_client_factory
@@ -574,7 +574,7 @@ class MultiSellerOrchestrator:
         return sellers
 
     # ------------------------------------------------------------------
-    # Stage 1.5: Cross-seller product resolution (bead ar-gufw)
+    # Stage 1.5: Cross-seller product resolution
     # ------------------------------------------------------------------
 
     async def _fetch_seller_catalog(
@@ -585,7 +585,7 @@ class MultiSellerOrchestrator:
         Clients exposing ``list_products_tolerant`` (the real
         ``OpenDirectClient``) parse PER-PRODUCT and return
         ``(valid_products, rejects)`` -- one invalid catalog item must
-        never fail the whole fetch (bead ar-sbej). Anything else (test
+        never fail the whole fetch. Anything else (test
         fakes, alternative clients) falls back to the strict
         ``list_products`` with no rejects. The result shape is checked
         rather than trusted so auto-mocking fakes cannot masquerade as
@@ -634,13 +634,13 @@ class MultiSellerOrchestrator:
            (case-insensitive) exists; deterministic tie-break by id.
         3. ``channel_match`` -- products whose declared ``ad_formats``
            normalize onto the campaign's channel (undeclared formats stay
-           eligible, ar-mkq5 semantics). Deterministic pick: cheapest
+           eligible). Deterministic pick: cheapest
            declared base_price first (unpriced last), tie-break by id.
         4. No candidates -> ``unresolved``: the seller is skipped with a
            clear per-seller error instead of receiving a foreign ID that
            would 404 as ``product_not_found``.
 
-        The catalog is parsed tolerantly (bead ar-sbej): individually
+        The catalog is parsed tolerantly: individually
         invalid products are SKIPPED with a logged warning and surfaced as
         reject records, and the tiers operate on the valid subset. A
         catalog whose EVERY product is invalid resolves to a clear
@@ -715,7 +715,7 @@ class MultiSellerOrchestrator:
         # normalized through the shared alias table so the buyer's channel
         # vocabulary reconciles with seller format declarations; products
         # with EMPTY/absent ad_formats are "undeclared -- do not exclude"
-        # (ar-mkq5 semantics, mirroring the catalog filter).
+        # (undeclared-means-eligible semantics, mirroring the catalog filter).
         from ..clients.opendirect_client import _normalize_ad_format
 
         requested = _normalize_ad_format(deal_params.channel or deal_params.media_type)
@@ -768,7 +768,7 @@ class MultiSellerOrchestrator:
             """Request a single quote from one seller."""
             seller_url = seller.url
 
-            # Cross-seller product identity (bead ar-gufw): resolve the
+            # Cross-seller product identity: resolve the
             # recommended product onto THIS seller's catalog before quoting.
             # Without a catalog client factory, legacy passthrough applies.
             product_id = deal_params.product_id
@@ -788,7 +788,7 @@ class MultiSellerOrchestrator:
                         "resolved_product_id": resolved_id,
                         "outcome": outcome,
                         "error": resolve_error,
-                        # Per-product catalog rejects (bead ar-sbej): count +
+                        # Per-product catalog rejects: count +
                         # details so drops are observable, never silent.
                         "invalid_products": len(invalid_products),
                         "invalid_product_details": invalid_products,
@@ -957,7 +957,7 @@ class MultiSellerOrchestrator:
         return ranked
 
     # ------------------------------------------------------------------
-    # Stage 3.5: Negotiate above-ceiling quotes within the band (ar-cc3n)
+    # Stage 3.5: Negotiate above-ceiling quotes within the band
     # ------------------------------------------------------------------
 
     def _get_negotiation_client(self) -> Any:
@@ -967,7 +967,7 @@ class MultiSellerOrchestrator:
         (``NegotiationConfig.timeout_seconds``), NOT the quote timeout:
         quotes come from a deterministic engine, while a seller may answer
         the proposal open with a synchronous LLM crew measured at ~646 s
-        live (bead ar-vc4m).
+        live.
         """
         if self._negotiation_client is None:
             from ..negotiation.client import NegotiationClient
@@ -1069,7 +1069,7 @@ class MultiSellerOrchestrator:
         # Never open above the ceiling: a misconfigured target is clamped.
         open_price = min(target, max_cpm) if target is not None else max_cpm
 
-        # Cross-seller product identity (bead ar-gufw): negotiate and
+        # Cross-seller product identity: negotiate and
         # re-quote the product the SELLER quoted, never the campaign's
         # original recommendation ID -- which may belong to a different
         # seller's catalog when resolution substituted an equivalent.
@@ -1333,8 +1333,8 @@ class MultiSellerOrchestrator:
 
         ``reason`` carries the failure cause (exception class + detail,
         see ``_failure_reason``) for unavailable/failed attempts so the
-        events surface says WHY a negotiation concluded without a deal
-        (bead ar-vc4m); None on clean outcomes.
+        events surface says WHY a negotiation concluded without a
+        deal; None on clean outcomes.
         """
         await self._emit(
             EventType.NEGOTIATION_CONCLUDED,
@@ -1889,7 +1889,7 @@ class MultiSellerOrchestrator:
         )
 
         # Stage 3.5: Negotiate above-ceiling quotes within the band
-        # (ar-cc3n). Successful negotiations yield fresh quotes at the
+        # Successful negotiations yield fresh quotes at the
         # agreed price, which join the pool and are re-ranked; the
         # original above-ceiling quotes stay filtered out.
         negotiations: list[dict[str, Any]] = []

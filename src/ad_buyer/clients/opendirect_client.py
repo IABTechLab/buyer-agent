@@ -27,7 +27,7 @@ from ..models.opendirect import (
 )
 from .contract_mappers import from_wire_product
 
-# ad_format vocabulary reconciliation (bead ar-mxsp).
+# ad_format vocabulary reconciliation.
 #
 # The buyer's research crew searches with OpenRTB-style *placement* terms
 # ("banner", "interstitial", "video", "rewarded"), while sellers declare the
@@ -116,7 +116,7 @@ def _filter_wire_products(
         # Normalize BOTH sides to the shared canonical taxonomy so the buyer's
         # placement vocabulary ("banner") reconciles with the seller's channel
         # taxonomy ("display"). Empty/absent ad_formats still means "undeclared
-        # — do not exclude" (ar-mkq5 semantics preserved).
+        # — do not exclude" (that semantics is preserved here).
         requested = _normalize_ad_format(ad_format)
         result = [
             p
@@ -148,7 +148,7 @@ def _product_reject_record(item: Any, exc: ValidationError) -> dict[str, Any]:
     """Reject record for one catalog item that failed validation.
 
     Carries enough identity (id + raw name) to attribute the reject and a
-    compact reason so the drop is never silent (bead ar-sbej).
+    compact reason so the drop is never silent.
     """
     product_id = None
     name = None
@@ -264,8 +264,8 @@ class OpenDirectClient:
         OpenDirect model, so ONE invalid product (e.g. a name over the
         38-char cap) fails the ENTIRE fetch. On the per-seller product
         resolution path that turned a single bad catalog entry into a
-        skipped seller and, fleet-wide, into zero bookings (bead ar-sbej,
-        Wave-B rig proof 2026-07-21).
+        skipped seller and, fleet-wide, into zero bookings
+        (Wave-B rig proof 2026-07-21).
 
         This variant parses PER-PRODUCT: each catalog item is validated
         against the shared wire model and mapped to the OpenDirect model
@@ -361,8 +361,8 @@ class OpenDirectClient:
         # ISO-8601 strings so the request body is JSON-serializable at the httpx
         # boundary. Without it the raw datetime objects hit Python's default
         # json encoder and the POST crashes with "Object of type datetime is not
-        # JSON serializable" before the request ever reaches the seller (bead
-        # ar-rs25). by_alias keeps the spec-lowercase wire field names
+        # JSON serializable" before the request ever reaches the seller.
+        # by_alias keeps the spec-lowercase wire field names
         # (startdate/enddate/productid) the seller's avails endpoint expects.
         response = await self._request(
             "POST",

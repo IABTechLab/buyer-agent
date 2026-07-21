@@ -17,7 +17,7 @@ Key capabilities:
     PACING_REALLOCATION_RECOMMENDED
 
 Reference: Campaign Automation Strategic Plan, Section 7.3
-bead: buyer-9zz (2C: Budget Pacing & Reallocation)
+2C: Budget Pacing & Reallocation.
 """
 
 import asyncio

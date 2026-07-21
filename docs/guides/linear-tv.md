@@ -3,7 +3,7 @@
 The buyer agent supports linear television inventory through the same quote-then-book flow used for digital deals. Linear TV buying introduces scatter market purchasing, DMA-level geographic targeting, and traditional TV pricing models (CPP and CPM) — all accessible through the standard `DealsClient` with `media_type: "linear_tv"`.
 
 !!! success "New in v1.1"
-    Linear TV buying support shipped in Phase 1 (buyer-6io). The functionality described here is available now.
+    Linear TV buying support shipped in Phase 1. The functionality described here is available now.
 
 ## Overview
 

@@ -326,7 +326,7 @@ Handles the [OpenDirect](https://iabtechlab.com/standards/opendirect/) booking l
 ### Reporting Agent
 
 !!! info "Coming Soon"
-    The Reporting Agent (buyer-brn) is planned for a future phase. This section describes the planned reporting functionality.
+    The Reporting Agent is planned for a future phase. This section describes the planned reporting functionality.
 
 **File:** `src/ad_buyer/agents/level3/reporting_agent.py`
 

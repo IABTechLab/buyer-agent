@@ -6,7 +6,6 @@
 Tests six MCP tools: start_negotiation, get_negotiation_status,
 list_active_negotiations, list_orders, get_order_status, transition_order.
 
-bead: buyer-r0j
 """
 
 import json

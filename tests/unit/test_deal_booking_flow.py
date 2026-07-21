@@ -419,7 +419,7 @@ class TestPlanAudience:
 # ===========================================================================
 # 3. JSON-block extraction + default allocation helpers
 # ===========================================================================
-# Per ar-jbod, the old _parse_allocations was split into:
+# The old _parse_allocations was split into:
 #   _extract_json_block(text) -> dict | None
 #   _default_allocations() -> dict
 # The combined behaviour (parse-or-default) now lives in the
@@ -772,7 +772,7 @@ class TestCreateChannelBrief:
         # The channel brief is consumed by channel_crews._build_channel_crew,
         # which reads snake_case keys (start_date/end_date/target_audience).
         # It must therefore be dumped WITHOUT by_alias so producer and
-        # consumer agree (ar-kedz).
+        # consumer agree.
         assert brief["start_date"] == "2026-04-01"
         assert brief["end_date"] == "2026-04-30"
         assert (
@@ -783,7 +783,7 @@ class TestCreateChannelBrief:
     def test_channel_brief_flight_dates_reach_crew_research_task(self, flow_with_allocations):
         """Flight dates must thread into the channel crew's research task text.
 
-        Regression for ar-kedz: the POST /bookings brief carries
+        Regression: the POST /bookings brief carries
         start_date/end_date, but _create_channel_brief dumped the ChannelBrief
         with by_alias=True (startDate/endDate) while _build_channel_crew reads
         snake_case (start_date/end_date). The mismatch rendered the research
@@ -887,7 +887,7 @@ class TestExtractRecommendationItems:
     """Tests for _extract_recommendation_items on real crew-output shapes.
 
     The hierarchical channel crews return prose + a ```json fence holding
-    an OBJECT with a "recommendations" array (see rig run #13, ar-h2o6),
+    an OBJECT with a "recommendations" array (see rig run #13),
     sometimes with bracketed echoes (objectives lists) in the surrounding
     prose. Extraction must be deterministic and survive all of these.
     """
@@ -932,7 +932,7 @@ class TestExtractRecommendationItems:
         The manager agent can echo the brief's objectives as a Python list
         repr (single quotes) before its final answer. The legacy
         first-"[" / last-"]" slice starts at that echo, json.loads fails,
-        and extraction silently yields ZERO recommendations (ar-h2o6).
+        and extraction silently yields ZERO recommendations.
         """
         text = (
             "Objectives: ['Book programmatic_guaranteed deals for August 2026']\n\n"
@@ -1373,7 +1373,7 @@ class TestEdgeCases:
 
 
 # ===========================================================================
-# Regression: CrewAI 1.10.1 read-only flow.state setter (ar-x34o)
+# Regression: CrewAI 1.10.1 read-only flow.state setter
 # ===========================================================================
 
 

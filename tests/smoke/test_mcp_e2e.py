@@ -1,7 +1,7 @@
 """MCP E2E Smoke Test - Ad Buyer Agent
 
 Exercises every MCP tool via the SSE transport, as a real Claude Desktop
-user would experience it.  This is the UAT gate for buyer-mw9 (Phase 3 epic).
+user would experience it.  This is the UAT gate for the Phase 3 epic.
 
 Usage:
     # Start the buyer server first:

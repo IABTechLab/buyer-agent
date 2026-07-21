@@ -3,7 +3,7 @@
 
 """SQLite-backed negotiation round persistence.
 
-Extracted from ``DealStore`` (bead ar-bonx) as part of the EP-2.4 god-class
+Extracted from ``DealStore`` as part of the EP-2.4 god-class
 split.  Operates on the ``negotiation_rounds`` table, which is created by
 ``schema.initialize_schema`` during ``DealStore.connect()``.  Instances share
 the owning DealStore's SQLite connection and lock, so all writes remain

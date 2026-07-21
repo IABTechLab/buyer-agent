@@ -3,8 +3,8 @@
 
 """End-to-end integration test: audience plan on the channel-crew path.
 
-Bead ar-6ipo / proposal §6 row 20, adapted to the ONE canonical pipeline
-(bead ar-j2nw): the orphan BuyerDealFlow (former "Path B1") was deleted;
+Proposal §6 row 20, adapted to the ONE canonical pipeline:
+the orphan BuyerDealFlow (former "Path B1") was deleted;
 its brief-driven audience scenarios now run through the canonical
 DealBookingFlow handoff in tests/integration/test_canonical_audience_e2e.py.
 
@@ -395,7 +395,7 @@ class TestChannelCrewCapabilityDegradation:
 
     Exercises the legacy-seller capability scenario on the direct
     channel-crew invocation path. Asserts the scenario is
-    reachable; actual ``degrade_plan_for_seller`` is bead §12.
+    reachable; actual ``degrade_plan_for_seller`` is §12.
     """
 
     def test_crew_constructs_with_legacy_seller_profile(

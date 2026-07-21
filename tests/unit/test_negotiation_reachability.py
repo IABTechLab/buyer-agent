@@ -1,9 +1,9 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Stage 3.5 reachability from the booking flow (beads ar-g6jf + ar-phd7).
+"""Stage 3.5 reachability from the booking flow.
 
-Bug G (ar-g6jf): ``DealBookingFlow._book_approved`` used to set BOTH the
+Bug G: ``DealBookingFlow._book_approved`` used to set BOTH the
 negotiation ceiling (``InventoryRequirements.max_cpm``) AND the RFQ target
 (``DealParams.target_cpm``) to the same ``rec.cpm``, discarding the brief's
 target/ceiling split (``kpis.target_cpm_usd`` / ``kpis.max_cpm_usd``).
@@ -22,7 +22,7 @@ These tests pin the fix:
 3. A brief WITHOUT an explicit split preserves the previous behavior:
    both values fall back to ``rec.cpm``.
 
-Bug H (ar-phd7): the audit rationale on a booked line must state the TRUE
+Bug H: the audit rationale on a booked line must state the TRUE
 final price (the seller's confirmed ``final_cpm``), never the base/list
 price. The buyer assembles it from the confirmed deal pricing so the text
 can never contradict ``final_cpm``.

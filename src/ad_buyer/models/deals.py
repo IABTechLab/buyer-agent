@@ -8,7 +8,7 @@ docs/api/deal-creation-api-contract.md. They represent the buyer-side
 view of quotes and deals returned by the seller's /api/v1/quotes and
 /api/v1/deals endpoints.
 
-Extended with linear TV support (Option C hybrid approach, bead buyer-6io):
+Extended with linear TV support (Option C hybrid approach):
 - media_type discriminator on QuoteRequest/QuoteResponse
 - LinearTVParams nested object on QuoteRequest
 - LinearTVQuoteDetails nested object on QuoteResponse
@@ -52,7 +52,7 @@ class PricingInfo(BaseModel):
     Extended with CPP fields for linear TV (pricing_model "cpp" or "hybrid").
 
     base_cpm and final_cpm are Optional to support ``pricing_type=on_request``
-    (Layer 2b — pricing provenance tracking, bead ar-r76d).  When the seller
+    (Layer 2b — pricing provenance tracking). When the seller
     has not provided pricing, these fields are None.
     """
 
@@ -134,9 +134,9 @@ class QuoteRequest(BaseModel):
 
     # Typed audience plan threaded from CampaignPlan via the orchestrator
     # (proposal §5.2 + §5.3). None on legacy paths that have not yet been
-    # wired through; populated by the Audience Planner in a follow-up bead.
+    # wired through; populated by the Audience Planner in a follow-up change.
     # Wire-format serialization is governed by the seller-side contract
-    # (see beads §14a/14b for the agreed JSON shape).
+    # (see §14a/14b for the agreed JSON shape).
     audience_plan: AudiencePlan | None = None
 
 

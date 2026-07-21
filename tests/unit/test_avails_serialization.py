@@ -3,7 +3,7 @@
 
 """Regression: OpenDirectClient.check_avails must JSON-serialize its request.
 
-Real-mode failure (bead ar-rs25): the buyer's availability-check tool crashed
+Real-mode failure: the buyer's availability-check tool crashed
 8x at runtime with ``Object of type datetime is not JSON serializable``. The
 POST /products/avails body was built with
 ``AvailsRequest.model_dump(by_alias=True, exclude_none=True)`` WITHOUT

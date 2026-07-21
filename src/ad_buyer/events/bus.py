@@ -125,7 +125,7 @@ def get_event_bus_sync() -> EventBus:
     at construction time without an event loop. Constructing the orchestrator
     with ``event_bus=None`` silently no-ops ``_emit``, dropping
     ``product.resolution`` and the audit-class ``negotiation.*`` events from
-    the live ``/events`` surface (bead ar-nly5).
+    the live ``/events`` surface.
     """
     global _event_bus_instance
 

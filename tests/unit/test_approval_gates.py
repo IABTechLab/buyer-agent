@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for configurable human approval gates (buyer-2qs).
+"""Tests for configurable human approval gates.
 
 Tests the ApprovalGate class and ApprovalRequest model that implement
 configurable human approval gates at each stage of the campaign pipeline.

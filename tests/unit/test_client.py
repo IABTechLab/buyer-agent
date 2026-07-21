@@ -260,7 +260,7 @@ class TestFilterWireProducts:
         result = _filter_wire_products(products, {})
         assert result == products
 
-    # -- ad_format VOCABULARY reconciliation (bead ar-mxsp) ------------------
+    # -- ad_format VOCABULARY reconciliation ------------------
     # The buyer's research crew searches with OpenRTB-ish placement terms
     # ("banner", "interstitial", "video") while the seller declares the IAB
     # inventory_type taxonomy in ad_formats ("display", "video", "ctv", ...).
@@ -291,7 +291,7 @@ class TestFilterWireProducts:
         assert result == []
 
     def test_empty_ad_formats_survives_normalized_filter(self):
-        """ar-mkq5 'undeclared = do not exclude' still holds under banner."""
+        """The 'undeclared = do not exclude' rule still holds under banner."""
         undeclared = self._wire_product("undeclared_1", [])
         result = _filter_wire_products([undeclared], {"adFormat": "banner"})
         assert [p.product_id for p in result] == ["undeclared_1"]

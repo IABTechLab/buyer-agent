@@ -6,7 +6,7 @@
 Uses synchronous sqlite3 (not aiosqlite) following the same thread-safety
 pattern as DealStore: check_same_thread=False with a threading.Lock().
 
-bead: buyer-lna (Pacing snapshot storage)
+Pacing snapshot storage.
 """
 
 import json

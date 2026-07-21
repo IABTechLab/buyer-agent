@@ -6,7 +6,6 @@
 Tests five MCP tools: list_pending_approvals, approve_or_reject,
 list_api_keys, create_api_key, revoke_api_key.
 
-bead: buyer-j7f
 """
 
 import json

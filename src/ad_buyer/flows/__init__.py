@@ -3,7 +3,7 @@
 
 """Workflow flows for the Ad Buyer System.
 
-DealBookingFlow is the ONE canonical buyer pipeline (bead ar-j2nw):
+DealBookingFlow is the ONE canonical buyer pipeline:
 planning half (brief -> audience plan -> budget -> channel research ->
 approval gate) plus the execution handoff to MultiSellerOrchestrator
 (quotes -> seller-issued deals). The former BuyerDealFlow rival path

@@ -3,11 +3,11 @@
 
 """Unit tests for the Audience Planner reasoning loop (proposal §5.5).
 
-Bead ar-9u25 §7. The reasoning loop is pure Python (the CrewAI agent
+The reasoning loop is pure Python (the CrewAI agent
 shell is a thin wrapper around it), so tests can exercise every phase
 deterministically without spinning up an LLM.
 
-Coverage targets (per bead spec):
+Coverage targets:
 1. Demographic brief -> primary type=standard
 2. Content-adjacent brief -> primary type=contextual
 3. First-party brief -> primary type=agentic with mock embedding

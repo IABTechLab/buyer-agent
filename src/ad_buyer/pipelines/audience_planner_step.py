@@ -5,8 +5,8 @@
 
 Wires the Audience Planner agent (`agents/level3/audience_planner_agent.py`)
 between brief ingestion and the canonical orchestrator handoff
-per proposal §5.3 / bead ar-fgyq §6, and now drives the full reasoning
-loop per proposal §5.5 / bead ar-9u25 §7.
+per proposal §5.3 / §6, and now drives the full reasoning
+loop per proposal §5.5 / §7.
 
 Design:
 - The pure-Python reasoning core lives in `audience_planner_reasoning.py`
@@ -15,7 +15,7 @@ Design:
   (b) wires those tools into the reasoning function, and (c) returns the
   plan + agent for downstream introspection.
 - The CrewAI agent is constructed but not currently kicked off as a
-  Task; the reasoning loop is deterministic Python. A future bead may
+  Task; the reasoning loop is deterministic Python. Future work may
   hand the rationale prose generation to the agent, but the
   classification + role assignment stays here so tests stay
   deterministic.
@@ -63,7 +63,7 @@ class AudiencePlannerResult:
             as opaque.
         is_stub: False once the §7 reasoning loop is in place. Retained
             on the dataclass for backward compat with the §6 wiring
-            tests that asserted `is_stub` after the keystone bead landed;
+            tests that asserted `is_stub` after the keystone wiring landed;
             those tests were tightened in §7 to assert the new value.
         rationale_lines: List of rationale lines produced by the
             reasoning loop, in order. The plan's `rationale` is the
@@ -88,7 +88,7 @@ def build_audience_planner_agent(verbose: bool = False) -> Agent:
       - AudienceMatchingTool   (UCP) -- relocated from Research Agent
       - CoverageEstimationTool (UCP) -- relocated from Research Agent
       - TaxonomyLookupTool     -- vendored-taxonomy resolver
-      - EmbeddingMintTool      -- mock agentic-ref minter (bead §22 swaps
+      - EmbeddingMintTool      -- mock agentic-ref minter (§22 swaps
         in a real model)
 
     The factory is shared across the pipeline step (here) and tests so
@@ -147,7 +147,7 @@ def run_audience_planner_step(
         from legacy migration (source=`inferred` primary) or omitted
         targeting entirely.
       - Degrades gracefully when seller-side discovery is offline
-        (expected in this bead -- §8/§9/§11 activate it).
+        (expected at this stage -- §8/§9/§11 activate it).
 
     Args:
         brief: The validated `CampaignBrief` from ingestion.

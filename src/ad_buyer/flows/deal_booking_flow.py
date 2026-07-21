@@ -61,7 +61,7 @@ _FENCED_BLOCK_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL)
 
 # ---------------------------------------------------------------------------
 # Channel -> deals-API mapping (folded in from the retired CampaignPipeline,
-# adapted to this flow's channel vocabulary; bead ar-j2nw)
+# adapted to this flow's channel vocabulary)
 # ---------------------------------------------------------------------------
 
 # Maps this flow's channel names to the media_type string used by the
@@ -77,7 +77,7 @@ _CHANNEL_MEDIA_TYPE_MAP: dict[str, str] = {
 # enum (digital | ctv | linear_tv) that QuoteRequest/DealRequest validate
 # against. Discovery speaks inventory vocabulary ("display", "mobile");
 # the quote/deal wire speaks the contract library's — one string cannot
-# serve both (bead ar-9iw5).
+# serve both.
 _PRICING_MEDIA_TYPE_MAP: dict[str, str] = {
     "display": "digital",
     "mobile": "digital",
@@ -108,7 +108,7 @@ def build_default_orchestrator() -> MultiSellerOrchestrator:
     The orchestrator is wired to the global event bus singleton -- the
     same bus the API's ``/events`` endpoint reads -- so
     ``product.resolution`` and the audit-class ``negotiation.*`` events
-    are observable on the live surface (bead ar-nly5; without a bus,
+    are observable on the live surface (without a bus,
     ``_emit`` silently no-ops).
     """
     from ..clients.deals_client import DealsClient
@@ -133,7 +133,7 @@ def _make_catalog_client(seller_url: str, **kwargs: Any) -> Any:
 
     The seller serves the shared catalog surface (``GET /products``) at the
     same base URL as its deals API, so an OpenDirect client pointed at the
-    seller's own URL reads THAT seller's catalog (bead ar-gufw).
+    seller's own URL reads THAT seller's catalog.
     """
     from ..clients.opendirect_client import OpenDirectClient
 
@@ -204,7 +204,7 @@ class DealBookingFlow(Flow[BookingState]):
     ) -> str | None:
         """Assemble the truthful pricing audit line for a booked deal.
 
-        Bead ar-phd7: the seller's own quote ``rationale`` is computed
+        The seller's own quote ``rationale`` is computed
         from the pricing-engine decision BEFORE a target-grant overwrites
         ``final_cpm``, so it can report the base/list price as the "Final
         price" while the deal actually struck at a concession. The buyer
@@ -748,7 +748,7 @@ class DealBookingFlow(Flow[BookingState]):
         ``by_alias=True`` emitted camelCase keys (``startDate``/``endDate``)
         that the consumer's ``.get("start_date")`` missed, so the flight
         window rendered as "Flight: None to None" and the LLM crew reported
-        the dates as missing and refused to finalize (ar-kedz).
+        the dates as missing and refused to finalize.
         """
         return ChannelBrief(
             channel=channel,
@@ -768,12 +768,12 @@ class DealBookingFlow(Flow[BookingState]):
         (``target_cpm_usd``, the price the buyer asks for first). Keeping
         them distinct is the entire premise of negotiation Stage 3.5: the
         RFQ opens at the target, and quotes landing above the ceiling but
-        within the band are negotiated down toward it (bead ar-g6jf).
+        within the band are negotiated down toward it.
 
         Reads the CampaignBrief/real-driver shape (``kpis.max_cpm_usd`` /
         ``kpis.target_cpm_usd``) first, falling back to the legacy
-        top-level ``max_cpm`` / ``target_cpm`` keys (same idiom as bead
-        ar-0wev for the ceiling). A value that is absent or non-positive
+        top-level ``max_cpm`` / ``target_cpm`` keys (same idiom as the
+        ceiling lookup). A value that is absent or non-positive
         yields None, meaning "not configured".
         """
         brief = self.state.campaign_brief or {}
@@ -795,14 +795,14 @@ class DealBookingFlow(Flow[BookingState]):
 
         The CPM ceiling comes from the brief's ``kpis.max_cpm_usd`` — the
         CampaignBrief/real-driver shape, where constraints ride in the kpis
-        dict — falling back to the legacy top-level ``max_cpm`` key (bead
-        ar-0wev: reading only the top-level key left the clamp inert on the
+        dict — falling back to the legacy top-level ``max_cpm`` key
+        (reading only the top-level key left the clamp inert on the
         real path). The per-line cost ceiling is the channel's allocated
         budget, falling back to the campaign's total budget (``budget`` is a
         required top-level field, validated at flow entry, so it has no kpis
         analog). A limit that is absent or non-positive disables the
         corresponding clamp (None), preserving behavior for briefs without
-        configured limits. Bead ar-1ow7 (EP-4.3).
+        configured limits (EP-4.3).
         """
         brief = self.state.campaign_brief or {}
         max_cpm, _ = self._brief_price_split()
@@ -825,7 +825,7 @@ class DealBookingFlow(Flow[BookingState]):
         (``validate_and_clamp_recommendation``) before it becomes a typed
         ``ProductRecommendation``: malformed items are rejected and numeric
         fields are clamped to campaign bounds, so an out-of-bounds LLM value
-        can never reach the booking primitive. Bead ar-1ow7 (EP-4.3).
+        can never reach the booking primitive (EP-4.3).
         """
         bounds = self._recommendation_bounds(channel)
         recommendations: list[ProductRecommendation] = []
@@ -857,8 +857,7 @@ class DealBookingFlow(Flow[BookingState]):
     def _extract_recommendation_items(cls, result_str: str) -> list[Any]:
         """Extract the raw recommendation items from crew output text.
 
-        Deterministic (no LLM) extraction, in order of preference
-        (bead ar-h2o6):
+        Deterministic (no LLM) extraction, in order of preference:
 
         1. Each fenced ``````json`` block, parsed as JSON. A block that
            parses to a list, or to an object with a ``recommendations``
@@ -924,7 +923,7 @@ class DealBookingFlow(Flow[BookingState]):
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
         """Consolidate all channel recommendations for approval.
 
-        Trigger note (bead ar-h2o6): this MUST be ``and_``, not ``or_``.
+        Trigger note: this MUST be ``and_``, not ``or_``.
         Every research method always returns (success / no_budget / skipped /
         failed all return dicts), so ``and_`` fires exactly once, after ALL
         five have completed. With ``or_``, CrewAI >=1.14 (a) treats the four
@@ -1047,7 +1046,7 @@ class DealBookingFlow(Flow[BookingState]):
     def _execute_bookings(self) -> dict[str, Any]:
         """Execute bookings for approved recommendations via the orchestrator.
 
-        Canonical handoff (bead ar-j2nw): each approved recommendation is
+        Canonical handoff: each approved recommendation is
         translated into DealParams / InventoryRequirements and executed by
         MultiSellerOrchestrator (discover -> quote -> rank ->
         select_and_book). Booking records key on the SELLER-issued deal_id
@@ -1075,7 +1074,7 @@ class DealBookingFlow(Flow[BookingState]):
             self.state.execution_status = ExecutionStatus.COMPLETED
             return {"status": "success", "booked": 0, "message": "No recommendations approved"}
 
-        # Deterministic spend-ceiling guard (bead ar-70eh / EP-0.1): the
+        # Deterministic spend-ceiling guard (EP-0.1): the
         # approved recommendations come from LLM-parsed crew output, so
         # their total cost must be checked against the campaign budget
         # BEFORE any money is committed to a seller. A missing budget fails
@@ -1273,7 +1272,7 @@ class DealBookingFlow(Flow[BookingState]):
         Per-recommendation isolation: one failure records an error tuple
         and the rest continue.
 
-        Price split (bead ar-g6jf): the brief's ``max_cpm_usd`` is the
+        Price split: the brief's ``max_cpm_usd`` is the
         NEGOTIATION CEILING (``InventoryRequirements.max_cpm``) and its
         ``target_cpm_usd`` is the RFQ OPENING TARGET
         (``DealParams.target_cpm``). Collapsing both onto ``rec.cpm``
@@ -1319,10 +1318,10 @@ class DealBookingFlow(Flow[BookingState]):
                 target_cpm=target_cpm,
                 # DealParams.media_type reaches QuoteRequest/DealRequest,
                 # which validate against the shared pricing MediaType enum —
-                # translate from discovery vocabulary (ar-9iw5).
+                # translate from discovery vocabulary.
                 media_type=_PRICING_MEDIA_TYPE_MAP.get(media_type, "digital"),
                 audience_plan=audience_plan,
-                # Cross-seller product identity (ar-gufw): the recommended
+                # Cross-seller product identity: the recommended
                 # name + discovery-vocabulary channel let the orchestrator
                 # resolve an EQUIVALENT product on sellers whose catalogs
                 # don't contain rec.product_id.

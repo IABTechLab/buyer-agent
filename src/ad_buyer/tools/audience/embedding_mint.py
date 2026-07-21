@@ -14,7 +14,7 @@ NOTE: This is a MOCK implementation. The underlying vector is generated
 by `UCPClient.create_query_embedding()`, which is the SHA256-seeded
 deterministic mock at `clients/ucp_client.py:394-421` -- not a trained
 embedding model. The replacement with a real model is tracked as
-follow-up Epic 2 (proposal §6.5 + bead §22). Every emitted ref carries
+follow-up Epic 2 (proposal §6.5 + §22). Every emitted ref carries
 an `emb://` URI prefix to make the mock provenance unambiguous in logs
 and debugger output.
 
@@ -22,7 +22,7 @@ References:
 - Proposal §5.5 step 2 (planner picks Agentic when brief references
   advertiser-first-party data).
 - Proposal §5.6 (Agentic Audiences carrier; consent context required).
-- Proposal §6.5 / bead §22 (real model is a follow-up epic).
+- Proposal §6.5 / §22 (real model is a follow-up epic).
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ class EmbeddingMintTool(BaseTool):
         "'GLOBAL'), optional `consent_framework` (default 'advertiser-1p'). "
         "Returns an `AudienceRef` with type='agentic', an emb:// identifier, "
         "and a populated compliance_context. NOTE: the underlying embedding "
-        "is currently a SHA256-seeded mock (bead §22 will swap in a real "
+        "is currently a SHA256-seeded mock (§22 will swap in a real "
         "model)."
     )
     args_schema: type[BaseModel] = EmbeddingMintInput

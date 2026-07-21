@@ -19,7 +19,7 @@ Append-only by contract -- callers only `log_event` (insert) and `get_events`
 (read). There is no update or delete path. The table schema lives in
 `storage.schema.AUDIENCE_AUDIT_LOG_TABLE` and is created idempotently on
 every `initialize_schema` call, so older buyer DBs gain the table on first
-boot after this bead lands without an explicit migration.
+boot after this change lands without an explicit migration.
 
 Event types (per proposal §5.7):
   - "degradation"           -- one event per `degrade_plan_for_seller` call
@@ -37,7 +37,7 @@ Payload is a free-form JSON dict so we can grow event types without
 schema changes. Helpers serialize Pydantic models cleanly via
 `model_dump(mode="json")` and accept plain dicts as well.
 
-Bead: ar-q2uh (proposal §5.7 + §6 row 13a).
+See proposal §5.7 + §6 row 13a.
 """
 
 from __future__ import annotations
@@ -127,7 +127,7 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     """Create `audience_audit_log` if it does not already exist.
 
     Used on first connection and as the migration safety-net for the test
-    that opens a DB created before this bead landed.
+    that opens a DB created before this change landed.
     """
 
     cursor = conn.cursor()

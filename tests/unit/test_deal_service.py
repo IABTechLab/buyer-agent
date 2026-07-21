@@ -6,8 +6,6 @@
 Exercises ``ad_buyer.services.deal_service`` directly (below the MCP
 interface layer): portfolio reads, CSV import, SSP import, and manual
 deal entry -- happy paths and edge cases.
-
-bead: ar-22w1
 """
 
 from __future__ import annotations

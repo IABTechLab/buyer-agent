@@ -400,7 +400,7 @@ def from_wire_deal_booking_response(wire: WireDealBookingResponse) -> DealRespon
 # The shared catalog library's DeliveryType keeps its own spellings
 # ('Exclusive'/'Guaranteed'/'PMP'); the buyer's OpenDirect enum follows the
 # spec-lowercase spellings ('exclusive'/'guaranteed'). Map explicitly at the
-# boundary — the values no longer coincide (bead ar-kzi0).
+# boundary — the values no longer coincide.
 _WIRE_DELIVERY_TO_OD: dict[str, ODDeliveryType] = {
     "Exclusive": ODDeliveryType.EXCLUSIVE,
     "Guaranteed": ODDeliveryType.GUARANTEED,

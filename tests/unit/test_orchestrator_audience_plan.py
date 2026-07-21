@@ -3,13 +3,13 @@
 
 """Tests for threading AudiencePlan through the orchestrator data classes.
 
-Covers proposal §5.2 + §6 row 5 (bead ar-9nwu): the audience plan now lives
+Covers proposal §5.2 + §6 row 5: the audience plan now lives
 on InventoryRequirements, DealParams, QuoteRequest, and DealBookingRequest
-with a backward-compatible None default. This bead does NOT populate the
-field from the planner -- that's a follow-up bead. These tests confirm
+with a backward-compatible None default. This change does NOT populate the
+field from the planner -- that's follow-up work. These tests confirm
 only the field exists, defaults to None, accepts a valid AudiencePlan,
 serializes round-trip, and survives an end-to-end derivation chain from
-the canonical flow's typed plan (DealBookingFlow, bead ar-j2nw) ->
+the canonical flow's typed plan (DealBookingFlow) ->
 InventoryRequirements -> DealParams -> QuoteRequest -> DealBookingRequest.
 """
 
@@ -214,7 +214,7 @@ class TestEndToEndThread:
         plan = _build_minimal_plan()
         plan_id = plan.audience_plan_id
 
-        # 1. The canonical flow (bead ar-j2nw) carries the audience plan
+        # 1. The canonical flow carries the audience plan
         # on its state; _typed_audience_plan is what the booking handoff
         # threads onto the orchestrator surfaces.
         flow = DealBookingFlow(client=MagicMock(), orchestrator=MagicMock())

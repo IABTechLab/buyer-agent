@@ -26,7 +26,7 @@ to care about the source format.
 
 Lock metadata (versions + sha256) lives in `data/taxonomies/taxonomies.lock.json`
 and is read via `taxonomy_lock_hash()` for capability advertisement
-(see proposal §5.7 layer 1, bead ar-50cm + ar-XXX seller capability bead).
+(see proposal §5.7 layer 1).
 """
 
 from __future__ import annotations

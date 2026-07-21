@@ -1,6 +1,6 @@
 """_book_approved must emit shared-enum media types on the quote/deal wire.
 
-Run #15 (bead ar-9iw5): DealParams carried the discovery vocabulary
+Run #15: DealParams carried the discovery vocabulary
 ("display"), and QuoteRequest validation rejected it — the quote leg died
 client-side before any seller was called.
 """

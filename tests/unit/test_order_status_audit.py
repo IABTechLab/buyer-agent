@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for Order Status & Audit API Integration (buyer-nz9).
+"""Tests for Order Status & Audit API Integration.
 
 Covers:
 - Order storage CRUD (get_order, set_order, list_orders)

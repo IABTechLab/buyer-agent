@@ -6,7 +6,7 @@
 Provides real-time budget pacing analysis, deviation detection, and
 cross-channel reallocation recommendations.
 
-bead: buyer-9zz (2C: Budget Pacing & Reallocation)
+2C: Budget Pacing & Reallocation.
 """
 
 from .engine import (

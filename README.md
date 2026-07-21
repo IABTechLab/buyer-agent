@@ -1,5 +1,4 @@
 > **V2 — Active Development**
-> See [PROGRESS.md](.beads/PROGRESS.md) for roadmap status.
 
 # IAB Tech Lab — Buyer Agent
 

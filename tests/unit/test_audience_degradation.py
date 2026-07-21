@@ -3,7 +3,7 @@
 
 """Unit tests for `degrade_plan_for_seller` (proposal §5.7 layer 2).
 
-Covers the ten scenarios called out in the bead scope:
+Covers the ten scenarios in scope:
   1. agentic ref dropped when `agentic.supported=False`
   2. extensions dropped when `supports_extensions=False`
   3. constraints dropped when `supports_constraints=False`
@@ -17,8 +17,6 @@ Covers the ten scenarios called out in the bead scope:
 
 Plus targeted tests for `synthesize_capabilities_from_unsupported`, which
 underpins the retry-on-rejection path in §12 part B.
-
-Bead: ar-0w48.
 """
 
 from __future__ import annotations

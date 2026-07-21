@@ -1,8 +1,8 @@
-"""Tests for DealBookingFlow._extract_allocations (ar-jbod).
+"""Tests for DealBookingFlow._extract_allocations.
 
 The portfolio crew has two tasks: budget allocation and channel coordination.
 ``crew.kickoff()`` returns a CrewOutput whose top-level ``raw`` reflects the
-LAST task (channel coordination), not the first. Prior to the ar-jbod fix the
+LAST task (channel coordination), not the first. Prior to the fix the
 flow used ``str(result)`` and did a naive ``find('{')..rfind('}')`` extract,
 which parsed the wrong task's JSON and produced empty budget_allocations.
 
@@ -102,7 +102,7 @@ def test_extract_falls_back_to_default_when_all_paths_fail() -> None:
 
 
 def test_extract_ignores_wrong_schema_from_last_task() -> None:
-    """Regression test for ar-jbod itself.
+    """Regression test for the extraction bug itself.
 
     Before the fix the code did str(result) which captured the LAST task's
     output (channel coordination, different schema). This test pins that

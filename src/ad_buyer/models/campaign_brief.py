@@ -22,7 +22,6 @@ References:
   - Campaign Automation Strategic Plan, Sections 6.1 and 7.1
   - IAB Audience Taxonomy 1.1 (target_audience segment IDs)
   - ISO 4217 (currency codes)
-  - bead: buyer-80k
 """
 
 from __future__ import annotations
@@ -357,7 +356,7 @@ class CampaignBrief(BaseModel):
             if issues:
                 raise ContentTaxonomyMigrationRequired(issues)
 
-            # Brief-ingestion validation: reject GLOBAL agentic refs (ar-ei0s).
+            # Brief-ingestion validation: reject GLOBAL agentic refs.
             # Single ComplianceContext can't honestly span multiple consent
             # regimes; per-jurisdiction fan-out is a follow-on (proposal §7).
             global_agentic_issues = validate_no_global_agentic(self.target_audience)

@@ -4,7 +4,7 @@
 
 """Chat interface for the Ad Buyer System.
 
-Booking goes through the ONE canonical pipeline (bead ar-j2nw): the chat
+Booking goes through the ONE canonical pipeline: the chat
 agent's tools are thin wrappers over MultiSellerOrchestrator (discover ->
 quote -> rank -> select_and_book against the real quotes -> deals
 contract). The former inline seller-protocol tools (MultiSellerSearchTool,
@@ -386,7 +386,7 @@ Provide specific, actionable recommendations based on user requirements.""",
             self._orchestrator = MultiSellerOrchestrator(
                 registry_client=_ConfiguredSellersRegistry(self._sellers),
                 deals_client_factory=self._make_deals_client,
-                # Same singleton the API's /events surface reads (ar-nly5):
+                # Same singleton the API's /events surface reads:
                 # without a bus, product.resolution + negotiation.* events
                 # are silently dropped.
                 event_bus=get_event_bus_sync(),

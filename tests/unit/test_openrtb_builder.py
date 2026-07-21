@@ -5,8 +5,6 @@
 
 Exercises the standard / contextual / agentic mapping path documented in
 ``docs/api/audience_plan_wire_format.md`` §9 and proposal §5.1 Step 4.
-
-Bead: ar-8vzg.
 """
 
 from __future__ import annotations

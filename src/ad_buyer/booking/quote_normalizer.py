@@ -17,7 +17,6 @@ an apples-to-apples basis.
 
 Reference: Campaign Automation Strategic Plan, Section 7.2
 (Multi-Seller Deal Orchestration), step 5 -- Compare.
-Bead: buyer-lae (blocks buyer-8ih).
 """
 
 from __future__ import annotations

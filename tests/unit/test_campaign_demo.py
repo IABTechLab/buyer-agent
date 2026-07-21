@@ -14,8 +14,6 @@ Covers:
   - Pause and complete controls for active campaigns
   - Sample briefs are pre-seeded
   - Error handling for invalid briefs and missing campaigns
-
-bead: ar-llj4, ar-uxpw
 """
 
 import json

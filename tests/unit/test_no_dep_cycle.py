@@ -3,7 +3,7 @@
 
 """Regression guard: no clients <-> orchestration circular dependency.
 
-Bead ar-5ufg (EP-2.3). `clients.capability_client` used to reach up into
+Part of EP-2.3. `clients.capability_client` used to reach up into
 `orchestration.audience_degradation` for the `SellerAudienceCapabilities`
 model, papered over with function-local deferred imports. The shared model
 now lives in `models.audience_capabilities`, so the dependency flows one way:

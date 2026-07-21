@@ -256,7 +256,7 @@ class TestDealBookingFlowWithStore:
         assert result["booked"] == 1
 
         # Verify booking record was persisted, keyed by the SELLER-issued
-        # deal id + quote id + confirmed terms (bead ar-j2nw)
+        # deal id + quote id + confirmed terms
         import json as json_module
 
         bookings = deal_store.get_booking_records(deal_id)

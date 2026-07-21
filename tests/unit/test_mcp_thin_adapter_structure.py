@@ -11,8 +11,6 @@ The MCP interface layer must not:
 
 These are enforced by static analysis of the module source so a future
 regression fails loudly rather than silently re-fattening the adapter.
-
-bead: ar-22w1
 """
 
 from __future__ import annotations

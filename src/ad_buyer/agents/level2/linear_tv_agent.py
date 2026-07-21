@@ -9,7 +9,7 @@ GRP-based audience guarantees, makegood terms, and commercial pod
 positioning. Maps to seller's 1E (Linear TV Specialist Agent).
 
 Design decisions (from LINEAR_TV_DEAL_FLOW_RESEARCH.md):
-- Scatter-only for v1 (upfronts TBD, bead ar-gh6)
+- Scatter-only for v1 (upfronts TBD)
 - Nielsen measurement currency for v1
 - DMA-level granularity (all 210 DMAs)
 - TIP-compatible, not TIP-native

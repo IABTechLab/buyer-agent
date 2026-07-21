@@ -8,7 +8,7 @@ Covers:
 - Makegood client: POST /api/v1/deals/{deal_id}/makegoods
 - Cancellation client: POST /api/v1/deals/{deal_id}/cancel
 
-Tests written first (TDD) per bead buyer-6io.
+Tests written first (TDD).
 """
 
 import json

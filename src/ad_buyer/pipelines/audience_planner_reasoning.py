@@ -18,7 +18,7 @@ described in proposal §5.5:
 The reasoning is deterministic Python so the unit tests in
 `tests/unit/test_audience_planner_reasoning.py` can pin concrete behavior
 without spinning up CrewAI. The orchestration shell in
-`audience_planner_step.py` wraps this module and (in a later bead) may
+`audience_planner_step.py` wraps this module and (in a later phase) may
 invoke a CrewAI Task only for free-form rationale prose; the
 *classification + role assignment* logic lives here, intentionally
 testable without an LLM.
@@ -35,7 +35,7 @@ Hard rules from the proposal:
   rationale records the degradation rather than crashing.
 - `audience_strictness` from the brief is carried forward into the
   plan's metadata (encoded into the rationale prefix here; downstream
-  beads can promote to a structured field).
+  follow-ups can promote to a structured field).
 """
 
 from __future__ import annotations
@@ -686,7 +686,7 @@ def validate_plan(
 
     The validation step is a soft gate: if the discovery tool succeeds
     we record the available capabilities count; if it raises (the
-    expected case in this bead, since seller endpoints aren't
+    expected case at this stage, since seller endpoints aren't
     audience-aware until §8/§9/§11), we record the degradation in the
     rationale and continue.
     """
@@ -703,7 +703,7 @@ def validate_plan(
         return False, rationale
 
     # Run discovery against a sentinel "mock" endpoint -- the tool's mock
-    # branch returns a stable capability set in this bead, which is
+    # branch returns a stable capability set at this stage, which is
     # enough for the validation step to record "we tried and got X".
     try:
         # The tool's _run is sync; we invoke directly.
@@ -750,7 +750,7 @@ def validate_plan(
 def _strictness_prefix(strictness: AudienceStrictness) -> str:
     """One-line prefix that records the audience_strictness policy.
 
-    Carries the policy forward into the rationale so downstream beads
+    Carries the policy forward into the rationale so downstream stages
     (§12 buyer-side degradation; §13a audit trail) can read it without
     threading another field through the wire.
     """

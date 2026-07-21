@@ -3,7 +3,6 @@
 
 """Tests for CPM hallucination fix — Layer 2b: pricing provenance tracking.
 
-Bead: ar-r76d (child of epic ar-rrgw)
 
 These tests verify that every pricing value in the buyer agent carries
 a provenance source (`pricing_source`), and that the system refuses to

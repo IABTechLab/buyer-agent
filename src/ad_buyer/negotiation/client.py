@@ -96,7 +96,7 @@ class NegotiationClient:
         (``quote_led_negotiation`` unsupported). A buyer holding only a
         quote must therefore first submit a proposal via the seller's
         ``POST /proposals`` and negotiate against the returned
-        ``proposal_id`` (bead ar-cc3n).
+        ``proposal_id``.
 
         The response is the seller's ``ProposalResponse`` dict:
         ``proposal_id``, ``recommendation`` (accept/counter/reject),
@@ -357,7 +357,7 @@ class NegotiationClient:
         Returns:
             NegotiationResult with the outcome and history.
         """
-        # Guard: reject negotiation when the seller has disabled it (ar-9xi)
+        # Guard: reject negotiation when the seller has disabled it
         if not negotiation_enabled:
             logger.info(
                 "Negotiation not enabled for proposal %s; declining.",

@@ -452,7 +452,7 @@ Checks real-time availability and pricing for a specific product during a flight
 ## Reporting Tools
 
 !!! info "Coming Soon"
-    The Reporting Agent and its tools (buyer-brn) are planned for a future phase. This section describes the planned reporting functionality.
+    The Reporting Agent and its tools are planned for a future phase. This section describes the planned reporting functionality.
 
 **Package:** `src/ad_buyer/tools/reporting/`
 

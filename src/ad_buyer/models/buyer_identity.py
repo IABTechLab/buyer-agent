@@ -233,7 +233,7 @@ class DealRequest(BaseModel):
 
     # Typed audience plan threaded from the buyer's planning stage.
     # Mirrors the field added to QuoteRequest / DealBookingRequest in
-    # `models/deals.py` per proposal §5.2 + §5.3 / bead ar-vp4q §5.
+    # `models/deals.py` per proposal §5.2 + §5.3.
     # None on legacy paths that have not yet been wired through.
     audience_plan: AudiencePlan | None = Field(
         default=None,

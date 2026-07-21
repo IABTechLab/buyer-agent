@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Regression tests for buyer-1g4: sync CrewAI Flow.kickoff() must not
+"""Regression tests: sync CrewAI Flow.kickoff() must not
 block the FastAPI event loop.
 
 CrewAI's sync ``Flow.kickoff()`` internally does::
@@ -54,7 +54,7 @@ def _seed_job(job_id: str) -> None:
 
 def _sample_brief() -> CampaignBrief:
     return CampaignBrief(
-        name="buyer-1g4 regression",
+        name="sync-kickoff regression",
         objectives=["awareness"],
         budget=50000,
         start_date="2026-07-01",
@@ -73,7 +73,7 @@ class TestRunBookingFlowOffloadsKickoff:
         never on ``MainThread``. ``asyncio.to_thread`` provides this
         offload; calling ``flow.kickoff()`` directly from the async
         background task would run it on the event-loop thread and
-        block every other request (buyer-1g4)."""
+        block every other request."""
 
         import threading
 
@@ -85,7 +85,7 @@ class TestRunBookingFlowOffloadsKickoff:
 
         monkeypatch.setattr(DealBookingFlow, "kickoff", fake_kickoff)
 
-        job_id = "test-buyer-1g4-kickoff-thread"
+        job_id = "test-sync-kickoff-thread"
         _seed_job(job_id)
         try:
             await _run_booking_flow(
@@ -95,7 +95,7 @@ class TestRunBookingFlowOffloadsKickoff:
 
             assert kickoff_threads, "flow.kickoff should have been called"
             assert "MainThread" not in kickoff_threads[0], (
-                f"flow.kickoff ran on {kickoff_threads[0]} — buyer-1g4 "
+                f"flow.kickoff ran on {kickoff_threads[0]} — sync-kickoff "
                 "regression: should be offloaded via asyncio.to_thread"
             )
             assert jobs[job_id]["status"] != "failed", (
@@ -124,7 +124,7 @@ class TestRunBookingFlowOffloadsKickoff:
         monkeypatch.setattr(DealBookingFlow, "kickoff", fake_kickoff)
         monkeypatch.setattr(DealBookingFlow, "approve_all", fake_approve_all)
 
-        job_id = "test-buyer-1g4-approve-all-thread"
+        job_id = "test-sync-approve-all-thread"
         _seed_job(job_id)
         try:
             await _run_booking_flow(
@@ -134,7 +134,7 @@ class TestRunBookingFlowOffloadsKickoff:
 
             assert approve_threads, "approve_all should have been called"
             assert "MainThread" not in approve_threads[0], (
-                f"approve_all ran on {approve_threads[0]} — buyer-1g4 "
+                f"approve_all ran on {approve_threads[0]} — sync-kickoff "
                 "regression: should be offloaded via asyncio.to_thread"
             )
         finally:
@@ -196,7 +196,7 @@ class TestSourceLevelAsyncContract:
         calls = self._calls_in_async_functions(api_main.__file__)
         booking_calls = calls.get("_run_booking_flow", [])
         assert "kickoff" not in booking_calls, (
-            "_run_booking_flow contains a sync .kickoff() call — buyer-1g4 "
+            "_run_booking_flow contains a sync .kickoff() call — offload "
             "regression. Wrap with ``await asyncio.to_thread(flow.kickoff)``."
         )
 
@@ -207,7 +207,6 @@ class TestSourceLevelAsyncContract:
         endpoint_calls = calls.get("approve_all_recommendations", [])
         assert "approve_all" not in endpoint_calls, (
             "approve_all_recommendations endpoint contains a sync "
-            ".approve_all() call — buyer-1g4 regression. Wrap with "
+            ".approve_all() call — offload regression. Wrap with "
             "``await asyncio.to_thread(flow.approve_all)``."
         )
-

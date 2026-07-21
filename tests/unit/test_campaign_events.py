@@ -6,8 +6,6 @@
 Verifies that the campaign.*, pacing.*, and creative.* event types are properly
 defined, can be used to create Event instances, serialize correctly, can be
 emitted on the event bus, and can be persisted via DealStore.save_event().
-
-Bead: buyer-ppi -- Campaign event types.
 """
 
 import asyncio

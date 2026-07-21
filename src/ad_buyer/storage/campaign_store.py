@@ -9,9 +9,9 @@ Provides CRUD operations for the campaign automation data model:
 - creative_assets: Creative files and metadata per campaign
 - ad_server_campaigns: Ad server integration records (Innovid/Flashtalking)
 - campaign_events: Lifecycle events emitted during state transitions
-- approval_requests: Human approval gate requests (buyer-2qs)
+- approval_requests: Human approval gate requests
 
-Integrates with CampaignAutomationStateMachine (buyer-0u9) to validate
+Integrates with CampaignAutomationStateMachine to validate
 all status transitions before persisting them.  Lifecycle convenience
 methods (create_campaign, start_planning, start_booking, mark_ready,
 activate_campaign, pause_campaign, resume_campaign, complete_campaign,
@@ -1031,7 +1031,7 @@ class CampaignStore:
         return True
 
     # ------------------------------------------------------------------
-    # Approval Requests (buyer-2qs)
+    # Approval Requests
     # ------------------------------------------------------------------
 
     def create_approval_requests_table(self) -> None:

@@ -6,5 +6,5 @@
 This package contains the building blocks for the campaign automation
 pipeline, including:
 
-- approval: Configurable human approval gates (buyer-2qs)
+- approval: Configurable human approval gates
 """

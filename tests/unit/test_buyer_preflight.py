@@ -13,7 +13,7 @@ the flow:
 - TTL ceiling of 1h with `Cache-Control: max-age` honored.
 - Legacy-seller fallback (no `audience_capabilities` in the agent card).
 
-Bead: ar-gkbr (proposal §5.7 layer 1+2 + §6 row 13).
+See proposal §5.7 layer 1+2 + §6 row 13.
 """
 
 from __future__ import annotations

@@ -6,8 +6,6 @@
 All tests use in-memory SQLite (`:memory:`) for speed and isolation.
 Tests cover the CreativeAsset dataclass, the creative_assets schema table,
 and the CRUD methods on DealStore (save, get, list, update, delete).
-
-bead: ar-pw8u
 """
 
 import threading

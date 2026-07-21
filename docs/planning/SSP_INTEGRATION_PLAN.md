@@ -1,8 +1,8 @@
 # SSP Integration Plan: Deal Library Import Connectors
 
 **Date:** 2026-03-25
-**Bead:** buyer-xa5 (SSP Integration Planning — PubMatic, Magnite, Index Exchange)
-**Status:** Planning complete; implementation beads created
+SSP Integration Planning — PubMatic, Magnite, Index Exchange.
+**Status:** Planning complete; implementation tasks created
 
 ---
 
@@ -52,14 +52,14 @@ src/ad_buyer/
       deal_entry.py          # existing -- manual entry
       portfolio_inspection.py # existing
       templates.py           # existing
-      ssp_connector_base.py  # NEW -- abstract base class (buyer-ssp-base)
+      ssp_connector_base.py # NEW -- abstract base class
       connectors/
         __init__.py
-        pubmatic.py          # NEW -- PubMatic connector (buyer-ssp-pm)
-        magnite.py           # NEW -- Magnite connector (buyer-ssp-mg)
-        index_exchange.py    # NEW -- Index Exchange connector (buyer-ssp-ix)
+        pubmatic.py # NEW -- PubMatic connector
+        magnite.py # NEW -- Magnite connector
+        index_exchange.py # NEW -- Index Exchange connector
   interfaces/
-    mcp_server.py            # UPDATED -- new SSP import MCP tools (buyer-ssp-mcp)
+    mcp_server.py # UPDATED -- new SSP import MCP tools
 ```
 
 ### 2.2 Relationship to existing import pattern
@@ -525,18 +525,18 @@ There is no overlap or conflict between the seller's SSP modeling and the buyer'
 The implementation order follows buyer-side API accessibility (most accessible first):
 
 ```
-buyer-ssp-base: SSP Connector base class and interface
+ssp-base: SSP Connector base class and interface
     |
-    +-- buyer-ssp-pm: PubMatic SSP connector (Priority 1 -- best buyer API)
+    +-- ssp-pm: PubMatic SSP connector (Priority 1 -- best buyer API)
     |       |
-    |       +-- buyer-ssp-mcp: SSP connector MCP tools
+    |       +-- ssp-mcp: SSP connector MCP tools
     |
-    +-- buyer-ssp-mg: Magnite SSP connector (Priority 2 -- largest market share, DSP-mediated)
+    +-- ssp-mg: Magnite SSP connector (Priority 2 -- largest market share, DSP-mediated)
     |
-    +-- buyer-ssp-ix: Index Exchange connector (Priority 3 -- publisher-side only)
+    +-- ssp-ix: Index Exchange connector (Priority 3 -- publisher-side only)
 ```
 
-**Dependency rule:** All three SSP connectors depend on the base class. The MCP tools bead depends on at least the PubMatic connector (to validate the interface) but can be developed alongside it in practice.
+**Dependency rule:** All three SSP connectors depend on the base class. The MCP tools task depends on at least the PubMatic connector (to validate the interface) but can be developed alongside it in practice.
 
 ---
 

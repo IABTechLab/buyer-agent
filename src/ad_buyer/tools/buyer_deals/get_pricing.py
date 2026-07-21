@@ -247,7 +247,7 @@ Returns:
             output_lines.append(deal_opt)
 
         # Negotiation availability -- only when BOTH buyer can negotiate
-        # AND the seller's package has negotiation_enabled=True (ar-9xi)
+        # AND the seller's package has negotiation_enabled=True
         package_negotiation_enabled = product.get("negotiation_enabled", False)
         if self._buyer_context.can_negotiate() and package_negotiation_enabled:
             output_lines.extend(

@@ -25,7 +25,7 @@ This is asserted two ways, both mechanically (no runtime LLM needed):
    invokes a crew (``.kickoff()``) or constructs one (``create_*_crew``) --
    proving the booking half is disjoint from the LLM-driven research half.
 
-Bead ar-1dw5 (EP-4.2).
+Part of EP-4.2.
 """
 
 from __future__ import annotations

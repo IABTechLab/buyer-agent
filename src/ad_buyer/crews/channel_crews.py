@@ -8,7 +8,7 @@ CTV, performance). Each crew factory accepts an optional audience plan,
 which is rendered into the research task description so the channel
 agents can target inventory accordingly.
 
-Audience plan input shapes (proposal §5.3, bead ar-5y8v / §19):
+Audience plan input shapes (proposal §5.3 / §19):
 
   - Typed `AudiencePlan` (preferred): the new shape produced by the
     Audience Planner's reasoning loop. Carries primary + constraints +
@@ -86,7 +86,7 @@ def _create_execution_tools(client: OpenDirectClient) -> list[Any]:
 def _create_audience_tools() -> list[Any]:
     """Create the three UCP audience planning tools.
 
-    NOTE: As of proposal §5.3 / bead ar-fgyq, these tools are owned by the
+    NOTE: As of proposal §5.3, these tools are owned by the
     Audience Planner agent (`agents/level3/audience_planner_agent.py`), not
     by the Research Agent. The Research Agent operates on inventory; the
     Audience Planner owns audience composition, discovery, matching, and
@@ -249,7 +249,7 @@ def _format_audience_context(
 
 
 # ---------------------------------------------------------------------------
-# Channel-crew specs + shared builder (ar-w5g — DRY refactor)
+# Channel-crew specs + shared builder (DRY refactor)
 # ---------------------------------------------------------------------------
 #
 # The four `create_*_crew` factories below all share an identical scaffolding
@@ -265,7 +265,7 @@ def _format_audience_context(
 # signatures are unchanged so existing callers (DealBookingFlow and
 # direct invocation tests) are unaffected.
 #
-# Per proposal §5.3 + bead ar-fgyq: audience tools live on the Audience
+# Per proposal §5.3: audience tools live on the Audience
 # Planner upstream — the Research Agent here operates on inventory only.
 
 
@@ -680,7 +680,7 @@ def create_social_crew(
 
 
 # ---------------------------------------------------------------------------
-# Direct-invocation convenience wrapper (proposal §5.3 / bead ar-5y8v)
+# Direct-invocation convenience wrapper (proposal §5.3)
 # ---------------------------------------------------------------------------
 
 

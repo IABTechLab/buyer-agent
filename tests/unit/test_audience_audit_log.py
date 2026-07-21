@@ -3,7 +3,7 @@
 
 """Tests for the audience audit-log helper (proposal §5.7 + §6 row 13a).
 
-Covers the deliverables called out in the bead:
+Covers the deliverables:
   1. `log_event` writes a row; `get_events(plan_id)` returns it.
   2. Multiple events for one plan_id are returned in order.
   3. Events for different plan_ids do not bleed.
@@ -12,8 +12,6 @@ Covers the deliverables called out in the bead:
      `log_event` without crashing.
   6. Integration: `MultiSellerOrchestrator._book_with_audience_retry`
      emits a `degradation` audit event when degrade-and-retry fires.
-
-Bead: ar-q2uh.
 """
 
 from __future__ import annotations
@@ -201,7 +199,7 @@ class TestEdgeCases:
 
 class TestSchemaMigration:
     def test_log_event_creates_table_on_existing_db_without_it(self, tmp_path):
-        """A DB created before this bead lands has no audience_audit_log table.
+        """A DB created before this change lands has no audience_audit_log table.
 
         First call to `log_event` must not crash -- the helper's
         `_ensure_table` runs CREATE IF NOT EXISTS at connection time.

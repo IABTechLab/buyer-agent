@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for negotiation in the real booking path (bead ar-cc3n).
+"""Tests for negotiation in the real booking path.
 
 When a seller's quote comes back ABOVE the buyer's max_cpm ceiling but
 within a configurable negotiation band (default: quote <= ceiling x 1.25,

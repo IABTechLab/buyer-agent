@@ -131,8 +131,8 @@ Returns:
                 ``warn``, ``allow``.
             max_cpm: Deterministic CPM ceiling for this buyer/campaign.
                 When set, a deal whose computed final CPM exceeds it is
-                rejected before a Deal ID is minted (spend-ceiling guard,
-                bead ar-70eh). Set at construction or by the owning flow
+                rejected before a Deal ID is minted (spend-ceiling
+                guard). Set at construction or by the owning flow
                 — never from LLM tool arguments — so the model cannot
                 raise or drop the ceiling. None means no ceiling
                 (fail-open, preserves demo behavior).
@@ -212,7 +212,7 @@ Returns:
                 return f"Product {product_id} not found."
 
             # Build the seller-bound DealRequest payload so the plan
-            # rides on the wire (proposal §5.2 / §5.3 / bead ar-ts30 §18).
+            # rides on the wire (proposal §5.2 / §5.3 §18).
             # We construct the payload even when audience_plan is None so
             # tests can inspect a single payload object regardless of
             # whether audience targeting was supplied.
@@ -397,7 +397,7 @@ Returns:
             negotiation_enabled=product.get("negotiation_enabled", False),
         )
 
-        # Deterministic spend-ceiling guard (bead ar-70eh): the final CPM
+        # Deterministic spend-ceiling guard: the final CPM
         # must be checked against the buyer's max_cpm BEFORE a Deal ID is
         # minted. Raises SpendCeilingExceeded, handled in _arun. When
         # _max_cpm is None the guard fails open (allow + warning log) —
@@ -462,8 +462,8 @@ Returns:
 
         The buyer's planning stage puts an ``AudiencePlan`` on the request
         context; this helper materializes the wire-shape ``DealRequest``
-        so the plan rides on the seller-bound payload (proposal §5.2 / §5.3
-        + bead ar-ts30 §18). Tests assert the plan survives this boundary.
+        so the plan rides on the seller-bound payload (proposal §5.2 /
+        §5.3). Tests assert the plan survives this boundary.
         """
 
         try:

@@ -7,7 +7,6 @@ Provides campaign status summaries, pacing dashboards, creative
 performance reports, and deal-level reporting in both JSON and
 human-readable output formats.
 
-bead: buyer-f58
 """
 
 from .campaign_report import (

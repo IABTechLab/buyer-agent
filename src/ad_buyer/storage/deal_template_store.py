@@ -3,7 +3,7 @@
 
 """SQLite-backed deal template persistence (v5, Strategic Plan Section 6.3).
 
-Extracted from ``DealStore`` (bead ar-bonx) as part of the EP-2.4 god-class
+Extracted from ``DealStore`` as part of the EP-2.4 god-class
 split.  Operates on the ``deal_templates`` table, created by
 ``schema.initialize_schema`` during ``DealStore.connect()``.  Instances share
 the owning DealStore's SQLite connection and lock.

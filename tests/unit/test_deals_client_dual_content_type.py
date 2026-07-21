@@ -3,7 +3,7 @@
 
 """Buyer-side dual content-type emission + plan_id logging on deal booking.
 
-Implements bead ar-y6ki (proposal §5.1 Step 2 + §5.6 + §6 row 14b).
+Implements (proposal §5.1 Step 2 + §5.6 + §6 row 14b).
 
 Coverage:
 - POST /api/v1/deals with an audience_plan emits both wire-format media

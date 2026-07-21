@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Dedicated negotiation timeout + causeful conclusions (bead ar-vc4m).
+"""Dedicated negotiation timeout + causeful conclusions.
 
 S2 live proof 2026-07-21 (Bugs I + K): the NegotiationClient used for
 Stage 3.5 proposal/negotiation calls was constructed with

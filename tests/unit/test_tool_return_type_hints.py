@@ -1,6 +1,6 @@
-"""ar-gsd: every BaseTool subclass's `_run`/`_arun` method has a return annotation.
+"""every BaseTool subclass's `_run`/`_arun` method has a return annotation.
 
-This is a regression guard. As of ar-gsd's audit all 44 (22 sync + 22 async)
+This is a regression guard. As of the audit all 44 (22 sync + 22 async)
 methods already carried return-type hints; this test ensures that any new
 tool added to `ad_buyer.tools.*` is required to include one.
 """
@@ -57,8 +57,7 @@ def test_tool_method_has_return_annotation(qualname: str, method_name: str) -> N
     method = getattr(cls, method_name)
     sig = inspect.signature(method)
     assert sig.return_annotation is not inspect.Signature.empty, (
-        f"{qualname} is missing a return-type annotation. "
-        "Per ar-gsd, every Tool _run/_arun must declare one."
+        f"{qualname} is missing a return-type annotation. Every Tool _run/_arun must declare one."
     )
 
 

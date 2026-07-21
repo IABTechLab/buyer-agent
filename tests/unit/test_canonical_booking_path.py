@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""End-to-end tests for the ONE canonical buyer booking pipeline (bead ar-j2nw).
+"""End-to-end tests for the ONE canonical buyer booking pipeline.
 
 The canonical lifecycle is:
 

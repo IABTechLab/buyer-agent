@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Cross-seller product identity in the quote path (bead ar-gufw).
+"""Cross-seller product identity in the quote path.
 
 Wave-A proof run 2026-07-21 (S2): buyer research read the single
 OPENDIRECT_BASE_URL catalog (display-seller in the rig) and recommended
@@ -377,7 +377,7 @@ class TestCrossSellerInvariant:
     async def test_undeclared_formats_survive_channel_fallback(
         self, mock_deals_client_factory, mock_event_bus
     ):
-        """Products with no declared ad_formats stay eligible (ar-mkq5 semantics)."""
+        """Products with no declared ad_formats stay eligible."""
         catalogs = {
             SELLER_B_URL: [
                 _catalog_product(

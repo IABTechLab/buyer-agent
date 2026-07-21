@@ -5,7 +5,7 @@
 
 All tests use in-memory SQLite (`:memory:`) for speed and isolation.
 
-bead: buyer-lna (Pacing snapshot storage)
+Pacing snapshot storage.
 """
 
 import uuid

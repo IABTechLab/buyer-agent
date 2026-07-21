@@ -250,7 +250,7 @@ class DealsClient:
                 "Content-Type": _UCP_CONTENT_TYPE,
                 "Accept": _AUDIENCE_PLAN_ACCEPT,
             }
-            # Log forensic anchor hash (proposal §5.1 Step 2 / bead 14b).
+            # Log forensic anchor hash (proposal §5.1 Step 2 / row 14b).
             # Use the canonical id if populated; otherwise compute it now.
             plan_id = plan.audience_plan_id or plan.compute_id()
             booking_logger.info(

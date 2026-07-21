@@ -7,7 +7,7 @@ You give the buyer a campaign brief describing what you want to buy. The agent d
 Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https://iabtechlab.github.io/seller-agent/).
 
 !!! note "Alpha Release"
-    The buyer agent is in active development. Core deal flow (brief, research, negotiate, book) is functional end-to-end. See [PROGRESS.md](https://github.com/IABTechLab/buyer-agent/blob/main/.beads/PROGRESS.md) for current roadmap status.
+    The buyer agent is in active development. Core deal flow (brief, research, negotiate, book) is functional end-to-end.
 
 ## Key Capabilities
 

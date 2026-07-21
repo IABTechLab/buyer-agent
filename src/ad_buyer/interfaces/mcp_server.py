@@ -9,16 +9,16 @@ This is the foundation server that all other MCP tool modules build upon.
 Tool categories:
   - Foundation: get_setup_status, health_check, get_config
   - Setup Wizard: run_setup_wizard, get_wizard_step,
-    complete_wizard_step, skip_wizard_step (buyer-byk)
+    complete_wizard_step, skip_wizard_step
   - Campaign Management: list_campaigns, get_campaign_status,
-    check_pacing, review_budgets (buyer-3w3)
+    check_pacing, review_budgets
   - Deal Library: list_deals, search_deals, inspect_deal,
-    import_deals_csv, create_deal_manual, get_portfolio_summary (buyer-4ds)
+    import_deals_csv, create_deal_manual, get_portfolio_summary
   - Seller Discovery: discover_sellers, get_seller_media_kit,
-    compare_sellers (buyer-nob)
+    compare_sellers
   - Negotiation: start_negotiation, get_negotiation_status,
-    list_active_negotiations (buyer-r0j)
-  - Orders: list_orders, get_order_status, transition_order (buyer-r0j)
+    list_active_negotiations
+  - Orders: list_orders, get_order_status, transition_order
 
 Mount into a FastAPI app:
     from ad_buyer.interfaces.mcp_server import mount_mcp
@@ -322,7 +322,7 @@ def get_config() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Setup Wizard Tools (buyer-byk)
+# Setup Wizard Tools
 # ---------------------------------------------------------------------------
 
 # Module-level wizard instance for state persistence across MCP calls.
@@ -473,7 +473,7 @@ def skip_wizard_step(step_number: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Campaign Management Tools (buyer-3w3)
+# Campaign Management Tools
 # ---------------------------------------------------------------------------
 
 
@@ -740,7 +740,7 @@ def review_budgets() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Deal Library Tools (buyer-4ds)
+# Deal Library Tools
 # ---------------------------------------------------------------------------
 
 
@@ -813,7 +813,7 @@ def search_deals(query: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Seller Discovery Tools (buyer-nob)
+# Seller Discovery Tools
 # ---------------------------------------------------------------------------
 
 
@@ -881,7 +881,7 @@ async def compare_sellers(seller_urls: list[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Negotiation Tools (buyer-r0j)
+# Negotiation Tools
 # ---------------------------------------------------------------------------
 
 
@@ -1243,7 +1243,7 @@ def list_active_negotiations() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Order Management Tools (buyer-r0j)
+# Order Management Tools
 # ---------------------------------------------------------------------------
 
 
@@ -1349,7 +1349,7 @@ def transition_order(
 
 
 # ---------------------------------------------------------------------------
-# Approval Tools (buyer-j7f)
+# Approval Tools
 # ---------------------------------------------------------------------------
 
 
@@ -1479,7 +1479,7 @@ def approve_or_reject(
 
 
 # ---------------------------------------------------------------------------
-# API Key Management Tools (buyer-j7f)
+# API Key Management Tools
 # ---------------------------------------------------------------------------
 
 
@@ -1574,7 +1574,7 @@ def revoke_api_key(seller_url: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Template Tools (buyer-5x7)
+# Template Tools
 # ---------------------------------------------------------------------------
 
 
@@ -1814,7 +1814,7 @@ def instantiate_from_template(
 
 
 # ---------------------------------------------------------------------------
-# Reporting Tools (buyer-5x7)
+# Reporting Tools
 # ---------------------------------------------------------------------------
 
 
@@ -2022,7 +2022,7 @@ def get_pacing_report(campaign_id: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# SSP Connector Tools (buyer-sozw)
+# SSP Connector Tools
 # ---------------------------------------------------------------------------
 
 # Registry mapping normalised ssp_name → connector class attribute name.

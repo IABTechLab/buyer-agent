@@ -7,7 +7,6 @@ Tests the CampaignBrief Pydantic model and the parse_campaign_brief
 function that validates raw JSON/dict input and returns a structured
 CampaignBrief object.
 
-bead: buyer-80k
 """
 
 from datetime import date, timedelta
@@ -123,7 +122,7 @@ class TestRequiredFields:
         assert len(brief.channels) == 2
         # Legacy list[str] is migrated to a typed AudiencePlan with the
         # first item as the primary ref and the rest as extensions
-        # (proposal §6 row 4 / bead ar-fe0h migration policy).
+        # (proposal §6 row 4 migration policy).
         assert brief.target_audience is not None
         assert brief.target_audience.primary.identifier == "auto_intenders"
         assert len(brief.target_audience.extensions) == 1
@@ -729,7 +728,7 @@ class TestJSONSchemaExport:
     def test_json_schema_has_required_fields(self):
         """JSON Schema should list all required fields.
 
-        Note: as of proposal §5.2 (bead ar-fe0h), `target_audience` is now
+        Note: as of proposal §5.2, `target_audience` is now
         optional (typed `AudiencePlan | None`) so it does NOT appear in
         the required list anymore.
         """

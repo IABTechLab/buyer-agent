@@ -53,25 +53,25 @@ A few tests exist purely to lock in invariants and prevent future drift:
 
 | Guard | Purpose |
 |-------|---------|
-| `test_endpoint_no_flow_kickoff.py` | Seller read endpoints (`/products`, `/.well-known/agent.json`, `/api/v1/quotes`) must not call `Flow.kickoff()` per request. Autouse fixture monkeypatches `kickoff` to raise (ar-uwad / ar-0vtg). |
-| `test_tool_return_type_hints.py` | Every `BaseTool` subclass's `_run` / `_arun` method must declare a return type. Parametrized walk over `ad_buyer.tools.*` (ar-gsd). |
+| `test_endpoint_no_flow_kickoff.py` | Seller read endpoints (`/products`, `/.well-known/agent.json`, `/api/v1/quotes`) must not call `Flow.kickoff()` per request. Autouse fixture monkeypatches `kickoff` to raise. |
+| `test_tool_return_type_hints.py` | Every `BaseTool` subclass's `_run` / `_arun` method must declare a return type. Parametrized walk over `ad_buyer.tools.*`. |
 | `test_schema_drift_canonical.py` | `AudienceRef` / `AudiencePlan` JSON Schema must match the canonical snapshot at `agent_range/docs/api/audience_plan_schemas.json` (E2-10). The seller has a mirror test for cross-repo drift detection. |
-| `test_settings_lazy_init.py` | Importing `ad_buyer.config.settings` must not eagerly construct `Settings()`. Tests assert env-var overrides win when applied before first attribute access (ar-le3). |
+| `test_settings_lazy_init.py` | Importing `ad_buyer.config.settings` must not eagerly construct `Settings()`. Tests assert env-var overrides win when applied before first attribute access. |
 
 If any of these fail, you've introduced drift — read the failing assertion, then fix the underlying code (don't update the guard).
 
 ## Flakes
 
-- **`test_threshold_recalibration.py::TestThresholds::test_lookup_per_mode`** (`ar-0isf`): order-dependent — passes in isolation, fails when run after other tests that mutate `settings.embedding_mode` without restoring. Tracked separately; not introduced by any specific bead.
+- **`test_threshold_recalibration.py::TestThresholds::test_lookup_per_mode`**: order-dependent — passes in isolation, fails when run after other tests that mutate `settings.embedding_mode` without restoring. Tracked separately; a pre-existing order dependency.
 
 If you discover a new flake:
 1. Confirm it passes in isolation: `pytest <path>::<test> -v`
 2. Confirm it's order-dependent: re-run the full suite a couple of times
-3. File a new bead and add it here
+3. File a new issue and add it here
 
 ## Audience-extension tests by epic
 
-| Bead / scope | File |
+| Scope | File |
 |---|---|
 | Epic 1 § 3 — typed AudienceRef + AudiencePlan | `test_audience_plan.py`, `test_taxonomy_loader.py`, `test_taxonomy_lookup_tool.py` |
 | Epic 1 § 4 — brief migration + strictness + content-taxonomy validation | `test_campaign_brief_migration.py`, `test_audience_strictness.py`, `test_brief_ingestion_validation.py` |

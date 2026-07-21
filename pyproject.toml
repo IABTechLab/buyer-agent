@@ -74,7 +74,7 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 # Deferred categories — behavior-adjacent or require --unsafe-fixes.
-# Tracked separately for future cleanup; see bead ar-r82f.14 for context.
+# Tracked separately for future cleanup.
 ignore = [
     "N806",  # variable in function should be lowercase (rename = behavior-adjacent)
     "N814",  # camelcase import as constant (rename = behavior-adjacent)

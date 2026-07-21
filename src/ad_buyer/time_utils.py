@@ -5,7 +5,7 @@
 
 `utc_now()` replaces the deprecated `datetime.utcnow()` (Python 3.12+)
 while preserving the existing project-wide convention of NAIVE-UTC
-timestamps. Per ar-4e9b: `datetime.utcnow()` is on a deprecation path
+timestamps. `datetime.utcnow()` is on a deprecation path
 in Python 3.12+; the recommended `datetime.now(datetime.UTC)` returns
 a TZ-AWARE value, which is semantically correct but would require
 synchronized changes across every comparator and every test that

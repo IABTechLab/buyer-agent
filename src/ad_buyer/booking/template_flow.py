@@ -8,7 +8,7 @@ on the seller side. The actual deal creation logic (template resolution,
 override application, portfolio storage, and event emission) lives in
 ad_buyer.tools.deal_library.instantiate_from_template.
 
-See: buyer-te6b.2.8 (InstantiateDealFromTemplateTool)
+See: InstantiateDealFromTemplateTool
 """
 
 from typing import Any

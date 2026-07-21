@@ -1,5 +1,4 @@
 # Tests for seller's negotiation_enabled flag being respected by buyer
-# bead: ar-9xi
 
 """Test that buyer respects the seller's negotiation_enabled flag on packages.
 

@@ -17,7 +17,6 @@ Design notes:
 
 References:
   - Campaign Automation Strategic Plan, Section 6.3
-  - bead: ar-pw8u
 """
 
 from __future__ import annotations

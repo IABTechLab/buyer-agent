@@ -1,7 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Event-bus wiring for the production orchestrator (bead ar-nly5).
+"""Event-bus wiring for the production orchestrator.
 
 Wave-B rig proof 2026-07-21: ``build_default_orchestrator`` (and the chat
 interface's direct construction) built ``MultiSellerOrchestrator`` WITHOUT

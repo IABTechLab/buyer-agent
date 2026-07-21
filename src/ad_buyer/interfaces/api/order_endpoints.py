@@ -10,7 +10,7 @@ Provides:
 These endpoints query the buyer's local OrderStore, which is populated
 by pulling state from the seller's Order API.
 
-bead: buyer-nz9 (Order Status & Audit API Integration)
+Order Status & Audit API Integration.
 """
 
 import logging

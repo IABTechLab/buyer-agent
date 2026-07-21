@@ -16,7 +16,7 @@ Covers:
 - Exclusion list filtering
 
 Reference: Campaign Automation Strategic Plan, Section 7.2
-Bead: buyer-8ih (2A: Multi-Seller Deal Orchestration)
+2A: Multi-Seller Deal Orchestration.
 """
 
 from unittest.mock import AsyncMock

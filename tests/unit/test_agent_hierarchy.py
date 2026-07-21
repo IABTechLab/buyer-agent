@@ -45,7 +45,7 @@ from ad_buyer.crews.channel_crews import (
 )
 
 
-# Per ar-i84f: agent constructors now honor settings.crew_memory_enabled
+# Agent constructors now honor settings.crew_memory_enabled
 # instead of hard-coding memory=True. Force the flag on for this test module
 # so memory-related assertions don't depend on ambient .env state.
 @pytest.fixture(autouse=True)
@@ -615,7 +615,7 @@ class TestHierarchyInvariants:
             assert agent.memory, f"{agent.role} should have memory"
 
     def test_all_agents_honor_crew_memory_enabled_false(self, monkeypatch):
-        """ar-i84f regression: when settings.crew_memory_enabled is False,
+        """Regression: when settings.crew_memory_enabled is False,
         every agent must construct WITHOUT memory (no chromadb / OpenAI
         embedder dependency). Prior to the fix this assertion failed
         because memory=True was hardcoded in every agent constructor."""

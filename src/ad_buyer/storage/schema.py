@@ -17,7 +17,7 @@ Defines relational tables for the deal lifecycle:
 - pacing_snapshots: Periodic pacing data points per campaign (v4)
 - creative_assets: Creative files and metadata per campaign (v4)
 - ad_server_campaigns: Ad server integration records (v4)
-- approval_requests: Human approval gate requests (v4, buyer-2qs)
+- approval_requests: Human approval gate requests (v4)
 
 Uses a schema_version table for forward-compatible migrations.
 """
@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 # Version registry:
 #   v1: Initial schema (deals, negotiation_rounds, booking_records, jobs, etc.)
 #   v2: Deal library hybrid approach (portfolio_metadata, deal_activations, etc.)
-#   v3: Reserved for deal_templates (ar-fcq)
-#   v4: Campaign automation tables (buyer-80o)
-#   v5: Deal templates + supply path templates (ar-ct33)
+# v3: Reserved for deal_templates
+# v4: Campaign automation tables
+# v5: Deal templates + supply path templates
 SCHEMA_VERSION = 5
 
 # -- Schema version tracking ------------------------------------------------
@@ -286,7 +286,7 @@ PERFORMANCE_CACHE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_performance_cache_deal_id ON performance_cache(deal_id);",
 ]
 
-# -- v4: Campaign Automation tables (buyer-80o) ----------------------------
+# -- v4: Campaign Automation tables ----------------------------
 
 CAMPAIGNS_TABLE = """
 CREATE TABLE IF NOT EXISTS campaigns (
@@ -377,7 +377,7 @@ AD_SERVER_CAMPAIGNS_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_ad_server_campaigns_ad_server ON ad_server_campaigns(ad_server);",  # noqa: E501
 ]
 
-# -- v4 continued: Approval requests (buyer-2qs) --------------------------
+# -- v4 continued: Approval requests --------------------------
 
 APPROVAL_REQUESTS_TABLE = """
 CREATE TABLE IF NOT EXISTS approval_requests (
@@ -693,7 +693,7 @@ def migrate_v2_to_v4(conn: sqlite3.Connection) -> None:
     This migration is idempotent: all DDL uses CREATE TABLE IF NOT EXISTS
     and CREATE INDEX IF NOT EXISTS, so re-running on a v4 database is safe.
 
-    Note: v3 is reserved for deal_templates (ar-fcq) but may not yet exist
+    Note: v3 is reserved for deal_templates but may not yet exist
     in the database.  This migration is independent of v3 and works whether
     or not v3 tables are present.
 
@@ -763,7 +763,7 @@ def run_migrations(conn: sqlite3.Connection) -> None:
         return
 
     # Migration registry: version -> migration function
-    # Note: v3 is reserved for deal_templates (ar-fcq); skipped.
+    # Note: v3 is reserved for deal_templates; skipped.
     # v5 adds deal_templates + supply_path_templates.
     migrations: dict[int, callable] = {
         2: migrate_v1_to_v2,

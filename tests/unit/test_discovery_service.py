@@ -5,8 +5,6 @@
 
 Exercises ``ad_buyer.services.discovery_service`` directly with faked
 registry / media-kit clients -- happy paths plus error degradation.
-
-bead: ar-22w1
 """
 
 from __future__ import annotations

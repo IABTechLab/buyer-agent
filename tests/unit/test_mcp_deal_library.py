@@ -6,7 +6,6 @@
 Tests six deal library MCP tools: list_deals, search_deals,
 inspect_deal, import_deals_csv, create_deal_manual, get_portfolio_summary.
 
-bead: buyer-4ds
 """
 
 import json

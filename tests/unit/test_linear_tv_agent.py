@@ -4,7 +4,7 @@
 """Tests for the Linear TV Specialist agent (Level 2).
 
 Follows the same pattern as test_agents.py for consistency.
-Tests written first (TDD) per bead buyer-6io.
+Tests written first (TDD).
 """
 
 import os
