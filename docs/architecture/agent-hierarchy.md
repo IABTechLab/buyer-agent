@@ -17,7 +17,9 @@ graph TB
         CTV["CTV Specialist<br/>(streaming)"]
         MOB["Mobile App Specialist<br/>(app install)"]
         PERF["Performance Specialist<br/>(remarketing)"]
+        LTV["Linear TV Specialist<br/>(dayparts / DMA)"]
         DSP["Buyer Deal Specialist<br/>(deal discovery)"]
+        DL["Deal Library Agent<br/>(portfolio management)"]
     end
 
     subgraph Level3["Level 3 — Functional Agents"]
@@ -158,6 +160,24 @@ Maximizes conversions and ROAS through lower-funnel tactics.
 | Creative | Dynamic creative optimization, A/B testing |
 | Tracking | Pixel implementation, cross-device attribution |
 
+### Linear TV Specialist
+
+**File:** `src/ad_buyer/agents/level2/linear_tv_agent.py`
+
+Handles traditional linear television buying.
+
+| Area | Focus |
+|------|-------|
+| Pricing | Daypart-based CPP/CPM, scatter deal structures |
+| Targeting | DMA / local market, target demographics (GRPs) |
+| Inventory | Broadcast and cable dayparts, spot lengths |
+
+### Deal Library Agent
+
+**File:** `src/ad_buyer/agents/level2/deal_library_agent.py`
+
+Manages the deal portfolio: importing, cataloging, inspecting, organizing, and optimizing deals. Works with the seven deal-library CrewAI tools (portfolio inspection, templates, manual entry).
+
 ### Buyer Deal Discovery Specialist
 
 **File:** `src/ad_buyer/agents/level2/buyer_deal_specialist_agent.py`
@@ -172,7 +192,7 @@ Discovers inventory and obtains Deal IDs for activation in traditional DSP platf
 | Negotiation | Price negotiation for agency/advertiser tiers |
 
 !!! tip "Buyer Deal Specialist vs. other specialists"
-    The Buyer Deal Specialist works alongside the channel specialists, not in place of them. Channel specialists decide *what* inventory to buy; the Buyer Deal Specialist handles the mechanics of obtaining Deal IDs for programmatic activation. See [Buyer Deal Flow](buyer-deal-flow.md) for the full workflow.
+    The Buyer Deal Specialist works alongside the channel specialists, not in place of them. Channel specialists decide *what* inventory to buy; the Buyer Deal Specialist handles the mechanics of obtaining Deal IDs for programmatic activation.
 
 ---
 
@@ -443,6 +463,5 @@ sequenceDiagram
 
 - [Architecture Overview](overview.md) --- Full system architecture
 - [Tools Reference](tools.md) --- All CrewAI tools available to agents
-- [Buyer Deal Flow](buyer-deal-flow.md) --- Buyer deal discovery workflow
 - [Booking Flow](booking-flow.md) --- Detailed booking sequence
 - [Configuration](../guides/configuration.md) --- LLM and agent settings

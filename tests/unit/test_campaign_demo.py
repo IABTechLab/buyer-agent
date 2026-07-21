@@ -22,7 +22,7 @@ import json
 
 import pytest
 
-from ad_buyer.demo.campaign_demo import create_campaign_demo_app
+from demo.campaign_demo import create_campaign_demo_app
 from ad_buyer.storage.campaign_store import CampaignStore
 
 # ---------------------------------------------------------------------------

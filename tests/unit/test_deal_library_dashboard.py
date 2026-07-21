@@ -18,8 +18,8 @@ import json
 
 import pytest
 
-from ad_buyer.demo.deal_library_dashboard import create_app
-from ad_buyer.demo.seed_data import seed_demo_data
+from demo.deal_library_dashboard import create_app
+from demo.seed_data import seed_demo_data
 from ad_buyer.storage.deal_store import DealStore
 
 # ---------------------------------------------------------------------------

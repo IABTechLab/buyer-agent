@@ -52,12 +52,12 @@ class TestOpenDirectModels:
         """Test creating Product from dict with aliases."""
         data = {
             "id": "prod_456",
-            "publisherId": "pub_xyz",
+            "publisherid": "pub_xyz",
             "name": "Video Ad",
             "currency": "USD",
-            "basePrice": 25.00,
-            "rateType": "CPM",
-            "deliveryType": "PMP",
+            "baseprice": 25.00,
+            "ratetype": "CPM",
+            "deliverytype": "PMP",
         }
 
         product = Product.model_validate(data)

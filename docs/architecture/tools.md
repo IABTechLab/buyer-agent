@@ -1,8 +1,8 @@
 # CrewAI Tools Reference
 
-The buyer agent provides 13 tools that agents use to interact with sellers, plan audiences, execute bookings, and retrieve performance data. All tools extend CrewAI's `BaseTool` and expose both synchronous (`_run`) and asynchronous (`_arun`) interfaces.
+The buyer agent provides 23 tools that agents use to interact with sellers, plan audiences, manage the deal library, execute bookings, and retrieve performance data. All tools extend CrewAI's `BaseTool` and expose both synchronous (`_run`) and asynchronous (`_arun`) interfaces.
 
-Tools are how AI agents take action in the real world. While agents reason about strategy and make decisions, tools are the concrete operations they invoke --- searching a seller's product catalog, checking inventory availability, or confirming a booking. Each tool wraps a single, well-defined API call so that agents do not need to construct raw HTTP requests. Tools fall into four categories: **Audience** (understanding who to target), **Research** (finding what to buy), **Buyer Deals** (obtaining Deal IDs for programmatic activation), and **Execution** (placing and confirming orders).
+Tools are how AI agents take action in the real world. While agents reason about strategy and make decisions, tools are the concrete operations they invoke --- searching a seller's product catalog, checking inventory availability, or confirming a booking. Each tool wraps a single, well-defined API call so that agents do not need to construct raw HTTP requests. This page documents the core booking-path tools in depth: **Audience** (understanding who to target), **Research** (finding what to buy), **Buyer Deals** (obtaining Deal IDs for programmatic activation), and **Execution** (placing and confirming orders). The remaining tools live in the same `tools/` package: seven **Deal Library** tools (portfolio inspection, templates, manual entry — surfaced via the [MCP server](mcp-server.md) and [deal library](deal-library.md)), plus `SGPVendorApprovalTool`, `TaxonomyLookupTool`, and `EmbeddingMintTool`.
 
 ### Typical Tool Flow
 
@@ -525,6 +525,5 @@ buyer_deal_tools = [
 ## Related
 
 - [Agent Hierarchy](agent-hierarchy.md) --- Which agents use which tools
-- [Buyer Deal Flow](buyer-deal-flow.md) --- How buyer deal tools work together in a flow
 - [Booking Flow](booking-flow.md) --- How execution tools drive the booking lifecycle
 - [Configuration](../guides/configuration.md) --- Tool-related settings

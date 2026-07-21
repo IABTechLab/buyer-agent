@@ -18,7 +18,7 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "aiosqlite>=0.20.0",
     "pyyaml>=6.0.0",
-    "nest-asyncio>=1.6.0",
+    "iab-agentic-primitives[client] @ git+https://github.com/IABTechLab/iab-agentic-primitives.git@v0.3.0",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +31,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.5.0",
     "mypy>=1.11.0",
-    # flask is imported transitively by src/ad_buyer/demo/{campaign_demo,deal_library_dashboard}.py
+    # flask is imported transitively by demo/{campaign_demo,deal_library_dashboard}.py
     # which the demo Flask-app unit tests under tests/unit/ import. Without this,
     # pytest collection fails with ModuleNotFoundError before any tests run.
     "flask>=3.0",
@@ -57,6 +57,12 @@ ad-buyer = "ad_buyer.interfaces.cli.main:app"
 [build-system]
 requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+# Allow the direct git reference to the private shared contract library
+# (iab-agentic-primitives) in project.dependencies. Hatchling rejects
+# direct-URL/VCS deps unless this is opted into explicitly.
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ad_buyer"]
@@ -84,6 +90,10 @@ strict = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# `src` puts the ad_buyer package on the path; `.` makes the top-level
+# `demo` package (moved out of the shipped wheel in EP-8.1) importable.
+pythonpath = ["src", "."]
 markers = [
     "agentcore: tests that invoke a deployed AgentCore runtime (require AWS credentials)",
+    "e2e: tests that hit external production APIs (require provider credentials)",
 ]

@@ -147,7 +147,7 @@ class TestSourceLevelAsyncContract:
     These guard against silent reverts to sync ``kickoff()`` /
     unwrapped ``approve_all()`` inside ``async def`` functions. They are
     cheaper than full mocking for sites whose runtime invocation needs
-    extensive client/flow stubbing (e.g. ``run_buyer_deal_flow``).
+    extensive client/flow stubbing.
     """
 
     @staticmethod
@@ -211,12 +211,3 @@ class TestSourceLevelAsyncContract:
             "``await asyncio.to_thread(flow.approve_all)``."
         )
 
-    def test_run_buyer_deal_flow_no_sync_kickoff(self):
-        from ad_buyer.flows import buyer_deal_flow
-
-        calls = self._calls_in_async_functions(buyer_deal_flow.__file__)
-        run_calls = calls.get("run_buyer_deal_flow", [])
-        assert "kickoff" not in run_calls, (
-            "run_buyer_deal_flow contains a sync .kickoff() call — "
-            "buyer-1g4 regression. Use ``await flow.kickoff_async()``."
-        )

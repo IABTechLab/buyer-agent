@@ -172,7 +172,7 @@ class TestDealLibraryEventBus:
             event_type=EventType.DEAL_IMPORTED,
             payload={"import_source": "csv"},
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.DEAL_IMPORTED
 
@@ -184,7 +184,7 @@ class TestDealLibraryEventBus:
             event_type=EventType.DEAL_TEMPLATE_CREATED,
             payload={"template_id": "tmpl-1"},
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.DEAL_TEMPLATE_CREATED
 
@@ -196,7 +196,7 @@ class TestDealLibraryEventBus:
             event_type=EventType.PORTFOLIO_INSPECTED,
             payload={"result_count": 10},
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.PORTFOLIO_INSPECTED
 
@@ -209,7 +209,7 @@ class TestDealLibraryEventBus:
             deal_id="deal-99",
             payload={"action_description": "Manual setup needed"},
         )
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
         assert len(bus._events) == 1
         assert bus._events[0].event_type == EventType.DEAL_MANUAL_ACTION_REQUIRED
 
@@ -218,12 +218,12 @@ class TestDealLibraryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("deal.imported", lambda e: received.append(e))
         )
 
         event = Event(event_type=EventType.DEAL_IMPORTED)
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
         assert len(received) == 1
         assert received[0].event_type == EventType.DEAL_IMPORTED
@@ -233,12 +233,12 @@ class TestDealLibraryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("deal.manual_action_required", lambda e: received.append(e))
         )
 
         event = Event(event_type=EventType.DEAL_MANUAL_ACTION_REQUIRED)
-        asyncio.get_event_loop().run_until_complete(bus.publish(event))
+        asyncio.run(bus.publish(event))
 
         assert len(received) == 1
         assert received[0].event_type == EventType.DEAL_MANUAL_ACTION_REQUIRED
@@ -247,17 +247,17 @@ class TestDealLibraryEventBus:
         """Should filter events by Phase 1 event types."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_IMPORTED))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_BOOKED))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.PORTFOLIO_INSPECTED))
         )
 
-        events = asyncio.get_event_loop().run_until_complete(
+        events = asyncio.run(
             bus.list_events(event_type="deal.imported")
         )
         assert len(events) == 1
@@ -268,14 +268,14 @@ class TestDealLibraryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.subscribe("*", lambda e: received.append(e))
         )
 
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_IMPORTED))
         )
-        asyncio.get_event_loop().run_until_complete(
+        asyncio.run(
             bus.publish(Event(event_type=EventType.DEAL_TEMPLATE_CREATED))
         )
 
@@ -385,7 +385,7 @@ class TestDealLibraryEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.DEAL_IMPORTED,
                 deal_id="deal-import-1",
@@ -406,7 +406,7 @@ class TestDealLibraryEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.PORTFOLIO_INSPECTED,
                 payload={"result_count": 15},
@@ -425,7 +425,7 @@ class TestDealLibraryEmitEvent:
 
         bus_mod._event_bus_instance = None
 
-        event = asyncio.get_event_loop().run_until_complete(
+        event = asyncio.run(
             emit_event(
                 event_type=EventType.DEAL_MANUAL_ACTION_REQUIRED,
                 deal_id="deal-99",

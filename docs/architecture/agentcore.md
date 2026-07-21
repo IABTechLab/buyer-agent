@@ -18,11 +18,11 @@ The AgentCore deployment wraps the existing `DealBookingFlow` and `ChatInterface
 src/ad_buyer/interfaces/agentcore/
 ├── http_main.py          # BedrockAgentCoreApp entrypoint
 ├── crew_tools.py         # DealBookingFlow wrapper + brief parsing
-├── http_entrypoint.py    # Alternative entrypoint (legacy)
 └── __init__.py
 
 patches/
-├── crewai_bedrock_fix.py # Bedrock Converse API compatibility
+├── crewai_bedrock_fix.py       # Bedrock Converse API compatibility
+├── crewai_agentcore_memory.py  # AgentCore memory integration
 └── __init__.py
 
 infra/aws/agentcore/

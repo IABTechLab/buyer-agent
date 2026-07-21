@@ -204,11 +204,11 @@ For end-to-end testing, run both agents simultaneously:
 
 ```bash
 # Terminal 1 — Seller agent
-cd ../ad_seller_system/infra/docker
+cd ../seller-agent/infra/docker
 docker compose up
 
 # Terminal 2 — Buyer agent (pointing at the seller)
-cd ../ad_buyer_system
+cd ../buyer-agent
 SELLER_ENDPOINTS=http://host.docker.internal:8000 \
   docker compose -f infra/docker/docker-compose.yml up
 ```
@@ -255,7 +255,7 @@ The buyer agent runs on **ECS Fargate** with **EFS-backed SQLite persistence**. 
 | Logging | CloudWatch Logs | 30-day retention by default |
 
 !!! warning "Single-task constraint with SQLite"
-    SQLite supports only one concurrent writer. If you deploy with `STORAGE_TYPE=sqlite` (the default), you must run exactly **one ECS task** (`DesiredCount: 1`). Running multiple tasks against the same EFS-backed SQLite file will corrupt the database. For horizontal scaling, switch to `STORAGE_TYPE=hybrid` (PostgreSQL + Redis) — see [Storage Backends](../architecture/storage-backends.md).
+    SQLite supports only one concurrent writer. You must run exactly **one ECS task** (`DesiredCount: 1`). Running multiple tasks against the same EFS-backed SQLite file will corrupt the database. See [Storage Layer](../architecture/storage-backends.md).
 
 ### Prerequisites
 
@@ -451,25 +451,15 @@ MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
 
 ### Storage
 
-See [Storage Backends](../architecture/storage-backends.md) for the full backend reference.
+See [Storage Layer](../architecture/storage-backends.md) for the store-by-store reference.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `STORAGE_TYPE` | `sqlite` | Backend selector — `sqlite`, `redis`, or `hybrid` (Postgres + Redis). |
-| `DATABASE_URL` | `sqlite:///./ad_buyer.db` | SQLite or PostgreSQL connection string. Use `postgresql+asyncpg://…` for hybrid. |
-| `REDIS_URL` | `None` | Redis URL. Required for `redis` and `hybrid` backends; also used for CrewAI memory persistence and session caching when set. |
-| `POSTGRES_POOL_MIN` | `2` | Minimum asyncpg pool size (hybrid only). |
-| `POSTGRES_POOL_MAX` | `10` | Maximum asyncpg pool size (hybrid only). |
+| `DATABASE_URL` | `sqlite:///./ad_buyer.db` | SQLite connection string shared by all domain stores. |
 
 ```dotenv
-# SQLite (default, development, single-task only)
-STORAGE_TYPE=sqlite
+# SQLite (single-task only)
 DATABASE_URL=sqlite:///./ad_buyer.db
-
-# Hybrid (production, horizontal scaling)
-STORAGE_TYPE=hybrid
-DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
-REDIS_URL=redis://cache.example.com:6379/0
 ```
 
 ### Agent Behavior
@@ -505,9 +495,7 @@ API_KEY=your-service-api-key
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
 IAB_SERVER_URL=https://primary-seller.example.com
 
-STORAGE_TYPE=hybrid
-DATABASE_URL=postgresql+asyncpg://buyer:pass@db.example.com:5432/ad_buyer
-REDIS_URL=redis://cache.example.com:6379/0
+DATABASE_URL=sqlite:////app/data/ad_buyer.db
 
 CREW_VERBOSE=False
 CREW_MAX_ITERATIONS=10
@@ -661,7 +649,7 @@ The buyer agent exposes its own MCP server for external clients (Claude Desktop,
 MCP endpoint (Streamable HTTP, canonical):
 
 ```
-http://localhost:8001/mcp
+http://localhost:8001/mcp/
 ```
 
 Legacy SSE fallback (for older MCP clients): `http://localhost:8001/mcp-sse/sse`
@@ -684,7 +672,7 @@ Add the buyer agent to your Claude Desktop MCP configuration (`~/Library/Applica
       "command": "npx",
       "args": [
         "mcp-remote",
-        "http://localhost:8001/mcp"
+        "http://localhost:8001/mcp/"
       ]
     }
   }
@@ -701,7 +689,7 @@ Any client supporting Streamable HTTP transport can connect:
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
 
-async with streamablehttp_client("http://localhost:8001/mcp") as (read, write, _):
+async with streamablehttp_client("http://localhost:8001/mcp/") as (read, write, _):
     async with ClientSession(read, write) as session:
         await session.initialize()
         tools = await session.list_tools()

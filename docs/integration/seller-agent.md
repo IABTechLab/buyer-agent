@@ -59,7 +59,7 @@ This returns the seller's capabilities, supported OpenDirect version, and availa
 The buyer queries the seller's product catalog during the research phase:
 
 - **List products**: `GET /products?$skip=0&$top=50` --- paginated product listing
-- **Search products**: `POST /products/search` --- filtered search with channel, format, pricing criteria
+- **Search products**: `GET /products` + client-side filtering --- the seller returns full filterable product records and `OpenDirectClient.search_products()` applies channel, format, and pricing filters locally (there is no seller-side search route)
 - **Get product**: `GET /products/{id}` --- single product details
 
 ### Availability and Pricing
@@ -103,14 +103,14 @@ sequenceDiagram
     Buyer->>Seller: GET /.well-known/agent.json
     Seller-->>Buyer: Agent capabilities
 
-    Buyer->>Seller: POST /products/search
+    Buyer->>Seller: GET /products (filtered client-side)
     Seller-->>Buyer: Matching products
 
     Buyer->>Seller: POST /products/avails
     Seller-->>Buyer: Availability + pricing
 
     opt Negotiation (Agency/Advertiser tiers)
-        Buyer->>Seller: POST /proposals/{id}/counter
+        Buyer->>Seller: POST /api/v1/negotiations/messages
         Seller-->>Buyer: Counter-offer or accept
     end
 

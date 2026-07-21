@@ -12,6 +12,10 @@ from typing import Any
 
 import httpx
 
+from ..clients.contract_mappers import (
+    normalize_negotiation_round_response,
+    to_wire_negotiation_message,
+)
 from .models import (
     NegotiationOutcome,
     NegotiationResult,
@@ -21,6 +25,12 @@ from .models import (
 from .strategy import NegotiationContext, NegotiationStrategy
 
 logger = logging.getLogger(__name__)
+
+# Canonical shared-contract negotiation endpoint (EP-12.1). The retired
+# `/proposals/{id}/counter` route and its bare-`price` payload are replaced by
+# the shared NegotiationMessage POSTed here (see iab_agentic_primitives
+# .protocol.negotiation — this is the structural fix for the historical 422).
+_NEGOTIATION_MESSAGES_PATH = "/api/v1/negotiations/messages"
 
 
 class NegotiationClient:
@@ -96,13 +106,20 @@ class NegotiationClient:
                 f"{proposal_id}. Book at the listed price instead."
             )
 
-        url = f"{seller_url}/proposals/{proposal_id}/counter"
-        payload = {"price": initial_price}
+        url = f"{seller_url}{_NEGOTIATION_MESSAGES_PATH}"
+        # Opening move: a shared NegotiationMessage with action="counter" and
+        # negotiation_id=None (the seller mints the negotiation on open). Money
+        # crosses as the shared Money via buyer_price.
+        payload = to_wire_negotiation_message(
+            action="counter",
+            proposal_id=proposal_id,
+            buyer_price=initial_price,
+        ).model_dump(mode="json", exclude_none=True)
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(url, json=payload, headers=self._build_headers())
             response.raise_for_status()
-            data = response.json()
+            data = normalize_negotiation_round_response(response.json())
 
         session = NegotiationSession(
             proposal_id=proposal_id,
@@ -146,13 +163,18 @@ class NegotiationClient:
         Returns:
             The seller's response as a NegotiationRound.
         """
-        url = f"{session.seller_url}/proposals/{session.proposal_id}/counter"
-        payload = {"price": price}
+        url = f"{session.seller_url}{_NEGOTIATION_MESSAGES_PATH}"
+        payload = to_wire_negotiation_message(
+            action="counter",
+            proposal_id=session.proposal_id,
+            negotiation_id=session.negotiation_id,
+            buyer_price=price,
+        ).model_dump(mode="json", exclude_none=True)
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(url, json=payload, headers=self._build_headers())
             response.raise_for_status()
-            data = response.json()
+            data = normalize_negotiation_round_response(response.json())
 
         round_result = NegotiationRound(
             round_number=data.get("round_number", len(session.rounds) + 1),
@@ -188,11 +210,15 @@ class NegotiationClient:
         Returns:
             Seller's confirmation response.
         """
-        url = f"{session.seller_url}/proposals/{session.proposal_id}/counter"
-        payload = {
-            "price": session.current_seller_price,
-            "action": "accept",
-        }
+        url = f"{session.seller_url}{_NEGOTIATION_MESSAGES_PATH}"
+        # TERMINAL accept: echoes the counterparty's last stated price as
+        # buyer_price (optional on accept per the shared contract).
+        payload = to_wire_negotiation_message(
+            action="accept",
+            proposal_id=session.proposal_id,
+            negotiation_id=session.negotiation_id,
+            buyer_price=session.current_seller_price,
+        ).model_dump(mode="json", exclude_none=True)
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(url, json=payload, headers=self._build_headers())
@@ -212,8 +238,15 @@ class NegotiationClient:
         Args:
             session: Active negotiation session.
         """
-        url = f"{session.seller_url}/proposals/{session.proposal_id}/counter"
-        payload = {"action": "decline"}
+        url = f"{session.seller_url}{_NEGOTIATION_MESSAGES_PATH}"
+        # TERMINAL walk-away: action="reject" carries no buyer_price (the shared
+        # contract forbids a price on reject). The buyer's retired "decline" verb
+        # maps onto the shared NegotiationAction.REJECT.
+        payload = to_wire_negotiation_message(
+            action="reject",
+            proposal_id=session.proposal_id,
+            negotiation_id=session.negotiation_id,
+        ).model_dump(mode="json", exclude_none=True)
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(url, json=payload, headers=self._build_headers())

@@ -55,18 +55,30 @@ class ProductRecommendation(BaseModel):
 
 
 class BookedLine(BaseModel):
-    """A successfully booked line item."""
+    """A successfully booked line item.
 
-    line_id: str = Field(..., alias="lineId")
-    order_id: str = Field(..., alias="orderId")
-    seller_deal_id: str | None = Field(None, alias="sellerDealId")
+    Booking records are keyed by the SELLER-issued ``deal_id`` plus the
+    ``quote_id`` it was booked from and the confirmed terms returned by the
+    seller (bead ar-j2nw). The buyer never mints deal identifiers locally
+    on this path and never records placeholder order ids.
+    """
+
+    deal_id: str = Field(..., alias="dealId", description="Seller-issued deal ID")
+    quote_id: str | None = Field(default=None, alias="quoteId")
     product_id: str = Field(..., alias="productId")
     product_name: str = Field(..., alias="productName")
     channel: str
     impressions: int = Field(..., ge=0)
+    cpm: float | None = Field(default=None, description="Confirmed final CPM from the seller")
     cost: float = Field(..., ge=0)
     booking_status: str = Field(..., alias="bookingStatus")
     booked_at: datetime = Field(..., alias="bookedAt")
+    seller_id: str | None = Field(default=None, alias="sellerId")
+
+    # Legacy OpenDirect identifiers. Optional: the canonical booking path
+    # books via the deals API (quote -> deal), not OpenDirect orders.
+    line_id: str | None = Field(default=None, alias="lineId")
+    order_id: str | None = Field(default=None, alias="orderId")
 
     model_config = {"populate_by_name": True}
 

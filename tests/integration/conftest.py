@@ -175,9 +175,3 @@ def seller_agent_cards() -> list[AgentCard]:
 def tmp_key_store(tmp_path: Path) -> ApiKeyStore:
     """API key store backed by a temp file."""
     return ApiKeyStore(store_path=tmp_path / "test_keys.json")
-
-
-@pytest.fixture
-def tmp_session_store_path(tmp_path: Path) -> str:
-    """Path for a temporary session store file."""
-    return str(tmp_path / "test_sessions.json")

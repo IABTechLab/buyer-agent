@@ -5,13 +5,20 @@
 
 import json
 import logging
+import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from crewai.flow.flow import Flow, listen, or_, start
+from crewai.flow.flow import Flow, and_, listen, start
+from pydantic import ValidationError
 
+from ..async_utils import run_async
+from ..booking.recommendation_guard import (
+    RecommendationBounds,
+    validate_and_clamp_recommendation,
+)
 from ..booking.spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
 from ..clients.opendirect_client import OpenDirectClient
 from ..crews.channel_crews import (
@@ -24,7 +31,9 @@ from ..crews.channel_crews import (
 from ..crews.portfolio_crew import create_portfolio_crew
 from ..events.helpers import emit_event_sync
 from ..events.models import EventType
+from ..models.audience_plan import AudiencePlan
 from ..models.flow_state import (
+    BookedLine,
     BookingState,
     ChannelAllocation,
     ChannelBrief,
@@ -32,9 +41,77 @@ from ..models.flow_state import (
     ProductRecommendation,
 )
 from ..models.ucp import SignalType
+from ..orchestration.multi_seller import (
+    DealParams,
+    InventoryRequirements,
+    MultiSellerOrchestrator,
+    OrchestrationResult,
+)
 from ..storage.deal_store import DealStore
 
 logger = logging.getLogger(__name__)
+
+# Fenced code blocks (``` or ```json) in crew output. DOTALL body match;
+# the closing fence is required so a dangling fence is not over-matched.
+# Module-level because ``Flow`` is a pydantic model: an underscore-prefixed
+# class attribute would be wrapped as a ModelPrivateAttr.
+_FENCED_BLOCK_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL)
+
+
+# ---------------------------------------------------------------------------
+# Channel -> deals-API mapping (folded in from the retired CampaignPipeline,
+# adapted to this flow's channel vocabulary; bead ar-j2nw)
+# ---------------------------------------------------------------------------
+
+# Maps this flow's channel names to the media_type string used by the
+# orchestrator's InventoryRequirements for seller discovery.
+_CHANNEL_MEDIA_TYPE_MAP: dict[str, str] = {
+    "branding": "display",
+    "ctv": "ctv",
+    "mobile_app": "mobile",
+    "performance": "display",
+}
+
+# Maps discovery/inventory media types onto the SHARED pricing MediaType
+# enum (digital | ctv | linear_tv) that QuoteRequest/DealRequest validate
+# against. Discovery speaks inventory vocabulary ("display", "mobile");
+# the quote/deal wire speaks the contract library's — one string cannot
+# serve both (bead ar-9iw5).
+_PRICING_MEDIA_TYPE_MAP: dict[str, str] = {
+    "display": "digital",
+    "mobile": "digital",
+    "video": "digital",
+    "digital": "digital",
+    "ctv": "ctv",
+    "linear": "linear_tv",
+    "linear_tv": "linear_tv",
+}
+
+# Default deal types to request per channel.
+_CHANNEL_DEAL_TYPES: dict[str, list[str]] = {
+    "branding": ["PD", "PA"],
+    "ctv": ["PG", "PD"],
+    "mobile_app": ["PD", "PA"],
+    "performance": ["PD", "PA"],
+}
+
+
+def build_default_orchestrator() -> MultiSellerOrchestrator:
+    """Build the production MultiSellerOrchestrator from settings.
+
+    Registry discovery uses the same config-driven wiring as the MCP
+    server's registry client (real AAMP registry when AAMP_REGISTRY_URL is
+    set, legacy IAB server URL otherwise); per-seller DealsClients are
+    created for whichever seller URLs discovery returns.
+    """
+    from ..clients.deals_client import DealsClient
+    from ..config.settings import get_settings
+    from ..registry import create_registry_client
+
+    return MultiSellerOrchestrator(
+        registry_client=create_registry_client(get_settings()),
+        deals_client_factory=lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs),
+    )
 
 
 class DealBookingFlow(Flow[BookingState]):
@@ -54,6 +131,7 @@ class DealBookingFlow(Flow[BookingState]):
         self,
         client: OpenDirectClient,
         store: DealStore | None = None,
+        orchestrator: MultiSellerOrchestrator | None = None,
         **state_kwargs: Any,
     ):
         """Initialize the flow with OpenDirect client and optional persistence.
@@ -62,18 +140,33 @@ class DealBookingFlow(Flow[BookingState]):
             client: OpenDirect API client for publisher interactions
             store: Optional DealStore for persisting deal state. When None,
                 the flow behaves identically to before (in-memory only).
-            **state_kwargs: Initial state field values applied directly to
-                ``BookingState`` after ``Flow.__init__`` creates the default
-                state. Compatible with all crewai versions: crewai >=1.15
-                made ``Flow`` a ``BaseModel`` whose extra fields are silently
-                dropped, so we must set state attributes post-init instead of
-                relying on ``Flow.__init__`` kwargs or ``_initialize_state``.
+            orchestrator: MultiSellerOrchestrator used to execute approved
+                bookings against real sellers (quotes -> deals contract).
+                When None, a default production orchestrator is built
+                lazily from settings on first booking.
+            **state_kwargs: Initial state field values for the underlying
+                ``BookingState``.  CrewAI >=1.14 made ``Flow`` a Pydantic
+                model and removed the legacy ``state`` setter, so initial
+                state is now supplied via the ``initial_state=`` field on
+                ``Flow.__init__`` rather than as ad-hoc keyword arguments.
         """
-        super().__init__()
-        for key, value in state_kwargs.items():
-            setattr(self.state, key, value)
+        if state_kwargs:
+            # CrewAI >=1.14 expects ``initial_state`` to be the typed
+            # state model instance (or None), not a loose dict.  Build a
+            # ``BookingState`` from the supplied kwargs so callers can
+            # keep passing fields by name (e.g. ``campaign_brief=...``).
+            super().__init__(initial_state=BookingState(**state_kwargs))
+        else:
+            super().__init__()
         self._client = client
         self._store = store
+        self._orchestrator = orchestrator
+
+    def _get_orchestrator(self) -> MultiSellerOrchestrator:
+        """Return the booking orchestrator, building the default lazily."""
+        if self._orchestrator is None:
+            self._orchestrator = build_default_orchestrator()
+        return self._orchestrator
 
     # ------------------------------------------------------------------
     # Persistence helpers (best-effort dual-write)
@@ -82,16 +175,28 @@ class DealBookingFlow(Flow[BookingState]):
     def _persist_booking(self, deal_id: str, booked_line: Any) -> None:
         """Best-effort persist a booking record to the store.
 
+        The record is keyed by the SELLER-issued deal id, the quote id it
+        was booked from, and the confirmed terms (carried in metadata; the
+        booking_records schema is unchanged).
+
         Never raises -- logs and continues on failure so the flow is
         unaffected by persistence errors.
 
         Args:
-            deal_id: The deal this booking belongs to.
+            deal_id: The store deal row this booking belongs to.
             booked_line: A BookedLine instance from flow state.
         """
         if self._store is None:
             return
         try:
+            metadata = json.dumps(
+                {
+                    "seller_deal_id": getattr(booked_line, "deal_id", None),
+                    "quote_id": getattr(booked_line, "quote_id", None),
+                    "seller_id": getattr(booked_line, "seller_id", None),
+                    "final_cpm": getattr(booked_line, "cpm", None),
+                }
+            )
             self._store.save_booking_record(
                 deal_id=deal_id,
                 order_id=getattr(booked_line, "order_id", None),
@@ -100,6 +205,7 @@ class DealBookingFlow(Flow[BookingState]):
                 impressions=getattr(booked_line, "impressions", 0),
                 cost=getattr(booked_line, "cost", 0.0),
                 booking_status=getattr(booked_line, "booking_status", "pending"),
+                metadata=metadata,
             )
         except (sqlite3.Error, OSError, ValueError, AttributeError):
             logger.exception("Failed to persist booking for deal %s", deal_id)
@@ -319,47 +425,11 @@ class DealBookingFlow(Flow[BookingState]):
             # allocations if used directly.
             allocations = self._extract_allocations(result)
 
-            # If brief specifies channels, respect LLM allocation for those channels
-            # and rescale to total budget. Equal split is only a fallback when the
-            # LLM failed to allocate to any of the requested channels at all.
-            requested = [
-                c.lower() for c in self.state.campaign_brief.get("channels", []) if c.strip()
-            ]
-            if requested:
-                grand_total = self.state.campaign_brief.get("budget", 0)
-                filtered = {
-                    ch: allocations[ch]
-                    for ch in requested
-                    if ch in allocations and allocations[ch].get("budget", 0) > 0
-                }
-                if filtered:
-                    alloc_total = sum(v["budget"] for v in filtered.values())
-                    for ch in filtered:
-                        filtered[ch]["budget"] = round(
-                            filtered[ch]["budget"] / alloc_total * grand_total, 2
-                        )
-                        filtered[ch]["percentage"] = round(
-                            filtered[ch]["budget"] / grand_total * 100, 1
-                        )
-                    allocations = filtered
-                else:
-                    per_channel = round(grand_total / len(requested), 2)
-                    pct = round(100.0 / len(requested), 1)
-                    allocations = {
-                        ch: {
-                            "budget": per_channel,
-                            "percentage": pct,
-                            "rationale": f"Requested channel: {ch}",
-                        }
-                        for ch in requested
-                    }
-
-            # Store allocations (normalize channel keys to lowercase)
+            # Store allocations
             for channel, alloc_data in allocations.items():
                 if alloc_data.get("budget", 0) > 0:
-                    ch = channel.lower()
-                    self.state.budget_allocations[ch] = ChannelAllocation(
-                        channel=ch,
+                    self.state.budget_allocations[channel] = ChannelAllocation(
+                        channel=channel,
                         budget=alloc_data["budget"],
                         percentage=alloc_data.get("percentage", 0),
                         rationale=alloc_data.get("rationale", ""),
@@ -487,14 +557,7 @@ class DealBookingFlow(Flow[BookingState]):
             )
             result = crew.kickoff()
 
-            result_str = str(result)
-            recommendations = self._parse_recommendations(result_str, "branding")
-            if not recommendations:
-                for task in crew.tasks or []:
-                    if task.output:
-                        recommendations = self._parse_recommendations(task.output.raw, "branding")
-                        if recommendations:
-                            break
+            recommendations = self._parse_recommendations(str(result), "branding")
             self.state.channel_recommendations["branding"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -524,12 +587,6 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "ctv")
-            if not recommendations:
-                for task in crew.tasks or []:
-                    if task.output:
-                        recommendations = self._parse_recommendations(task.output.raw, "ctv")
-                        if recommendations:
-                            break
             self.state.channel_recommendations["ctv"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -559,12 +616,6 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "mobile_app")
-            if not recommendations:
-                for task in crew.tasks or []:
-                    if task.output:
-                        recommendations = self._parse_recommendations(task.output.raw, "mobile_app")
-                        if recommendations:
-                            break
             self.state.channel_recommendations["mobile_app"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -594,14 +645,6 @@ class DealBookingFlow(Flow[BookingState]):
             result = crew.kickoff()
 
             recommendations = self._parse_recommendations(str(result), "performance")
-            if not recommendations:
-                for task in crew.tasks or []:
-                    if task.output:
-                        recommendations = self._parse_recommendations(
-                            task.output.raw, "performance"
-                        )
-                        if recommendations:
-                            break
             self.state.channel_recommendations["performance"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
@@ -611,111 +654,16 @@ class DealBookingFlow(Flow[BookingState]):
             self.state.errors.append(f"Performance research failed: {e}")
             return {"channel": "performance", "status": "failed", "error": str(e)}
 
-    def _create_channel_brief(self, channel: str, allocation: ChannelAllocation) -> dict[str, Any]:
-        """Create a channel-specific brief from campaign brief and allocation."""
-        return ChannelBrief(
-            channel=channel,
-            budget=allocation.budget,
-            start_date=self.state.campaign_brief.get("start_date", ""),
-            end_date=self.state.campaign_brief.get("end_date", ""),
-            target_audience=self.state.campaign_brief.get("target_audience", {}),
-            objectives=self.state.campaign_brief.get("objectives", []),
-            kpis=self.state.campaign_brief.get("kpis", {}),
-        ).model_dump(by_alias=True)
-
-    @staticmethod
-    def _extract_items_from_str(result_str: str) -> list[dict]:
-        """Extract a product list from the crew result string.
-
-        Tries three strategies in order:
-        1. Strip markdown fences, parse as JSON object/array directly.
-        2. If the parsed object has a 'recommendations' key, use that list.
-        3. Bracket-scan: find every outermost '[...]' span and try each.
-        """
-        product_keys = {"product_id", "product_name", "cpm", "cost", "impressions"}
-
-        def _is_product_list(lst: list) -> bool:
-            return (
-                isinstance(lst, list)
-                and bool(lst)
-                and any(isinstance(it, dict) and product_keys & it.keys() for it in lst)
-            )
-
-        # Strategy 1 & 2 — try direct JSON parse (strip ``` fences first)
-        clean = result_str.strip()
-        if clean.startswith("```"):
-            lines = clean.splitlines()
-            # Remove first line (```json or ```) and last line (```)
-            inner = lines[1:-1] if lines[-1].strip() == "```" else lines[1:]
-            clean = "\n".join(inner)
-        try:
-            data = json.loads(clean)
-            if isinstance(data, list) and _is_product_list(data):
-                return [it for it in data if isinstance(it, dict)]
-            if isinstance(data, dict):
-                # Handle {"recommendations": [...]} wrapper
-                for key in ("recommendations", "products", "items"):
-                    lst = data.get(key, [])
-                    if _is_product_list(lst):
-                        return [it for it in lst if isinstance(it, dict)]
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-        # Strategy 3 — bracket-scan every '[...]' span
-        candidates: list[str] = []
-        i = 0
-        while i < len(result_str):
-            if result_str[i] == "[":
-                depth = 0
-                for j in range(i, len(result_str)):
-                    if result_str[j] == "[":
-                        depth += 1
-                    elif result_str[j] == "]":
-                        depth -= 1
-                        if depth == 0:
-                            candidates.append(result_str[i : j + 1])
-                            i = j + 1
-                            break
-                else:
-                    i += 1
-            else:
-                i += 1
-
-        for candidate in candidates:
-            try:
-                lst = json.loads(candidate)
-                if _is_product_list(lst):
-                    return [it for it in lst if isinstance(it, dict)]
-            except (json.JSONDecodeError, TypeError):
-                continue
-
-        return []
-
-    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
-        """Parse product recommendations from a crew result string."""
-        recommendations: list[ProductRecommendation] = []
-
-        for item in self._extract_items_from_str(result_str):
-            if not isinstance(item, dict):
-                continue
-            rec = ProductRecommendation(
-                product_id=item.get("product_id", "unknown"),
-                product_name=item.get("product_name", "Unknown Product"),
-                publisher=item.get("publisher", "Unknown"),
-                channel=channel,
-                format=item.get("format"),
-                impressions=item.get("impressions", 0),
-                cpm=item.get("cpm", 0),
-                cost=item.get("cost", 0),
-                rationale=item.get("rationale"),
-            )
-            recommendations.append(rec)
-
-        return recommendations
-
     @listen(allocate_budget)
     def research_social(self, allocation_result: dict[str, Any]) -> dict[str, Any]:
-        """Social media specialist researches Meta Ads inventory."""
+        """Social specialist researches Meta Ads inventory (port of main PR #87).
+
+        Unlike the other channels this crew does not search OpenDirect
+        catalogs — it queries the Meta Graph API for placement reach
+        estimates (``MetaInventoryTool``); recommendations use
+        ``meta:<placement>`` product ids and book via the Meta path in
+        ``_execute_bookings``.
+        """
         if allocation_result.get("status") != "success":
             return {"channel": "social", "status": "skipped"}
 
@@ -732,35 +680,200 @@ class DealBookingFlow(Flow[BookingState]):
             )
             result = crew.kickoff()
 
-            result_str = str(result)
-            recommendations = self._parse_recommendations(result_str, "social")
-            if not recommendations:
-                for task in crew.tasks or []:
-                    if task.output:
-                        recommendations = self._parse_recommendations(task.output.raw, "social")
-                        if recommendations:
-                            break
+            recommendations = self._parse_recommendations(str(result), "social")
             self.state.channel_recommendations["social"] = recommendations
             self.state.updated_at = datetime.now(UTC)
 
             return {"channel": "social", "status": "success", "count": len(recommendations)}
 
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001 - flow step must capture any failure from CrewAI
             self.state.errors.append(f"Social research failed: {e}")
             return {"channel": "social", "status": "failed", "error": str(e)}
 
+    def _create_channel_brief(self, channel: str, allocation: ChannelAllocation) -> dict[str, Any]:
+        """Create a channel-specific brief from campaign brief and allocation.
+
+        The dict is dumped with snake_case keys (``by_alias=False``) because
+        its sole consumer, ``channel_crews._build_channel_crew``, reads the
+        Python field names (``start_date``/``end_date``/``target_audience``)
+        when rendering the research task the crew agents see. Dumping
+        ``by_alias=True`` emitted camelCase keys (``startDate``/``endDate``)
+        that the consumer's ``.get("start_date")`` missed, so the flight
+        window rendered as "Flight: None to None" and the LLM crew reported
+        the dates as missing and refused to finalize (ar-kedz).
+        """
+        return ChannelBrief(
+            channel=channel,
+            budget=allocation.budget,
+            start_date=self.state.campaign_brief.get("start_date", ""),
+            end_date=self.state.campaign_brief.get("end_date", ""),
+            target_audience=self.state.campaign_brief.get("target_audience", {}),
+            objectives=self.state.campaign_brief.get("objectives", []),
+            kpis=self.state.campaign_brief.get("kpis", {}),
+        ).model_dump()
+
+    def _recommendation_bounds(self, channel: str) -> RecommendationBounds:
+        """Build the deterministic clamp bounds for a channel's LLM output.
+
+        The CPM ceiling comes from the brief's ``kpis.max_cpm_usd`` — the
+        CampaignBrief/real-driver shape, where constraints ride in the kpis
+        dict — falling back to the legacy top-level ``max_cpm`` key (bead
+        ar-0wev: reading only the top-level key left the clamp inert on the
+        real path). The per-line cost ceiling is the channel's allocated
+        budget, falling back to the campaign's total budget (``budget`` is a
+        required top-level field, validated at flow entry, so it has no kpis
+        analog). A limit that is absent or non-positive disables the
+        corresponding clamp (None), preserving behavior for briefs without
+        configured limits. Bead ar-1ow7 (EP-4.3).
+        """
+        brief = self.state.campaign_brief or {}
+        kpis = brief.get("kpis")
+        kpis = kpis if isinstance(kpis, dict) else {}
+
+        max_cpm: float | None = None
+        for raw in (kpis.get("max_cpm_usd"), brief.get("max_cpm")):
+            if isinstance(raw, (int, float)) and raw > 0:
+                max_cpm = float(raw)
+                break
+
+        allocation = self.state.budget_allocations.get(channel)
+        max_cost: float | None = None
+        if allocation is not None and allocation.budget > 0:
+            max_cost = float(allocation.budget)
+        else:
+            raw_budget = brief.get("budget")
+            if isinstance(raw_budget, (int, float)) and raw_budget > 0:
+                max_cost = float(raw_budget)
+
+        return RecommendationBounds(max_cpm=max_cpm, max_cost=max_cost)
+
+    def _parse_recommendations(self, result_str: str, channel: str) -> list[ProductRecommendation]:
+        """Parse recommendations from crew result.
+
+        Every item crosses the deterministic validation+clamp boundary
+        (``validate_and_clamp_recommendation``) before it becomes a typed
+        ``ProductRecommendation``: malformed items are rejected and numeric
+        fields are clamped to campaign bounds, so an out-of-bounds LLM value
+        can never reach the booking primitive. Bead ar-1ow7 (EP-4.3).
+        """
+        bounds = self._recommendation_bounds(channel)
+        recommendations: list[ProductRecommendation] = []
+
+        for item in self._extract_recommendation_items(result_str):
+            rec = validate_and_clamp_recommendation(item, channel, bounds)
+            if rec is not None:
+                recommendations.append(rec)
+
+        return recommendations
+
+    @staticmethod
+    def _items_from_parsed(parsed: Any) -> list[Any] | None:
+        """Interpret one parsed JSON candidate as a recommendation-item list.
+
+        A bare list IS the items; an object carries them under its
+        ``recommendations`` key (the hierarchical crews' final-answer shape).
+        Anything else is not a candidate.
+        """
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            recommendations = parsed.get("recommendations")
+            if isinstance(recommendations, list):
+                return recommendations
+        return None
+
+    @classmethod
+    def _extract_recommendation_items(cls, result_str: str) -> list[Any]:
+        """Extract the raw recommendation items from crew output text.
+
+        Deterministic (no LLM) extraction, in order of preference
+        (bead ar-h2o6):
+
+        1. Each fenced ``````json`` block, parsed as JSON. A block that
+           parses to a list, or to an object with a ``recommendations``
+           list, is a candidate; the LAST successful candidate wins (the
+           final answer supersedes drafts).
+        2. Legacy fallback: the first-``[`` to last-``]`` slice of the whole
+           text, parsed as a JSON array. This is easily poisoned by
+           bracketed prose (e.g. a Python-repr objectives echo before the
+           JSON, or ``[1]``-style references after it), which is why the
+           fenced pass runs first.
+        3. A bare top-level object: the first-``{`` to last-``}`` slice,
+           accepted when it parses to an object with a ``recommendations``
+           list.
+
+        Returns an empty list when nothing parses -- non-JSON free text
+        yields no recommendations. Item-level validation/clamping stays in
+        ``validate_and_clamp_recommendation``.
+        """
+        # 1. Fenced blocks -- last successfully-parsing candidate wins.
+        fenced_items: list[Any] | None = None
+        for match in _FENCED_BLOCK_RE.finditer(result_str):
+            try:
+                parsed = json.loads(match.group(1))
+            except json.JSONDecodeError:
+                continue
+            items = cls._items_from_parsed(parsed)
+            if items is not None:
+                fenced_items = items
+        if fenced_items is not None:
+            return fenced_items
+
+        # 2. Legacy bracket slice across the whole text.
+        start_idx = result_str.find("[")
+        end_idx = result_str.rfind("]") + 1
+        if start_idx >= 0 and end_idx > start_idx:
+            try:
+                parsed = json.loads(result_str[start_idx:end_idx])
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, list):
+                return parsed
+
+        # 3. Bare top-level object carrying a "recommendations" list.
+        obj_start = result_str.find("{")
+        obj_end = result_str.rfind("}") + 1
+        if obj_start >= 0 and obj_end > obj_start:
+            try:
+                parsed = json.loads(result_str[obj_start:obj_end])
+            except json.JSONDecodeError:
+                return []
+            if isinstance(parsed, dict):
+                recommendations = parsed.get("recommendations")
+                if isinstance(recommendations, list):
+                    return recommendations
+
+        return []
+
     @listen(
-        or_(research_branding, research_ctv, research_mobile, research_performance, research_social)
+        and_(
+            research_branding, research_ctv, research_mobile, research_performance, research_social
+        )
     )
     def consolidate_recommendations(self, channel_result: dict[str, Any]) -> dict[str, Any]:
-        """Consolidate all channel recommendations for approval."""
+        """Consolidate all channel recommendations for approval.
+
+        Trigger note (bead ar-h2o6): this MUST be ``and_``, not ``or_``.
+        Every research method always returns (success / no_budget / skipped /
+        failed all return dicts), so ``and_`` fires exactly once, after ALL
+        five have completed. With ``or_``, CrewAI >=1.14 (a) treats the four
+        research methods as a "racing group" -- the first to complete WINS
+        and the still-running ones are CANCELLED -- and (b) fires a
+        multi-source OR listener only ONCE per run. A fast no-budget channel
+        therefore triggered consolidation while the funded channel's crew
+        was still researching; the "waiting" branch returned, the listener
+        never fired again, and ``pending_approvals`` stayed empty -- so
+        approval silently approved nothing and jobs "completed" unbooked.
+        """
         # Check if all active channels have reported
         active_channels = [
             ch for ch, alloc in self.state.budget_allocations.items() if alloc.budget > 0
         ]
         completed_channels = list(self.state.channel_recommendations.keys())
 
-        # Check if we're still waiting for channels
+        # Defensive: with the and_ trigger all research methods have
+        # completed, so an active channel can only be missing here if its
+        # research failed (the failure is already recorded on state.errors).
         pending = set(active_channels) - set(completed_channels)
         if pending:
             return {"status": "waiting", "pending": list(pending)}
@@ -837,76 +950,328 @@ class DealBookingFlow(Flow[BookingState]):
         all_ids = [rec.product_id for rec in self.state.pending_approvals]
         return self.approve_recommendations(all_ids)
 
-    def _book_via_seller_api(self, rec: Any) -> tuple[str, str, str]:
-        """Call seller: quote → deal → order. Returns (quote_id, deal_id, order_id).
+    def _typed_audience_plan(self) -> AudiencePlan | None:
+        """Return the state's audience plan as a typed AudiencePlan, if valid.
 
-        Uses a synchronous httpx.Client so this can be called from the
-        non-async _execute_bookings method. Raises on HTTP errors.
+        A parent pipeline may pre-seed ``state.audience_plan`` with a typed
+        plan (as a dict). When it validates, the plan is threaded onto
+        DealParams / InventoryRequirements so it survives the buyer ->
+        seller boundary. The flow's own UCP coverage-estimation dict does
+        not follow the AudiencePlan schema and coerces to None.
         """
-        import httpx
+        raw = self.state.audience_plan
+        if not raw:
+            return None
+        if isinstance(raw, AudiencePlan):
+            return raw
+        if isinstance(raw, dict):
+            # CrewAI >=1.14 wraps state dicts in a LockedDictProxy that
+            # pydantic cannot introspect; copy into a plain dict first.
+            raw = dict(raw)
+        try:
+            return AudiencePlan.model_validate(raw)
+        except ValidationError:
+            return None
 
-        base_url = self._client.base_url.rstrip("/")
-        headers = {**self._client._headers}
+    def _execute_bookings(self) -> dict[str, Any]:
+        """Execute bookings for approved recommendations via the orchestrator.
+
+        Canonical handoff (bead ar-j2nw): each approved recommendation is
+        translated into DealParams / InventoryRequirements and executed by
+        MultiSellerOrchestrator (discover -> quote -> rank ->
+        select_and_book). Booking records key on the SELLER-issued deal_id
+        + quote_id + confirmed terms; the buyer never mints deal ids or
+        placeholder order ids on this path.
+
+        Social/meta-channel recommendations bypass the seller orchestrator
+        and book against the Meta Graph API (``_book_via_meta_api``, port
+        of main PR #87): campaign + ad set are created PAUSED and the
+        META-issued campaign id keys the booking record.
+        """
+        approved_all = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
+
+        # Deduplicate: if the same product_id was recommended by multiple
+        # channel crews, keep the one with the highest impressions so the
+        # same inventory is never booked twice (main PR #87).
+        deduped: dict[str, ProductRecommendation] = {}
+        for rec in approved_all:
+            existing = deduped.get(rec.product_id)
+            if existing is None or rec.impressions > existing.impressions:
+                deduped[rec.product_id] = rec
+        approved = list(deduped.values())
+
+        if not approved:
+            self.state.execution_status = ExecutionStatus.COMPLETED
+            return {"status": "success", "booked": 0, "message": "No recommendations approved"}
+
+        # Deterministic spend-ceiling guard (bead ar-70eh / EP-0.1): the
+        # approved recommendations come from LLM-parsed crew output, so
+        # their total cost must be checked against the campaign budget
+        # BEFORE any money is committed to a seller. A missing budget fails
+        # open (allow + warning log) — an explicit choice to preserve demo
+        # behavior for briefs without a budget; a supplied budget is always
+        # enforced.
+        budget = self.state.campaign_brief.get("budget")
+        total_cost = sum(rec.cost for rec in approved)
+        try:
+            enforce_spend_ceiling(total_cost=total_cost, budget=budget)
+        except SpendCeilingExceeded as e:
+            logger.warning("Booking rejected by spend ceiling: %s", e)
+            self.state.errors.append(f"Booking rejected: {e}")
+            self.state.execution_status = ExecutionStatus.FAILED
+            self.state.updated_at = datetime.now(UTC)
+            return {
+                "status": "rejected",
+                "booked": 0,
+                "error": str(e),
+                "total_cost": total_cost,
+                "budget": budget,
+            }
+
+        # Partition by counterparty: social/meta recommendations book via
+        # the Meta Graph API; everything else goes through the seller
+        # orchestrator (quotes -> deals).
+        meta_recs = [rec for rec in approved if rec.channel in ("social", "meta")]
+        seller_recs = [rec for rec in approved if rec.channel not in ("social", "meta")]
+
+        failed_bookings: list[dict[str, Any]] = []
+
+        for rec in meta_recs:
+            store_deal_id = getattr(rec, "_store_deal_id", None)
+            try:
+                campaign_id, ad_set_id, _kind = self._book_via_meta_api(rec)
+            except Exception as e:  # noqa: BLE001 - per-recommendation isolation
+                msg = f"Booking failed for {rec.product_id}: {e}"
+                logger.warning(msg)
+                self.state.errors.append(msg)
+                failed_bookings.append({"product_id": rec.product_id, "error": str(e)})
+                if store_deal_id:
+                    self._persist_deal_status(store_deal_id, "failed")
+                continue
+
+            # The campaign id is META-issued (the buyer still never mints
+            # booking identifiers); campaign + ad set are created PAUSED.
+            booked = BookedLine(
+                deal_id=campaign_id,
+                quote_id=None,
+                product_id=rec.product_id,
+                product_name=rec.product_name,
+                channel=rec.channel,
+                impressions=rec.impressions,
+                cpm=rec.cpm if rec.cpm > 0 else None,
+                cost=rec.cost,
+                booking_status="paused",
+                booked_at=datetime.now(UTC),
+                seller_id="meta",
+                line_id=ad_set_id,
+                order_id=campaign_id,
+            )
+            self.state.booked_lines.append(booked)
+
+            if store_deal_id:
+                self._persist_booking(store_deal_id, booked)
+                self._persist_deal_status(store_deal_id, "booked")
+
+            emit_event_sync(
+                EventType.DEAL_BOOKED,
+                flow_type="deal_booking",
+                deal_id=campaign_id,
+                payload={
+                    "deal_id": campaign_id,
+                    "quote_id": None,
+                    "product_id": rec.product_id,
+                    "channel": rec.channel,
+                    "impressions": rec.impressions,
+                    "cost": rec.cost,
+                    "final_cpm": rec.cpm if rec.cpm > 0 else None,
+                },
+            )
+
+        # Real handoff to the multi-seller execution engine. `run_async`
+        # bridges this synchronous approval entry point (CLI/API/chat) to
+        # the async orchestrator.
+        booking_results = run_async(self._book_approved(seller_recs)) if seller_recs else []
+
+        for rec, result, error in booking_results:
+            store_deal_id = getattr(rec, "_store_deal_id", None)
+
+            if error is not None or result is None:
+                msg = f"Booking failed for {rec.product_id}: {error}"
+                logger.warning(msg)
+                self.state.errors.append(msg)
+                failed_bookings.append({"product_id": rec.product_id, "error": str(error)})
+                if store_deal_id:
+                    self._persist_deal_status(store_deal_id, "failed")
+                continue
+
+            booked_deals = result.selection.booked_deals
+            if not booked_deals:
+                # Orchestrator ran but no seller issued a deal (no sellers,
+                # no viable quotes, or every booking attempt failed).
+                details = result.selection.failed_bookings or [
+                    {"error": "no viable quotes from any seller"}
+                ]
+                msg = f"No deal booked for {rec.product_id}: {details}"
+                logger.warning(msg)
+                self.state.errors.append(msg)
+                failed_bookings.append({"product_id": rec.product_id, "details": details})
+                if store_deal_id:
+                    self._persist_deal_status(store_deal_id, "failed")
+                continue
+
+            quote_seller_ids = {
+                qr.quote.quote_id: qr.seller_id
+                for qr in result.quote_results
+                if qr.quote is not None
+            }
+            for deal in booked_deals:
+                # Confirmed terms from the seller's 201 DealResponse take
+                # precedence over the researched estimates.
+                impressions = deal.terms.impressions or rec.impressions
+                final_cpm = deal.pricing.final_cpm
+                cost = (
+                    round(impressions * final_cpm / 1000.0, 2)
+                    if final_cpm is not None and impressions
+                    else rec.cost
+                )
+                booked = BookedLine(
+                    deal_id=deal.deal_id,
+                    quote_id=deal.quote_id,
+                    product_id=rec.product_id,
+                    product_name=rec.product_name,
+                    channel=rec.channel,
+                    impressions=impressions,
+                    cpm=final_cpm,
+                    cost=cost,
+                    booking_status=deal.status or "booked",
+                    booked_at=datetime.now(UTC),
+                    seller_id=quote_seller_ids.get(deal.quote_id or ""),
+                )
+                self.state.booked_lines.append(booked)
+
+                # Persist booking record and update deal status
+                if store_deal_id:
+                    self._persist_booking(store_deal_id, booked)
+                    self._persist_deal_status(store_deal_id, "booked")
+
+                # Emit deal.booked event keyed by the seller-issued deal id
+                emit_event_sync(
+                    EventType.DEAL_BOOKED,
+                    flow_type="deal_booking",
+                    deal_id=deal.deal_id,
+                    payload={
+                        "deal_id": deal.deal_id,
+                        "quote_id": deal.quote_id,
+                        "product_id": rec.product_id,
+                        "channel": rec.channel,
+                        "impressions": impressions,
+                        "cost": cost,
+                        "final_cpm": final_cpm,
+                    },
+                )
+
+        if self.state.booked_lines:
+            self.state.execution_status = ExecutionStatus.COMPLETED
+            status = "success"
+        else:
+            # Every approved recommendation failed to book.
+            self.state.execution_status = ExecutionStatus.FAILED
+            status = "failed"
+        self.state.updated_at = datetime.now(UTC)
+
+        return {
+            "status": status,
+            "booked": len(self.state.booked_lines),
+            "failed": failed_bookings,
+            "total_impressions": sum(b.impressions for b in self.state.booked_lines),
+            "total_cost": sum(b.cost for b in self.state.booked_lines),
+        }
+
+    async def _book_approved(
+        self,
+        approved: list[ProductRecommendation],
+    ) -> list[tuple[ProductRecommendation, OrchestrationResult | None, str | None]]:
+        """Book each approved recommendation through the orchestrator.
+
+        The approved terms are binding on execution: the recommendation's
+        cost is the budget ceiling and its CPM the max acceptable CPM for
+        that line, so the orchestrator cannot commit money beyond what the
+        human approved. Per-recommendation isolation: one failure records
+        an error tuple and the rest continue.
+
+        Returns:
+            List of (recommendation, orchestration_result, error) tuples.
+            Exactly one of result/error is non-None per entry.
+        """
+        orchestrator = self._get_orchestrator()
+        audience_plan = self._typed_audience_plan()
         brief = self.state.campaign_brief
 
-        with httpx.Client(base_url=base_url, headers=headers, timeout=30.0) as http:
-            # 1. Request a quote from the seller
-            quote_payload = {
-                "product_id": rec.product_id,
-                "deal_type": "PD",
-                "impressions": rec.impressions,
-                "flight_start": brief.get("start_date"),
-                "flight_end": brief.get("end_date"),
-                "target_cpm": rec.cpm,
-                "buyer_identity": {
-                    "advertiser_id": "buyer-agent-001",
-                    "dsp_platform": "iab-buyer-agent",
-                },
-            }
-            r = http.post("/api/v1/quotes", json=quote_payload)
-            r.raise_for_status()
-            quote_id = r.json().get("quote_id") or r.json().get("id", "")
+        results: list[tuple[ProductRecommendation, OrchestrationResult | None, str | None]] = []
+        for rec in approved:
+            media_type = _CHANNEL_MEDIA_TYPE_MAP.get(rec.channel, rec.channel)
+            deal_types = _CHANNEL_DEAL_TYPES.get(rec.channel, ["PD"])
 
-            # 2. Book the deal using the quote
-            deal_payload = {
-                "quote_id": quote_id,
-                "buyer_identity": {
-                    "advertiser_id": "buyer-agent-001",
-                    "dsp_platform": "iab-buyer-agent",
-                },
-                "notes": f"Booked via buyer agent — {rec.product_name}",
-            }
-            r = http.post("/api/v1/deals", json=deal_payload)
-            r.raise_for_status()
-            deal_id = r.json().get("deal_id") or r.json().get("id", "")
+            inventory_requirements = InventoryRequirements(
+                media_type=media_type,
+                deal_types=deal_types,
+                max_cpm=rec.cpm if rec.cpm > 0 else None,
+                audience_plan=audience_plan,
+            )
+            deal_params = DealParams(
+                product_id=rec.product_id,
+                deal_type=deal_types[0],
+                impressions=rec.impressions,
+                flight_start=brief.get("start_date", ""),
+                flight_end=brief.get("end_date", ""),
+                target_cpm=rec.cpm if rec.cpm > 0 else None,
+                # DealParams.media_type reaches QuoteRequest/DealRequest,
+                # which validate against the shared pricing MediaType enum —
+                # translate from discovery vocabulary (ar-9iw5).
+                media_type=_PRICING_MEDIA_TYPE_MAP.get(media_type, "digital"),
+                audience_plan=audience_plan,
+            )
 
-            # 3. Create an order record on the seller
-            order_payload = {"deal_id": deal_id, "quote_id": quote_id}
-            r = http.post("/api/v1/orders", json=order_payload)
-            r.raise_for_status()
-            order_id = r.json().get("order_id") or r.json().get("id", "")
+            try:
+                result = await orchestrator.orchestrate(
+                    inventory_requirements=inventory_requirements,
+                    deal_params=deal_params,
+                    budget=rec.cost,
+                    max_deals=1,
+                )
+                results.append((rec, result, None))
+            except Exception as exc:  # noqa: BLE001 - per-recommendation isolation
+                results.append((rec, None, str(exc)))
+        return results
 
-        return quote_id, deal_id, order_id
+    def _book_via_meta_api(self, rec: ProductRecommendation) -> tuple[str, str, str]:
+        """Book a social recommendation as a PAUSED Meta Ads campaign + ad set.
 
-    def _book_via_meta_api(self, rec: Any) -> tuple[str, str, str]:
-        """Book a Meta Ads campaign via 4 sequential CLI commands.
+        Port of main PR #87 in v2 idiom. Steps against the Graph API:
 
-        Steps:
-            1. meta ads campaign create  → campaign_id  (PAUSED)
-            2. meta ads adset create     → ad_set_id    (PAUSED)
-            3. meta ads creative create  → creative_id
-            4. meta ads ad create        → ad_id        (PAUSED)
+            1. create campaign  -> campaign_id  (PAUSED)
+            2. create ad set    -> ad_set_id    (PAUSED)
+
+        Creative + ad creation are intentionally skipped: they require a
+        real image asset; campaign + ad set created PAUSED are sufficient
+        to record the booking, with creative added later via Meta Ads
+        Manager or a follow-up call.
 
         Returns:
             (campaign_id, ad_set_id, "meta")
+
+        Raises:
+            ValueError: when Meta credentials are not configured or the
+                Graph API returns a response without an id.
         """
-        from ..clients.meta_ads_client import MetaAdsClient
         from ..config.settings import settings as _settings
 
         if not _settings.meta_access_token or not _settings.meta_ad_account_id:
             raise ValueError("Meta not configured: set META_ACCESS_TOKEN + META_AD_ACCOUNT_ID")
         if not _settings.meta_page_id:
             raise ValueError("META_PAGE_ID required — set in .env (Business Manager → Pages)")
+
+        from ..clients.meta_ads_client import MetaAdsClient
 
         brief = self.state.campaign_brief
         target_audience = brief.get("target_audience", {})
@@ -937,7 +1302,6 @@ class DealBookingFlow(Flow[BookingState]):
             api_version=_settings.meta_api_version,
         )
 
-        # 1. Create campaign
         camp = client.create_campaign(
             name=campaign_name,
             objective=meta_obj,
@@ -947,7 +1311,6 @@ class DealBookingFlow(Flow[BookingState]):
         if not campaign_id:
             raise ValueError(f"Campaign creation failed — no id in response: {camp}")
 
-        # 2. Create ad set
         adset = client.create_adset(
             campaign_id=campaign_id,
             name=f"{rec.product_name} Ad Set",
@@ -960,124 +1323,7 @@ class DealBookingFlow(Flow[BookingState]):
         if not ad_set_id:
             raise ValueError(f"Ad set creation failed — no id in response: {adset}")
 
-        # 3. Create creative (optional — requires an image asset)
-        # Skipped here: ad creative needs a real image URL or file.
-        # Campaign + ad set are created PAUSED and sufficient for booking.
-        # Add creative + ad via Meta Ads Manager or a follow-up API call
-        # once real creative assets are available for this placement.
-
         return campaign_id, ad_set_id, "meta"
-
-    def _execute_bookings(self) -> dict[str, Any]:
-        """Execute bookings for all approved recommendations via seller API."""
-        from ..models.flow_state import BookedLine
-
-        approved_all = [rec for rec in self.state.pending_approvals if rec.status == "approved"]
-
-        # Deduplicate: if the same product_id appears from multiple channel crews,
-        # keep the one with the highest impressions to avoid double-booking.
-        seen: dict[str, Any] = {}
-        for rec in approved_all:
-            if rec.product_id not in seen or rec.impressions > seen[rec.product_id].impressions:
-                seen[rec.product_id] = rec
-        approved = list(seen.values())
-
-        if not approved:
-            self.state.execution_status = ExecutionStatus.COMPLETED
-            return {"status": "success", "booked": 0, "message": "No recommendations approved"}
-
-        booking_errors: list[str] = []
-
-        # Deterministic spend-ceiling guard (bead ar-70eh): the approved
-        # recommendations come from LLM-parsed crew output, so their total
-        # cost must be checked against the campaign budget BEFORE any line
-        # is booked. A missing budget fails open (allow + warning log) —
-        # an explicit choice to preserve demo behavior for briefs without
-        # a budget; a supplied budget is always enforced.
-        budget = self.state.campaign_brief.get("budget")
-        total_cost = sum(rec.cost for rec in approved)
-        try:
-            enforce_spend_ceiling(total_cost=total_cost, budget=budget)
-        except SpendCeilingExceeded as e:
-            logger.warning("Booking rejected by spend ceiling: %s", e)
-            self.state.errors.append(f"Booking rejected: {e}")
-            self.state.execution_status = ExecutionStatus.FAILED
-            self.state.updated_at = datetime.now(UTC)
-            return {
-                "status": "rejected",
-                "booked": 0,
-                "error": str(e),
-                "total_cost": total_cost,
-                "budget": budget,
-            }
-
-        # In a full implementation, this would use the Execution Agent
-        # to create orders and book lines. For now, we track the approvals.
-        for rec in approved:
-            booking_status = "booked"
-            order_id = "order_pending"
-            seller_deal_id: str | None = None
-            line_id_override: str | None = None
-
-            try:
-                if rec.channel in ("social", "meta"):
-                    campaign_id, ad_set_id, _ = self._book_via_meta_api(rec)
-                    order_id = campaign_id
-                    line_id_override = ad_set_id
-                    booking_status = "paused"
-                else:
-                    _quote_id, seller_deal_id, order_id = self._book_via_seller_api(rec)
-                    booking_status = "booked"
-            except Exception as e:  # noqa: BLE001
-                booking_status = "booking_failed"
-                booking_errors.append(f"{rec.product_id}: {e}")
-                logger.warning("Booking failed for %s: %s", rec.product_id, e)
-
-            booked = BookedLine(
-                line_id=line_id_override or f"line_{rec.product_id}",
-                order_id=order_id,
-                seller_deal_id=seller_deal_id,
-                product_id=rec.product_id,
-                product_name=rec.product_name,
-                channel=rec.channel,
-                impressions=rec.impressions,
-                cost=rec.cost,
-                booking_status=booking_status,
-                booked_at=datetime.now(UTC),
-            )
-            self.state.booked_lines.append(booked)
-
-            # Persist booking record and update deal status
-            store_deal_id = getattr(rec, "_store_deal_id", None)
-            if store_deal_id:
-                self._persist_booking(store_deal_id, booked)
-                self._persist_deal_status(store_deal_id, booking_status)
-
-        self.state.execution_status = ExecutionStatus.COMPLETED
-        self.state.updated_at = datetime.now(UTC)
-
-        # Emit deal.booked event for each booked line
-        for booked in self.state.booked_lines:
-            emit_event_sync(
-                EventType.DEAL_BOOKED,
-                flow_type="deal_booking",
-                deal_id=getattr(booked, "line_id", ""),
-                payload={
-                    "product_id": booked.product_id,
-                    "channel": booked.channel,
-                    "impressions": booked.impressions,
-                    "cost": booked.cost,
-                },
-            )
-
-        actually_booked = [b for b in self.state.booked_lines if b.booking_status == "booked"]
-        return {
-            "status": "success",
-            "booked": len(actually_booked),
-            "total_impressions": sum(b.impressions for b in actually_booked),
-            "total_cost": sum(b.cost for b in actually_booked),
-            "booking_errors": booking_errors,
-        }
 
     def get_status(self) -> dict[str, Any]:
         """Get current flow status.

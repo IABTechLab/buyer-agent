@@ -1,14 +1,13 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Integration tests: auth -> session -> negotiation coordination.
+"""Integration tests: auth -> negotiation coordination.
 
-Tests the interaction between the auth middleware, session manager,
-and negotiation client modules. Verifies that authentication flows
-through to session creation and negotiation execution.
+Tests the interaction between the auth middleware and negotiation client
+modules. Verifies that authentication flows through to negotiation
+execution.
 """
 
-from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
@@ -21,8 +20,6 @@ from ad_buyer.negotiation.models import (
     NegotiationOutcome,
 )
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.sessions.session_manager import SessionManager
-from ad_buyer.sessions.session_store import SessionRecord
 
 
 class TestAuthToSessionFlow:
@@ -98,146 +95,6 @@ class TestAuthToSessionFlow:
 
         authed2 = middleware.add_auth(request)
         assert authed2.headers.get("X-Api-Key") == "new-key"
-
-
-class TestSessionManagerIntegration:
-    """Tests session manager with mock HTTP endpoints."""
-
-    @pytest.mark.asyncio
-    async def test_create_session_stores_record(self, tmp_session_store_path: str):
-        """create_session should persist the session record to the store."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-        seller_url = "http://seller.example.com"
-
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = {
-            "session_id": "sess-abc-123",
-            "created_at": datetime.now(UTC).isoformat(),
-            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        }
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            session_id = await manager.create_session(
-                seller_url,
-                buyer_identity={"seat_id": "ttd-123"},
-            )
-
-        assert session_id == "sess-abc-123"
-        # Verify it's in the store
-        record = manager.store.get(seller_url)
-        assert record is not None
-        assert record.session_id == "sess-abc-123"
-
-    @pytest.mark.asyncio
-    async def test_get_or_create_reuses_active_session(self, tmp_session_store_path: str):
-        """get_or_create_session should reuse an active session from the store."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-        seller_url = "http://seller.example.com"
-
-        # Manually insert an active session
-        record = SessionRecord(
-            session_id="existing-sess-001",
-            seller_url=seller_url,
-            created_at=datetime.now(UTC).isoformat(),
-            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        )
-        manager.store.save(record)
-
-        # Should return existing session without HTTP call
-        session_id = await manager.get_or_create_session(seller_url)
-        assert session_id == "existing-sess-001"
-
-    @pytest.mark.asyncio
-    async def test_session_expiry_triggers_recreation(self, tmp_session_store_path: str):
-        """Expired session should trigger creation of a new one."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-        seller_url = "http://seller.example.com"
-
-        # Insert an expired session
-        record = SessionRecord(
-            session_id="expired-sess",
-            seller_url=seller_url,
-            created_at=(datetime.now(UTC) - timedelta(days=10)).isoformat(),
-            expires_at=(datetime.now(UTC) - timedelta(days=3)).isoformat(),
-        )
-        manager.store.save(record)
-
-        # Mock HTTP for new session creation
-        mock_response = MagicMock()
-        mock_response.status_code = 201
-        mock_response.json.return_value = {
-            "session_id": "new-sess-002",
-            "created_at": datetime.now(UTC).isoformat(),
-            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        }
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            session_id = await manager.get_or_create_session(seller_url)
-
-        assert session_id == "new-sess-002"
-
-    @pytest.mark.asyncio
-    async def test_send_message_with_session_renewal(self, tmp_session_store_path: str):
-        """send_message should auto-renew when seller returns 404 (expired)."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-        seller_url = "http://seller.example.com"
-
-        # Insert a session that the seller considers expired
-        record = SessionRecord(
-            session_id="stale-sess",
-            seller_url=seller_url,
-            created_at=datetime.now(UTC).isoformat(),
-            expires_at=(datetime.now(UTC) + timedelta(days=1)).isoformat(),
-        )
-        manager.store.save(record)
-
-        # Mock: first message call returns 404, session creation succeeds, retry succeeds
-        expired_response = MagicMock()
-        expired_response.status_code = 404
-
-        new_session_response = MagicMock()
-        new_session_response.status_code = 201
-        new_session_response.json.return_value = {
-            "session_id": "renewed-sess",
-            "created_at": datetime.now(UTC).isoformat(),
-            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        }
-
-        success_response = MagicMock()
-        success_response.status_code = 200
-        success_response.json.return_value = {"reply": "Got your message"}
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_client = AsyncMock()
-            # First post -> 404 (expired), second post -> new session, third post -> message
-            mock_client.post = AsyncMock(
-                side_effect=[expired_response, new_session_response, success_response]
-            )
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            result = await manager.send_message(
-                seller_url,
-                "stale-sess",
-                {"type": "query", "content": "list products"},
-            )
-
-        assert result["reply"] == "Got your message"
-        # Verify the new session was stored
-        stored = manager.store.get(seller_url)
-        assert stored is not None
-        assert stored.session_id == "renewed-sess"
 
 
 class TestNegotiationFlowIntegration:
@@ -353,88 +210,3 @@ class TestNegotiationFlowIntegration:
 
         assert result.outcome == NegotiationOutcome.WALKED_AWAY
         assert result.final_price is None
-
-
-class TestAuthSessionNegotiationChain:
-    """End-to-end: auth -> session -> negotiation chain."""
-
-    @pytest.mark.asyncio
-    async def test_full_auth_session_negotiation_chain(
-        self,
-        tmp_key_store: ApiKeyStore,
-        tmp_session_store_path: str,
-    ):
-        """Full chain: store API key, create session, run negotiation."""
-        seller_url = "http://seller.example.com"
-
-        # Step 1: Store API key for the seller
-        tmp_key_store.add_key(seller_url, "seller-api-key-123")
-
-        # Step 2: Verify auth middleware decorates requests
-        middleware = AuthMiddleware(key_store=tmp_key_store)
-        request = httpx.Request("POST", f"{seller_url}/proposals/p1/counter")
-        authed = middleware.add_auth(request)
-        assert authed.headers.get("X-Api-Key") == "seller-api-key-123"
-
-        # Step 3: Create a session with the seller
-        manager = SessionManager(store_path=tmp_session_store_path)
-
-        session_create_resp = MagicMock()
-        session_create_resp.status_code = 201
-        session_create_resp.json.return_value = {
-            "session_id": "sess-chain-001",
-            "created_at": datetime.now(UTC).isoformat(),
-            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        }
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=session_create_resp)
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            session_id = await manager.create_session(
-                seller_url, buyer_identity={"seat_id": "ttd-123"}
-            )
-
-        assert session_id == "sess-chain-001"
-
-        # Step 4: Run a negotiation with the seller
-        strategy = SimpleThresholdStrategy(
-            target_cpm=22.0,
-            max_cpm=25.0,
-            concession_step=1.0,
-            max_rounds=3,
-        )
-
-        neg_client = NegotiationClient(api_key="seller-api-key-123")
-
-        # Seller accepts on first round at $24
-        round1_resp = MagicMock()
-        round1_resp.status_code = 200
-        round1_resp.json.return_value = {
-            "round_number": 1,
-            "seller_price": 24.0,
-            "action": "counter",
-        }
-        round1_resp.raise_for_status = MagicMock()
-
-        accept_resp = MagicMock()
-        accept_resp.status_code = 200
-        accept_resp.json.return_value = {"action": "accepted", "final_price": 24.0}
-        accept_resp.raise_for_status = MagicMock()
-
-        with patch("httpx.AsyncClient") as MockAsyncClient:
-            mock_http = AsyncMock()
-            mock_http.post = AsyncMock(side_effect=[round1_resp, accept_resp])
-            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_http)
-            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            result = await neg_client.auto_negotiate(
-                seller_url=seller_url,
-                proposal_id="prop-chain-001",
-                strategy=strategy,
-            )
-
-        assert result.outcome == NegotiationOutcome.ACCEPTED
-        assert result.final_price == 24.0

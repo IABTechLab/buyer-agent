@@ -8,7 +8,7 @@ Provides:
 - GET /api/v1/buyer/orders/{id}/audit -- local audit trail for an order
 
 These endpoints query the buyer's local OrderStore, which is populated
-by the OrderSyncService pulling state from the seller's Order API.
+by pulling state from the seller's Order API.
 
 bead: buyer-nz9 (Order Status & Audit API Integration)
 """

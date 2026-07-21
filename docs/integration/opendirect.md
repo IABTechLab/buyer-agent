@@ -34,41 +34,41 @@ erDiagram
     }
     Account {
         string id
-        string advertiserId
-        string buyerId
+        string advertiserid
+        string buyerid
     }
     Product {
         string id
-        string publisherId
+        string publisherid
         string name
-        float basePrice
-        string rateType
-        string deliveryType
+        float baseprice
+        string ratetype
+        string deliverytype
     }
     Order {
         string id
-        string accountId
+        string accountid
         float budget
-        datetime startDate
-        datetime endDate
-        string orderStatus
+        datetime startdate
+        datetime enddate
+        string orderstatus
     }
     Line {
         string id
-        string orderId
-        string productId
+        string orderid
+        string productid
         float rate
-        int quantity
-        string bookingStatus
+        int qty
+        string bookingstatus
     }
     Creative {
         string id
-        string accountId
+        string accountid
         string name
     }
     Assignment {
         string id
-        string creativeId
+        string creativeid
         string lineId
     }
 ```
@@ -83,7 +83,7 @@ Links a buyer (agency/advertiser) to a publisher. All orders and creatives live 
 
 ### Product
 
-A sellable inventory item defined by the publisher. Products have a base price, rate type (CPM, CPC, CPD, FlatRate), delivery type (Exclusive, Guaranteed, PMP), and optional targeting capabilities.
+A sellable inventory item defined by the publisher. Products have a base price, rate type (CPM, CPC, CPD, FlatRate), delivery type (exclusive, guaranteed, PMP), and optional targeting capabilities.
 
 ### Order
 
@@ -117,8 +117,7 @@ sequenceDiagram
     Note over Buyer,Seller: 2. Product Search
     Buyer->>Seller: GET /products
     Seller-->>Buyer: Available products
-    Buyer->>Seller: POST /products/search
-    Seller-->>Buyer: Filtered products
+    Note over Buyer: Filters products client-side
     Buyer->>Seller: POST /products/avails
     Seller-->>Buyer: Availability, pricing, confidence
 
@@ -134,12 +133,13 @@ sequenceDiagram
     Buyer->>Seller: PATCH .../lines/{id}?action=book
     Seller-->>Buyer: Line (Booked)
 
-    Note over Buyer,Seller: 5. Creative Assignment
+    Note over Buyer,Seller: 5. Creative Upload
     Buyer->>Seller: POST /accounts/{id}/creatives
     Seller-->>Buyer: Creative (pending approval)
-    Buyer->>Seller: POST assignment (creative -> line)
-    Seller-->>Buyer: Assignment confirmed
 ```
+
+!!! note "Creative-to-line assignment"
+    The `Assignment` model (`models/opendirect.py`) defines the creative-to-line binding, but the `OpenDirectClient` does not yet expose a `create_assignment()` method — only `create_creative()`. Assignment happens on the seller side today.
 
 ## Line Booking Status Lifecycle
 
@@ -152,8 +152,8 @@ stateDiagram-v2
     PendingBooking --> Booked: confirmed
     Booked --> InFlight: campaign starts
     InFlight --> Finished: campaign ends
-    Booked --> Cancelled: buyer cancels
-    Reserved --> Cancelled: buyer cancels
+    Booked --> Canceled: buyer cancels
+    Reserved --> Canceled: buyer cancels
     Reserved --> Expired: hold expired
 ```
 
@@ -164,7 +164,7 @@ The `OpenDirectClient` (`clients/opendirect_client.py`) provides typed async met
 | Operation | Client Method | HTTP Call |
 |-----------|--------------|-----------|
 | List products | `list_products()` | `GET /products` |
-| Search products | `search_products()` | `POST /products/search` |
+| Search products | `search_products()` | `GET /products` + client-side filtering |
 | Check availability | `check_avails()` | `POST /products/avails` |
 | Create account | `create_account()` | `POST /accounts` |
 | Create order | `create_order()` | `POST /accounts/{id}/orders` |

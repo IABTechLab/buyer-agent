@@ -294,9 +294,9 @@ The event bus tracks creative lifecycle events:
 
 ---
 
-## Integration with the Campaign Pipeline
+## Integration with the Campaign Workflow
 
-The creative management system integrates with the [campaign pipeline](campaign-pipeline.md) at two points:
+The creative management system integrates with the campaign workflow at two points:
 
 1. **Brief submission** --- The campaign brief can include `creative_ids` referencing pre-uploaded assets. These are validated and associated with the campaign during ingestion.
 
@@ -323,5 +323,4 @@ The `AdServerStore` provides a separate, model-aware interface to the `ad_server
 
 - [Architecture Overview](../architecture/overview.md) --- Agent hierarchy and system design
 - [Deals API](../api/deals.md) --- Deal booking and management
-- [Campaign Brief to Deal Pipeline](campaign-pipeline.md) --- Pipeline can auto-assign creatives from the library to deals
 - [Budget Pacing & Reallocation](budget-pacing.md) --- Pacing engine that monitors deal delivery

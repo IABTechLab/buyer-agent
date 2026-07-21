@@ -49,6 +49,11 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from ..models.audience_capabilities import (
+    SellerAudienceCapabilities,
+    _AgenticFlag,
+    _MaxRefsPerRole,
+)
 from ..models.audience_plan import AudiencePlan, AudienceRef
 
 # ---------------------------------------------------------------------------
@@ -114,82 +119,12 @@ class CannotFulfillPlan(ValueError):
 # Buyer-side capability mirror
 # ---------------------------------------------------------------------------
 #
-# The seller's authoritative capability shape lives in
-# `ad_seller/models/audience_capabilities.py:CapabilityAudienceBlock`. We do
-# not import that across repos -- the buyer reads the seller's JSON on the
-# wire and parses into this model. Field names match the seller's so the
-# wire shape round-trips without translation.
-
-
-class _AgenticFlag(BaseModel):
-    """Buyer-side mirror of the seller's `AgenticCapabilityFlag`.
-
-    Carries only the top-level "agentic supported at all" boolean. Per-package
-    detail (signal types, embedding dim) is the seller's concern at booking
-    time; the buyer only needs to know whether to keep agentic refs in the
-    plan.
-    """
-
-    supported: bool = Field(default=False)
-
-
-class _MaxRefsPerRole(BaseModel):
-    """Buyer-side mirror of the seller's `MaxRefsPerRole`.
-
-    Cardinality caps per role. The buyer trims ref lists to fit before
-    sending the plan.
-    """
-
-    primary: int = Field(default=1, ge=0)
-    constraints: int = Field(default=3, ge=0)
-    extensions: int = Field(default=0, ge=0)
-    exclusions: int = Field(default=0, ge=0)
-
-
-class SellerAudienceCapabilities(BaseModel):
-    """Buyer-side mirror of the seller's `CapabilityAudienceBlock`.
-
-    Same JSON shape as the seller's authoritative model so capability
-    discovery responses round-trip without translation. The buyer's
-    `degrade_plan_for_seller` reads from this model only -- it doesn't care
-    where the values came from (a real capability discovery response in
-    bead §13, or a synthesized downgrade in the retry path of this bead).
-
-    A seller that doesn't ship `audience_capabilities` at all is treated as
-    legacy. Callers can construct a "legacy default" instance via
-    `SellerAudienceCapabilities.legacy_default()`.
-    """
-
-    schema_version: str = Field(default="1")
-    standard_taxonomy_versions: list[str] = Field(default_factory=lambda: ["1.1"])
-    contextual_taxonomy_versions: list[str] = Field(default_factory=lambda: ["3.1"])
-    agentic: _AgenticFlag = Field(default_factory=_AgenticFlag)
-    supports_constraints: bool = Field(default=True)
-    supports_extensions: bool = Field(default=False)
-    supports_exclusions: bool = Field(default=False)
-    max_refs_per_role: _MaxRefsPerRole = Field(default_factory=_MaxRefsPerRole)
-
-    model_config = {"populate_by_name": True}
-
-    @classmethod
-    def legacy_default(cls) -> SellerAudienceCapabilities:
-        """Return the safe-default for a seller that ships no capability block.
-
-        Per proposal §5.7: "A seller that doesn't ship this field is treated
-        as legacy: standard segments only, no constraints, no extensions, no
-        exclusions, no agentic. That's the safe default."
-        """
-
-        return cls(
-            schema_version="0",
-            standard_taxonomy_versions=["1.1"],
-            contextual_taxonomy_versions=[],
-            agentic=_AgenticFlag(supported=False),
-            supports_constraints=False,
-            supports_extensions=False,
-            supports_exclusions=False,
-            max_refs_per_role=_MaxRefsPerRole(primary=1, constraints=0, extensions=0, exclusions=0),
-        )
+# `SellerAudienceCapabilities` (and its `_AgenticFlag` / `_MaxRefsPerRole`
+# components) now live in `..models.audience_capabilities` so both this
+# orchestration module and the low-level `clients.capability_client` can
+# import them without a circular dependency. They are re-exported here so
+# existing `from ..orchestration.audience_degradation import ...` call sites
+# keep working.
 
 
 # ---------------------------------------------------------------------------
@@ -574,7 +509,10 @@ __all__ = [
     "DegradationAction",
     "DegradationLog",
     "DegradationLogEntry",
+    # Re-exported from ..models.audience_capabilities for backward compat.
     "SellerAudienceCapabilities",
+    "_AgenticFlag",
+    "_MaxRefsPerRole",
     "degrade_plan_for_seller",
     "synthesize_capabilities_from_unsupported",
 ]

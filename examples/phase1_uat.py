@@ -2,11 +2,11 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Phase 1 UAT: Integration test for all 6 buyer foundation modules.
+"""Phase 1 UAT: Integration test for the buyer foundation modules.
 
-Exercises auth, identity, registry, media kit, sessions, and negotiation
-modules against a live seller server. The script is self-contained: it
-starts the seller, runs all tests, and shuts down / cleans up on exit.
+Exercises auth, registry, media kit, and negotiation modules against a
+live seller server. The script is self-contained: it starts the seller,
+runs all tests, and shuts down / cleans up on exit.
 
 Usage:
     cd ad_buyer_system
@@ -25,7 +25,6 @@ import subprocess
 import sys
 import tempfile
 import time
-from datetime import UTC
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -176,10 +175,8 @@ def stop_server(proc: subprocess.Popen) -> None:
 
 results: dict[str, bool | None] = {
     "Auth": None,
-    "Identity": None,
     "Registry": None,
     "Media Kit": None,
-    "Sessions": None,
     "Negotiation": None,
 }
 
@@ -240,89 +237,6 @@ def test_auth(tmp_dir: str) -> bool:
     ok("Key removed successfully")
 
     ok("Auth module working")
-    return True
-
-
-def test_identity() -> bool:
-    """Test the identity strategy module."""
-    banner("[2/6] IDENTITY MODULE (strategy + masking)")
-
-    from ad_buyer.identity.strategy import (
-        CampaignGoal,
-        DealContext,
-        IdentityStrategy,
-        SellerRelationship,
-    )
-    from ad_buyer.models.buyer_identity import AccessTier, BuyerIdentity, DealType
-
-    strategy = IdentityStrategy()
-
-    step("Create full buyer identity (seat + agency + advertiser)")
-    identity = BuyerIdentity(
-        seat_id="ttd-seat-001",
-        seat_name="The Trade Desk",
-        agency_id="omnicom-456",
-        agency_name="OMD",
-        agency_holding_company="Omnicom",
-        advertiser_id="rivian-789",
-        advertiser_name="Rivian",
-        advertiser_industry="Auto",
-    )
-    ok(f"Identity created: tier={identity.get_access_tier().value}")
-
-    step("Test tier recommendation for PG deal -> expect ADVERTISER")
-    pg_context = DealContext(
-        deal_value_usd=500_000,
-        deal_type=DealType.PROGRAMMATIC_GUARANTEED,
-        seller_relationship=SellerRelationship.TRUSTED,
-    )
-    pg_tier = strategy.recommend_tier(pg_context)
-    assert pg_tier == AccessTier.ADVERTISER, f"Expected ADVERTISER, got {pg_tier}"
-    ok(f"PG deal -> {pg_tier.value} (correct)")
-
-    step("Test tier recommendation for low-value PD deal -> expect lower tier")
-    pd_context = DealContext(
-        deal_value_usd=5_000,
-        deal_type=DealType.PREFERRED_DEAL,
-        seller_relationship=SellerRelationship.UNKNOWN,
-        campaign_goal=CampaignGoal.AWARENESS,
-    )
-    pd_tier = strategy.recommend_tier(pd_context)
-    assert pd_tier != AccessTier.ADVERTISER, f"Expected lower tier, got {pd_tier}"
-    ok(f"Low-value PD deal -> {pd_tier.value} (lower than advertiser)")
-
-    step("Test identity masking at AGENCY tier -> advertiser fields stripped")
-    masked = strategy.build_identity(identity, AccessTier.AGENCY)
-    assert masked.agency_id == "omnicom-456"
-    assert masked.advertiser_id is None
-    assert masked.advertiser_name is None
-    ok("Agency-tier mask strips advertiser fields correctly")
-
-    step("Test identity masking at SEAT tier -> agency fields stripped")
-    seat_masked = strategy.build_identity(identity, AccessTier.SEAT)
-    assert seat_masked.seat_id == "ttd-seat-001"
-    assert seat_masked.agency_id is None
-    assert seat_masked.advertiser_id is None
-    ok("Seat-tier mask strips agency + advertiser fields")
-
-    step("Test identity masking at PUBLIC tier -> all fields stripped")
-    public_masked = strategy.build_identity(identity, AccessTier.PUBLIC)
-    assert public_masked.seat_id is None
-    assert public_masked.agency_id is None
-    assert public_masked.advertiser_id is None
-    ok("Public-tier mask strips all fields")
-
-    step("Test savings estimation")
-    savings = strategy.estimate_savings(
-        base_price=30.0,
-        current_tier=AccessTier.SEAT,
-        target_tier=AccessTier.ADVERTISER,
-    )
-    # Seat=5%, Advertiser=15%, incremental=10%, savings=30*0.10=3.0
-    assert savings == 3.0, f"Expected 3.0, got {savings}"
-    ok(f"Savings from SEAT->ADVERTISER on $30 CPM: ${savings:.2f}")
-
-    ok("Identity module working")
     return True
 
 
@@ -437,89 +351,6 @@ def test_media_kit() -> bool:
 
     asyncio.run(_run_media_kit_tests())
     ok("Media kit module working")
-    return True
-
-
-def test_sessions(tmp_dir: str) -> bool:
-    """Test the session module against the live seller."""
-    banner("[5/6] SESSION MODULE (manager + store)")
-
-    from ad_buyer.sessions.session_manager import SessionManager
-
-    store_path = os.path.join(tmp_dir, "test_sessions.json")
-
-    async def _run_session_tests() -> bool:
-        mgr = SessionManager(store_path=store_path, timeout=10.0)
-
-        # POST /sessions
-        step("Create session with seller (POST /sessions)")
-        try:
-            session_id = await mgr.create_session(
-                seller_url=SELLER_URL,
-                buyer_identity={"seat_id": "test-seat-001", "name": "UAT Buyer"},
-            )
-            ok(f"Session created: {session_id}")
-        except RuntimeError as e:
-            warn(f"Session creation failed: {e}")
-            warn("Seller may not support /sessions endpoint")
-            # Still test local persistence
-            step("Testing local session store persistence")
-            from datetime import datetime, timedelta
-
-            from ad_buyer.sessions.session_store import SessionRecord, SessionStore
-
-            store = SessionStore(store_path)
-            now = datetime.now(UTC)
-            record = SessionRecord(
-                session_id="local-test-001",
-                seller_url=SELLER_URL,
-                created_at=now.isoformat(),
-                expires_at=(now + timedelta(days=7)).isoformat(),
-            )
-            store.save(record)
-            retrieved = store.get(SELLER_URL)
-            assert retrieved is not None
-            assert retrieved.session_id == "local-test-001"
-            ok("Local session store works correctly")
-            return True
-
-        # Verify session ID returned
-        step("Verify session ID returned")
-        assert session_id is not None and len(session_id) > 0
-        ok(f"Session ID is valid: {session_id}")
-
-        # Send a message
-        step("Send a message in session")
-        try:
-            response = await mgr.send_message(
-                seller_url=SELLER_URL,
-                session_id=session_id,
-                message={"type": "inquiry", "content": "What CTV inventory is available?"},
-            )
-            ok(f"Message sent, response keys: {list(response.keys())}")
-        except RuntimeError as e:
-            warn(f"send_message failed: {e}")
-
-        # Verify persistence (get_or_create returns same ID)
-        step("Verify session persistence (get_or_create returns same ID)")
-        same_id = await mgr.get_or_create_session(seller_url=SELLER_URL)
-        assert same_id == session_id, f"Expected {session_id}, got {same_id}"
-        ok(f"get_or_create returned same session: {same_id}")
-
-        # Close session
-        step("Close session")
-        await mgr.close_session(SELLER_URL, session_id)
-        ok("Session closed")
-
-        # Verify session removed from store
-        active = mgr.list_active_sessions()
-        assert SELLER_URL not in active
-        ok("Session removed from local store after close")
-
-        return True
-
-    asyncio.run(_run_session_tests())
-    ok("Session module working")
     return True
 
 
@@ -698,35 +529,21 @@ def main() -> int:
             fail(f"Auth module: {e}")
             results["Auth"] = False
 
-        # 2. Identity (local strategy logic)
-        try:
-            results["Identity"] = test_identity()
-        except Exception as e:
-            fail(f"Identity module: {e}")
-            results["Identity"] = False
-
-        # 3. Registry (client + cache, graceful 404 handling)
+        # 2. Registry (client + cache, graceful 404 handling)
         try:
             results["Registry"] = test_registry()
         except Exception as e:
             fail(f"Registry module: {e}")
             results["Registry"] = False
 
-        # 4. Media Kit (live seller endpoints)
+        # 3. Media Kit (live seller endpoints)
         try:
             results["Media Kit"] = test_media_kit()
         except Exception as e:
             fail(f"Media Kit module: {e}")
             results["Media Kit"] = False
 
-        # 5. Sessions (live seller endpoints)
-        try:
-            results["Sessions"] = test_sessions(tmp_dir)
-        except Exception as e:
-            fail(f"Sessions module: {e}")
-            results["Sessions"] = False
-
-        # 6. Negotiation (local strategy pattern)
+        # 4. Negotiation (local strategy pattern)
         try:
             results["Negotiation"] = test_negotiation()
         except Exception as e:

@@ -28,7 +28,7 @@ The `results` array contains product data returned by the seller agent's product
 
 ### How It Works
 
-The endpoint creates an `OpenDirectClient` using the configured seller connection (`OPENDIRECT_BASE_URL`, `OPENDIRECT_TOKEN`, `OPENDIRECT_API_KEY`) and delegates to the `ProductSearchTool`. The tool calls the seller agent's `/products/search` endpoint (or `/products` with filter parameters) and returns matching products.
+The endpoint creates an `OpenDirectClient` using the configured seller connection (`OPENDIRECT_BASE_URL`, `OPENDIRECT_TOKEN`, `OPENDIRECT_API_KEY`) and delegates to the `ProductSearchTool`. The client fetches the seller agent's catalog via `GET /products` and applies the search filters client-side (the seller has no server-side search route), returning matching products.
 
 ### Example
 

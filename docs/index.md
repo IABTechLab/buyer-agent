@@ -20,7 +20,7 @@ Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https:/
 **Negotiation & Pricing**
 
 - Tiered identity strategy with 4 access tiers (public, seat, agency, advertiser) and progressive rate discounts
-- Multi-turn negotiation with pluggable strategies (threshold, adaptive, competitive) over A2A conversations
+- Multi-turn negotiation with a pluggable strategy interface — threshold strategy today; adaptive and competitive strategies are planned
 - Human-in-the-loop approval gate before committing spend
 
 **Execution & Booking**
@@ -33,8 +33,7 @@ Part of the IAB Tech Lab Agent Ecosystem --- see also the [Seller Agent](https:/
 **Observability & Lifecycle**
 
 - Formal order state machine with 12 deal states, guard conditions, and audit trail
-- Event bus with 13 event types, fail-open emission, subscriber dispatch, and SQLite persistence
-- Persistent session management tracking conversation state, negotiation history, and deal context
+- Event bus with 38 event types, fail-open emission, subscriber dispatch, and SQLite persistence
 - Severity-based change request management for post-deal modifications
 
 ## Access Methods
@@ -52,15 +51,18 @@ See [Protocol Overview](api/protocols.md) for detailed comparison.
 
 ## API Endpoints
 
-The buyer agent exposes 7 endpoints across 3 categories:
+The buyer agent exposes 14 endpoints across 6 categories:
 
 | Category | Endpoints |
 |----------|-----------|
 | **Health** | `GET /health` |
 | **Bookings** | `POST /bookings`, `GET /bookings/{job_id}`, `POST /bookings/{job_id}/approve`, `POST /bookings/{job_id}/approve-all`, `GET /bookings` |
 | **Products** | `POST /products/search` |
+| **Events** | `GET /events`, `GET /events/{event_id}` |
+| **Buyer Orders** | `GET /api/v1/buyer/orders`, `GET /api/v1/buyer/orders/{order_id}/audit` |
+| **Reporting** | `GET /reports/{job_id}`, `GET /meta/campaigns`, `GET /meta/report` |
 
-See the [API Overview](api/overview.md) for full details.
+See the [API Overview](api/overview.md) for full details, or the [auto-generated endpoint inventory](reference/endpoints.md) for the byte-exact list.
 
 ## Documentation
 
@@ -77,7 +79,7 @@ See the [API Overview](api/overview.md) for full details.
 - [API Reference](api/overview.md) --- all endpoints, models, and curl examples
 - [Protocol Overview](api/protocols.md) --- comparison of MCP, A2A, and REST
 - [Order State Machine](state-machines/order-lifecycle.md) --- 12 deal states with guard conditions and audit trail
-- [Event Bus](event-bus/overview.md) --- 13 event types with fail-open emission and persistence
+- [Event Bus](event-bus/overview.md) --- 38 event types with fail-open emission and persistence
 
 ### Guides
 
@@ -85,9 +87,8 @@ See the [API Overview](api/overview.md) for full details.
 - [AgentCore Deployment](guides/agentcore-deployment.md) --- Bedrock AgentCore managed runtime
 - [Deal Booking](guides/deal-booking.md) --- end-to-end quote-then-book workflow
 - [Negotiation](guides/negotiation.md) --- multi-turn negotiation strategies and deal flow
-- [Identity Strategy](guides/identity.md) --- tiered pricing and buyer identity resolution
+- [Identity & Access Tiers](guides/identity.md) --- tiered pricing and buyer identity resolution
 - [Media Kit Browsing](guides/media-kit.md) --- progressive disclosure of seller inventory
-- [Sessions](guides/sessions.md) --- persistent session management across interactions
 - [Multi-Seller Discovery](guides/multi-seller.md) --- AAMP registry and trust verification
 - [Linear TV Buying](guides/linear-tv.md) --- scatter, upfront, DMA targeting, and CPP/CPM pricing
 

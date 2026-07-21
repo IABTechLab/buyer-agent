@@ -8,7 +8,6 @@ being swallowed silently, and that partial failures are handled
 gracefully by downstream modules.
 """
 
-from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,8 +26,6 @@ from ad_buyer.models.flow_state import (
 )
 from ad_buyer.negotiation.client import NegotiationClient
 from ad_buyer.negotiation.strategies.simple_threshold import SimpleThresholdStrategy
-from ad_buyer.sessions.session_manager import SessionManager
-from ad_buyer.sessions.session_store import SessionRecord
 
 
 class TestClientErrorPropagation:
@@ -38,20 +35,12 @@ class TestClientErrorPropagation:
     async def test_opendirect_http_error_propagates(self):
         """HTTP errors from OpenDirectClient should raise to callers."""
         client = OpenDirectClient(base_url="http://fake.test")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 500
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
-            "Server Error", request=MagicMock(), response=mock_response
+        client._transport = httpx.MockTransport(
+            lambda request: httpx.Response(500, json={"error": "Server Error"})
         )
 
-        mock_http = MagicMock()
-        mock_http.__aenter__ = AsyncMock(return_value=mock_http)
-        mock_http.__aexit__ = AsyncMock(return_value=False)
-        mock_http.get = AsyncMock(return_value=mock_response)
-        with patch.object(client, "_make_client", return_value=mock_http):
-            with pytest.raises(httpx.HTTPStatusError):
-                await client.list_products()
+        with pytest.raises(httpx.HTTPStatusError):
+            await client.list_products()
 
     @pytest.mark.asyncio
     async def test_unified_client_error_in_result(self):
@@ -162,69 +151,6 @@ class TestFlowErrorPropagation:
         assert "CTV research failed" in flow.state.errors[0]
 
 
-class TestSessionErrorPropagation:
-    """Tests error handling in session management."""
-
-    @pytest.mark.asyncio
-    async def test_session_creation_failure_raises(self, tmp_session_store_path: str):
-        """Failed session creation should raise RuntimeError."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-
-        mock_response = MagicMock()
-        mock_response.status_code = 503
-        mock_response.text = "Service unavailable"
-
-        with patch("httpx.AsyncClient") as mock_async_client:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(return_value=mock_response)
-            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            with pytest.raises(RuntimeError, match="Failed to create session"):
-                await manager.create_session("http://seller.example.com")
-
-    @pytest.mark.asyncio
-    async def test_send_message_failure_after_retry(self, tmp_session_store_path: str):
-        """send_message should raise after retry also fails."""
-        manager = SessionManager(store_path=tmp_session_store_path)
-        seller_url = "http://seller.example.com"
-
-        # Insert an active session
-        record = SessionRecord(
-            session_id="active-sess",
-            seller_url=seller_url,
-            created_at=datetime.now(UTC).isoformat(),
-            expires_at=(datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        )
-        manager.store.save(record)
-
-        # Mock: first message -> 404, session creation -> 201, retry message -> 500
-        expired_resp = MagicMock()
-        expired_resp.status_code = 404
-
-        new_session_resp = MagicMock()
-        new_session_resp.status_code = 201
-        new_session_resp.json.return_value = {
-            "session_id": "new-sess",
-            "created_at": datetime.now(UTC).isoformat(),
-            "expires_at": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
-        }
-
-        failed_retry_resp = MagicMock()
-        failed_retry_resp.status_code = 500
-
-        with patch("httpx.AsyncClient") as mock_async_client:
-            mock_client = AsyncMock()
-            mock_client.post = AsyncMock(
-                side_effect=[expired_resp, new_session_resp, failed_retry_resp]
-            )
-            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
-
-            with pytest.raises(RuntimeError, match="Failed to send message"):
-                await manager.send_message(seller_url, "active-sess", {"type": "query"})
-
-
 class TestNegotiationErrorPropagation:
     """Tests error handling in negotiation flows."""
 
@@ -236,7 +162,7 @@ class TestNegotiationErrorPropagation:
         )
         client = NegotiationClient()
 
-        with patch("httpx.AsyncClient") as mock_async_client:
+        with patch("httpx.AsyncClient") as MockAsyncClient:
             mock_http = AsyncMock()
             error_response = MagicMock()
             error_response.status_code = 500
@@ -246,8 +172,8 @@ class TestNegotiationErrorPropagation:
                 response=error_response,
             )
             mock_http.post = AsyncMock(return_value=error_response)
-            mock_async_client.return_value.__aenter__ = AsyncMock(return_value=mock_http)
-            mock_async_client.return_value.__aexit__ = AsyncMock(return_value=False)
+            MockAsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_http)
+            MockAsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with pytest.raises(httpx.HTTPStatusError):
                 await client.auto_negotiate(

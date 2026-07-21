@@ -74,22 +74,16 @@ The Architecture section covers these topics:
 |-------|---------------|
 | **[Agent Hierarchy](agent-hierarchy.md)** | Three-level agent structure: portfolio manager, channel specialists, and tool-level agents |
 | **[Booking Flow](booking-flow.md)** | Detailed sequence diagram of the DealBookingFlow --- the campaign-level orchestration |
-| **[Buyer Deal Flow](buyer-deal-flow.md)** | Single-deal flow for direct DSP integration without multi-channel orchestration |
 | **[Order State Machine](../state-machines/order-lifecycle.md)** | 12 deal states and 9 campaign states with guard conditions and audit trail |
-| **[Event Bus](../event-bus/overview.md)** | 13 event types providing structured observability across all flows |
+| **[Event Bus](../event-bus/overview.md)** | 38 event types providing structured observability across all flows |
 | **[Deal Store](deal-store.md)** | Synchronous SQLite persistence for deal lifecycle, negotiation history, and audit trail |
-| **[Storage Backends](storage-backends.md)** | Pluggable async backend (SQLite / Redis / Postgres+Redis hybrid) used by domain stores beyond DealStore |
+| **[Storage Layer](storage-backends.md)** | The SQLite-backed domain stores that persist all buyer state |
 | **[Models](models.md)** | Pydantic data models for API requests, flow state, and deal records |
 | **[Tools Reference](tools.md)** | CrewAI tools available to agents for research, booking, and negotiation |
 
-### Two Entry Points: Campaign Flow vs. Deal Flow
+### The Flow Entry Point
 
-The buyer has two distinct flow entry points, depending on the use case:
-
-- **DealBookingFlow** (campaign flow) --- Starts from a campaign brief. The portfolio manager allocates budget across channels, channel specialists research inventory in parallel, recommendations are built and approved, then deals are booked. This is the multi-channel, orchestrated path.
-- **BuyerDealFlow** (deal flow) --- Starts from a single deal request. Discovers inventory, evaluates pricing, and books one deal directly. This is the lightweight, single-deal path used for DSP integration.
-
-Both flows share the same deal state machine, event bus, and DealStore persistence --- they differ in scope and orchestration, not in how individual deals are managed.
+The buyer has one canonical flow entry point: **DealBookingFlow** (campaign flow). It starts from a campaign brief. The portfolio manager allocates budget across channels, channel specialists research inventory in parallel, recommendations are built and approved, then deals are booked through the multi-seller orchestrator. Single, targeted deals can be executed directly against the `DealsClient` quote-then-book API without the flow.
 
 ## Component Summary
 
@@ -103,7 +97,7 @@ Both flows share the same deal state machine, event bus, and DealStore persisten
 | **IABMCPClient** | MCP SDK client with Streamable HTTP transport | `clients/mcp_client.py` |
 | **A2AClient** | JSON-RPC 2.0 client for conversational agent-to-agent requests | `clients/a2a_client.py` |
 | **OpenDirectClient** | Async HTTP client for IAB OpenDirect 2.1 seller APIs | `clients/opendirect_client.py` |
-| **NegotiationClient** | Multi-turn price negotiation with seller agents via A2A/proposals | `clients/negotiation_client.py` |
+| **NegotiationClient** | Multi-turn price negotiation with seller agents | `negotiation/client.py` |
 | **BookingState** | Pydantic state model tracking the full flow lifecycle | `models/flow_state.py` |
 | **Settings** | Environment-based configuration via pydantic-settings | `config/settings.py` |
 
@@ -150,7 +144,6 @@ See also: [Seller Agent Architecture](https://iabtechlab.github.io/seller-agent/
 ## Related
 
 - [Booking Flow](booking-flow.md) --- detailed sequence diagram of the campaign-level DealBookingFlow
-- [Buyer Deal Flow](buyer-deal-flow.md) --- single-deal flow for direct DSP integration
 - [Order State Machine](../state-machines/order-lifecycle.md) --- deal and campaign lifecycle enforcement
 - [Event Bus](../event-bus/overview.md) --- structured observability across all flows
 - [Models](models.md) --- data model reference

@@ -35,6 +35,7 @@ Use the standard `DealsClient.request_quote()` with `media_type` set to `"linear
 ```python
 from ad_buyer.clients.deals_client import DealsClient
 from ad_buyer.models.deals import QuoteRequest, BuyerIdentityPayload
+from ad_buyer.models.linear_tv import LinearTVParams
 
 async with DealsClient(seller_url, api_key="key") as client:
     quote = await client.request_quote(QuoteRequest(
@@ -45,13 +46,13 @@ async with DealsClient(seller_url, api_key="key") as client:
         flight_start="2026-07-01",
         flight_end="2026-09-30",
         target_cpm=12.00,
-        linear_tv_params={
-            "daypart": "primetime",
-            "networks": ["NBC", "CBS", "ABC"],
-            "dma_codes": ["501", "803"],  # NYC, LA
-            "demo_target": "A25-54",
-            "spot_length_seconds": 30,
-        },
+        linear_tv=LinearTVParams(
+            target_demo="A25-54",           # required
+            dayparts=["primetime"],
+            networks=["NBC", "CBS", "ABC"],
+            dmas=["501", "803"],            # NYC, LA
+            spot_length=30,
+        ),
         buyer_identity=BuyerIdentityPayload(
             seat_id="ttd-seat-123",
             agency_id="omnicom-456",
@@ -60,19 +61,21 @@ async with DealsClient(seller_url, api_key="key") as client:
 
     print(f"Quote ID: {quote.quote_id}")
     print(f"CPM: ${quote.pricing.final_cpm}")
-    if hasattr(quote, "cpp"):
-        print(f"CPP: ${quote.cpp}")
+    if quote.pricing.final_cpp is not None:
+        print(f"CPP: ${quote.pricing.final_cpp}")
 ```
 
-### Linear TV Quote Parameters
+### Linear TV Quote Parameters (`LinearTVParams`)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `daypart` | `str` | Time slot: `"early_morning"`, `"daytime"`, `"primetime"`, `"late_night"`, `"overnight"` |
-| `networks` | `list[str]` | Target network call signs (e.g., `["NBC", "CBS"]`) |
-| `dma_codes` | `list[str]` | Nielsen DMA codes for geographic targeting |
-| `demo_target` | `str` | Demographic target (e.g., `"A25-54"`, `"W18-49"`) |
-| `spot_length_seconds` | `int` | Spot duration: `15`, `30`, or `60` |
+| `target_demo` | `str` (**required**) | Demographic target (e.g., `"A25-54"`, `"A18-49"`, `"HH"`, `"P2+"`) |
+| `grps_requested` | `int \| None` | Requested volume in Gross Rating Points (alternative to impressions) |
+| `dayparts` | `list[str] \| None` | Time slots: `"primetime"`, `"daytime"`, `"early_morning"`, `"late_night"`, `"early_fringe"`, `"prime_access"`, `"overnight"`, `"weekend"` |
+| `networks` | `list[str] \| None` | Target network call signs (e.g., `["NBC", "CBS"]`) |
+| `dmas` | `list[str] \| None` | Nielsen DMA codes for local buying; `None` means national |
+| `spot_length` | `int` (default `30`) | Spot duration in seconds: `15`, `30`, or `60` |
+| `target_cpp` | `float \| None` | Desired Cost Per Point |
 
 ## DMA-Level Targeting
 
@@ -100,25 +103,25 @@ Linear TV inventory is geographically structured around Nielsen Designated Marke
 national_quote = await client.request_quote(QuoteRequest(
     product_id="prod-linear-primetime-001",
     media_type="linear_tv",
-    linear_tv_params={
-        "daypart": "primetime",
-        "networks": ["NBC"],
-        "demo_target": "A25-54",
-        "spot_length_seconds": 30,
-        # No dma_codes = national coverage
-    },
+    linear_tv=LinearTVParams(
+        target_demo="A25-54",
+        dayparts=["primetime"],
+        networks=["NBC"],
+        spot_length=30,
+        # No dmas = national coverage
+    ),
 ))
 
 # Local buy — specific DMAs
 local_quote = await client.request_quote(QuoteRequest(
     product_id="prod-linear-local-001",
     media_type="linear_tv",
-    linear_tv_params={
-        "daypart": "primetime",
-        "dma_codes": ["501", "803", "602"],  # NYC, LA, Chicago
-        "demo_target": "A18-49",
-        "spot_length_seconds": 30,
-    },
+    linear_tv=LinearTVParams(
+        target_demo="A18-49",
+        dayparts=["primetime"],
+        dmas=["501", "803", "602"],  # NYC, LA, Chicago
+        spot_length=30,
+    ),
 ))
 ```
 
@@ -137,13 +140,19 @@ Cost per rating point — a traditional TV metric where one "point" equals 1% of
 ```python
 quote = await client.request_quote(quote_request)
 
-# CPM is always available
+# CPM pricing (may be None for pricing_type=on_request)
+print(f"Pricing model: {quote.pricing.pricing_model}")  # "cpm", "cpp", "unit_rate", or "hybrid"
 print(f"CPM: ${quote.pricing.final_cpm}")
 
-# CPP may be available for linear TV quotes
-if hasattr(quote.pricing, "cpp") and quote.pricing.cpp:
-    print(f"CPP: ${quote.pricing.cpp}")
-    print(f"Estimated GRPs: {quote.pricing.estimated_grps}")
+# CPP appears on the pricing block for linear TV quotes
+if quote.pricing.final_cpp is not None:
+    print(f"CPP: ${quote.pricing.final_cpp}")
+
+# Rich linear TV details are nested under quote.linear_tv (LinearTVQuoteDetails)
+if quote.linear_tv is not None:
+    print(f"Estimated GRPs: {quote.linear_tv.estimated_grps}")
+    print(f"Seller CPP: ${quote.linear_tv.cpp}")
+    print(f"Spots/week: {quote.linear_tv.spots_per_week}")
 ```
 
 | Metric | Definition | When to Use |
@@ -183,7 +192,7 @@ This alignment means linear TV deals booked through the buyer agent can integrat
 
 ## How It Works: Hybrid Media Type Handling
 
-Linear TV is treated as a special case of the standard deal flow rather than a separate system. The core quote-then-book flow (quotes, negotiation, booking) remains media-type-agnostic, while media-type-specific parameters are passed through the `linear_tv_params` extension field. This means:
+Linear TV is treated as a special case of the standard deal flow rather than a separate system. The core quote-then-book flow (quotes, negotiation, booking) remains media-type-agnostic, while media-type-specific parameters are passed through the `linear_tv` extension field. This means:
 
 - The `DealsClient` API is the same regardless of media type
 - Linear TV-specific validation (daypart values, DMA codes, spot lengths) is applied contextually when `media_type` is `"linear_tv"`

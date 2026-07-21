@@ -1,6 +1,6 @@
 # Budget Pacing & Reallocation
 
-The budget pacing engine monitors campaign spend against plan in real time, detects over-delivery and under-delivery, and proposes cross-channel budget reallocations mid-flight. After a campaign's deals are booked via the [campaign pipeline](campaign-pipeline.md), pacing answers three questions continuously: **Are we on pace? What is off? What should we do about it?**
+The budget pacing engine monitors campaign spend against plan in real time, detects over-delivery and under-delivery, and proposes cross-channel budget reallocations mid-flight. After a campaign's deals are booked via the [booking flow](../architecture/booking-flow.md), pacing answers three questions continuously: **Are we on pace? What is off? What should we do about it?**
 
 The pacing engine is implemented by `BudgetPacingEngine` in `ad_buyer.pacing.engine`. Snapshots are persisted by `PacingStore` in `ad_buyer.storage.pacing_store`, and pacing events flow through the [event bus](../event-bus/overview.md).
 
@@ -347,7 +347,7 @@ Budget pacing operates on campaigns that have reached **ACTIVE** status. The typ
 
 ## Related
 
-- [Campaign Brief to Deal Pipeline](campaign-pipeline.md) --- Initial campaign setup (pacing monitors what the pipeline books)
+- [Booking Flow](../architecture/booking-flow.md) --- Initial campaign setup (pacing monitors what the flow books)
 - [Deals API](../api/deals.md) --- Deal status and modification endpoints
 - [Multi-Seller Orchestration](multi-seller-orchestration.md) --- Cross-seller portfolio management
 - [Architecture Overview](../architecture/overview.md) --- Agent hierarchy and system design

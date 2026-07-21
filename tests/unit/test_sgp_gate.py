@@ -267,40 +267,6 @@ def test_invalid_unknown_policy_rejected(mock_client, agency_context):
 
 
 # ---------------------------------------------------------------------------
-# Flow-level wiring of SGPVendorApprovalTool
-# ---------------------------------------------------------------------------
-
-
-def test_flow_wires_vendor_approval_tool_when_sgp_configured(agency_context):
-    """BuyerDealFlow exposes the vendor approval tool to the deal agent."""
-    from ad_buyer.clients.sgp_client import SGPClient
-    from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow
-    from ad_buyer.tools.research import SGPVendorApprovalTool
-
-    sgp = SGPClient(api_key="k", base_url="https://sgp.test")
-    flow = BuyerDealFlow(
-        client=MagicMock(),
-        buyer_context=agency_context,
-        sgp_client=sgp,
-    )
-    assert isinstance(flow._vendor_approval_tool, SGPVendorApprovalTool)
-
-
-def test_flow_omits_vendor_approval_tool_without_sgp(agency_context, monkeypatch):
-    """Without an SGP client (and no SGP_API_KEY env), the tool is not built."""
-    from ad_buyer.config.settings import settings
-    from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow
-
-    monkeypatch.setattr(settings, "sgp_api_key", "")
-    flow = BuyerDealFlow(
-        client=MagicMock(),
-        buyer_context=agency_context,
-        sgp_client=None,
-    )
-    assert flow._vendor_approval_tool is None
-
-
-# ---------------------------------------------------------------------------
 # DiscoverInventoryTool enforcement (filters before the agent sees products)
 # ---------------------------------------------------------------------------
 

@@ -1,6 +1,6 @@
-# Identity Strategy
+# Identity & Access Tiers
 
-Identity is the buyer's most valuable negotiating asset. Every interaction with a seller involves a decision: **how much to reveal about who you are**. Revealing more unlocks better pricing and premium inventory, but exposes buyer information that sellers can use for competitive intelligence. The identity strategy system automates this tradeoff.
+Identity is the buyer's most valuable negotiating asset. Every interaction with a seller involves a decision: **how much to reveal about who you are**. Revealing more unlocks better pricing and premium inventory, but exposes buyer information that sellers can use for competitive intelligence. The `BuyerIdentity` model controls this tradeoff: the fields you populate determine the access tier a seller grants you.
 
 ## Why Identity Matters
 
@@ -43,56 +43,20 @@ The buyer reveals full identity including the advertiser (name, ID, industry ver
 !!! info "Tier is determined by fields, not by request"
     The `BuyerIdentity` model determines its tier automatically based on which fields are populated. If `advertiser_id` is set, the tier is ADVERTISER regardless of other fields.
 
-## BuyerIdentityStrategy
+## Choosing a Tier
 
-The `IdentityStrategy` class recommends which tier to present based on the deal context. It does not modify the buyer's stored identity --- instead, it creates masked copies that expose only the fields appropriate for the recommended tier.
-
-### Decision Logic
-
-The strategy evaluates four signals in order:
-
-```mermaid
-flowchart TD
-    A[Deal Context] --> B{PG Deal?}
-    B -->|Yes| C[ADVERTISER]
-    B -->|No| D{Deal Value}
-    D -->|≥ $100k| E[ADVERTISER]
-    D -->|≥ $25k| F[AGENCY]
-    D -->|< $25k| G[SEAT]
-    E --> H{Seller Relationship}
-    F --> H
-    G --> H
-    H -->|Trusted/Established| I[Upgrade +1 tier]
-    H -->|Unknown/New| J[Keep tier]
-    I --> K{Campaign Goal}
-    J --> K
-    K -->|Performance| L[Upgrade +1 tier]
-    K -->|Awareness| M[Keep tier]
-    L --> N[Final Tier]
-    M --> N
-```
-
-1. **Deal type** --- Programmatic Guaranteed always requires ADVERTISER tier (guaranteed inventory needs full identity).
-2. **Deal value** --- Higher-value deals justify revealing more identity for larger absolute savings.
-3. **Seller relationship** --- Trusted or established sellers earn a one-tier upgrade (the buyer is comfortable sharing more).
-4. **Campaign goal** --- Performance campaigns benefit from higher tiers because sellers can apply better targeting with more buyer information.
-
-### Thresholds
-
-The strategy uses two configurable value thresholds:
-
-| Threshold | Default | Effect |
-|-----------|---------|--------|
-| `high_value_threshold_usd` | $100,000 | Deals at or above this recommend ADVERTISER tier |
-| `mid_value_threshold_usd` | $25,000 | Deals at or above this recommend AGENCY tier |
-
-### Usage
+Tier selection is a decision you make per seller and per deal, by constructing a `BuyerIdentity` with only the fields you want to reveal:
 
 ```python
-from ad_buyer.identity import IdentityStrategy, DealContext, SellerRelationship, CampaignGoal
-from ad_buyer.models.buyer_identity import BuyerIdentity, DealType
+from ad_buyer.models.buyer_identity import BuyerIdentity
 
-# Full buyer identity (all fields populated)
+# SEAT tier — reveal only the DSP seat
+seat_identity = BuyerIdentity(
+    seat_id="ttd-seat-123",
+    seat_name="The Trade Desk",
+)
+
+# ADVERTISER tier — reveal everything for maximum discount
 full_identity = BuyerIdentity(
     seat_id="ttd-seat-123",
     seat_name="The Trade Desk",
@@ -103,36 +67,14 @@ full_identity = BuyerIdentity(
     advertiser_name="Coca-Cola",
     advertiser_industry="CPG",
 )
-
-strategy = IdentityStrategy()
-
-# High-value deal with a trusted seller
-context = DealContext(
-    deal_value_usd=150_000,
-    deal_type=DealType.PREFERRED_DEAL,
-    seller_relationship=SellerRelationship.TRUSTED,
-    campaign_goal=CampaignGoal.PERFORMANCE,
-)
-
-recommended_tier = strategy.recommend_tier(context)
-# -> AccessTier.ADVERTISER
-
-# Build a masked identity at the recommended tier
-masked = strategy.build_identity(full_identity, recommended_tier)
 ```
 
-### Estimating Savings
+Practical guidelines:
 
-Before deciding whether to escalate to a higher tier, estimate the savings:
-
-```python
-savings = strategy.estimate_savings(
-    base_price=35.0,      # $35 CPM base price
-    current_tier=AccessTier.SEAT,       # Currently at 5% discount
-    target_tier=AccessTier.AGENCY,      # Considering 10% discount
-)
-# savings = 1.75 ($35 * 5% incremental discount)
-```
+1. **Deal type** --- Programmatic Guaranteed requires ADVERTISER tier (guaranteed inventory needs full identity).
+2. **Deal value** --- Higher-value deals justify revealing more identity for larger absolute savings.
+3. **Seller relationship** --- Reveal more to trusted, established sellers; stay conservative with unknown ones.
+4. **Campaign goal** --- Performance campaigns benefit from higher tiers because sellers can apply better targeting with more buyer information.
 
 ### Progressive Revelation
 
@@ -141,20 +83,13 @@ A typical workflow starts anonymous and escalates as the deal progresses:
 ```mermaid
 sequenceDiagram
     participant Buyer as Buyer Agent
-    participant Strategy as IdentityStrategy
     participant Seller as Seller Agent
 
     Buyer->>Seller: Browse media kit (PUBLIC)
     Seller-->>Buyer: Price ranges, package summaries
 
-    Buyer->>Strategy: Interesting package found — recommend tier?
-    Strategy-->>Buyer: SEAT (low-value browsing)
-
     Buyer->>Seller: Get package detail (SEAT)
     Seller-->>Buyer: Exact pricing at 5% discount
-
-    Buyer->>Strategy: Want to negotiate — recommend tier?
-    Strategy-->>Buyer: AGENCY (mid-value, negotiation needed)
 
     Buyer->>Seller: Request deal (AGENCY)
     Seller-->>Buyer: 10% discount, negotiation enabled
@@ -274,7 +209,7 @@ See [Negotiation Guide](negotiation.md) for negotiation workflows.
 
 ### Pricing
 
-Sellers apply tier-based discounts automatically. The discount is determined by the highest identity field present in the request. The seller's pricing engine maps tiers to discount percentages that match the buyer-side `_TIER_DISCOUNTS` table.
+Sellers apply tier-based discounts automatically. The discount is determined by the highest identity field present in the request.
 
 For details on how sellers configure pricing tiers, see the [Seller Pricing Rules](https://iabtechlab.github.io/seller-agent/guides/pricing-rules/).
 
@@ -306,23 +241,6 @@ campaign_identity = BuyerIdentity(
     advertiser_id="coca-cola-789",
     advertiser_name="Coca-Cola",
     advertiser_industry="CPG",
-)
-```
-
-### Configuring the Strategy
-
-Adjust the value thresholds to match your organization's deal sizes:
-
-```python
-from ad_buyer.identity import IdentityStrategy
-
-# Default thresholds
-strategy = IdentityStrategy()
-
-# Custom thresholds for a large agency
-strategy = IdentityStrategy(
-    high_value_threshold_usd=500_000,   # Only reveal advertiser for $500k+ deals
-    mid_value_threshold_usd=100_000,    # Only reveal agency for $100k+ deals
 )
 ```
 

@@ -6,21 +6,14 @@
 These tests verify that:
 1. DealBookingFlow with store=None works unchanged (backward compatibility)
 2. DealBookingFlow with a store persists deal and booking data
-3. BuyerDealFlow with a store persists deal data
-4. API job tracking writes to the store via _persist_job
+3. API job tracking writes to the store via _persist_job
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from ad_buyer.flows.buyer_deal_flow import BuyerDealFlow, BuyerDealFlowStatus
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
-from ad_buyer.models.buyer_identity import (
-    BuyerContext,
-    BuyerIdentity,
-    DealType,
-)
 from ad_buyer.models.flow_state import (
     BookingState,
     ChannelAllocation,
@@ -48,29 +41,6 @@ def mock_opendirect_client():
     client = MagicMock()
     client.base_url = "http://seller.example.com"
     return client
-
-
-@pytest.fixture
-def mock_unified_client():
-    """Create a mock UnifiedClient."""
-    client = MagicMock()
-    client.base_url = "http://seller.example.com"
-    return client
-
-
-@pytest.fixture
-def buyer_context():
-    """Create a BuyerContext for DSP flow tests."""
-    identity = BuyerIdentity(
-        buyer_id="test-buyer-001",
-        organization="Test Org",
-        contact_email="test@example.com",
-    )
-    return BuyerContext(
-        identity=identity,
-        is_authenticated=True,
-        preferred_deal_types=[DealType.PREFERRED_DEAL],
-    )
 
 
 # -----------------------------------------------------------------------
@@ -144,9 +114,9 @@ class TestDealBookingFlowNoStore:
         assert result["status"] == "ready_for_approval"
         assert result["total_recommendations"] == 1
 
-    def test_execute_bookings_no_store(self, mock_opendirect_client):
+    def test_execute_bookings_no_store(self, mock_opendirect_client, fake_booking_orchestrator):
         """Booking execution works without a store."""
-        flow = DealBookingFlow(mock_opendirect_client)
+        flow = DealBookingFlow(mock_opendirect_client, orchestrator=fake_booking_orchestrator)
         flow._state = BookingState(
             campaign_brief={
                 "objectives": ["awareness"],
@@ -169,9 +139,7 @@ class TestDealBookingFlowNoStore:
         )
         flow.state.pending_approvals = [rec]
 
-        mock_rv = ("quote_1", "deal_1", "order_1")
-        with patch.object(flow, "_book_via_seller_api", return_value=mock_rv):
-            result = flow.approve_all()
+        result = flow.approve_all()
         assert result["status"] == "success"
         assert result["booked"] == 1
 
@@ -243,9 +211,13 @@ class TestDealBookingFlowWithStore:
             history = deal_store.get_status_history("deal", deal["id"])
             assert len(history) >= 1
 
-    def test_execute_bookings_persists_records(self, mock_opendirect_client, deal_store):
+    def test_execute_bookings_persists_records(
+        self, mock_opendirect_client, deal_store, fake_booking_orchestrator
+    ):
         """Booking execution persists booking records and updates deal status."""
-        flow = DealBookingFlow(mock_opendirect_client, store=deal_store)
+        flow = DealBookingFlow(
+            mock_opendirect_client, store=deal_store, orchestrator=fake_booking_orchestrator
+        )
         flow._state = BookingState(
             campaign_brief={
                 "objectives": ["awareness"],
@@ -279,18 +251,23 @@ class TestDealBookingFlowWithStore:
         rec._store_deal_id = deal_id  # type: ignore[attr-defined]
         flow.state.pending_approvals = [rec]
 
-        mock_rv = ("quote_1", "deal_1", "order_1")
-        with patch.object(flow, "_book_via_seller_api", return_value=mock_rv):
-            result = flow.approve_all()
+        result = flow.approve_all()
         assert result["status"] == "success"
         assert result["booked"] == 1
 
-        # Verify booking record was persisted
+        # Verify booking record was persisted, keyed by the SELLER-issued
+        # deal id + quote id + confirmed terms (bead ar-j2nw)
+        import json as json_module
+
         bookings = deal_store.get_booking_records(deal_id)
         assert len(bookings) == 1
         assert bookings[0]["channel"] == "branding"
         assert bookings[0]["impressions"] == 100000
         assert bookings[0]["cost"] == 1500.0
+        metadata = json_module.loads(bookings[0]["metadata"])
+        assert metadata["seller_deal_id"] == "SELLER-DEAL-prod_1"
+        assert metadata["quote_id"] == "quote-prod_1"
+        assert metadata["final_cpm"] == 15.0
 
         # Verify deal status was updated to "booked"
         deal = deal_store.get_deal(deal_id)
@@ -335,80 +312,6 @@ class TestDealBookingFlowWithStore:
         # This should NOT raise despite the broken store
         result = flow.consolidate_recommendations({"channel": "branding", "status": "success"})
         assert result["status"] == "ready_for_approval"
-
-
-# -----------------------------------------------------------------------
-# BuyerDealFlow backward compatibility (store=None)
-# -----------------------------------------------------------------------
-
-
-class TestBuyerDealFlowNoStore:
-    """Verify BuyerDealFlow works identically when store=None."""
-
-    def test_init_without_store(self, mock_unified_client, buyer_context):
-        """Flow can be created without a store argument."""
-        flow = BuyerDealFlow(mock_unified_client, buyer_context)
-        assert flow._store is None
-
-    def test_receive_request_no_store(self, mock_unified_client, buyer_context):
-        """Request reception works without a store."""
-        flow = BuyerDealFlow(mock_unified_client, buyer_context)
-        flow.state.request = "Premium video inventory for Q2"
-        result = flow.receive_request()
-        assert result["status"] == "success"
-        assert flow.state.status == BuyerDealFlowStatus.REQUEST_RECEIVED
-
-
-# -----------------------------------------------------------------------
-# BuyerDealFlow with store
-# -----------------------------------------------------------------------
-
-
-class TestBuyerDealFlowWithStore:
-    """Verify BuyerDealFlow persists data when store is provided."""
-
-    def test_init_with_store(self, mock_unified_client, buyer_context, deal_store):
-        """Flow accepts and stores the DealStore reference."""
-        flow = BuyerDealFlow(mock_unified_client, buyer_context, store=deal_store)
-        assert flow._store is deal_store
-
-    def test_receive_request_persists_deal(self, mock_unified_client, buyer_context, deal_store):
-        """Request reception creates a draft deal in the store."""
-        flow = BuyerDealFlow(mock_unified_client, buyer_context, store=deal_store)
-        flow.state.request = "Premium video inventory for Q2"
-        flow.state.deal_type = DealType.PREFERRED_DEAL
-        flow.state.impressions = 500000
-        flow.state.flight_start = "2026-04-01"
-        flow.state.flight_end = "2026-06-30"
-
-        result = flow.receive_request()
-        assert result["status"] == "success"
-
-        # Verify deal was persisted
-        deals = deal_store.list_deals()
-        assert len(deals) == 1
-        deal = deals[0]
-        assert deal["status"] == "draft"
-        assert deal["impressions"] == 500000
-        assert deal["flight_start"] == "2026-04-01"
-        assert deal["flight_end"] == "2026-06-30"
-
-        # Verify the flow remembers the store deal ID
-        assert flow._store_deal_id is not None
-        assert flow._store_deal_id == deal["id"]
-
-    def test_store_failure_does_not_break_dsp_flow(self, mock_unified_client, buyer_context):
-        """DSP flow completes even when store raises exceptions."""
-        broken_store = DealStore("sqlite:///:memory:")
-        broken_store.connect()
-        broken_store.disconnect()
-
-        flow = BuyerDealFlow(mock_unified_client, buyer_context, store=broken_store)
-        flow.state.request = "Premium video inventory"
-
-        # Should not raise
-        result = flow.receive_request()
-        assert result["status"] == "success"
 
 
 # -----------------------------------------------------------------------

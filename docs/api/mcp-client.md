@@ -19,7 +19,7 @@ Use MCP when you know the exact tool and arguments. The buyer's CrewAI tools def
 
 ## Client Implementations
 
-The buyer includes two MCP client implementations, selected based on environment and dependency availability.
+The buyer includes two MCP client implementations. Only `IABMCPClient` is wired into the production path (`UnifiedClient.connect` constructs it unconditionally, `clients/unified_client.py`); `SimpleMCPClient` exists in `clients/mcp_client.py` but is never instantiated automatically.
 
 ### IABMCPClient
 
@@ -39,14 +39,15 @@ Connection flow:
 
 ### SimpleMCPClient
 
-A lightweight HTTP fallback that does not require the MCP SDK. It calls simple REST endpoints exposed by the seller.
+A lightweight HTTP client that does not require the MCP SDK. It calls simple REST endpoints exposed by the seller.
 
 - **Tool listing**: `GET /mcp/tools` --- returns available tool definitions
 - **Tool execution**: `POST /mcp/call` --- sends `{"name": ..., "arguments": {...}}`
 - **Fallback chain**: Tries `/mcp/tools`, then `call_tool("list_tools")`, then assumes standard [OpenDirect](https://iabtechlab.com/standards/opendirect/) tools
 - **No session**: Each request is independent (no SSE connection)
 
-The `SimpleMCPClient` is used automatically when the `mcp` SDK is not installed.
+!!! warning "Not an automatic fallback"
+    `SimpleMCPClient` is **not** selected automatically — `UnifiedClient` always constructs `IABMCPClient`, and the `mcp` SDK is a hard dependency of that path. Use `SimpleMCPClient` only by instantiating it directly.
 
 ## Tool Discovery
 

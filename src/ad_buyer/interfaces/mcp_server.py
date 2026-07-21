@@ -30,13 +30,10 @@ This creates an SSE endpoint at /mcp/sse for MCP client connections
 
 from __future__ import annotations
 
-import csv
-import io
 import json
 import logging
 import os
-import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import FastAPI
@@ -47,28 +44,18 @@ from ..auth.key_store import ApiKeyStore
 from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 from ..config.settings import Settings
 from ..media_kit.client import MediaKitClient
-from ..media_kit.models import MediaKitError
-from ..registry.client import RegistryClient
+from ..registry import AampRegistryClient, RegistryClient, create_registry_client
+from ..services import deal_service, discovery_service
 from ..services.setup_wizard import SetupWizard
+from ..storage import health as storage_health
 from ..storage.campaign_store import CampaignStore
 from ..storage.deal_store import DealStore
 from ..storage.order_store import OrderStore
 from ..storage.pacing_store import PacingStore
-from ..tools.deal_import import (
-    ImportResult as CsvImportResult,
-)
-from ..tools.deal_import import (
-    _parse_row,
-    _resolve_columns,
-)
 from ..tools.deal_library.connectors import (
     IndexExchangeConnector,  # noqa: F401 - looked up dynamically via _get_ssp_connector_class
     MagniteConnector,  # noqa: F401
     PubMaticConnector,  # noqa: F401
-)
-from ..tools.deal_library.deal_entry import (
-    ManualDealEntry,
-    create_manual_deal,
 )
 
 logger = logging.getLogger(__name__)
@@ -157,14 +144,14 @@ def _set_deal_store(store: DealStore | None) -> None:
     _deal_store_override = store
 
 
-def _get_registry_client() -> RegistryClient:
-    """Get a RegistryClient instance.
+def _get_registry_client() -> RegistryClient | AampRegistryClient:
+    """Get a registry client instance.
 
-    Uses the IAB server URL from settings as the registry URL.
+    Config-swap (EP-5.1): the real AAMP agent registry when
+    AAMP_REGISTRY_URL is set, otherwise the legacy IAB-server-URL path.
     Returns a new instance each time so that test patches are reflected.
     """
-    settings = _get_settings()
-    return RegistryClient(registry_url=settings.iab_server_url)
+    return create_registry_client(_get_settings())
 
 
 def _get_api_key_store() -> ApiKeyStore:
@@ -225,24 +212,8 @@ def get_setup_status() -> str:
     seller_endpoints = settings.get_seller_endpoints()
     checks["seller_endpoints_configured"] = len(seller_endpoints) > 0
 
-    # Check database accessibility
-    db_accessible = False
-    try:
-        db_url = settings.database_url
-        # Strip sqlite:/// prefix for direct connection test
-        if db_url.startswith("sqlite:///"):
-            db_path = db_url[len("sqlite:///") :]
-        else:
-            db_path = db_url
-
-        # Try a lightweight connection test
-        conn = sqlite3.connect(db_path)
-        conn.execute("SELECT 1")
-        conn.close()
-        db_accessible = True
-    except (sqlite3.Error, OSError):
-        db_accessible = False
-    checks["database_accessible"] = db_accessible
+    # Check database accessibility (raw sqlite probe lives in the storage layer)
+    checks["database_accessible"] = storage_health.database_accessible(settings.database_url)
 
     # Check API key configuration
     checks["api_key_configured"] = bool(settings.api_key)
@@ -276,20 +247,12 @@ def health_check() -> str:
     settings = _get_settings()
     services: dict[str, dict] = {}
 
-    # Check database service
-    try:
-        db_url = settings.database_url
-        if db_url.startswith("sqlite:///"):
-            db_path = db_url[len("sqlite:///") :]
-        else:
-            db_path = db_url
-
-        conn = sqlite3.connect(db_path)
-        conn.execute("SELECT 1")
-        conn.close()
+    # Check database service (raw sqlite probe lives in the storage layer)
+    db_ok, db_error = storage_health.probe_database(settings.database_url)
+    if db_ok:
         services["database"] = {"status": "healthy"}
-    except (sqlite3.Error, OSError) as exc:
-        services["database"] = {"status": "unhealthy", "error": str(exc)}
+    else:
+        services["database"] = {"status": "unhealthy", "error": db_error}
 
     # Check seller connectivity (lightweight -- just config presence)
     seller_endpoints = settings.get_seller_endpoints()
@@ -805,42 +768,14 @@ def list_deals(
     """
     store = _get_deal_store()
     try:
-        kwargs: dict[str, Any] = {}
-        if status is not None:
-            kwargs["status"] = status
-        if deal_type is not None:
-            kwargs["deal_type"] = deal_type
-        if media_type is not None:
-            kwargs["media_type"] = media_type
-        if seller_domain is not None:
-            kwargs["seller_domain"] = seller_domain
-        kwargs["limit"] = limit
-
-        deals = store.list_deals(**kwargs)
-
-        deal_summaries = []
-        for d in deals:
-            deal_summaries.append(
-                {
-                    "deal_id": d["id"],
-                    "display_name": d.get("display_name") or d.get("product_name") or "(unnamed)",
-                    "status": d.get("status", "unknown"),
-                    "deal_type": d.get("deal_type", "unknown"),
-                    "media_type": d.get("media_type"),
-                    "seller_org": d.get("seller_org"),
-                    "seller_domain": d.get("seller_domain"),
-                    "price": d.get("price"),
-                    "impressions": d.get("impressions"),
-                    "flight_start": d.get("flight_start"),
-                    "flight_end": d.get("flight_end"),
-                }
-            )
-
-        result = {
-            "total": len(deal_summaries),
-            "deals": deal_summaries,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        result = deal_service.list_deals(
+            store,
+            status=status,
+            deal_type=deal_type,
+            media_type=media_type,
+            seller_domain=seller_domain,
+            limit=limit,
+        )
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
@@ -868,53 +803,9 @@ def search_deals(query: str) -> str:
             indent=2,
         )
 
-    query = query.strip()
-    query_lower = query.lower()
-
     store = _get_deal_store()
     try:
-        # Fetch all deals for search (search needs full scan)
-        deals = store.list_deals(limit=10000)
-
-        # Search fields and their labels
-        search_fields = [
-            ("display_name", "display name"),
-            ("product_name", "product name"),
-            ("description", "description"),
-            ("seller_org", "seller organization"),
-            ("seller_domain", "seller domain"),
-        ]
-
-        matches = []
-        for deal in deals:
-            matched_fields = []
-            for field_name, field_label in search_fields:
-                value = deal.get(field_name)
-                if value and query_lower in str(value).lower():
-                    matched_fields.append(field_label)
-            if matched_fields:
-                matches.append(
-                    {
-                        "deal_id": deal["id"],
-                        "display_name": (
-                            deal.get("display_name") or deal.get("product_name") or "(unnamed)"
-                        ),
-                        "status": deal.get("status", "unknown"),
-                        "deal_type": deal.get("deal_type", "unknown"),
-                        "media_type": deal.get("media_type"),
-                        "seller_org": deal.get("seller_org"),
-                        "seller_domain": deal.get("seller_domain"),
-                        "price": deal.get("price"),
-                        "matched_in": matched_fields,
-                    }
-                )
-
-        result = {
-            "total": len(matches),
-            "query": query,
-            "deals": matches,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        result = deal_service.search_deals(store, query)
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
@@ -943,44 +834,8 @@ async def discover_sellers(capability: str | None = None) -> str:
       capabilities, trust_level, and protocols
     """
     registry = _get_registry_client()
-    try:
-        caps_filter = [capability] if capability else None
-        sellers = await registry.discover_sellers(
-            capabilities_filter=caps_filter,
-        )
-
-        seller_list = []
-        for seller in sellers:
-            seller_list.append(
-                {
-                    "agent_id": seller.agent_id,
-                    "name": seller.name,
-                    "url": seller.url,
-                    "capabilities": [
-                        {"name": c.name, "description": c.description, "tags": c.tags}
-                        for c in seller.capabilities
-                    ],
-                    "trust_level": seller.trust_level.value,
-                    "protocols": seller.protocols,
-                }
-            )
-
-        result = {
-            "total": len(seller_list),
-            "sellers": seller_list,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        return json.dumps(result, indent=2)
-
-    except Exception as exc:
-        logger.warning("Failed to discover sellers: %s", exc)
-        result = {
-            "error": f"Failed to discover sellers: {exc}",
-            "total": 0,
-            "sellers": [],
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        return json.dumps(result, indent=2)
+    result = await discovery_service.discover_sellers(registry, capability)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()
@@ -1001,56 +856,8 @@ async def get_seller_media_kit(seller_url: str) -> str:
     - packages: list of package summaries with pricing and format info
     """
     client = _get_media_kit_client()
-    try:
-        kit = await client.get_media_kit(seller_url)
-
-        packages = []
-        for pkg in kit.all_packages:
-            packages.append(
-                {
-                    "package_id": pkg.package_id,
-                    "name": pkg.name,
-                    "description": pkg.description,
-                    "ad_formats": pkg.ad_formats,
-                    "device_types": pkg.device_types,
-                    "price_range": pkg.price_range,
-                    "rate_type": pkg.rate_type,
-                    "is_featured": pkg.is_featured,
-                    "geo_targets": pkg.geo_targets,
-                    "tags": pkg.tags,
-                }
-            )
-
-        result = {
-            "seller_name": kit.seller_name,
-            "seller_url": kit.seller_url,
-            "total_packages": kit.total_packages,
-            "packages": packages,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        return json.dumps(result, indent=2)
-
-    except MediaKitError as exc:
-        logger.warning("Failed to fetch media kit from %s: %s", seller_url, exc)
-        result = {
-            "error": f"Failed to fetch media kit: {exc}",
-            "seller_url": seller_url,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        return json.dumps(result, indent=2)
-
-    except Exception as exc:
-        logger.warning(
-            "Unexpected error fetching media kit from %s: %s",
-            seller_url,
-            exc,
-        )
-        result = {
-            "error": f"Unexpected error: {exc}",
-            "seller_url": seller_url,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        return json.dumps(result, indent=2)
+    result = await discovery_service.get_seller_media_kit(client, seller_url)
+    return json.dumps(result, indent=2)
 
 
 @mcp.tool()
@@ -1069,66 +876,7 @@ async def compare_sellers(seller_urls: list[str]) -> str:
     - summary: aggregate stats (total packages, all ad formats seen)
     """
     client = _get_media_kit_client()
-
-    sellers_data: list[dict[str, Any]] = []
-    total_packages = 0
-    all_ad_formats: set[str] = set()
-
-    for url in seller_urls:
-        try:
-            kit = await client.get_media_kit(url)
-
-            # Collect ad formats across all packages
-            seller_formats: set[str] = set()
-            packages = []
-            for pkg in kit.all_packages:
-                seller_formats.update(pkg.ad_formats)
-                packages.append(
-                    {
-                        "package_id": pkg.package_id,
-                        "name": pkg.name,
-                        "price_range": pkg.price_range,
-                        "ad_formats": pkg.ad_formats,
-                        "rate_type": pkg.rate_type,
-                    }
-                )
-
-            all_ad_formats.update(seller_formats)
-            total_packages += len(packages)
-
-            sellers_data.append(
-                {
-                    "seller_url": url,
-                    "seller_name": kit.seller_name,
-                    "total_packages": len(packages),
-                    "ad_formats": sorted(seller_formats),
-                    "packages": packages,
-                }
-            )
-
-        except (MediaKitError, Exception) as exc:
-            logger.warning("Failed to fetch media kit from %s: %s", url, exc)
-            sellers_data.append(
-                {
-                    "seller_url": url,
-                    "error": f"Failed to fetch media kit: {exc}",
-                    "total_packages": 0,
-                    "ad_formats": [],
-                    "packages": [],
-                }
-            )
-
-    result = {
-        "sellers_compared": len(seller_urls),
-        "sellers": sellers_data,
-        "summary": {
-            "total_packages_across_sellers": total_packages,
-            "all_ad_formats": sorted(all_ad_formats),
-            "sellers_reachable": sum(1 for s in sellers_data if "error" not in s),
-            "sellers_unreachable": sum(1 for s in sellers_data if "error" in s),
-        },
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+    result = await discovery_service.compare_sellers(client, seller_urls)
     return json.dumps(result, indent=2)
 
 
@@ -1273,81 +1021,7 @@ def inspect_deal(deal_id: str) -> str:
     """
     store = _get_deal_store()
     try:
-        deal = store.get_deal(deal_id)
-        if deal is None:
-            return json.dumps(
-                {"error": f"Deal not found: {deal_id}"},
-                indent=2,
-            )
-
-        # Build comprehensive deal view
-        result: dict[str, Any] = {
-            "deal_id": deal["id"],
-            "display_name": deal.get("display_name") or deal.get("product_name") or "(unnamed)",
-            "status": deal.get("status"),
-            "deal_type": deal.get("deal_type"),
-            "media_type": deal.get("media_type"),
-            "seller_url": deal.get("seller_url"),
-            "seller_deal_id": deal.get("seller_deal_id"),
-            "seller_org": deal.get("seller_org"),
-            "seller_domain": deal.get("seller_domain"),
-            "seller_type": deal.get("seller_type"),
-            "buyer_org": deal.get("buyer_org"),
-            "buyer_id": deal.get("buyer_id"),
-            "price": deal.get("price"),
-            "fixed_price_cpm": deal.get("fixed_price_cpm"),
-            "bid_floor_cpm": deal.get("bid_floor_cpm"),
-            "price_model": deal.get("price_model"),
-            "currency": deal.get("currency"),
-            "impressions": deal.get("impressions"),
-            "flight_start": deal.get("flight_start"),
-            "flight_end": deal.get("flight_end"),
-            "description": deal.get("description"),
-            "created_at": deal.get("created_at"),
-            "updated_at": deal.get("updated_at"),
-        }
-
-        # Portfolio metadata
-        metadata = store.get_portfolio_metadata(deal_id)
-        if metadata is not None:
-            result["portfolio_metadata"] = {
-                "import_source": metadata.get("import_source"),
-                "import_date": metadata.get("import_date"),
-                "advertiser_id": metadata.get("advertiser_id"),
-                "agency_id": metadata.get("agency_id"),
-                "tags": metadata.get("tags"),
-            }
-        else:
-            result["portfolio_metadata"] = None
-
-        # Deal activations
-        activations = store.get_deal_activations(deal_id)
-        result["activations"] = [
-            {
-                "platform": a.get("platform"),
-                "platform_deal_id": a.get("platform_deal_id"),
-                "activation_status": a.get("activation_status"),
-                "last_sync_at": a.get("last_sync_at"),
-            }
-            for a in activations
-        ]
-
-        # Performance cache
-        perf = store.get_performance_cache(deal_id)
-        if perf is not None:
-            result["performance"] = {
-                "impressions_delivered": perf.get("impressions_delivered"),
-                "spend_to_date": perf.get("spend_to_date"),
-                "fill_rate": perf.get("fill_rate"),
-                "win_rate": perf.get("win_rate"),
-                "avg_effective_cpm": perf.get("avg_effective_cpm"),
-                "performance_trend": perf.get("performance_trend"),
-                "cached_at": perf.get("cached_at"),
-            }
-        else:
-            result["performance"] = None
-
-        result["timestamp"] = datetime.now(UTC).isoformat()
+        result = deal_service.inspect_deal(store, deal_id)
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
@@ -1383,110 +1057,12 @@ def import_deals_csv(
     """
     store = _get_deal_store()
     try:
-        # Parse CSV from string
-        reader = csv.reader(io.StringIO(csv_data))
-        rows = list(reader)
-
-        import_result = CsvImportResult()
-
-        if not rows:
-            result = {
-                "total_rows": 0,
-                "successful": 0,
-                "failed": 0,
-                "skipped": 0,
-                "errors": [],
-                "deal_ids": [],
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-            return json.dumps(result, indent=2)
-
-        # First row is headers
-        headers = rows[0]
-        data_rows = rows[1:]
-
-        col_map = _resolve_columns(headers, None)
-
-        if not col_map:
-            result = {
-                "total_rows": 0,
-                "successful": 0,
-                "failed": 0,
-                "skipped": 0,
-                "errors": [{"message": "No columns could be mapped to schema fields."}],
-                "deal_ids": [],
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
-            return json.dumps(result, indent=2)
-
-        import_result.total_rows = len(data_rows)
-
-        # Track seen deal IDs for deduplication
-        seen_deal_ids: set[str] = set()
-
-        for row_idx, row in enumerate(data_rows, start=1):
-            # Skip completely empty rows
-            if not any(cell.strip() for cell in row):
-                import_result.total_rows -= 1
-                continue
-
-            deal, errors = _parse_row(
-                row,
-                col_map,
-                row_number=row_idx,
-                default_seller_url=default_seller_url,
-                default_product_id=default_product_id,
-            )
-
-            if errors:
-                import_result.errors.extend(errors)
-                import_result.failed += 1
-                continue
-
-            # Deduplication by seller_deal_id
-            sdid = deal.get("seller_deal_id")
-            if sdid and sdid in seen_deal_ids:
-                import_result.skipped += 1
-                continue
-            if sdid:
-                seen_deal_ids.add(sdid)
-
-            import_result.deals.append(deal)
-            import_result.successful += 1
-
-        # Persist parsed deals to the store
-        deal_ids: list[str] = []
-        for deal_data in import_result.deals:
-            saved_id = store.save_deal(**deal_data)
-            deal_ids.append(saved_id)
-
-            # Save portfolio metadata
-            store.save_portfolio_metadata(
-                deal_id=saved_id,
-                import_source="CSV",
-                import_date=datetime.now(UTC).strftime("%Y-%m-%d"),
-            )
-
-        # Build error dicts
-        error_dicts = [
-            {
-                "row": e.row_number,
-                "field": e.field,
-                "value": e.value,
-                "message": e.message,
-            }
-            for e in import_result.errors
-        ]
-
-        result = {
-            "total_rows": import_result.total_rows,
-            "successful": import_result.successful,
-            "failed": import_result.failed,
-            "skipped": import_result.skipped,
-            "errors": error_dicts,
-            "deal_ids": deal_ids,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        result = deal_service.import_deals_csv(
+            store,
+            csv_data,
+            default_seller_url=default_seller_url,
+            default_product_id=default_product_id,
+        )
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
@@ -1553,9 +1129,10 @@ def create_deal_manual(
     - errors: validation error messages (on failure)
     - timestamp: when this operation was performed
     """
-    # Build the ManualDealEntry for validation
+    store = _get_deal_store()
     try:
-        entry = ManualDealEntry(
+        result = deal_service.create_manual_deal(
+            store,
             display_name=display_name,
             seller_url=seller_url,
             deal_type=deal_type,
@@ -1579,55 +1156,7 @@ def create_deal_manual(
             advertiser_id=advertiser_id,
             tags=tags,
         )
-    except (ValueError, TypeError) as exc:
-        return json.dumps(
-            {
-                "success": False,
-                "errors": [str(exc)],
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-            indent=2,
-        )
-
-    # Validate and prepare
-    entry_result = create_manual_deal(entry)
-
-    if not entry_result.success:
-        return json.dumps(
-            {
-                "success": False,
-                "errors": entry_result.errors,
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-            indent=2,
-        )
-
-    # Save the deal
-    store = _get_deal_store()
-    try:
-        deal_id = store.save_deal(**entry_result.deal_data)
-
-        # Save portfolio metadata
-        tags_json = (
-            json.dumps(entry_result.metadata["tags"]) if entry_result.metadata.get("tags") else None
-        )
-        store.save_portfolio_metadata(
-            deal_id=deal_id,
-            import_source=entry_result.metadata["import_source"],
-            import_date=datetime.now(UTC).strftime("%Y-%m-%d"),
-            advertiser_id=entry_result.metadata.get("advertiser_id"),
-            tags=tags_json,
-        )
-
-        return json.dumps(
-            {
-                "success": True,
-                "deal_id": deal_id,
-                "display_name": display_name,
-                "timestamp": datetime.now(UTC).isoformat(),
-            },
-            indent=2,
-        )
+        return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
             store.disconnect()
@@ -1659,94 +1188,11 @@ def get_portfolio_summary(
     """
     store = _get_deal_store()
     try:
-        deals = store.list_deals(limit=10000)
-
-        total = len(deals)
-
-        if total == 0:
-            return json.dumps(
-                {
-                    "total_deals": 0,
-                    "total_value": 0.0,
-                    "by_status": {},
-                    "by_deal_type": {},
-                    "by_media_type": {},
-                    "top_sellers": [],
-                    "expiring_deals": [],
-                    "timestamp": datetime.now(UTC).isoformat(),
-                },
-                indent=2,
-            )
-
-        # Count by status
-        status_counts: dict[str, int] = {}
-        for deal in deals:
-            s = deal.get("status", "unknown")
-            status_counts[s] = status_counts.get(s, 0) + 1
-
-        # Count by deal type
-        type_counts: dict[str, int] = {}
-        for deal in deals:
-            dt = deal.get("deal_type", "unknown")
-            type_counts[dt] = type_counts.get(dt, 0) + 1
-
-        # Count by media type
-        media_counts: dict[str, int] = {}
-        for deal in deals:
-            mt = deal.get("media_type") or "N/A"
-            media_counts[mt] = media_counts.get(mt, 0) + 1
-
-        # Top sellers by deal count
-        seller_counts: dict[str, int] = {}
-        for deal in deals:
-            seller = deal.get("seller_org") or deal.get("seller_domain") or "Unknown"
-            seller_counts[seller] = seller_counts.get(seller, 0) + 1
-        top_sellers = sorted(
-            seller_counts.items(),
-            key=lambda x: x[1],
-            reverse=True,
-        )[:top_sellers_count]
-
-        # Total portfolio value: sum of (price * impressions / 1000)
-        total_value = 0.0
-        for deal in deals:
-            p = deal.get("price")
-            imp = deal.get("impressions")
-            if p is not None and imp is not None:
-                total_value += p * imp / 1000.0
-
-        # Deals expiring within N days
-        now = datetime.now(UTC)
-        cutoff = now + timedelta(days=expiring_within_days)
-        cutoff_str = cutoff.strftime("%Y-%m-%d")
-        now_str = now.strftime("%Y-%m-%d")
-
-        expiring_deals = []
-        for deal in deals:
-            if deal.get("status") not in ("active", "draft", "imported"):
-                continue
-            flight_end = deal.get("flight_end")
-            if flight_end and now_str <= flight_end <= cutoff_str:
-                expiring_deals.append(
-                    {
-                        "deal_id": deal["id"],
-                        "display_name": (
-                            deal.get("display_name") or deal.get("product_name") or "(unnamed)"
-                        ),
-                        "flight_end": flight_end,
-                    }
-                )
-
-        result = {
-            "total_deals": total,
-            "total_value": total_value,
-            "by_status": status_counts,
-            "by_deal_type": type_counts,
-            "by_media_type": media_counts,
-            "top_sellers": [{"seller": name, "deal_count": count} for name, count in top_sellers],
-            "expiring_deals": expiring_deals,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        result = deal_service.portfolio_summary(
+            store,
+            top_sellers_count=top_sellers_count,
+            expiring_within_days=expiring_within_days,
+        )
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:
@@ -2696,33 +2142,11 @@ def import_deals_ssp(ssp_name: str) -> str:
             indent=2,
         )
 
-    # Fetch deals from the SSP
-    fetch_result = connector.fetch_deals()
-
-    # Persist normalised deals to the deal store
+    # Fetch + persist normalised deals via the deal service
     store = _get_deal_store()
     try:
-        deal_ids: list[str] = []
-        today = datetime.now(UTC).strftime("%Y-%m-%d")
-        for deal_data in fetch_result.deals:
-            saved_id = store.save_deal(**deal_data)
-            deal_ids.append(saved_id)
-            store.save_portfolio_metadata(
-                deal_id=saved_id,
-                import_source=connector.import_source,
-                import_date=today,
-            )
-
-        result = {
-            "total_rows": fetch_result.total_fetched,
-            "successful": fetch_result.successful,
-            "failed": fetch_result.failed,
-            "skipped": fetch_result.skipped,
-            "errors": fetch_result.errors,
-            "deal_ids": deal_ids,
-            "ssp_name": key,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
+        result = deal_service.import_deals_ssp(store, connector)
+        result["ssp_name"] = key
         return json.dumps(result, indent=2)
     finally:
         if _deal_store_override is None:

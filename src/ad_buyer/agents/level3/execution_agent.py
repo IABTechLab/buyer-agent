@@ -59,7 +59,7 @@ Booking workflow states:
 - InFlight: Currently delivering
 - Finished: Completed delivery
 - Stopped: Paused by user
-- Cancelled: Removed from delivery
+- Canceled: Removed from delivery
 - Expired: Reservation expired without booking
 
 You work for the channel specialists and execute bookings only after

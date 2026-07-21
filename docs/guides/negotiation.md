@@ -18,18 +18,18 @@ sequenceDiagram
 
     Buyer->>Strategy: next_offer() → $20 CPM
     Buyer->>Client: start_negotiation($20)
-    Client->>Seller: POST /proposals/{id}/counter {price: 20}
+    Client->>Seller: POST /api/v1/negotiations/messages {action: "counter", buyer_price: 20}
     Seller-->>Client: {seller_price: 32, action: "counter"}
     Client->>Strategy: should_accept($32)?
     Strategy-->>Client: No
     Client->>Strategy: should_walk_away($32)?
     Strategy-->>Client: No
     Client->>Strategy: next_offer($32) → $22
-    Client->>Seller: POST /proposals/{id}/counter {price: 22}
+    Client->>Seller: POST /api/v1/negotiations/messages {action: "counter", buyer_price: 22}
     Seller-->>Client: {seller_price: 28, action: "counter"}
     Client->>Strategy: should_accept($28)?
     Strategy-->>Client: Yes (≤ max_cpm $30)
-    Client->>Seller: POST /proposals/{id}/counter {action: "accept"}
+    Client->>Seller: POST /api/v1/negotiations/messages {action: "accept"}
     Seller-->>Client: Deal confirmed at $28
 ```
 
@@ -113,7 +113,7 @@ print(f"Rounds: {result.rounds_count}")    # e.g. 3
 The `auto_negotiate` loop:
 
 1. Calls `strategy.next_offer()` for the opening price
-2. Sends counter-offer to seller's `/proposals/{id}/counter`
+2. Sends counter-offer to the seller's `/api/v1/negotiations/messages`
 3. Checks `strategy.should_accept()` — if yes, accepts and returns
 4. Checks `strategy.should_walk_away()` — if yes, declines and returns
 5. Otherwise, computes `strategy.next_offer()` and loops back to step 2
@@ -238,13 +238,13 @@ class NegotiationSession:
 
 ## Seller-Side Integration
 
-The buyer's `NegotiationClient` communicates with the seller's negotiation endpoints:
+The buyer's `NegotiationClient` communicates with the seller's shared-contract negotiation endpoint. Every action is a `NegotiationMessage` POSTed to `/api/v1/negotiations/messages`:
 
 | Action | HTTP Call |
 |--------|-----------|
-| Counter-offer | `POST /proposals/{id}/counter` with `{price: float}` |
-| Accept | `POST /proposals/{id}/counter` with `{price: float, action: "accept"}` |
-| Decline | `POST /proposals/{id}/counter` with `{action: "decline"}` |
+| Counter-offer | `POST /api/v1/negotiations/messages` with `{action: "counter", buyer_price: ...}` |
+| Accept | `POST /api/v1/negotiations/messages` with `{action: "accept", buyer_price: <seller's last price>}` |
+| Decline | `POST /api/v1/negotiations/messages` with `{action: "reject"}` |
 
 The seller's negotiation engine responds with its own strategy (AGGRESSIVE, STANDARD, COLLABORATIVE, or PREMIUM depending on the buyer's tier). See the [Seller Negotiation Protocol](https://iabtechlab.github.io/seller-agent/integration/negotiation/) for the seller-side view.
 

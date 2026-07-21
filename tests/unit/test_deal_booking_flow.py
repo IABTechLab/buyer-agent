@@ -16,11 +16,17 @@ Covers:
 
 import json
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
+from ad_buyer.models.deals import (
+    DealResponse,
+    PricingInfo,
+    ProductInfo,
+    TermsInfo,
+)
 from ad_buyer.models.flow_state import (
     BookedLine,
     ChannelAllocation,
@@ -28,6 +34,11 @@ from ad_buyer.models.flow_state import (
     ProductRecommendation,
 )
 from ad_buyer.models.ucp import SignalType
+from ad_buyer.orchestration.multi_seller import (
+    DealSelection,
+    MultiSellerOrchestrator,
+    OrchestrationResult,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -38,6 +49,53 @@ from ad_buyer.models.ucp import SignalType
 def mock_opendirect_client():
     """Create a mock OpenDirectClient."""
     return MagicMock()
+
+
+def _make_seller_deal_response(deal_params) -> DealResponse:
+    """Build a seller-confirmed DealResponse echoing the requested terms."""
+    return DealResponse(
+        deal_id=f"SELLER-DEAL-{deal_params.product_id}",
+        deal_type=deal_params.deal_type,
+        status="active",
+        quote_id=f"quote-{deal_params.product_id}",
+        product=ProductInfo(product_id=deal_params.product_id, name=deal_params.product_id),
+        pricing=PricingInfo(base_cpm=deal_params.target_cpm, final_cpm=deal_params.target_cpm),
+        terms=TermsInfo(
+            impressions=deal_params.impressions,
+            flight_start=deal_params.flight_start,
+            flight_end=deal_params.flight_end,
+            guaranteed=deal_params.deal_type == "PG",
+        ),
+    )
+
+
+async def _fake_orchestrate(
+    inventory_requirements,
+    deal_params,
+    budget,
+    max_deals=3,
+):
+    """Fake MultiSellerOrchestrator.orchestrate: one seller-issued deal."""
+    deal = _make_seller_deal_response(deal_params)
+    return OrchestrationResult(
+        discovered_sellers=[MagicMock(agent_id="seller-1")],
+        quote_results=[],
+        ranked_quotes=[],
+        selection=DealSelection(
+            booked_deals=[deal],
+            failed_bookings=[],
+            total_spend=budget,
+            remaining_budget=0.0,
+        ),
+    )
+
+
+@pytest.fixture
+def mock_orchestrator():
+    """AsyncMock orchestrator that books one deal per orchestrate() call."""
+    orch = AsyncMock(spec=MultiSellerOrchestrator)
+    orch.orchestrate.side_effect = _fake_orchestrate
+    return orch
 
 
 @pytest.fixture
@@ -72,9 +130,9 @@ def minimal_campaign_brief():
 
 
 @pytest.fixture
-def flow(mock_opendirect_client):
-    """Create a DealBookingFlow with mocked client."""
-    return DealBookingFlow(client=mock_opendirect_client)
+def flow(mock_opendirect_client, mock_orchestrator):
+    """Create a DealBookingFlow with mocked client and orchestrator."""
+    return DealBookingFlow(client=mock_opendirect_client, orchestrator=mock_orchestrator)
 
 
 @pytest.fixture
@@ -711,9 +769,39 @@ class TestCreateChannelBrief:
 
         assert brief["channel"] == "branding"
         assert brief["budget"] == 40000
-        assert brief["startDate"] == "2026-04-01"
-        assert brief["endDate"] == "2026-04-30"
-        assert "target_audience" in brief or "targetAudience" in brief
+        # The channel brief is consumed by channel_crews._build_channel_crew,
+        # which reads snake_case keys (start_date/end_date/target_audience).
+        # It must therefore be dumped WITHOUT by_alias so producer and
+        # consumer agree (ar-kedz).
+        assert brief["start_date"] == "2026-04-01"
+        assert brief["end_date"] == "2026-04-30"
+        assert (
+            brief["target_audience"]
+            == flow_with_allocations.state.campaign_brief["target_audience"]
+        )
+
+    def test_channel_brief_flight_dates_reach_crew_research_task(self, flow_with_allocations):
+        """Flight dates must thread into the channel crew's research task text.
+
+        Regression for ar-kedz: the POST /bookings brief carries
+        start_date/end_date, but _create_channel_brief dumped the ChannelBrief
+        with by_alias=True (startDate/endDate) while _build_channel_crew reads
+        snake_case (start_date/end_date). The mismatch rendered the research
+        task's "Flight:" line as "Flight: None to None", so the real LLM crew
+        agents reported "Flight Dates Missing" and refused to finalize. This
+        asserts the dates reach the exact text the research agent reads.
+        """
+        from ad_buyer.crews.channel_crews import create_branding_crew
+
+        alloc = flow_with_allocations.state.budget_allocations["branding"]
+        channel_brief = flow_with_allocations._create_channel_brief("branding", alloc)
+
+        crew = create_branding_crew(flow_with_allocations._client, channel_brief)
+        research_description = crew.tasks[0].description
+
+        assert "2026-04-01" in research_description
+        assert "2026-04-30" in research_description
+        assert "None to None" not in research_description
 
 
 # ===========================================================================
@@ -759,11 +847,7 @@ class TestParseRecommendations:
 
     def test_json_in_surrounding_text(self, flow):
         """JSON array embedded in text is still parsed."""
-        text = (
-            "Recommendations:\n"
-            '[{"product_id": "x", "product_name": "Test", "publisher": "P",'
-            ' "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'
-        )
+        text = 'Recommendations:\n[{"product_id": "x", "product_name": "Test", "publisher": "P", "impressions": 50000, "cpm": 10, "cost": 500}]\nEnd.'  # noqa: E501
 
         recs = flow._parse_recommendations(text, "ctv")
 
@@ -797,6 +881,116 @@ class TestParseRecommendations:
 
         assert len(recs) == 1
         assert recs[0].format is None
+
+
+class TestExtractRecommendationItems:
+    """Tests for _extract_recommendation_items on real crew-output shapes.
+
+    The hierarchical channel crews return prose + a ```json fence holding
+    an OBJECT with a "recommendations" array (see rig run #13, ar-h2o6),
+    sometimes with bracketed echoes (objectives lists) in the surrounding
+    prose. Extraction must be deterministic and survive all of these.
+    """
+
+    ITEMS = [
+        {
+            "product_id": "prod-b41e2339",
+            "product_name": "Premium Display - Homepage",
+            "publisher": "seller-premium-pub-001",
+            "impressions": 1666666,
+            "cpm": 15.0,
+            "cost": 24999.99,
+        },
+        {
+            "product_id": "prod-6fa6d961",
+            "product_name": "Standard Display - ROS",
+            "publisher": "seller-premium-pub-001",
+            "impressions": 3125000,
+            "cpm": 8.0,
+            "cost": 25000.00,
+        },
+    ]
+
+    def _fenced_object(self, items):
+        payload = json.dumps({"recommendations": items, "summary": "s"}, indent=2)
+        return "```json\n" + payload + "\n```"
+
+    def test_fenced_object_with_recommendations_array(self, flow):
+        """Prose + fenced object + trailing prose: the real run #13 shape."""
+        text = (
+            "Based on my comprehensive review, here are my recommendations:\n\n"
+            + self._fenced_object(self.ITEMS)
+            + "\n\n**CRITICAL NOTES:**\n\n1. Inventory scarcity.\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+        assert items[0]["product_id"] == "prod-b41e2339"
+
+    def test_objectives_echo_before_fence_does_not_poison_extraction(self, flow):
+        """A Python-repr list echo before the fence must not break extraction.
+
+        The manager agent can echo the brief's objectives as a Python list
+        repr (single quotes) before its final answer. The legacy
+        first-"[" / last-"]" slice starts at that echo, json.loads fails,
+        and extraction silently yields ZERO recommendations (ar-h2o6).
+        """
+        text = (
+            "Objectives: ['Book programmatic_guaranteed deals for August 2026']\n\n"
+            "Final recommendations:\n\n"
+            + self._fenced_object(self.ITEMS)
+            + "\n\nProceed to approval.\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+        assert items[0]["product_id"] == "prod-b41e2339"
+
+    def test_last_parsing_fenced_block_wins(self, flow):
+        """With several fenced blocks, the LAST parseable one is the answer."""
+        first = "```json\n" + json.dumps([{"product_id": "draft", "cpm": 1}]) + "\n```"
+        text = (
+            "Draft findings:\n"
+            + first
+            + "\n\nRevised final answer:\n"
+            + self._fenced_object(self.ITEMS)
+            + "\nDone.\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+        assert items[0]["product_id"] == "prod-b41e2339"
+
+    def test_fenced_bare_array(self, flow):
+        """A fenced bare array (the documented expected_output shape) works."""
+        text = "Here you go:\n```json\n" + json.dumps(self.ITEMS) + "\n```\n"
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+
+    def test_unfenced_object_with_recommendations(self, flow):
+        """A bare top-level object with a recommendations list is handled."""
+        text = (
+            "Result:\n"
+            + json.dumps({"recommendations": self.ITEMS, "total_cost": 49999.99})
+            + "\n(see item [1] above)\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+
+    def test_bare_array_slice_fallback_still_works(self, flow):
+        """Legacy behavior: an unfenced array in prose still extracts."""
+        text = "Recommendations:\n" + json.dumps(self.ITEMS) + "\nEnd."
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
+
+    def test_no_json_returns_empty(self, flow):
+        assert DealBookingFlow._extract_recommendation_items("No products found.") == []
+
+    def test_malformed_fence_falls_back_to_slice(self, flow):
+        """An unparseable fence must not mask a valid bare array elsewhere."""
+        text = (
+            "```json\n{not valid json}\n```\n"
+            "But the final list is:\n" + json.dumps(self.ITEMS) + "\n"
+        )
+        items = DealBookingFlow._extract_recommendation_items(text)
+        assert len(items) == 2
 
 
 # ===========================================================================
@@ -884,8 +1078,7 @@ class TestApprovalAndBooking:
         """Approving specific IDs books only those."""
         self._setup_pending_approvals(flow)
 
-        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
-            result = flow.approve_recommendations(["prod_a", "prod_c"])
+        result = flow.approve_recommendations(["prod_a", "prod_c"])
 
         assert result["status"] == "success"
         assert result["booked"] == 2
@@ -900,8 +1093,7 @@ class TestApprovalAndBooking:
         """approve_all approves every pending recommendation."""
         self._setup_pending_approvals(flow)
 
-        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
-            result = flow.approve_all()
+        result = flow.approve_all()
 
         assert result["status"] == "success"
         assert result["booked"] == 3
@@ -919,27 +1111,112 @@ class TestApprovalAndBooking:
         assert all(r.status == "rejected" for r in flow.state.pending_approvals)
 
     def test_booked_lines_created(self, flow):
-        """Booked lines are created with correct fields."""
+        """Booked lines carry the SELLER-issued deal id and confirmed terms."""
         self._setup_pending_approvals(flow)
 
-        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
-            flow.approve_recommendations(["prod_a"])
+        flow.approve_recommendations(["prod_a"])
 
         assert len(flow.state.booked_lines) == 1
         booked = flow.state.booked_lines[0]
+        assert booked.deal_id == "SELLER-DEAL-prod_a"  # seller-issued, never minted locally
+        assert booked.quote_id == "quote-prod_a"
         assert booked.product_id == "prod_a"
         assert booked.channel == "branding"
         assert booked.impressions == 500000
+        assert booked.cpm == 15.0
         assert booked.cost == 7500.0  # 500000 * 15.0 / 1000
-        assert booked.booking_status == "booked"
+        assert booked.booking_status == "active"
+        assert booked.order_id is None  # no placeholder OpenDirect order ids
         assert isinstance(booked.booked_at, datetime)
+
+    def test_handoff_passes_binding_approved_terms(self, flow, mock_orchestrator):
+        """The orchestrator receives the approved terms as hard bounds."""
+        self._setup_pending_approvals(flow)
+
+        flow.approve_recommendations(["prod_a"])
+
+        assert mock_orchestrator.orchestrate.call_count == 1
+        kwargs = mock_orchestrator.orchestrate.call_args.kwargs
+        assert kwargs["budget"] == 7500.0  # approved cost is the budget ceiling
+        assert kwargs["max_deals"] == 1
+        assert kwargs["inventory_requirements"].max_cpm == 15.0
+        assert kwargs["deal_params"].product_id == "prod_a"
+        assert kwargs["deal_params"].impressions == 500000
+        assert kwargs["deal_params"].target_cpm == 15.0
+
+    def test_orchestrator_failure_isolated_per_recommendation(self, flow, mock_orchestrator):
+        """One failed booking does not abort the others."""
+        self._setup_pending_approvals(flow)
+        call_count = {"n": 0}
+
+        async def _flaky(inventory_requirements, deal_params, budget, max_deals=3):
+            call_count["n"] += 1
+            if deal_params.product_id == "prod_b":
+                raise RuntimeError("seller unreachable")
+            return await _fake_orchestrate(inventory_requirements, deal_params, budget, max_deals)
+
+        mock_orchestrator.orchestrate.side_effect = _flaky
+
+        result = flow.approve_all()
+
+        assert call_count["n"] == 3
+        assert result["status"] == "success"
+        assert result["booked"] == 2
+        assert len(result["failed"]) == 1
+        assert result["failed"][0]["product_id"] == "prod_b"
+        assert any("prod_b" in err for err in flow.state.errors)
+
+    def test_all_bookings_failed_marks_flow_failed(self, flow, mock_orchestrator):
+        """When no seller issues a deal, the flow ends FAILED, not COMPLETED."""
+        self._setup_pending_approvals(flow)
+        mock_orchestrator.orchestrate.side_effect = RuntimeError("registry down")
+
+        result = flow.approve_all()
+
+        assert result["status"] == "failed"
+        assert result["booked"] == 0
+        assert flow.state.execution_status == ExecutionStatus.FAILED
+
+    def test_orchestrate_called_once_per_approved_recommendation(self, flow, mock_orchestrator):
+        """Composition: one orchestrate call per approved recommendation.
+
+        (Moved from the retired CampaignPipeline execute_booking tests —
+        the per-channel orchestrator composition now lives on the flow.)
+        """
+        self._setup_pending_approvals(flow)
+
+        flow.approve_all()
+
+        assert mock_orchestrator.orchestrate.call_count == 3
+        media_types = [
+            call.kwargs["inventory_requirements"].media_type
+            for call in mock_orchestrator.orchestrate.call_args_list
+        ]
+        # branding/performance -> display, ctv -> ctv (channel mapping)
+        assert sorted(media_types) == ["ctv", "display", "display"]
+
+    def test_deal_booked_event_emitted_with_seller_deal_id(self, flow):
+        """DEAL_BOOKED events key on the seller-issued deal id."""
+        from ad_buyer.events.models import EventType
+
+        self._setup_pending_approvals(flow)
+
+        with patch("ad_buyer.flows.deal_booking_flow.emit_event_sync") as emit:
+            flow.approve_recommendations(["prod_a"])
+
+        booked_calls = [
+            c for c in emit.call_args_list if c.args and c.args[0] == EventType.DEAL_BOOKED
+        ]
+        assert len(booked_calls) == 1
+        call = booked_calls[0]
+        assert call.kwargs["deal_id"] == "SELLER-DEAL-prod_a"
+        assert call.kwargs["payload"]["quote_id"] == "quote-prod_a"
 
     def test_total_cost_and_impressions(self, flow):
         """Result includes aggregated totals."""
         self._setup_pending_approvals(flow)
 
-        with patch.object(flow, "_book_via_seller_api", return_value=("q", "d", "order_1")):
-            result = flow.approve_all()
+        result = flow.approve_all()
 
         expected_cost = 7500.0 + 7500.0 + 8000.0
         expected_impressions = 500000 + 300000 + 800000
@@ -995,8 +1272,8 @@ class TestGetStatus:
         """Status reflects booked lines."""
         flow.state.booked_lines = [
             BookedLine(
-                line_id="l1",
-                order_id="o1",
+                deal_id="SELLER-DEAL-p1",
+                quote_id="quote-p1",
                 product_id="p1",
                 product_name="Test",
                 channel="branding",

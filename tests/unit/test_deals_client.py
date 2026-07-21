@@ -32,7 +32,56 @@ SELLER_URL = "http://seller.example.com"
 
 
 def _quote_response_json() -> dict:
-    """Minimal valid QuoteResponse JSON matching the API contract."""
+    """Seller quote response on the wire: the shared QuoteResponse envelope.
+
+    EP-12.1 — the buyer now deserializes the shared
+    ``iab_agentic_primitives.protocol.QuoteResponse`` (a ``{"quote": Quote}``
+    envelope) where money fields are the shared ``Money`` (integer micros).
+    """
+    return {
+        "quote": {
+            "quote_id": "qt-abc123",
+            "status": "available",
+            "deal_type": "PD",
+            "product": {
+                "product_id": "ctv-premium-sports",
+                "name": "Premium CTV - Sports",
+                "inventory_type": "ctv",
+            },
+            "pricing": {
+                "pricing_type": "fixed",
+                "base_cpm": {"amount_micros": 35_000_000, "currency": "USD"},
+                "tier_discount_pct": 15.0,
+                "volume_discount_pct": 5.0,
+                "final_cpm": {"amount_micros": 28_260_000, "currency": "USD"},
+                "pricing_model": "cpm",
+                "rationale": "Base $35 | -15% tier | -5% volume => $28.26",
+            },
+            "terms": {
+                "impressions": 5000000,
+                "flight_start": "2026-04-01",
+                "flight_end": "2026-04-30",
+                "guaranteed": False,
+            },
+            "availability": {
+                "inventory_available": True,
+                "estimated_fill_rate": 0.92,
+                "competing_demand": "moderate",
+            },
+            "buyer_tier": "advertiser",
+            "expires_at": "2026-03-09T14:30:00Z",
+            "seller_id": "seller-premium-pub-001",
+            "created_at": "2026-03-08T14:30:00Z",
+        }
+    }
+
+
+def _internal_quote_response_json() -> dict:
+    """Internal QuoteResponse shape (buyer's ad_buyer.models.deals model).
+
+    Used only to unit-test the internal model itself; the wire is the shared
+    envelope built by ``_quote_response_json``.
+    """
     return {
         "quote_id": "qt-abc123",
         "status": "available",
@@ -69,7 +118,63 @@ def _quote_response_json() -> dict:
 
 
 def _deal_response_json() -> dict:
-    """Minimal valid DealResponse JSON matching the API contract."""
+    """Seller deal response on the wire: the shared DealBookingResponse envelope.
+
+    EP-12.1 — the buyer now deserializes the shared
+    ``iab_agentic_primitives.protocol.DealBookingResponse`` (a ``{"deal": Deal}``
+    envelope) where money fields (pricing, openrtb bidfloor) are the shared
+    ``Money`` (integer micros).
+    """
+    return {
+        "deal": {
+            "deal_id": "DEMO-A1B2C3D4E5F6",
+            "deal_type": "PD",
+            "status": "proposed",
+            "quote_id": "qt-abc123",
+            "product": {
+                "product_id": "ctv-premium-sports",
+                "name": "Premium CTV - Sports",
+                "inventory_type": "ctv",
+            },
+            "pricing": {
+                "pricing_type": "fixed",
+                "base_cpm": {"amount_micros": 35_000_000, "currency": "USD"},
+                "tier_discount_pct": 15.0,
+                "volume_discount_pct": 5.0,
+                "final_cpm": {"amount_micros": 28_260_000, "currency": "USD"},
+                "pricing_model": "cpm",
+                "rationale": "Base $35 | -15% tier | -5% volume => $28.26",
+            },
+            "terms": {
+                "impressions": 5000000,
+                "flight_start": "2026-04-01",
+                "flight_end": "2026-04-30",
+                "guaranteed": False,
+            },
+            "buyer_tier": "advertiser",
+            "expires_at": "2026-04-08T00:00:00Z",
+            "activation_instructions": {
+                "ttd": "The Trade Desk > Inventory > PMP > Add Deal ID: DEMO-A1B2C3D4E5F6",
+                "dv360": "DV360 > Inventory > My Inventory > Deal ID: DEMO-A1B2C3D4E5F6",
+            },
+            "openrtb_params": {
+                "id": "DEMO-A1B2C3D4E5F6",
+                "bidfloor": {"amount_micros": 28_260_000, "currency": "USD"},
+                "at": 3,
+                "wseat": [],
+                "wadomain": [],
+            },
+            "created_at": "2026-03-08T14:30:00Z",
+        }
+    }
+
+
+def _internal_deal_response_json() -> dict:
+    """Internal DealResponse shape (buyer's ad_buyer.models.deals model).
+
+    Used only to unit-test the internal model itself; the wire is the shared
+    envelope built by ``_deal_response_json``.
+    """
     return {
         "deal_id": "DEMO-A1B2C3D4E5F6",
         "deal_type": "PD",
@@ -181,7 +286,7 @@ class TestModelParsing:
 
     def test_quote_response_parsing(self):
         """QuoteResponse parses all fields from JSON."""
-        data = _quote_response_json()
+        data = _internal_quote_response_json()
         resp = QuoteResponse.model_validate(data)
         assert resp.quote_id == "qt-abc123"
         assert resp.status == "available"
@@ -194,7 +299,7 @@ class TestModelParsing:
 
     def test_deal_response_parsing(self):
         """DealResponse parses all fields from JSON."""
-        data = _deal_response_json()
+        data = _internal_deal_response_json()
         resp = DealResponse.model_validate(data)
         assert resp.deal_id == "DEMO-A1B2C3D4E5F6"
         assert resp.deal_type == "PD"
@@ -373,10 +478,14 @@ class TestRequestQuote:
         await c.request_quote(quote_req)
 
         body = json.loads(capture.last.content)
+        # Wire bytes now match the shared QuoteRequest schema: money crosses as
+        # the shared Money (integer micros) and a required idempotency_key rides
+        # with the money-mutating request (FD-12).
         assert body["product_id"] == "ctv-premium-sports"
         assert body["deal_type"] == "PG"
         assert body["impressions"] == 1000000
-        assert body["target_cpm"] == 28.00
+        assert body["target_cpm"] == {"amount_micros": 28_000_000, "currency": "USD"}
+        assert body["idempotency_key"]
         await c.close()
 
     @pytest.mark.asyncio
@@ -567,9 +676,12 @@ class TestBookDeal:
         await c.book_deal(booking_req)
 
         body = json.loads(capture.last.content)
+        # Wire bytes now match the shared DealBookingRequest schema, carrying the
+        # required idempotency_key (FD-12) alongside the booking fields.
         assert body["quote_id"] == "qt-abc123"
         assert body["buyer_identity"]["seat_id"] == "seat-1"
         assert body["notes"] == "Booking after comparing sellers"
+        assert body["idempotency_key"]
         await c.close()
 
     @pytest.mark.asyncio

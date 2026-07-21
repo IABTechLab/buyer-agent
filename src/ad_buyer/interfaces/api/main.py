@@ -3,8 +3,6 @@
 
 """FastAPI server for the Ad Buyer System."""
 
-import asyncio
-import json
 import logging
 import sqlite3
 import sys
@@ -12,18 +10,19 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from ...clients.meta_ads_client import MetaAdsClient
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
-from ...flows.deal_booking_flow import DealBookingFlow
+from ...services import booking_service
 from ...storage import DealStore
 from ...storage.order_store import OrderStore
-from ...time_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +51,6 @@ app = FastAPI(
         {"name": "Bookings", "description": "Campaign booking workflow lifecycle"},
         {"name": "Products", "description": "Seller inventory product search"},
         {"name": "Events", "description": "Event bus query endpoints"},
-        {"name": "Reporting", "description": "Campaign delivery reporting (Meta + Seller)"},
     ],
 )
 
@@ -214,30 +212,11 @@ from .order_endpoints import create_order_router as _create_order_router  # noqa
 def _persist_job(job_id: str, job: dict[str, Any]) -> None:
     """Best-effort dual-write of a job dict to the DealStore.
 
-    Never raises -- logs errors and continues so the API endpoint is
-    unaffected by persistence failures.
-
-    Args:
-        job_id: Unique job identifier.
-        job: The in-memory job dict.
+    Thin wrapper delegating the persistence logic to
+    ``booking_service.persist_job``; the DealStore singleton lookup stays
+    here so tests can inject a store via ``_deal_store``.
     """
-    store = _get_store()
-    if store is None:
-        return
-    try:
-        store.save_job(
-            job_id=job_id,
-            status=job.get("status", "pending"),
-            progress=job.get("progress", 0.0),
-            brief=json.dumps(job.get("brief", {})),
-            auto_approve=job.get("auto_approve", False),
-            budget_allocs=json.dumps(job.get("budget_allocations", {})),
-            recommendations=json.dumps(job.get("recommendations", [])),
-            booked_lines=json.dumps(job.get("booked_lines", [])),
-            errors=json.dumps(job.get("errors", [])),
-        )
-    except (sqlite3.Error, OSError, ValueError, AttributeError, TypeError):
-        logger.exception("Failed to persist job %s", job_id)
+    booking_service.persist_job(_get_store(), job_id, job)
 
 
 # Request/Response Models
@@ -333,20 +312,11 @@ async def create_booking(
     Use GET /bookings/{job_id} to check status.
     """
     job_id = str(uuid.uuid4())
-    now = utc_now().isoformat()
 
-    jobs[job_id] = {
-        "status": "pending",
-        "progress": 0.0,
-        "brief": request.brief.model_dump(),
-        "auto_approve": request.auto_approve,
-        "budget_allocations": {},
-        "recommendations": [],
-        "booked_lines": [],
-        "errors": [],
-        "created_at": now,
-        "updated_at": now,
-    }
+    jobs[job_id] = booking_service.new_job_record(
+        request.brief.model_dump(),
+        request.auto_approve,
+    )
 
     # Dual-write to SQLite
     _persist_job(job_id, jobs[job_id])
@@ -401,33 +371,20 @@ async def approve_recommendations(
             detail=f"Job is not awaiting approval. Current status: {job['status']}",
         )
 
-    # Get the flow from the job (in production, restore from storage)
-    flow = job.get("_flow")
-    if not flow:
+    # Flow must still be resident for the approval handoff.
+    if not job.get("_flow"):
         raise HTTPException(
             status_code=500,
             detail="Flow state not available. Job may have expired.",
         )
 
-    # Execute approvals
-    result = flow.approve_recommendations(request.approved_product_ids)
-
-    # Update job — refresh recommendations with live statuses from flow state
-    job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
-    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
-    job["updated_at"] = utc_now().isoformat()
-    job["progress"] = 1.0
-
-    # Dual-write to SQLite
-    _persist_job(job_id, job)
-
-    return {
-        "status": result.get("status"),
-        "approved_count": len(request.approved_product_ids),
-        "booked": result.get("booked", 0),
-        "total_cost": result.get("total_cost", 0),
-    }
+    return await booking_service.approve(
+        job_id,
+        job,
+        request.approved_product_ids,
+        store=_get_store(),
+        persist=_persist_job,
+    )
 
 
 @app.post("/bookings/{job_id}/approve-all", tags=["Bookings"])
@@ -443,28 +400,21 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
             detail=f"Job is not awaiting approval. Current status: {job['status']}",
         )
 
-    flow = job.get("_flow")
-    if not flow:
+    # Flow must still be resident for the approval handoff.
+    if not job.get("_flow"):
         raise HTTPException(
             status_code=500,
             detail="Flow state not available. Job may have expired.",
         )
 
-    # buyer-1g4: approve_all() runs sync CrewAI work that holds the
-    # calling thread; offload to a worker thread so the event loop
-    # stays responsive.
-    result = await asyncio.to_thread(flow.approve_all)
-
-    job["status"] = "completed" if result.get("status") == "success" else "failed"
-    job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
-    job["recommendations"] = [r.model_dump(mode="json") for r in flow.state.pending_approvals]
-    job["updated_at"] = utc_now().isoformat()
-    job["progress"] = 1.0
-
-    # Dual-write to SQLite
-    _persist_job(job_id, job)
-
-    return result
+    # buyer-1g4: approve_all() runs sync CrewAI work; the service offloads
+    # it to a worker thread so the event loop stays responsive.
+    return await booking_service.approve_all(
+        job_id,
+        job,
+        store=_get_store(),
+        persist=_persist_job,
+    )
 
 
 @app.get("/bookings", tags=["Bookings"])
@@ -501,19 +451,13 @@ async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
     client = _create_client()
     tool = ProductSearchTool(client)
 
-    try:
-        result = tool._run(
-            channel=request.channel,
-            format=request.format,
-            min_price=request.min_price,
-            max_price=request.max_price,
-            limit=request.limit,
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Product search failed: seller unreachable or returned an error — {e}",
-        )
+    result = tool._run(
+        channel=request.channel,
+        format=request.format,
+        min_price=request.min_price,
+        max_price=request.max_price,
+        limit=request.limit,
+    )
 
     return {"results": result}
 
@@ -550,6 +494,23 @@ async def list_events(
     }
 
 
+@app.get("/events/{event_id}", tags=["Events"])
+async def get_event(event_id: str) -> dict[str, Any]:
+    """Retrieve a single event by ID."""
+    from ...events.bus import get_event_bus
+
+    bus = await get_event_bus()
+    event = await bus.get_event(event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event.model_dump(mode="json")
+
+
+# ---------------------------------------------------------------------------
+# Reporting endpoints (Meta Ads + seller deal performance; port of main PR #87)
+# ---------------------------------------------------------------------------
+
+
 @app.get("/reports/{job_id}", tags=["Reporting"])
 async def get_campaign_report(
     job_id: str,
@@ -559,7 +520,8 @@ async def get_campaign_report(
 
     Fetches data from:
     - Meta Ads API (for social channel bookings — campaign insights)
-    - Seller agent deal performance API (for IAB/OpenDirect booked lines)
+    - Seller agent deal performance API (for orchestrator-booked lines,
+      keyed by the seller-issued ``deal_id``)
 
     Requires META_ACCESS_TOKEN + META_AD_ACCOUNT_ID + META_PAGE_ID in .env
     for Meta reporting.
@@ -572,13 +534,14 @@ async def get_campaign_report(
     if not booked_lines:
         return {"job_id": job_id, "message": "No booked lines to report on", "reports": []}
 
+    # Social lines carry the META-issued campaign id as order_id/deal_id.
     meta_campaign_ids = [
-        b["order_id"] for b in booked_lines if b.get("channel") in ("social", "meta")
+        b.get("order_id") or b.get("deal_id")
+        for b in booked_lines
+        if b.get("channel") in ("social", "meta")
     ]
     seller_lines = [
-        b
-        for b in booked_lines
-        if b.get("channel") not in ("social", "meta") and b.get("seller_deal_id")
+        b for b in booked_lines if b.get("channel") not in ("social", "meta") and b.get("deal_id")
     ]
 
     reports: list[dict[str, Any]] = []
@@ -595,8 +558,14 @@ async def get_campaign_report(
                     "report": tool._run(campaign_ids=meta_campaign_ids, date_preset=date_range),
                 }
             )
-        except Exception as e:
-            reports.append({"source": "Meta", "campaign_ids": meta_campaign_ids, "error": str(e)})
+        except Exception as e:  # noqa: BLE001 - reporting is best-effort per source
+            reports.append(
+                {
+                    "source": "Meta",
+                    "campaign_ids": meta_campaign_ids,
+                    "error": _sanitize_meta_error(e),
+                }
+            )
     elif meta_campaign_ids:
         reports.append(
             {
@@ -609,12 +578,10 @@ async def get_campaign_report(
         )
 
     if seller_lines:
-        import httpx
-
         seller_url = settings.opendirect_base_url.rstrip("/")
         seller_reports = []
         for b in seller_lines:
-            deal_id = b["seller_deal_id"]
+            deal_id = b["deal_id"]
             try:
                 r = httpx.get(
                     f"{seller_url}/api/v1/deals/{deal_id}/performance",
@@ -628,7 +595,7 @@ async def get_campaign_report(
                         "performance": r.json(),
                     }
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - reporting is best-effort per deal
                 seller_reports.append(
                     {
                         "deal_id": deal_id,
@@ -673,8 +640,6 @@ async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
             detail="Meta not configured — set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID in .env",
         )
     try:
-        import httpx
-
         account_id = settings.meta_ad_account_id.replace("act_", "")
         r = httpx.get(
             f"https://graph.facebook.com/{settings.meta_api_version}/act_{account_id}/campaigns",
@@ -693,8 +658,8 @@ async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
             "campaigns": campaigns,
             "count": len(campaigns),
         }
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))
+    except Exception as e:  # noqa: BLE001 - proxy endpoint; sanitize and surface
+        raise HTTPException(status_code=502, detail=_sanitize_meta_error(e)) from e
 
 
 @app.get("/meta/report", tags=["Reporting"])
@@ -705,7 +670,7 @@ async def meta_direct_report(
     """Pull insights directly from Meta Ads by campaign ID(s).
 
     Args:
-        campaign_ids: Comma-separated Meta campaign IDs (e.g. 23856280731590791,23856280738900791)
+        campaign_ids: Comma-separated Meta campaign IDs
         date_preset: last_7d | last_14d | last_30d | last_90d | this_month
 
     Returns spend, impressions, reach, clicks, CTR, CPM per campaign.
@@ -723,10 +688,6 @@ async def meta_direct_report(
             detail="campaign_ids must be a comma-separated list of Meta campaign IDs",
         )
     try:
-        import httpx
-
-        from ...clients.meta_ads_client import MetaAdsClient
-
         client = MetaAdsClient(
             access_token=settings.meta_access_token,
             ad_account_id=settings.meta_ad_account_id,
@@ -734,7 +695,7 @@ async def meta_direct_report(
             api_version=settings.meta_api_version,
         )
 
-        # Fetch campaign details for all IDs in one batch request
+        # Fetch campaign details for each ID
         campaign_details: dict[str, dict] = {}
         for cid in ids:
             r = httpx.get(
@@ -794,96 +755,29 @@ async def meta_direct_report(
             "campaigns": rows,
             "summary": summary,
         }
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=_sanitize_meta_error(e))
-
-
-@app.get("/events/{event_id}", tags=["Events"])
-async def get_event(event_id: str) -> dict[str, Any]:
-    """Retrieve a single event by ID."""
-    from ...events.bus import get_event_bus
-
-    bus = await get_event_bus()
-    event = await bus.get_event(event_id)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
-    return event.model_dump(mode="json")
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001 - proxy endpoint; sanitize and surface
+        raise HTTPException(status_code=502, detail=_sanitize_meta_error(e)) from e
 
 
 async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
-    """Background task to run the booking flow."""
-    job = jobs[job_id]
+    """Background task to run the booking flow.
 
-    try:
-        job["status"] = "running"
-        job["progress"] = 0.1
-        job["updated_at"] = utc_now().isoformat()
-        _persist_job(job_id, job)
-
-        client = _create_client()
-        # Pass initial state via constructor — CrewAI 1.10.1 removed flow.state setter.
-        flow = DealBookingFlow(
-            client,
-            store=_get_store(),
-            campaign_brief=request.brief.model_dump(),
-        )
-
-        # Store flow reference for approval
-        job["_flow"] = flow
-
-        job["progress"] = 0.2
-        # buyer-1g4: offload the whole sync flow.kickoff() to a worker
-        # thread so the FastAPI event loop stays responsive while the
-        # crew agents (which block on real LLM HTTP calls) run.
-        #
-        # We do NOT use ``await flow.kickoff_async()`` here even though
-        # it looks cleaner — the buyer's Flow ``@start`` / ``@listen``
-        # step methods are sync and themselves call ``crew.kickoff()``
-        # directly. Awaited from the event loop, those sync steps would
-        # run IN the event loop thread, re-introducing the block.
-        #
-        # CrewAI's sync ``Flow.kickoff()`` already does
-        # ``ThreadPoolExecutor.submit(asyncio.run, _run_flow).result()``
-        # internally — the ``.result()`` is what blocks the calling
-        # thread. ``asyncio.to_thread`` puts that ``.result()`` on a
-        # worker thread (two threads deep, but the event loop is free).
-        _result = await asyncio.to_thread(flow.kickoff)
-
-        # Propagate any errors captured by flow steps into the job response so
-        # the client can see what went wrong instead of silent-success (ar-jbod).
-        if flow.state.errors:
-            job["errors"].extend(flow.state.errors)
-
-        # If consolidate_recommendations didn't fire (CrewAI or_() limitation), collect manually.
-        if not flow.state.pending_approvals:
-            for recs in flow.state.channel_recommendations.values():
-                for rec in recs:
-                    rec.status = "pending_approval"
-                    flow.state.pending_approvals.append(rec)
-
-        job["progress"] = 0.8
-        job["budget_allocations"] = {
-            k: v.model_dump() for k, v in flow.state.budget_allocations.items()
-        }
-        job["recommendations"] = [r.model_dump() for r in flow.state.pending_approvals]
-
-        if request.auto_approve:
-            # buyer-1g4: same reason as above — offload sync work.
-            await asyncio.to_thread(flow.approve_all)
-            job["booked_lines"] = [b.model_dump(mode="json") for b in flow.state.booked_lines]
-            job["status"] = "completed"
-        else:
-            job["status"] = "awaiting_approval"
-
-        job["progress"] = 1.0 if job["status"] == "completed" else 0.9
-        job["updated_at"] = utc_now().isoformat()
-        _persist_job(job_id, job)
-
-    except Exception as e:  # noqa: BLE001 - top-level background task handler; must record any failure
-        job["status"] = "failed"
-        job["errors"].append(str(e))
-        job["updated_at"] = utc_now().isoformat()
-        _persist_job(job_id, job)
+    Thin adapter over ``booking_service.execute_booking``: wires the
+    OpenDirect client, the DealStore, and the persistence callback, then
+    hands off to the service which owns the canonical DealBookingFlow run
+    (including the buyer-1g4 worker-thread offload of the sync kickoff).
+    """
+    await booking_service.execute_booking(
+        job_id,
+        jobs[job_id],
+        request.brief.model_dump(),
+        request.auto_approve,
+        client=_create_client(),
+        store=_get_store(),
+        persist=_persist_job,
+    )
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:

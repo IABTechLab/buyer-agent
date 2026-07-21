@@ -54,7 +54,7 @@ sequenceDiagram
 
     opt Negotiation (eligible tiers)
         Flow->>ODClient: NegotiationClient.start_negotiation()
-        ODClient->>Seller: POST /proposals/{id}/counter
+        ODClient->>Seller: POST /api/v1/negotiations/messages
         Seller-->>ODClient: Counter-offer / accept
         ODClient-->>Flow: Negotiated pricing
     end
@@ -93,9 +93,9 @@ sequenceDiagram
 | 4b | `research_ctv()` | Listens to step 3 | CTV crew searches streaming inventory |
 | 4c | `research_mobile()` | Listens to step 3 | Mobile crew searches app inventory |
 | 4d | `research_performance()` | Listens to step 3 | Performance crew searches remarketing inventory |
-| 5 | `consolidate_recommendations()` | Listens to 4a-4d (OR) | Waits for all active channels, flattens recommendations |
+| 5 | `consolidate_recommendations()` | Listens to 4a-4d (`and_`) | Waits for all channel branches to finish, flattens recommendations |
 | 6 | `approve_recommendations()` / `approve_all()` | External call (API) | Marks recommendations as approved/rejected |
-| 7 | `_execute_bookings()` | Called by step 6 | Creates BookedLine entries for approved items |
+| 7 | `_execute_bookings()` | Called by step 6 | Enforces the spend ceiling against the campaign budget, then hands each approved recommendation to `MultiSellerOrchestrator` (discover → quote → rank → select-and-book); booked lines key on seller-issued deal IDs |
 
 ## Execution Status Transitions
 
