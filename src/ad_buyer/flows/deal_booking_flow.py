@@ -198,6 +198,27 @@ class DealBookingFlow(Flow[BookingState]):
     # Persistence helpers (best-effort dual-write)
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _pricing_rationale(
+        base_cpm: float | None, final_cpm: float | None
+    ) -> str | None:
+        """Assemble the truthful pricing audit line for a booked deal.
+
+        Bead ar-phd7: the seller's own quote ``rationale`` is computed
+        from the pricing-engine decision BEFORE a target-grant overwrites
+        ``final_cpm``, so it can report the base/list price as the "Final
+        price" while the deal actually struck at a concession. The buyer
+        therefore assembles its own line from the seller's CONFIRMED deal
+        pricing — base and final stated separately — so the audit text
+        can never contradict the booked ``final_cpm``.
+        """
+        parts: list[str] = []
+        if isinstance(base_cpm, (int, float)) and not isinstance(base_cpm, bool):
+            parts.append(f"Base price: ${base_cpm:.2f} CPM")
+        if isinstance(final_cpm, (int, float)) and not isinstance(final_cpm, bool):
+            parts.append(f"Final price: ${final_cpm:.2f} CPM")
+        return " | ".join(parts) or None
+
     def _persist_booking(self, deal_id: str, booked_line: Any) -> None:
         """Best-effort persist a booking record to the store.
 
@@ -221,6 +242,7 @@ class DealBookingFlow(Flow[BookingState]):
                     "quote_id": getattr(booked_line, "quote_id", None),
                     "seller_id": getattr(booked_line, "seller_id", None),
                     "final_cpm": getattr(booked_line, "cpm", None),
+                    "rationale": getattr(booked_line, "rationale", None),
                 }
             )
             self._store.save_booking_record(
@@ -738,6 +760,36 @@ class DealBookingFlow(Flow[BookingState]):
             kpis=self.state.campaign_brief.get("kpis", {}),
         ).model_dump()
 
+    def _brief_price_split(self) -> tuple[float | None, float | None]:
+        """Return the brief's ``(ceiling, target)`` CPM split, if configured.
+
+        The brief's kpis carry a DISTINCT price ceiling (``max_cpm_usd``,
+        the most the buyer will ever pay) and opening target
+        (``target_cpm_usd``, the price the buyer asks for first). Keeping
+        them distinct is the entire premise of negotiation Stage 3.5: the
+        RFQ opens at the target, and quotes landing above the ceiling but
+        within the band are negotiated down toward it (bead ar-g6jf).
+
+        Reads the CampaignBrief/real-driver shape (``kpis.max_cpm_usd`` /
+        ``kpis.target_cpm_usd``) first, falling back to the legacy
+        top-level ``max_cpm`` / ``target_cpm`` keys (same idiom as bead
+        ar-0wev for the ceiling). A value that is absent or non-positive
+        yields None, meaning "not configured".
+        """
+        brief = self.state.campaign_brief or {}
+        kpis = brief.get("kpis")
+        kpis = kpis if isinstance(kpis, dict) else {}
+
+        def _first_positive(*candidates: Any) -> float | None:
+            for raw in candidates:
+                if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
+                    return float(raw)
+            return None
+
+        ceiling = _first_positive(kpis.get("max_cpm_usd"), brief.get("max_cpm"))
+        target = _first_positive(kpis.get("target_cpm_usd"), brief.get("target_cpm"))
+        return ceiling, target
+
     def _recommendation_bounds(self, channel: str) -> RecommendationBounds:
         """Build the deterministic clamp bounds for a channel's LLM output.
 
@@ -753,14 +805,7 @@ class DealBookingFlow(Flow[BookingState]):
         configured limits. Bead ar-1ow7 (EP-4.3).
         """
         brief = self.state.campaign_brief or {}
-        kpis = brief.get("kpis")
-        kpis = kpis if isinstance(kpis, dict) else {}
-
-        max_cpm: float | None = None
-        for raw in (kpis.get("max_cpm_usd"), brief.get("max_cpm")):
-            if isinstance(raw, (int, float)) and raw > 0:
-                max_cpm = float(raw)
-                break
+        max_cpm, _ = self._brief_price_split()
 
         allocation = self.state.budget_allocations.get(channel)
         max_cost: float | None = None
@@ -1160,6 +1205,7 @@ class DealBookingFlow(Flow[BookingState]):
                     if final_cpm is not None and impressions
                     else rec.cost
                 )
+                rationale = self._pricing_rationale(deal.pricing.base_cpm, final_cpm)
                 booked = BookedLine(
                     deal_id=deal.deal_id,
                     quote_id=deal.quote_id,
@@ -1172,6 +1218,7 @@ class DealBookingFlow(Flow[BookingState]):
                     booking_status=deal.status or "booked",
                     booked_at=datetime.now(UTC),
                     seller_id=quote_seller_ids.get(deal.quote_id or ""),
+                    rationale=rationale,
                 )
                 self.state.booked_lines.append(booked)
 
@@ -1193,6 +1240,7 @@ class DealBookingFlow(Flow[BookingState]):
                         "impressions": impressions,
                         "cost": cost,
                         "final_cpm": final_cpm,
+                        "rationale": rationale,
                     },
                 )
 
@@ -1220,10 +1268,21 @@ class DealBookingFlow(Flow[BookingState]):
         """Book each approved recommendation through the orchestrator.
 
         The approved terms are binding on execution: the recommendation's
-        cost is the budget ceiling and its CPM the max acceptable CPM for
-        that line, so the orchestrator cannot commit money beyond what the
-        human approved. Per-recommendation isolation: one failure records
-        an error tuple and the rest continue.
+        cost is the budget ceiling for that line, so the orchestrator
+        cannot commit money beyond what the human approved.
+        Per-recommendation isolation: one failure records an error tuple
+        and the rest continue.
+
+        Price split (bead ar-g6jf): the brief's ``max_cpm_usd`` is the
+        NEGOTIATION CEILING (``InventoryRequirements.max_cpm``) and its
+        ``target_cpm_usd`` is the RFQ OPENING TARGET
+        (``DealParams.target_cpm``). Collapsing both onto ``rec.cpm``
+        (the crew's recommended price) made Stage 3.5 structurally
+        unreachable: the seller grants any target >= floor inside the
+        quote, so a quote could never land above a ceiling equal to the
+        granted target. ``rec.cpm`` remains only the FALLBACK for a brief
+        that configures no explicit split — preserving the historical
+        behavior (ceiling = target = rec.cpm) for such briefs.
 
         Returns:
             List of (recommendation, orchestration_result, error) tuples.
@@ -1232,16 +1291,23 @@ class DealBookingFlow(Flow[BookingState]):
         orchestrator = self._get_orchestrator()
         audience_plan = self._typed_audience_plan()
         brief = self.state.campaign_brief
+        brief_ceiling, brief_target = self._brief_price_split()
 
         results: list[tuple[ProductRecommendation, OrchestrationResult | None, str | None]] = []
         for rec in approved:
             media_type = _CHANNEL_MEDIA_TYPE_MAP.get(rec.channel, rec.channel)
             deal_types = _CHANNEL_DEAL_TYPES.get(rec.channel, ["PD"])
 
+            # Fallback: a brief without an explicit target/ceiling keeps
+            # the pre-split semantics (both ride on the recommended CPM).
+            rec_cpm = rec.cpm if rec.cpm > 0 else None
+            max_cpm = brief_ceiling if brief_ceiling is not None else rec_cpm
+            target_cpm = brief_target if brief_target is not None else rec_cpm
+
             inventory_requirements = InventoryRequirements(
                 media_type=media_type,
                 deal_types=deal_types,
-                max_cpm=rec.cpm if rec.cpm > 0 else None,
+                max_cpm=max_cpm,
                 audience_plan=audience_plan,
             )
             deal_params = DealParams(
@@ -1250,7 +1316,7 @@ class DealBookingFlow(Flow[BookingState]):
                 impressions=rec.impressions,
                 flight_start=brief.get("start_date", ""),
                 flight_end=brief.get("end_date", ""),
-                target_cpm=rec.cpm if rec.cpm > 0 else None,
+                target_cpm=target_cpm,
                 # DealParams.media_type reaches QuoteRequest/DealRequest,
                 # which validate against the shared pricing MediaType enum —
                 # translate from discovery vocabulary (ar-9iw5).

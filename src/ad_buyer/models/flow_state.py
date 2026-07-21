@@ -74,6 +74,14 @@ class BookedLine(BaseModel):
     booking_status: str = Field(..., alias="bookingStatus")
     booked_at: datetime = Field(..., alias="bookedAt")
     seller_id: str | None = Field(default=None, alias="sellerId")
+    rationale: str | None = Field(
+        default=None,
+        description=(
+            "Truthful pricing audit line assembled by the BUYER from the "
+            "seller's confirmed deal pricing (base vs final CPM), so the "
+            "text can never contradict the booked price (bead ar-phd7)."
+        ),
+    )
 
     # Legacy OpenDirect identifiers. Optional: the canonical booking path
     # books via the deals API (quote -> deal), not OpenDirect orders.
