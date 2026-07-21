@@ -45,6 +45,7 @@ from ..orchestration.multi_seller import (
     DealParams,
     InventoryRequirements,
     MultiSellerOrchestrator,
+    NegotiationConfig,
     OrchestrationResult,
 )
 from ..storage.deal_store import DealStore
@@ -108,9 +109,11 @@ def build_default_orchestrator() -> MultiSellerOrchestrator:
     from ..config.settings import get_settings
     from ..registry import create_registry_client
 
+    settings = get_settings()
     return MultiSellerOrchestrator(
-        registry_client=create_registry_client(get_settings()),
+        registry_client=create_registry_client(settings),
         deals_client_factory=lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs),
+        negotiation_config=NegotiationConfig.from_settings(settings),
     )
 
 

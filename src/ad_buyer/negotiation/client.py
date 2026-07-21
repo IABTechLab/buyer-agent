@@ -73,6 +73,82 @@ class NegotiationClient:
             headers["X-API-Key"] = self._api_key
         return headers
 
+    async def submit_proposal(
+        self,
+        seller_url: str,
+        *,
+        product_id: str,
+        deal_type: str,
+        price: float,
+        impressions: int,
+        start_date: str,
+        end_date: str,
+        buyer_id: str | None = None,
+        agency_id: str | None = None,
+        advertiser_id: str | None = None,
+        agent_url: str | None = None,
+    ) -> dict[str, Any]:
+        """Submit a proposal to open a proposal-led negotiation.
+
+        The seller's canonical negotiation surface
+        (``POST /api/v1/negotiations/messages``) is proposal-led: it keys
+        negotiations by ``proposal_id`` and rejects quote-led opens
+        (``quote_led_negotiation`` unsupported). A buyer holding only a
+        quote must therefore first submit a proposal via the seller's
+        ``POST /proposals`` and negotiate against the returned
+        ``proposal_id`` (bead ar-cc3n).
+
+        The response is the seller's ``ProposalResponse`` dict:
+        ``proposal_id``, ``recommendation`` (accept/counter/reject),
+        ``status``, and optional ``counter_terms`` carrying the seller's
+        round-1 counter (``proposed_price``, ``negotiation_id``, ...).
+
+        Args:
+            seller_url: Base URL of the seller API.
+            product_id: Seller product the proposal is for.
+            deal_type: Deal type (PG, PD, PA).
+            price: The buyer's proposed CPM (the opening offer).
+            impressions: Desired impression volume.
+            start_date: Flight start (ISO date string).
+            end_date: Flight end (ISO date string).
+            buyer_id / agency_id / advertiser_id / agent_url: Optional
+                buyer identity fields per the seller's ProposalRequest.
+
+        Returns:
+            The seller's proposal response as a dict.
+        """
+        url = f"{seller_url}/proposals"
+        payload: dict[str, Any] = {
+            "product_id": product_id,
+            "deal_type": deal_type,
+            "price": price,
+            "impressions": impressions,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+        if buyer_id is not None:
+            payload["buyer_id"] = buyer_id
+        if agency_id is not None:
+            payload["agency_id"] = agency_id
+        if advertiser_id is not None:
+            payload["advertiser_id"] = advertiser_id
+        if agent_url is not None:
+            payload["agent_url"] = agent_url
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(url, json=payload, headers=self._build_headers())
+            response.raise_for_status()
+            data: dict[str, Any] = response.json()
+
+        logger.info(
+            "Proposal submitted: %s | product=%s | price=$%.2f | recommendation=%s",
+            data.get("proposal_id"),
+            product_id,
+            price,
+            data.get("recommendation"),
+        )
+        return data
+
     async def start_negotiation(
         self,
         seller_url: str,
