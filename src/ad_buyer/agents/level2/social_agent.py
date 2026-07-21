@@ -6,6 +6,7 @@
 from crewai import Agent
 
 from ...config.settings import settings
+from ...llm import build_llm
 
 
 def create_social_agent() -> Agent:
@@ -24,7 +25,11 @@ def create_social_agent() -> Agent:
             "(brand awareness, reach, conversions) to optimal Meta placements "
             "and bidding strategies."
         ),
-        llm=settings.manager_llm_model,
+        llm=build_llm(
+            model=settings.default_llm_model,
+            temperature=0.5,
+            max_tokens=settings.llm_max_tokens,
+        ),
         verbose=settings.crew_verbose,
         allow_delegation=False,
         max_iter=settings.crew_max_iterations,

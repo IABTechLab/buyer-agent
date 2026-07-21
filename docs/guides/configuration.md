@@ -41,7 +41,9 @@ print(settings.get_seller_endpoints())
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `ANTHROPIC_API_KEY` | `str` | `""` | Anthropic API key for Claude models. Required for agent functionality. |
+| `ANTHROPIC_API_KEY` | `str` | `""` | Anthropic API key for Claude models. Required when `DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` use the `anthropic/` prefix (the default). |
+| `OPENAI_API_KEY` | `str` | `None` | OpenAI API key. Required when using the `openai/` provider prefix. |
+| `GOOGLE_API_KEY` | `str` | `None` | Google API key. Required when using the `gemini/` provider prefix. |
 | `API_KEY` | `str` | `""` | Inbound API key for authenticating requests to this service. When empty, authentication is disabled (development mode). |
 
 !!! warning "Development mode"
@@ -82,6 +84,8 @@ endpoints = settings.get_seller_endpoints()
 | `MANAGER_LLM_MODEL` | `str` | `anthropic/claude-opus-4-20250514` | Model for the Level 1 Portfolio Manager. Opus is used for strategic reasoning. |
 | `LLM_TEMPERATURE` | `float` | `0.3` | Default temperature for LLM calls. Individual agents may override this. |
 | `LLM_MAX_TOKENS` | `int` | `4096` | Maximum token output for LLM responses. |
+| `OPENAI_COMPATIBLE_LLM_API_KEY` | `str` | `None` | API key for a [custom OpenAI-compatible endpoint](#custom-openai-compatible-endpoints) (optional — some endpoints don't require one). |
+| `OPENAI_COMPATIBLE_LLM_API_BASE_URL` | `str` | `None` | Base URL for a custom OpenAI-compatible endpoint; when set, `DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` are sent as-is to that endpoint instead of being routed by provider prefix. |
 
 Models are specified in `provider/model-name` format using CrewAI's native provider integrations. Install the matching extra (e.g., `pip install "crewai[anthropic]"`) and set the API key. No code changes required to switch providers.
 
@@ -89,6 +93,46 @@ Models are specified in `provider/model-name` format using CrewAI's native provi
 # Use a different model provider
 DEFAULT_LLM_MODEL=openai/gpt-4o
 MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+```
+
+### Supported Providers
+
+| Provider | Model Format | API Key Variable | Install Extra |
+|----------|-------------|-----------------|---------------|
+| **Anthropic** (default) | `anthropic/claude-sonnet-4-5-20250929` | `ANTHROPIC_API_KEY` | `crewai[anthropic]` |
+| **OpenAI** | `openai/gpt-4o` | `OPENAI_API_KEY` | none — the `openai` SDK is a core CrewAI dependency |
+| **Google Gemini** | `gemini/gemini-2.5-flash` | `GOOGLE_API_KEY` | `crewai[google-genai]` |
+| **Azure OpenAI** | `azure/my-deployment` | `AZURE_API_KEY`, `AZURE_API_BASE` | none — uses the same core `openai` SDK client |
+| **AWS Bedrock** | `bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0` | AWS credentials | `crewai[bedrock]` |
+
+For other providers, see the [CrewAI LLM documentation](https://docs.crewai.com/en/learn/litellm-removal-guide).
+
+### Custom OpenAI-Compatible Endpoints
+
+For endpoints that don't have one of the native provider prefixes above —
+NVIDIA NIM, Ollama, HuggingFace TGI, vLLM, LM Studio, and similar — set
+`OPENAI_COMPATIBLE_LLM_API_BASE_URL`. This pins the request to CrewAI's native
+OpenAI-compatible client regardless of the model id's shape, so
+`DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` should be set to the raw model id the
+endpoint expects (no provider prefix). `OPENAI_COMPATIBLE_LLM_API_KEY` is
+optional — omit it for endpoints, such as a local Ollama server, that don't
+require one.
+
+**Example — NVIDIA NIM:**
+
+```bash
+OPENAI_COMPATIBLE_LLM_API_KEY=nvapi-xxxxx
+OPENAI_COMPATIBLE_LLM_API_BASE_URL=https://integrate.api.nvidia.com/v1
+DEFAULT_LLM_MODEL=meta/llama-3.1-70b-instruct
+MANAGER_LLM_MODEL=meta/llama-3.1-70b-instruct
+```
+
+**Example — Ollama, local or self-hosted:**
+
+```bash
+OPENAI_COMPATIBLE_LLM_API_BASE_URL=http://localhost:11434/v1
+DEFAULT_LLM_MODEL=llama3
+MANAGER_LLM_MODEL=llama3
 ```
 
 **Agent temperature overrides:**

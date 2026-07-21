@@ -16,13 +16,14 @@ the user is SELLER-issued.
 from dataclasses import dataclass, field
 from typing import Any
 
-from crewai import LLM, Agent, Crew, Task
+from crewai import Agent, Crew, Task
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
 from ...async_utils import run_async
 from ...config.settings import settings
 from ...flows.deal_booking_flow import build_default_orchestrator
+from ...llm import build_llm
 from ...orchestration.multi_seller import (
     DealParams,
     InventoryRequirements,
@@ -350,9 +351,10 @@ Don't just explain how to do it, actually execute the booking.
 
 Be conversational but professional. Ask clarifying questions when needed.
 Provide specific, actionable recommendations based on user requirements.""",
-            llm=LLM(
+            llm=build_llm(
                 model=settings.default_llm_model,
                 temperature=0.7,
+                max_tokens=settings.llm_max_tokens,
             ),
             tools=self._tools,
             verbose=False,

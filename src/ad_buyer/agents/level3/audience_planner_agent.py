@@ -9,9 +9,10 @@ for real-time audience matching with seller inventory.
 
 from typing import Any
 
-from crewai import LLM, Agent
+from crewai import Agent
 
 from ...config import get_settings
+from ...llm import build_llm
 
 
 def create_audience_planner_agent(
@@ -41,7 +42,7 @@ def create_audience_planner_agent(
     """
     settings = get_settings()
 
-    llm = LLM(
+    llm = build_llm(
         model=settings.default_llm_model,
         temperature=0.3,  # Balanced for strategic recommendations
         max_tokens=settings.llm_max_tokens,

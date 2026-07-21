@@ -17,9 +17,10 @@ Design decisions (from LINEAR_TV_DEAL_FLOW_RESEARCH.md):
 
 from typing import Any
 
-from crewai import LLM, Agent
+from crewai import Agent
 
 from ...config.settings import settings
+from ...llm import build_llm
 
 
 def create_linear_tv_agent(
@@ -76,9 +77,10 @@ CRITICAL: NEVER estimate, assume, or fabricate CPM pricing. Only use prices
 explicitly provided by sellers through quotes or media kits. If no pricing is
 available from the seller, state clearly that pricing requires negotiation. Do
 not fill in CPMs from market knowledge or training data.""",
-        llm=LLM(
+        llm=build_llm(
             model=settings.default_llm_model,
             temperature=0.5,
+            max_tokens=settings.llm_max_tokens,
         ),
         tools=tools or [],
         allow_delegation=True,

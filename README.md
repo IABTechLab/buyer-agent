@@ -145,12 +145,17 @@ Key settings:
 # LLM — set the API key for your chosen provider
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxx        # For Anthropic (default)
 # OPENAI_API_KEY=sk-xxxxx                   # For OpenAI / Azure
-# COHERE_API_KEY=xxxxx                      # For Cohere
+# GOOGLE_API_KEY=xxxxx                      # For Gemini
 
 # LLM model (uses provider/model format — native Anthropic, OpenAI, Gemini, Azure, Bedrock)
 DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
 # DEFAULT_LLM_MODEL=openai/gpt-4o          # OpenAI example
-# DEFAULT_LLM_MODEL=ollama/llama3           # Local Ollama example
+
+# Any OpenAI-wire-compatible endpoint (NVIDIA NIM, Ollama, HuggingFace TGI, vLLM, ...)
+# pins routing to the native OpenAI client via a custom base URL, regardless
+# of the model id's shape:
+# OPENAI_COMPATIBLE_LLM_API_BASE_URL=http://localhost:11434/v1   # Local Ollama example
+# DEFAULT_LLM_MODEL=llama3
 
 # Seller connection
 SELLER_BASE_URL=http://localhost:8001        # Seller agent URL
@@ -159,7 +164,7 @@ SELLER_BASE_URL=http://localhost:8001        # Seller agent URL
 DATABASE_URL=sqlite:///./ad_buyer.db
 ```
 
-> **LLM Provider Flexibility:** CrewAI supports native integrations with Anthropic (default), OpenAI, Google Gemini, Azure OpenAI, and AWS Bedrock. Set `DEFAULT_LLM_MODEL` and `MANAGER_LLM_MODEL` using `provider/model-name` format (e.g., `anthropic/claude-sonnet-4-5-20250929`) and provide the matching API key. Install the matching extra: `pip install "crewai[anthropic]"`. See the [Quickstart Guide](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/) for details.
+> **LLM Provider Flexibility:** CrewAI supports native integrations with Anthropic (default), OpenAI, Google Gemini, Azure OpenAI, and AWS Bedrock. Set `DEFAULT_LLM_MODEL` and `MANAGER_LLM_MODEL` using `provider/model-name` format (e.g., `anthropic/claude-sonnet-4-5-20250929`) and provide the matching API key. Install the matching extra: `pip install "crewai[anthropic]"`. For any other OpenAI-wire-compatible endpoint (NVIDIA NIM, Ollama, HuggingFace TGI, vLLM, LM Studio, ...), set `OPENAI_COMPATIBLE_LLM_API_BASE_URL` alongside `DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` (using the raw model id the endpoint expects) — see [`.env.example`](.env.example) for provider-specific examples. See the [Quickstart Guide](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/) for details.
 
 → [Full Configuration](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/)
 
