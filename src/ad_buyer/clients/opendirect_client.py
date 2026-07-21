@@ -13,6 +13,7 @@ import httpx
 # client-side over the returned Product records.
 from iab_agentic_primitives.primitives import Product as WireProduct
 from iab_agentic_primitives.protocol import ProductListResponse as WireProductListResponse
+from pydantic import ValidationError
 
 from ..models.opendirect import (
     Account,
@@ -135,6 +136,31 @@ def _filter_wire_products(
     return result
 
 
+def _validation_reason(exc: ValidationError) -> str:
+    """Compact one-line summary of a pydantic ValidationError."""
+    return "; ".join(
+        f"{'.'.join(str(loc) for loc in err.get('loc', ()))}: {err.get('msg', '')}"
+        for err in exc.errors()
+    )
+
+
+def _product_reject_record(item: Any, exc: ValidationError) -> dict[str, Any]:
+    """Reject record for one catalog item that failed validation.
+
+    Carries enough identity (id + raw name) to attribute the reject and a
+    compact reason so the drop is never silent (bead ar-sbej).
+    """
+    product_id = None
+    name = None
+    if isinstance(item, dict):
+        product_id = item.get("product_id") or item.get("id")
+        name = item.get("name")
+    else:
+        product_id = getattr(item, "product_id", None)
+        name = getattr(item, "name", None)
+    return {"product_id": product_id, "name": name, "reason": _validation_reason(exc)}
+
+
 class OpenDirectClient:
     """Async HTTP client for OpenDirect API v2.1."""
 
@@ -228,6 +254,63 @@ class OpenDirectClient:
         if filters:
             wire_products = _filter_wire_products(wire_products, filters)
         return [from_wire_product(p) for p in wire_products]
+
+    async def list_products_tolerant(
+        self, skip: int = 0, top: int = 50, **filters: Any
+    ) -> tuple[list[Product], list[dict[str, Any]]]:
+        """List products, skipping (not failing on) per-product invalid items.
+
+        The strict ``list_products`` maps the whole catalog through the
+        OpenDirect model, so ONE invalid product (e.g. a name over the
+        38-char cap) fails the ENTIRE fetch. On the per-seller product
+        resolution path that turned a single bad catalog entry into a
+        skipped seller and, fleet-wide, into zero bookings (bead ar-sbej,
+        Wave-B rig proof 2026-07-21).
+
+        This variant parses PER-PRODUCT: each catalog item is validated
+        against the shared wire model and mapped to the OpenDirect model
+        individually; items that fail either step are collected as reject
+        records instead of raising. Callers MUST surface the rejects
+        (log/event) -- silent drops are not acceptable.
+
+        Returns:
+            (products, rejects): the valid subset (with ``**filters``
+            applied client-side, same semantics as ``list_products``) and
+            one ``{"product_id", "name", "reason"}`` record per rejected
+            item.
+        """
+        params = {"limit": top, "offset": skip}
+        response = await self._request("GET", "/products", params=params)
+        response.raise_for_status()
+        body = response.json()
+
+        items: list[Any] | None = body.get("products") if isinstance(body, dict) else None
+        if not isinstance(items, list):
+            # No usable raw products array. Validate the envelope strictly:
+            # a malformed envelope IS a whole-catalog error and raises a
+            # precise ValidationError; a valid envelope that omitted
+            # ``products`` yields its defaulted (empty) list.
+            items = list(WireProductListResponse.model_validate(body).products)
+
+        rejects: list[dict[str, Any]] = []
+        valid_wire: list[WireProduct] = []
+        for item in items:
+            try:
+                valid_wire.append(WireProduct.model_validate(item))
+            except ValidationError as exc:
+                rejects.append(_product_reject_record(item, exc))
+
+        if filters:
+            valid_wire = _filter_wire_products(valid_wire, filters)
+
+        products: list[Product] = []
+        for wire in valid_wire:
+            try:
+                products.append(from_wire_product(wire))
+            except ValidationError as exc:
+                rejects.append(_product_reject_record(wire, exc))
+
+        return products, rejects
 
     async def get_product(self, product_id: str) -> Product:
         """Get a single product by ID.

@@ -541,11 +541,49 @@ class MultiSellerOrchestrator:
     # Stage 1.5: Cross-seller product resolution (bead ar-gufw)
     # ------------------------------------------------------------------
 
+    async def _fetch_seller_catalog(
+        self, catalog_client: Any
+    ) -> tuple[list[Any], list[dict[str, Any]]]:
+        """Fetch one seller's catalog, tolerantly when the client supports it.
+
+        Clients exposing ``list_products_tolerant`` (the real
+        ``OpenDirectClient``) parse PER-PRODUCT and return
+        ``(valid_products, rejects)`` -- one invalid catalog item must
+        never fail the whole fetch (bead ar-sbej). Anything else (test
+        fakes, alternative clients) falls back to the strict
+        ``list_products`` with no rejects. The result shape is checked
+        rather than trusted so auto-mocking fakes cannot masquerade as
+        tolerant clients.
+        """
+        lister = getattr(catalog_client, "list_products_tolerant", None)
+        if callable(lister):
+            result = await asyncio.wait_for(lister(top=500), timeout=self._quote_timeout)
+            if (
+                isinstance(result, tuple)
+                and len(result) == 2
+                and isinstance(result[0], list)
+                and isinstance(result[1], list)
+            ):
+                return result[0], result[1]
+        products = await asyncio.wait_for(
+            catalog_client.list_products(top=500),
+            timeout=self._quote_timeout,
+        )
+        return list(products), []
+
+    @staticmethod
+    def _describe_invalid_products(invalid_products: list[dict[str, Any]]) -> str:
+        """One-line, attributable summary of catalog reject records."""
+        return "; ".join(
+            f"{p.get('product_id') or p.get('name') or '<unidentified>'} ({p.get('reason')})"
+            for p in invalid_products
+        )
+
     async def _resolve_product_for_seller(
         self,
         seller: AgentCard,
         deal_params: DealParams,
-    ) -> tuple[str | None, str, str | None]:
+    ) -> tuple[str | None, str, str | None, list[dict[str, Any]]]:
         """Resolve the recommended product onto ONE seller's own catalog.
 
         Invariant enforced: a product ID is only ever sent to the seller
@@ -566,21 +604,26 @@ class MultiSellerOrchestrator:
            clear per-seller error instead of receiving a foreign ID that
            would 404 as ``product_not_found``.
 
+        The catalog is parsed tolerantly (bead ar-sbej): individually
+        invalid products are SKIPPED with a logged warning and surfaced as
+        reject records, and the tiers operate on the valid subset. A
+        catalog whose EVERY product is invalid resolves to a clear
+        ``catalog_error`` carrying the per-product reasons.
+
         Returns:
-            (resolved_product_id, outcome, error). ``resolved_product_id``
-            is None when the seller must be skipped; ``error`` then holds
-            a ``product_not_resolvable: ...`` message for the
-            SellerQuoteResult. ``outcome`` is one of "exact_id" /
-            "name_match" / "channel_match" / "unresolved" /
-            "catalog_error".
+            (resolved_product_id, outcome, error, invalid_products).
+            ``resolved_product_id`` is None when the seller must be
+            skipped; ``error`` then holds a ``product_not_resolvable: ...``
+            message for the SellerQuoteResult. ``outcome`` is one of
+            "exact_id" / "name_match" / "channel_match" / "unresolved" /
+            "catalog_error". ``invalid_products`` lists one
+            ``{"product_id", "name", "reason"}`` record per catalog item
+            that failed validation (empty on clean catalogs).
         """
         assert self._catalog_client_factory is not None  # narrowed by _request_one
         try:
             catalog_client = self._catalog_client_factory(seller.url)
-            products = await asyncio.wait_for(
-                catalog_client.list_products(top=500),
-                timeout=self._quote_timeout,
-            )
+            products, invalid_products = await self._fetch_seller_catalog(catalog_client)
         except Exception as exc:  # noqa: BLE001 - per-seller isolation; skip honestly
             logger.warning(
                 "Catalog fetch failed for seller %s (%s): %s",
@@ -592,12 +635,35 @@ class MultiSellerOrchestrator:
                 None,
                 "catalog_error",
                 f"product_not_resolvable: catalog fetch failed for seller {seller.agent_id}: {exc}",
+                [],
+            )
+
+        if invalid_products:
+            # Surface the drops loudly: which products, and why. Silent
+            # per-product drops would hide seller-catalog conformance bugs.
+            logger.warning(
+                "Seller %s catalog contained %d invalid product(s), skipped during resolution: %s",
+                seller.agent_id,
+                len(invalid_products),
+                self._describe_invalid_products(invalid_products),
+            )
+
+        if not products and invalid_products:
+            # The ENTIRE catalog failed validation -- a clear catalog-level
+            # outcome carrying the reasons, not a bare "unresolved".
+            return (
+                None,
+                "catalog_error",
+                f"product_not_resolvable: all {len(invalid_products)} products in "
+                f"seller {seller.agent_id}'s catalog failed validation: "
+                f"{self._describe_invalid_products(invalid_products)}",
+                invalid_products,
             )
 
         # Tier 1: the recommended ID is native to this seller's catalog.
         for product in products:
             if product.id == deal_params.product_id:
-                return product.id, "exact_id", None
+                return product.id, "exact_id", None, invalid_products
 
         # Tier 2: equivalent product by name (case-insensitive exact).
         if deal_params.product_name:
@@ -607,7 +673,7 @@ class MultiSellerOrchestrator:
                 key=lambda p: p.id or "",
             )
             if named:
-                return named[0].id, "name_match", None
+                return named[0].id, "name_match", None, invalid_products
 
         # Tier 3: equivalent product by channel/ad-format. Both sides are
         # normalized through the shared alias table so the buyer's channel
@@ -626,7 +692,7 @@ class MultiSellerOrchestrator:
             # Deterministic, buyer-favorable pick: cheapest declared price
             # first (unpriced/on-request products sort last), then by id.
             candidates.sort(key=lambda p: (p.base_price <= 0, p.base_price, p.id or ""))
-            return candidates[0].id, "channel_match", None
+            return candidates[0].id, "channel_match", None, invalid_products
 
         return (
             None,
@@ -634,6 +700,7 @@ class MultiSellerOrchestrator:
             f"product_not_resolvable: no equivalent of product "
             f"{deal_params.product_id!r} in seller {seller.agent_id}'s catalog "
             f"(name={deal_params.product_name!r}, channel={requested!r})",
+            invalid_products,
         )
 
     # ------------------------------------------------------------------
@@ -670,9 +737,12 @@ class MultiSellerOrchestrator:
             # Without a catalog client factory, legacy passthrough applies.
             product_id = deal_params.product_id
             if self._catalog_client_factory is not None:
-                resolved_id, outcome, resolve_error = await self._resolve_product_for_seller(
-                    seller, deal_params
-                )
+                (
+                    resolved_id,
+                    outcome,
+                    resolve_error,
+                    invalid_products,
+                ) = await self._resolve_product_for_seller(seller, deal_params)
                 await self._emit(
                     EventType.PRODUCT_RESOLUTION,
                     payload={
@@ -682,6 +752,10 @@ class MultiSellerOrchestrator:
                         "resolved_product_id": resolved_id,
                         "outcome": outcome,
                         "error": resolve_error,
+                        # Per-product catalog rejects (bead ar-sbej): count +
+                        # details so drops are observable, never silent.
+                        "invalid_products": len(invalid_products),
+                        "invalid_product_details": invalid_products,
                     },
                 )
                 if resolved_id is None:
