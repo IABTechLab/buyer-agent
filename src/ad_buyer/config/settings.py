@@ -80,6 +80,15 @@ class Settings(BaseSettings):
     negotiation_enabled: bool = True
     negotiation_band: float = 1.25
     negotiation_max_rounds: int = 3
+    # HTTP timeout for the negotiation surface (proposal open + counter
+    # rounds), SEPARATE from the 30 s quote timeout (bead ar-vc4m). Sellers
+    # may answer POST /proposals with a synchronous LLM crew: the live
+    # rig's ProposalHandlingFlow measured ~10m46s (~646 s) per proposal
+    # (S2 live proof 2026-07-21, Bug I), so the old 30 s quote-timeout
+    # deterministically killed every live negotiation at round 1. Default
+    # 720 s = the measured flow plus ~11% headroom, finite by design.
+    # Override via NEGOTIATION_TIMEOUT_SECONDS.
+    negotiation_timeout_seconds: float = 720.0
 
     # Cross-seller product resolution (bead ar-gufw). Research reads one
     # catalog, but discovery may return OTHER sellers whose catalogs use

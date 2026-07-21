@@ -35,6 +35,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..clients.capability_client import (
     CapabilityClient,
@@ -60,6 +62,30 @@ from .audience_degradation import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _failure_reason(
+    exc: BaseException,
+    *,
+    timeout: float | None = None,
+    context: str = "",
+) -> str:
+    """Describe a failed call: exception class + bound + operation + detail.
+
+    ``str(httpx.ReadTimeout)`` is EMPTY (S2 live proof 2026-07-21, Bug K),
+    so a bare ``str(exc)`` left the ``negotiation.concluded`` "unavailable"
+    outcome causeless. The class name and operation context are therefore
+    always included; the bounding timeout is added for timeout-class
+    failures (e.g. ``"ReadTimeout after 720s (POST .../proposals)"``).
+    """
+    parts = [type(exc).__name__]
+    if timeout is not None and isinstance(exc, TimeoutError | httpx.TimeoutException):
+        parts.append(f"after {timeout:g}s")
+    if context:
+        parts.append(f"({context})")
+    base = " ".join(parts)
+    detail = str(exc).strip()
+    return f"{base}: {detail}" if detail else base
 
 
 # Error code emitted by the seller per proposal §5.7 layer 3 when the
@@ -201,11 +227,20 @@ class NegotiationConfig:
             legacy filter behavior.
         max_rounds: Bounded number of seller responses (the proposal's
             round-1 counter included) before the buyer walks away.
+        timeout_seconds: HTTP timeout for the negotiation surface
+            (proposal open + counter rounds), SEPARATE from the quote
+            timeout (bead ar-vc4m). Sellers may answer ``POST /proposals``
+            with a synchronous LLM crew measured at ~646 s on the live
+            rig, so the quote timeout (30 s, deterministic engine) must
+            not bound negotiation calls. Default 720 s mirrors
+            ``Settings.negotiation_timeout_seconds``
+            (env ``NEGOTIATION_TIMEOUT_SECONDS``).
     """
 
     enabled: bool = True
     band: float = 1.25
     max_rounds: int = 3
+    timeout_seconds: float = 720.0
 
     @classmethod
     def from_settings(cls, settings: Any) -> NegotiationConfig:
@@ -214,6 +249,7 @@ class NegotiationConfig:
             enabled=settings.negotiation_enabled,
             band=settings.negotiation_band,
             max_rounds=settings.negotiation_max_rounds,
+            timeout_seconds=settings.negotiation_timeout_seconds,
         )
 
 
@@ -925,11 +961,20 @@ class MultiSellerOrchestrator:
     # ------------------------------------------------------------------
 
     def _get_negotiation_client(self) -> Any:
-        """Return the negotiation client, constructing the default lazily."""
+        """Return the negotiation client, constructing the default lazily.
+
+        The default client is bounded by the DEDICATED negotiation timeout
+        (``NegotiationConfig.timeout_seconds``), NOT the quote timeout:
+        quotes come from a deterministic engine, while a seller may answer
+        the proposal open with a synchronous LLM crew measured at ~646 s
+        live (bead ar-vc4m).
+        """
         if self._negotiation_client is None:
             from ..negotiation.client import NegotiationClient
 
-            self._negotiation_client = NegotiationClient(timeout=self._quote_timeout)
+            self._negotiation_client = NegotiationClient(
+                timeout=self._negotiation_config.timeout_seconds
+            )
         return self._negotiation_client
 
     async def negotiate_above_ceiling(
@@ -1070,14 +1115,19 @@ class MultiSellerOrchestrator:
                 end_date=deal_params.flight_end,
             )
         except Exception as exc:  # noqa: BLE001 - negotiation is best-effort; walk honestly
+            reason = _failure_reason(
+                exc,
+                timeout=config.timeout_seconds,
+                context=f"POST {seller_url}/proposals",
+            )
             logger.warning(
                 "Negotiation unavailable for quote %s (seller %s): %s",
                 quote.quote_id,
                 seller_id,
-                exc,
+                reason,
             )
             record["outcome"] = "unavailable"
-            record["error"] = str(exc)
+            record["error"] = reason
             await self._emit_negotiation_concluded(record)
             return None, record
 
@@ -1111,6 +1161,10 @@ class MultiSellerOrchestrator:
             # No counter to evaluate: rejected outright, or the proposal
             # went to a pending/failed state the buyer cannot negotiate.
             record["outcome"] = "rejected" if recommendation == "reject" else "unavailable"
+            record["error"] = (
+                f"proposal response carried no counter price "
+                f"(recommendation={recommendation!r}, status={proposal.get('status')!r})"
+            )
             terminal = True
         elif seller_price <= max_cpm:
             # Accept the FIRST seller price at/below the ceiling.
@@ -1122,14 +1176,19 @@ class MultiSellerOrchestrator:
             try:
                 round_result = await client.counter_offer(session, open_price)
             except Exception as exc:  # noqa: BLE001 - seller surface failed; walk honestly
+                reason = _failure_reason(
+                    exc,
+                    timeout=config.timeout_seconds,
+                    context=f"POST {seller_url}/api/v1/negotiations/messages",
+                )
                 logger.warning(
                     "Negotiation round failed for proposal %s (seller %s): %s",
                     proposal_id,
                     seller_id,
-                    exc,
+                    reason,
                 )
                 record["outcome"] = "unavailable"
-                record["error"] = str(exc)
+                record["error"] = reason
                 terminal = True
                 break
 
@@ -1194,9 +1253,14 @@ class MultiSellerOrchestrator:
                 timeout=self._quote_timeout,
             )
         except Exception as exc:  # noqa: BLE001 - re-quote failed; walk honestly
-            logger.warning("Post-negotiation re-quote failed for seller %s: %s", seller_id, exc)
+            reason = _failure_reason(
+                exc,
+                timeout=self._quote_timeout,
+                context=f"post-negotiation re-quote {seller_url}",
+            )
+            logger.warning("Post-negotiation re-quote failed for seller %s: %s", seller_id, reason)
             record["outcome"] = "requote_failed"
-            record["error"] = str(exc)
+            record["error"] = reason
             await self._emit_negotiation_concluded(record)
             return None, record
 
@@ -1265,7 +1329,13 @@ class MultiSellerOrchestrator:
         )
 
     async def _emit_negotiation_concluded(self, record: dict[str, Any]) -> None:
-        """Emit NEGOTIATION_CONCLUDED for a finished attempt."""
+        """Emit NEGOTIATION_CONCLUDED for a finished attempt.
+
+        ``reason`` carries the failure cause (exception class + detail,
+        see ``_failure_reason``) for unavailable/failed attempts so the
+        events surface says WHY a negotiation concluded without a deal
+        (bead ar-vc4m); None on clean outcomes.
+        """
         await self._emit(
             EventType.NEGOTIATION_CONCLUDED,
             payload={
@@ -1275,6 +1345,7 @@ class MultiSellerOrchestrator:
                 "agreed_cpm": record["agreed_cpm"],
                 "rounds": len(record["rounds"]),
                 "requoted_quote_id": record["requoted_quote_id"],
+                "reason": record.get("error"),
             },
         )
 
