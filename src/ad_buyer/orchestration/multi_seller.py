@@ -272,6 +272,15 @@ class DealParams:
             InventoryRequirements / CampaignPlan. None on legacy paths
             that have not yet been wired through. Forwarded to QuoteRequest
             so the seller receives the campaign's audience targeting.
+        product_name: Human-readable name of the recommended product
+            (bead ar-gufw). Used by cross-seller product resolution to
+            find an equivalent product by name on a seller whose catalog
+            does not contain ``product_id``. None on legacy paths.
+        channel: Discovery-vocabulary channel/media type of the
+            recommendation (e.g. "display", "ctv" -- NOT the pricing
+            enum in ``media_type``). Used by cross-seller product
+            resolution's channel/ad-format fallback. When None,
+            resolution falls back to ``media_type``.
     """
 
     product_id: str
@@ -282,6 +291,8 @@ class DealParams:
     target_cpm: float | None = None
     media_type: str = "digital"
     audience_plan: AudiencePlan | None = None
+    product_name: str | None = None
+    channel: str | None = None
 
 
 @dataclass
@@ -412,6 +423,13 @@ class MultiSellerOrchestrator:
             When None, a default normalizer with no supply-path data is used.
         quote_timeout: Timeout in seconds for individual quote requests.
             Defaults to 30.0 seconds.
+        catalog_client_factory: Optional factory for per-seller catalog
+            clients (``(seller_url) -> client`` with an async
+            ``list_products``). When provided, the orchestrator resolves
+            the recommended product onto EACH seller's own catalog before
+            quoting it (bead ar-gufw) -- a product ID is only ever sent to
+            the seller it came from. When None, the legacy passthrough
+            behavior is preserved (same product_id sent to every seller).
     """
 
     def __init__(
@@ -424,6 +442,7 @@ class MultiSellerOrchestrator:
         capability_client: CapabilityClient | None = None,
         negotiation_client: Any | None = None,
         negotiation_config: NegotiationConfig | None = None,
+        catalog_client_factory: Callable[..., Any] | None = None,
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
@@ -441,6 +460,10 @@ class MultiSellerOrchestrator:
         # stage is enabled; injectable for tests.
         self._negotiation_client = negotiation_client
         self._negotiation_config = negotiation_config or NegotiationConfig()
+        # Cross-seller product resolution (bead ar-gufw). Optional, same
+        # injection idiom as `capability_client`: when None, no resolution
+        # runs and the quote path behaves exactly as before.
+        self._catalog_client_factory = catalog_client_factory
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -515,6 +538,105 @@ class MultiSellerOrchestrator:
         return sellers
 
     # ------------------------------------------------------------------
+    # Stage 1.5: Cross-seller product resolution (bead ar-gufw)
+    # ------------------------------------------------------------------
+
+    async def _resolve_product_for_seller(
+        self,
+        seller: AgentCard,
+        deal_params: DealParams,
+    ) -> tuple[str | None, str, str | None]:
+        """Resolve the recommended product onto ONE seller's own catalog.
+
+        Invariant enforced: a product ID is only ever sent to the seller
+        it came from. The recommended ``deal_params.product_id`` was read
+        from a single research catalog (one seller in the rig), so before
+        quoting any seller the orchestrator re-resolves an equivalent
+        product against THAT seller's catalog:
+
+        1. ``exact_id`` -- the seller's catalog contains the recommended
+           ID (this is the seller the recommendation came from).
+        2. ``name_match`` -- a product with the same name
+           (case-insensitive) exists; deterministic tie-break by id.
+        3. ``channel_match`` -- products whose declared ``ad_formats``
+           normalize onto the campaign's channel (undeclared formats stay
+           eligible, ar-mkq5 semantics). Deterministic pick: cheapest
+           declared base_price first (unpriced last), tie-break by id.
+        4. No candidates -> ``unresolved``: the seller is skipped with a
+           clear per-seller error instead of receiving a foreign ID that
+           would 404 as ``product_not_found``.
+
+        Returns:
+            (resolved_product_id, outcome, error). ``resolved_product_id``
+            is None when the seller must be skipped; ``error`` then holds
+            a ``product_not_resolvable: ...`` message for the
+            SellerQuoteResult. ``outcome`` is one of "exact_id" /
+            "name_match" / "channel_match" / "unresolved" /
+            "catalog_error".
+        """
+        assert self._catalog_client_factory is not None  # narrowed by _request_one
+        try:
+            catalog_client = self._catalog_client_factory(seller.url)
+            products = await asyncio.wait_for(
+                catalog_client.list_products(top=500),
+                timeout=self._quote_timeout,
+            )
+        except Exception as exc:  # noqa: BLE001 - per-seller isolation; skip honestly
+            logger.warning(
+                "Catalog fetch failed for seller %s (%s): %s",
+                seller.agent_id,
+                seller.url,
+                exc,
+            )
+            return (
+                None,
+                "catalog_error",
+                f"product_not_resolvable: catalog fetch failed for seller {seller.agent_id}: {exc}",
+            )
+
+        # Tier 1: the recommended ID is native to this seller's catalog.
+        for product in products:
+            if product.id == deal_params.product_id:
+                return product.id, "exact_id", None
+
+        # Tier 2: equivalent product by name (case-insensitive exact).
+        if deal_params.product_name:
+            wanted = deal_params.product_name.strip().casefold()
+            named = sorted(
+                (p for p in products if p.name and p.name.strip().casefold() == wanted),
+                key=lambda p: p.id or "",
+            )
+            if named:
+                return named[0].id, "name_match", None
+
+        # Tier 3: equivalent product by channel/ad-format. Both sides are
+        # normalized through the shared alias table so the buyer's channel
+        # vocabulary reconciles with seller format declarations; products
+        # with EMPTY/absent ad_formats are "undeclared -- do not exclude"
+        # (ar-mkq5 semantics, mirroring the catalog filter).
+        from ..clients.opendirect_client import _normalize_ad_format
+
+        requested = _normalize_ad_format(deal_params.channel or deal_params.media_type)
+        candidates = []
+        for product in products:
+            formats = (product.ext or {}).get("ad_formats") or []
+            if not formats or requested in {_normalize_ad_format(f) for f in formats}:
+                candidates.append(product)
+        if candidates:
+            # Deterministic, buyer-favorable pick: cheapest declared price
+            # first (unpriced/on-request products sort last), then by id.
+            candidates.sort(key=lambda p: (p.base_price <= 0, p.base_price, p.id or ""))
+            return candidates[0].id, "channel_match", None
+
+        return (
+            None,
+            "unresolved",
+            f"product_not_resolvable: no equivalent of product "
+            f"{deal_params.product_id!r} in seller {seller.agent_id}'s catalog "
+            f"(name={deal_params.product_name!r}, channel={requested!r})",
+        )
+
+    # ------------------------------------------------------------------
     # Stage 2: Request quotes in parallel
     # ------------------------------------------------------------------
 
@@ -542,11 +664,52 @@ class MultiSellerOrchestrator:
         async def _request_one(seller: AgentCard) -> SellerQuoteResult:
             """Request a single quote from one seller."""
             seller_url = seller.url
+
+            # Cross-seller product identity (bead ar-gufw): resolve the
+            # recommended product onto THIS seller's catalog before quoting.
+            # Without a catalog client factory, legacy passthrough applies.
+            product_id = deal_params.product_id
+            if self._catalog_client_factory is not None:
+                resolved_id, outcome, resolve_error = await self._resolve_product_for_seller(
+                    seller, deal_params
+                )
+                await self._emit(
+                    EventType.PRODUCT_RESOLUTION,
+                    payload={
+                        "seller_id": seller.agent_id,
+                        "seller_url": seller_url,
+                        "requested_product_id": deal_params.product_id,
+                        "resolved_product_id": resolved_id,
+                        "outcome": outcome,
+                        "error": resolve_error,
+                    },
+                )
+                if resolved_id is None:
+                    # Graceful per-seller skip: a clear, attributable error
+                    # instead of a seller-side 404 product_not_found.
+                    logger.info("Skipping seller %s: %s", seller.agent_id, resolve_error)
+                    return SellerQuoteResult(
+                        seller_id=seller.agent_id,
+                        seller_url=seller_url,
+                        quote=None,
+                        deal_type=deal_params.deal_type,
+                        error=resolve_error,
+                    )
+                if resolved_id != deal_params.product_id:
+                    logger.info(
+                        "Resolved product %s -> %s for seller %s (%s)",
+                        deal_params.product_id,
+                        resolved_id,
+                        seller.agent_id,
+                        outcome,
+                    )
+                product_id = resolved_id
+
             try:
                 client = self._deals_client_factory(seller_url)
 
                 quote_request = QuoteRequest(
-                    product_id=deal_params.product_id,
+                    product_id=product_id,
                     deal_type=deal_params.deal_type,
                     impressions=deal_params.impressions,
                     flight_start=deal_params.flight_start,
@@ -787,10 +950,16 @@ class MultiSellerOrchestrator:
         # Never open above the ceiling: a misconfigured target is clamped.
         open_price = min(target, max_cpm) if target is not None else max_cpm
 
+        # Cross-seller product identity (bead ar-gufw): negotiate and
+        # re-quote the product the SELLER quoted, never the campaign's
+        # original recommendation ID -- which may belong to a different
+        # seller's catalog when resolution substituted an equivalent.
+        product_id = quote.product.product_id
+
         record: dict[str, Any] = {
             "seller_id": seller_id,
             "quote_id": quote.quote_id,
-            "product_id": deal_params.product_id,
+            "product_id": product_id,
             "quote_cpm": quote_cpm,
             "max_cpm": max_cpm,
             "open_cpm": open_price,
@@ -805,7 +974,7 @@ class MultiSellerOrchestrator:
             payload={
                 "seller_id": seller_id,
                 "quote_id": quote.quote_id,
-                "product_id": deal_params.product_id,
+                "product_id": product_id,
                 "quote_cpm": quote_cpm,
                 "max_cpm": max_cpm,
                 "band_limit": max_cpm * config.band,
@@ -819,7 +988,7 @@ class MultiSellerOrchestrator:
         try:
             proposal = await client.submit_proposal(
                 seller_url=seller_url,
-                product_id=deal_params.product_id,
+                product_id=product_id,
                 deal_type=deal_params.deal_type,
                 price=open_price,
                 impressions=deal_params.impressions,
@@ -938,7 +1107,7 @@ class MultiSellerOrchestrator:
             requote = await asyncio.wait_for(
                 deals_client.request_quote(
                     QuoteRequest(
-                        product_id=deal_params.product_id,
+                        product_id=product_id,
                         deal_type=deal_params.deal_type,
                         impressions=deal_params.impressions,
                         flight_start=deal_params.flight_start,
