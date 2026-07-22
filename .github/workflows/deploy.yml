@@ -24,9 +24,9 @@ permissions:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: ad-buyer-system
-  ECS_CLUSTER: ad-buyer-${{ inputs.environment || 'staging' }}-cluster
-  ECS_SERVICE: ad-buyer-${{ inputs.environment || 'staging' }}-service
+  ECR_REPOSITORY: ad-buyer-system/${{ inputs.environment || 'staging' }}
+  ECS_CLUSTER: ad-buyer-system-${{ inputs.environment || 'staging' }}-cluster
+  ECS_SERVICE: ad-buyer-system-${{ inputs.environment || 'staging' }}-service
 
 jobs:
   deploy:
@@ -52,8 +52,10 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           docker build \
+            --secret id=github_token,env=GITHUB_TOKEN \
             -f infra/docker/Dockerfile \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
