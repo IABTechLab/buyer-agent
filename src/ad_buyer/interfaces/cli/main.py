@@ -37,6 +37,8 @@ def _create_client() -> OpenDirectClient:
         base_url=settings.opendirect_base_url,
         oauth_token=settings.opendirect_token,
         api_key=settings.opendirect_api_key,
+        account_id=settings.opendirect_account_id,
+        advertiser_brand_id=settings.opendirect_advertiser_brand_id,
     )
 
 

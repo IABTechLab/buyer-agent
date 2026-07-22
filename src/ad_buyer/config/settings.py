@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     opendirect_base_url: str = "http://localhost:3000/api/v2.1"
     opendirect_token: str | None = None
     opendirect_api_key: str | None = None
+    # OpenDirect 2.1 spec-dialect account context. When BOTH are set the
+    # avails client emits the published ProductAvailsSearch wire shape
+    # (spec-required accountid/advertiserbrandid); when unset it stays on
+    # the legacy simplified profile — the spec ids are never fabricated.
+    opendirect_account_id: str | None = None
+    opendirect_advertiser_brand_id: str | None = None
 
     # IAB Diligence Platform — vendor approval gate, wired into the
     # canonical booking path (MultiSellerOrchestrator discovery stage).

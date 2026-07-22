@@ -12,6 +12,7 @@ import httpx
 # ProductListResponse; there is no POST /products/search — filtering is
 # client-side over the returned Product records.
 from iab_agentic_primitives.primitives import Product as WireProduct
+from iab_agentic_primitives.protocol import AvailsCollection, parse_avails_response
 from iab_agentic_primitives.protocol import ProductListResponse as WireProductListResponse
 from pydantic import ValidationError
 
@@ -170,6 +171,8 @@ class OpenDirectClient:
         api_key: str | None = None,
         oauth_token: str | None = None,
         timeout: float = 30.0,
+        account_id: str | None = None,
+        advertiser_brand_id: str | None = None,
     ):
         """Initialize the client.
 
@@ -178,10 +181,21 @@ class OpenDirectClient:
             api_key: Optional API key for authentication
             oauth_token: Optional OAuth bearer token
             timeout: Request timeout in seconds
+            account_id: OpenDirect account id (spec ``accountid``). When
+                BOTH this and ``advertiser_brand_id`` are set, avails
+                checks emit the published OpenDirect 2.1
+                ``ProductAvailsSearch`` dialect (with a one-shot legacy
+                fallback for pre-convergence sellers); otherwise the
+                legacy simplified profile is emitted unchanged — the spec
+                form requires both ids and they are never fabricated.
+            advertiser_brand_id: OpenDirect advertiser brand id (spec
+                ``advertiserbrandid``); see ``account_id``.
         """
         self.base_url = base_url.rstrip("/")
         self._headers = self._build_headers(api_key, oauth_token)
         self._timeout = timeout
+        self.account_id = account_id
+        self.advertiser_brand_id = advertiser_brand_id
         # Test seam: when set, injected into each per-request client (e.g.
         # ``httpx.MockTransport``). Never set in production.
         self._transport: httpx.AsyncBaseTransport | None = None
@@ -351,26 +365,83 @@ class OpenDirectClient:
     async def check_avails(self, request: AvailsRequest) -> AvailsResponse:
         """Check availability and pricing for a product.
 
+        Dialect (shared avails contract, dialect convergence): when the
+        client has the spec-required account context (``account_id`` +
+        ``advertiser_brand_id``), the request is emitted as the published
+        OpenDirect 2.1 ``ProductAvailsSearch`` — spec top-level fields
+        only; the extension fields travel as minted Investment
+        ``producttargeting`` entries and the AdCOM Segment ``targeting``
+        array. A 422 from a pre-convergence seller (v2.1.0-v2.2.1 rejects
+        the ``productids`` array form) triggers ONE legacy-dialect retry.
+        Without account context the legacy simplified profile is emitted
+        byte-for-byte, as before.
+
+        Either response dialect is parsed: the spec ``avails`` collection
+        envelope is bridged back to the legacy ``AvailsResponse`` the
+        internal flow consumes (``availability`` ->
+        ``availableImpressions``, ``price`` -> ``estimatedCpm``).
+
         Args:
             request: Availability check request parameters
 
         Returns:
             AvailsResponse with availability and pricing info
         """
-        # mode="json" renders the datetime start_date/end_date fields as
-        # ISO-8601 strings so the request body is JSON-serializable at the httpx
-        # boundary. Without it the raw datetime objects hit Python's default
-        # json encoder and the POST crashes with "Object of type datetime is not
-        # JSON serializable" before the request ever reaches the seller.
-        # by_alias keeps the spec-lowercase wire field names
-        # (startdate/enddate/productid) the seller's avails endpoint expects.
-        response = await self._request(
+        spec_dialect = (
+            self.account_id is not None and self.advertiser_brand_id is not None
+        )
+        if spec_dialect:
+            search = request.to_spec(
+                account_id=self.account_id,
+                advertiser_brand_id=self.advertiser_brand_id,
+            )
+            response = await self._request(
+                "POST",
+                "/products/avails",
+                json=search.model_dump(mode="json", by_alias=True, exclude_none=True),
+            )
+            if response.status_code == 422:
+                # Pre-convergence seller: it rejected the spec form with a
+                # validation error. Fall back to the shipped legacy dialect
+                # once rather than failing the availability check.
+                response = await self._post_legacy_avails(request)
+        else:
+            response = await self._post_legacy_avails(request)
+
+        response.raise_for_status()
+        parsed = parse_avails_response(response.json())
+        if isinstance(parsed, AvailsCollection):
+            # One product was requested; prefer the record echoing its id
+            # (a conformant seller returns exactly one). The shared bridge
+            # refuses to fabricate a volume if availability is absent
+            # (ValueError surfaces to the caller).
+            matches = [
+                record
+                for record in parsed.avails
+                if record.product_id == request.product_id
+            ] or parsed.avails
+            if not matches:
+                raise ValueError(
+                    "avails collection response contained no records for "
+                    f"product {request.product_id!r}"
+                )
+            return matches[0].to_simplified()
+        return parsed
+
+    async def _post_legacy_avails(self, request: AvailsRequest) -> httpx.Response:
+        """POST the legacy simplified-profile body (shipped v2.1.0 dialect).
+
+        mode="json" renders the datetime start_date/end_date fields as
+        ISO-8601 strings so the request body is JSON-serializable at the
+        httpx boundary (without it the POST crashes before reaching the
+        seller); by_alias keeps the spec-lowercase wire field names
+        (startdate/enddate/productid) the seller's avails endpoint expects.
+        """
+        return await self._request(
             "POST",
             "/products/avails",
             json=request.model_dump(mode="json", by_alias=True, exclude_none=True),
         )
-        response.raise_for_status()
-        return AvailsResponse.model_validate(response.json())
 
     # -------------------------------------------------------------------------
     # Accounts

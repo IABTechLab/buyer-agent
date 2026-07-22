@@ -3,8 +3,10 @@
 
 """Pydantic models for IAB OpenDirect 2.1 resources.
 
-The avails query models (``AvailsRequest``/``AvailsResponse``) are the
-shared contract classes from ``iab_agentic_primitives.protocol``,
+The avails query models (legacy ``AvailsRequest``/``AvailsResponse``
+and the OpenDirect 2.1 spec-dialect ``ProductAvailsSearch``/``Avails``/
+``AvailsStatus``/``AvailsCollection``) are the shared contract classes
+from ``iab_agentic_primitives.protocol``,
 re-exported here so existing imports keep working (EP-12 adoption: one
 canonical home for the wire contract, no per-repo drift). The wire
 dialect is unchanged — the shared classes preserve the spec-lowercase /
@@ -17,10 +19,22 @@ from enum import Enum
 from typing import Any
 
 from iab_agentic_primitives.protocol import (
+    Avails as Avails,  # noqa: PLC0414 — explicit re-export
+)
+from iab_agentic_primitives.protocol import (
+    AvailsCollection as AvailsCollection,  # noqa: PLC0414 — explicit re-export
+)
+from iab_agentic_primitives.protocol import (
     AvailsRequest as AvailsRequest,  # noqa: PLC0414 — explicit re-export
 )
 from iab_agentic_primitives.protocol import (
     AvailsResponse as AvailsResponse,  # noqa: PLC0414 — explicit re-export
+)
+from iab_agentic_primitives.protocol import (
+    AvailsStatus as AvailsStatus,  # noqa: PLC0414 — explicit re-export
+)
+from iab_agentic_primitives.protocol import (
+    ProductAvailsSearch as ProductAvailsSearch,  # noqa: PLC0414 — explicit re-export
 )
 from pydantic import BaseModel, Field
 
