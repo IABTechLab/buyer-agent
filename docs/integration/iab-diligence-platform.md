@@ -59,12 +59,29 @@ Three response states matter to the buyer agent:
 | `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. Applies at both discovery and deal-request stages when enforcement is on. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime. Discovery→pricing→booking reuse a single SGP call within the TTL.                                                                         |
 
-!!! warning "Enforcement without a key is a no-op"
-    If `SGP_ENFORCE=true` but `SGP_API_KEY` is empty, the gate cannot be evaluated and is silently bypassed. The buyer agent logs a warning at flow construction time so this misconfiguration is visible.
+!!! warning "Enforcement without a key fails closed"
+    If `SGP_ENFORCE=true` but `SGP_API_KEY` is empty, the canonical booking pipeline cannot verify any vendor and **fails closed**: no seller passes discovery until a key is configured. The buyer agent logs an error at orchestrator construction time, and each excluded seller gets an `sgp.vendor_gate` event with outcome `unconfigured` and a causeful reason. Enforcement never silently books unverified vendors because a key is missing.
 
 ## Where the gate runs
 
-The integration plugs into two existing buyer-agent tools. Behavior at each stage is governed by the same `SGP_ENFORCE` flag.
+### Canonical booking pipeline
+
+The gate is wired into the real booking path: `DealBookingFlow` → `MultiSellerOrchestrator`. When `SGP_ENFORCE=true`, the orchestrator's discovery stage batches every discovered seller's domain into a single approval lookup (the client chunks by 10 and caches per `SGP_CACHE_TTL_SECONDS`) and excludes sellers that fail the check **before any quote or booking request is sent**. Each per-seller decision is emitted on the event bus as `sgp.vendor_gate` with an outcome:
+
+| Outcome | Meaning | Seller kept? |
+|---|---|---|
+| `approved` | SGP verifies the vendor's IAB buyer-agent approval | ✅ |
+| `denied` | Vendor exists in SGP but is NOT approved | ❌ |
+| `unknown_blocked` / `unknown_warned` / `unknown_allowed` | Vendor not in the SGP portfolio; per `SGP_UNKNOWN_VENDOR_POLICY` | per policy |
+| `no_domain` | No domain derivable from the seller URL — unverifiable | ❌ |
+| `check_failed` | The SGP lookup itself failed — **all** sellers fail closed | ❌ |
+| `unconfigured` | Enforcing with no `SGP_API_KEY` — **all** sellers fail closed | ❌ |
+
+Every excluding outcome carries a non-empty, causeful `reason` (for transport failures: exception class plus detail). With `SGP_ENFORCE=false` (the default) the pipeline makes **zero** SGP calls and behaves exactly as before.
+
+### Example tools
+
+The integration also plugs into two example buyer-agent tools. Behavior at each stage is governed by the same `SGP_ENFORCE` flag.
 
 ### Inventory discovery
 
@@ -153,8 +170,8 @@ tool = SGPVendorApprovalTool(client=sgp)
 
 Give this tool to an agent alongside the discovery and deal-request tools so it can consult approval status during product selection (before commitment), not only at Deal ID generation time.
 
-!!! warning "Not wired into the canonical booking flow"
-    The SGP gating tools are fully implemented, but the canonical `DealBookingFlow` does not currently construct them. Today they are exercised by the example workflow in `examples/dsp_deal_discovery.py`; to enforce SGP gating in your own workflow, wire an `SGPClient` into `DiscoverInventoryTool` / `RequestDealTool` as shown above.
+!!! note "Canonical flow is gated automatically"
+    The canonical `DealBookingFlow` / `MultiSellerOrchestrator` pipeline constructs the gate from settings on its own (see "Canonical booking pipeline" above) — no manual wiring needed there. The `DiscoverInventoryTool` / `RequestDealTool` wiring shown above applies to custom workflows built on the example tools, exercised by `examples/dsp_deal_discovery.py`.
 
 The class is prefixed `SGP` so future vendor-approval integrations can coexist under their own class names and CrewAI `name` attributes without colliding.
 
@@ -166,7 +183,7 @@ The class is prefixed `SGP` so future vendor-approval integrations can coexist u
 | `Deal blocked: <domain> is not in your IAB Diligence Platform portfolio` | The vendor is not onboarded in SGP. Add and approve the vendor in SGP, or switch `SGP_UNKNOWN_VENDOR_POLICY` to `warn` for soft-fail behavior. |
 | `Deal blocked: <vendor> does not carry the IAB buyer-agent approval flag` | The vendor is onboarded but not marked approved for IAB buyer-agent purchases. Toggle the approval in SGP.                                     |
 | `Deal blocked: IAB Diligence Platform lookup failed` | SGP was unreachable or returned a transient error. Enforcement fails closed; retry once the service is reachable.                              |
-| Gate seems to do nothing | Either `SGP_API_KEY` is empty or `SGP_ENFORCE=false`. Check startup logs for the bypass warning.                                               |
+| Gate seems to do nothing | `SGP_ENFORCE=false` (the default) — the gate is fully inert. With `SGP_ENFORCE=true` and no key, the pipeline fails closed instead (no sellers pass discovery); check the logs and `sgp.vendor_gate` events. |
 
 ## Related
 

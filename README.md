@@ -119,7 +119,7 @@ Reveal buyer identity progressively to unlock better pricing from sellers:
 
 ### Vendor Approval Gating (optional)
 
-Plug in an [IAB Diligence Platform](https://safeguardprivacy.com) tenant to keep unapproved sellers out of the buyer-agent workflow. Consults the `iabBuyerAgentApproval` flag via SGP's integration API. When `SGP_ENFORCE=true`, `DiscoverInventoryTool` filters NOT APPROVED vendors out of search results before the agent ever sees them, and `RequestDealTool` enforces the same check as a safety net at Deal ID time. With enforcement off, products are annotated APPROVED / NOT APPROVED / UNKNOWN but never filtered. Off by default — inert when `SGP_API_KEY` is empty.
+Plug in an [IAB Diligence Platform](https://safeguardprivacy.com) tenant to keep unapproved sellers out of the buyer-agent workflow. Consults the `iabBuyerAgentApproval` flag via SGP's integration API. When `SGP_ENFORCE=true`, the canonical booking pipeline (`DealBookingFlow` / `MultiSellerOrchestrator`) excludes NOT APPROVED sellers at the discovery stage, before quoting or booking, and emits one `sgp.vendor_gate` event per decision. The gate fails closed: if the SGP API is unreachable while enforcing — or `SGP_ENFORCE` is set without an `SGP_API_KEY` — no seller passes, with a causeful reason on the event trail. Unknown vendors (not in your SGP portfolio) follow `SGP_UNKNOWN_VENDOR_POLICY` (`block` default / `warn` / `allow`). The example `DiscoverInventoryTool` / `RequestDealTool` apply the same checks. Off by default — with `SGP_ENFORCE` unset there are zero SGP calls and booking behavior is unchanged.
 
 → [IAB Diligence Platform Approval](https://iabtechlab.github.io/buyer-agent/integration/iab-diligence-platform/)
 

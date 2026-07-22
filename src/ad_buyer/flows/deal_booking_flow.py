@@ -125,6 +125,41 @@ def build_default_orchestrator() -> MultiSellerOrchestrator:
         catalog_client_factory=(
             _make_catalog_client if settings.product_resolution_enabled else None
         ),
+        # SGP vendor-approval gate. Inert by default
+        # (SGP_ENFORCE=false -> no client, no calls, byte-identical
+        # behavior). SGP_ENFORCE=true without SGP_API_KEY yields an
+        # enforcing orchestrator with NO client, which fails closed at
+        # discovery -- enforcement must never silently book unverified
+        # vendors because a key is missing.
+        sgp_client=_build_sgp_client(settings),
+        sgp_enforce=settings.sgp_enforce,
+        sgp_unknown_policy=settings.sgp_unknown_vendor_policy,
+    )
+
+
+def _build_sgp_client(settings: Any) -> Any | None:
+    """SGPClient for the vendor-approval gate, or None when not needed.
+
+    A client is only constructed when the gate will actually consult it:
+    ``SGP_ENFORCE`` on AND ``SGP_API_KEY`` non-empty. Enforcing without a
+    key logs loudly and returns None; the orchestrator then fails closed
+    (no sellers pass discovery) rather than booking unverifiable vendors.
+    """
+    if not settings.sgp_enforce:
+        return None
+    if not settings.sgp_api_key:
+        logger.error(
+            "SGP_ENFORCE is on but SGP_API_KEY is empty; the SGP "
+            "vendor-approval gate will FAIL CLOSED (no sellers pass "
+            "discovery) until a key is configured."
+        )
+        return None
+    from ..clients.sgp_client import SGPClient
+
+    return SGPClient(
+        api_key=settings.sgp_api_key,
+        base_url=settings.sgp_base_url,
+        cache_ttl_seconds=settings.sgp_cache_ttl_seconds,
     )
 
 
