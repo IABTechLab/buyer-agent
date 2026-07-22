@@ -1,12 +1,27 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Pydantic models for IAB OpenDirect 2.1 resources."""
+"""Pydantic models for IAB OpenDirect 2.1 resources.
+
+The avails query models (``AvailsRequest``/``AvailsResponse``) are the
+shared contract classes from ``iab_agentic_primitives.protocol``,
+re-exported here so existing imports keep working (EP-12 adoption: one
+canonical home for the wire contract, no per-repo drift). The wire
+dialect is unchanged — the shared classes preserve the spec-lowercase /
+camelCase-extension shape byte-for-byte; see
+``tests/unit/test_avails_contract_adoption.py`` for the round-trip pins.
+"""
 
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
+from iab_agentic_primitives.protocol import (
+    AvailsRequest as AvailsRequest,  # noqa: PLC0414 — explicit re-export
+)
+from iab_agentic_primitives.protocol import (
+    AvailsResponse as AvailsResponse,  # noqa: PLC0414 — explicit re-export
+)
 from pydantic import BaseModel, Field
 
 
@@ -163,40 +178,6 @@ class Assignment(BaseModel):
     line_id: str = Field(..., alias="lineId")
     status: str | None = None
     ext: dict[str, Any] | None = None
-
-    model_config = {"populate_by_name": True}
-
-
-class AvailsRequest(BaseModel):
-    """Request for availability check.
-
-    ``productid`` is still scalar (the spec's ``productids`` array is the
-    Tier-2 structural change); the alias follows the spec-lowercase
-    dialect so the field set stays case-consistent on the wire.
-    """
-
-    product_id: str = Field(..., alias="productid")
-    start_date: datetime = Field(..., alias="startdate")
-    end_date: datetime = Field(..., alias="enddate")
-    requested_impressions: int | None = Field(default=None, alias="requestedImpressions")
-    budget: float | None = None
-    targeting: dict[str, Any] | None = None
-
-    model_config = {"populate_by_name": True}
-
-
-class AvailsResponse(BaseModel):
-    """Response from availability check."""
-
-    product_id: str = Field(..., alias="productid")
-    available_impressions: int = Field(..., alias="availableImpressions")
-    guaranteed_impressions: int | None = Field(default=None, alias="guaranteedImpressions")
-    estimated_cpm: float = Field(..., alias="estimatedCpm")
-    total_cost: float = Field(..., alias="totalCost")
-    delivery_confidence: float | None = Field(
-        default=None, alias="deliveryConfidence", ge=0, le=100
-    )
-    available_targeting: list[str] | None = Field(default=None, alias="availableTargeting")
 
     model_config = {"populate_by_name": True}
 
