@@ -57,14 +57,17 @@ BUYER_AVAILS_REQUEST_WIRE = {
     "targeting": {"geo": ["US"], "device": ["mobile"]},
 }
 
+# Canonical policy shape: optionals with no value are OMITTED, never
+# null-padded (deliveryConfidence has no data source; this product is
+# PG-capable so guaranteedImpressions is present). Legacy null-padded
+# payloads (seller <= v2.1.x) are pinned as still-parseable in
+# test_avails_contract_adoption.py.
 SELLER_AVAILS_RESPONSE_WIRE = {
     "productid": "prod-display-001",
     "availableImpressions": 750000,
     "guaranteedImpressions": 500000,
     "estimatedCpm": 12.0,
     "totalCost": 6000.0,
-    "deliveryConfidence": None,
-    "availableTargeting": None,
 }
 
 

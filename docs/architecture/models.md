@@ -199,7 +199,7 @@ Creative-to-line binding. Fields: `id`, `creative_id`, `line_id`, `status`.
 
 ### AvailsRequest / AvailsResponse
 
-Used for availability and pricing checks. Request fields: `product_id`, `start_date`, `end_date`, `requested_impressions`, `budget`, `targeting`. Response fields: `product_id`, `available_impressions`, `guaranteed_impressions`, `estimated_cpm`, `total_cost`, `delivery_confidence`, `available_targeting`.
+Used for availability and pricing checks. These are the shared contract classes from `iab_agentic_primitives.protocol` (the canonical home of the avails wire contract), re-exported here under the same names. Request fields: `product_id`, `start_date`, `end_date`, `requested_impressions`, `budget`, `targeting`. Response fields: `product_id`, `available_impressions` (always present), `guaranteed_impressions` (present only for PG-capable products), `estimated_cpm`, `total_cost`, `delivery_confidence` (omitted when the seller has no forecast data source), `available_targeting`.
 
 ### LineStats
 

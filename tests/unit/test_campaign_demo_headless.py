@@ -15,8 +15,14 @@ def _run_module(args: list[str]) -> subprocess.CompletedProcess:
     tmp_dir = tempfile.mkdtemp(prefix="campaign-demo-")
     db_path = f"sqlite:///{tmp_dir}/demo.db"
     # `src` puts ad_buyer on the path; `.` makes the top-level demo package
-    # (moved out of the shipped wheel in EP-8.1) importable.
-    env = {**os.environ, "CAMPAIGN_DEMO_DB": db_path, "PYTHONPATH": f"src{os.pathsep}."}
+    # (moved out of the shipped wheel in EP-8.1) importable. The inherited
+    # PYTHONPATH is preserved so dev environments that shadow pinned
+    # dependencies (e.g. an unreleased iab-agentic-primitives checkout)
+    # compose instead of being silently dropped.
+    python_path = f"src{os.pathsep}."
+    if os.environ.get("PYTHONPATH"):
+        python_path = f"{python_path}{os.pathsep}{os.environ['PYTHONPATH']}"
+    env = {**os.environ, "CAMPAIGN_DEMO_DB": db_path, "PYTHONPATH": python_path}
     return subprocess.run(
         [sys.executable, "-m", "demo.campaign_demo", *args],
         env=env,
