@@ -43,6 +43,7 @@ from ..clients.capability_client import (
     CapabilityDiscoveryResult,
 )
 from ..clients.deals_client import DealsClientError
+from ..clients.sgp_client import SGPClient
 from ..events.models import Event, EventType
 from ..models.audience_plan import AudiencePlan, AudienceStrictness
 from ..models.deals import (
@@ -86,6 +87,13 @@ def _failure_reason(
     base = " ".join(parts)
     detail = str(exc).strip()
     return f"{base}: {detail}" if detail else base
+
+
+# Valid values for the orchestrator's ``sgp_unknown_policy`` (how to treat
+# sellers absent from the buyer's SGP portfolio while enforcing). Mirrors
+# the example tools' vocabulary so SGP_UNKNOWN_VENDOR_POLICY means the same
+# thing everywhere.
+_VALID_SGP_UNKNOWN_POLICIES = ("block", "warn", "allow")
 
 
 # Error code emitted by the seller per proposal §5.7 layer 3 when the
@@ -466,6 +474,19 @@ class MultiSellerOrchestrator:
             quoting it -- a product ID is only ever sent to
             the seller it came from. When None, the legacy passthrough
             behavior is preserved (same product_id sent to every seller).
+        sgp_client: Optional SGP (IAB Diligence Platform) client used by
+            the vendor-approval gate. Only consulted when ``sgp_enforce``
+            is True; with enforcement off (the default) no SGP calls are
+            made and behavior is unchanged.
+        sgp_enforce: When True, ``discover_sellers`` excludes sellers
+            whose IAB buyer-agent approval is not positively verified on
+            the buyer's SGP tenant, and fails closed (excludes ALL
+            sellers, with a causeful ``sgp.vendor_gate`` reason) when the
+            approval check cannot complete -- including when no
+            ``sgp_client`` is configured at all.
+        sgp_unknown_policy: How to treat sellers absent from the buyer's
+            SGP portfolio while enforcing. One of ``"block"`` (default),
+            ``"warn"`` (keep, with a warning event), ``"allow"``.
     """
 
     def __init__(
@@ -479,6 +500,9 @@ class MultiSellerOrchestrator:
         negotiation_client: Any | None = None,
         negotiation_config: NegotiationConfig | None = None,
         catalog_client_factory: Callable[..., Any] | None = None,
+        sgp_client: Any | None = None,
+        sgp_enforce: bool = False,
+        sgp_unknown_policy: str = "block",
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
@@ -500,6 +524,22 @@ class MultiSellerOrchestrator:
         # injection idiom as `capability_client`: when None, no resolution
         # runs and the quote path behaves exactly as before.
         self._catalog_client_factory = catalog_client_factory
+        # SGP vendor-approval gate. Inert
+        # unless ``sgp_enforce`` is True: with enforcement off there are
+        # ZERO SGP calls and discovery behavior is byte-identical to the
+        # pre-gate orchestrator, even when a client is injected. When
+        # enforcing, `discover_sellers` excludes sellers whose IAB
+        # buyer-agent approval cannot be positively verified on the
+        # buyer's SGP (IAB Diligence Platform) tenant -- and FAILS CLOSED
+        # (no seller passes) when the check itself cannot complete.
+        if sgp_unknown_policy not in _VALID_SGP_UNKNOWN_POLICIES:
+            raise ValueError(
+                f"Invalid sgp_unknown_policy {sgp_unknown_policy!r}. "
+                f"Must be one of {_VALID_SGP_UNKNOWN_POLICIES}."
+            )
+        self._sgp_client = sgp_client
+        self._sgp_enforce = sgp_enforce
+        self._sgp_unknown_policy = sgp_unknown_policy
 
     # ------------------------------------------------------------------
     # Event helpers
@@ -535,6 +575,11 @@ class MultiSellerOrchestrator:
         capabilities filter, then applies exclusion rules:
         - Removes sellers in the excluded_sellers list
         - Removes sellers with BLOCKED trust level
+        - When ``sgp_enforce`` is on: removes sellers whose IAB
+          buyer-agent approval is not verified on the buyer's SGP tenant
+          (fail-closed when the check cannot complete). The
+          ``inventory.discovered`` event reflects the POST-gate list so
+          downstream counts stay truthful.
 
         Args:
             requirements: Inventory requirements for filtering sellers.
@@ -556,6 +601,12 @@ class MultiSellerOrchestrator:
         # Filter out blocked sellers
         sellers = [s for s in sellers if s.trust_level != TrustLevel.BLOCKED]
 
+        # SGP vendor-approval gate. Only entered when
+        # enforcement is on: the disabled default makes zero SGP calls and
+        # leaves the discovery result byte-identical.
+        if self._sgp_enforce:
+            sellers = await self._apply_sgp_gate(sellers)
+
         # Emit discovery event
         await self._emit(
             EventType.INVENTORY_DISCOVERED,
@@ -572,6 +623,177 @@ class MultiSellerOrchestrator:
             requirements.media_type,
         )
         return sellers
+
+    # ------------------------------------------------------------------
+    # Stage 1 gate: SGP vendor approval
+    # ------------------------------------------------------------------
+
+    async def _emit_sgp_gate(
+        self,
+        seller: AgentCard,
+        *,
+        domain: str | None,
+        outcome: str,
+        reason: str | None = None,
+        company_name: str | None = None,
+    ) -> None:
+        """Emit one ``sgp.vendor_gate`` event for a per-seller decision."""
+        await self._emit(
+            EventType.SGP_VENDOR_GATE,
+            payload={
+                "seller_id": seller.agent_id,
+                "seller_url": seller.url,
+                "domain": domain,
+                "outcome": outcome,
+                "reason": reason,
+                "company_name": company_name,
+            },
+        )
+
+    async def _apply_sgp_gate(self, sellers: list[AgentCard]) -> list[AgentCard]:
+        """Filter discovered sellers by SGP IAB buyer-agent approval.
+
+        Only called when ``sgp_enforce`` is True. Decisions, all emitted
+        as ``sgp.vendor_gate`` events with a truthful outcome + reason:
+
+        - ``approved``: SGP verifies the seller's approval -> kept.
+        - ``denied``: SGP says NOT approved -> excluded.
+        - ``unknown_*``: seller not in the buyer's SGP portfolio ->
+          per ``sgp_unknown_policy`` (block / warn / allow).
+        - ``no_domain``: no domain derivable from the seller URL ->
+          unverifiable -> excluded (fail closed for that seller).
+        - ``check_failed``: the SGP lookup itself failed -> ALL sellers
+          excluded (fail closed), reason carries the exception class and
+          detail via ``_failure_reason`` -- never an empty string.
+        - ``unconfigured``: enforcing with no SGP client at all (e.g.
+          SGP_ENFORCE set without SGP_API_KEY) -> ALL sellers excluded.
+          Enforcement without a way to verify must not book blind.
+
+        Domains are normalized with ``SGPClient.normalize_domain`` (the
+        static helper, so injected test doubles only need
+        ``check_approvals``) and looked up in ONE batched call; the client
+        chunks by 10 and caches per ``SGP_CACHE_TTL_SECONDS``.
+        """
+        if not sellers:
+            return []
+
+        if self._sgp_client is None:
+            reason = (
+                "SGP_ENFORCE is on but no SGP client is configured "
+                "(SGP_API_KEY missing?): vendor approval is unverifiable, "
+                "failing closed -- no sellers pass the vendor-approval gate"
+            )
+            logger.error(reason)
+            for seller in sellers:
+                await self._emit_sgp_gate(
+                    seller, domain=None, outcome="unconfigured", reason=reason
+                )
+            return []
+
+        # Derive one normalized domain per seller; sellers with no
+        # derivable domain are unverifiable and excluded immediately.
+        pairs: list[tuple[AgentCard, str]] = []
+        for seller in sellers:
+            domain = SGPClient.normalize_domain(seller.url)
+            if not domain:
+                reason = (
+                    f"Cannot derive a domain from seller URL {seller.url!r}; "
+                    f"vendor approval is unverifiable while SGP_ENFORCE is on, "
+                    f"failing closed for this seller"
+                )
+                logger.warning("SGP gate excluding seller %s: %s", seller.agent_id, reason)
+                await self._emit_sgp_gate(seller, domain=None, outcome="no_domain", reason=reason)
+                continue
+            pairs.append((seller, domain))
+
+        if not pairs:
+            return []
+
+        try:
+            approvals = await self._sgp_client.check_approvals(
+                sorted({domain for _, domain in pairs})
+            )
+        except Exception as exc:  # noqa: BLE001 - fail closed on ANY lookup failure
+            reason = _failure_reason(exc, context="SGP approval check")
+            logger.error(
+                "SGP approval check failed while enforcing; failing closed for all %d sellers: %s",
+                len(pairs),
+                reason,
+            )
+            for seller, domain in pairs:
+                await self._emit_sgp_gate(
+                    seller, domain=domain, outcome="check_failed", reason=reason
+                )
+            return []
+
+        kept: list[AgentCard] = []
+        for seller, domain in pairs:
+            record = approvals.get(domain)
+            if record is None:
+                if self._sgp_unknown_policy == "allow":
+                    await self._emit_sgp_gate(
+                        seller,
+                        domain=domain,
+                        outcome="unknown_allowed",
+                        reason=(
+                            f"Seller domain {domain} is not in the buyer's SGP "
+                            f"portfolio; allowed by SGP_UNKNOWN_VENDOR_POLICY=allow"
+                        ),
+                    )
+                    kept.append(seller)
+                elif self._sgp_unknown_policy == "warn":
+                    reason = (
+                        f"Seller domain {domain} is not in the buyer's SGP "
+                        f"portfolio; proceeding with warning per "
+                        f"SGP_UNKNOWN_VENDOR_POLICY=warn"
+                    )
+                    logger.warning("SGP gate: %s", reason)
+                    await self._emit_sgp_gate(
+                        seller, domain=domain, outcome="unknown_warned", reason=reason
+                    )
+                    kept.append(seller)
+                else:  # "block" (default)
+                    reason = (
+                        f"Seller domain {domain} is not in the buyer's SGP "
+                        f"portfolio; excluded per SGP_UNKNOWN_VENDOR_POLICY=block. "
+                        f"Onboard and approve the vendor in SGP to include it."
+                    )
+                    logger.warning("SGP gate excluding seller %s: %s", seller.agent_id, reason)
+                    await self._emit_sgp_gate(
+                        seller, domain=domain, outcome="unknown_blocked", reason=reason
+                    )
+                continue
+
+            if record.iab_buyer_agent_approval:
+                await self._emit_sgp_gate(
+                    seller,
+                    domain=domain,
+                    outcome="approved",
+                    company_name=record.company_name or None,
+                )
+                kept.append(seller)
+            else:
+                reason = (
+                    f"Seller domain {domain} "
+                    f"({record.company_name or 'unnamed vendor'}) is NOT "
+                    f"approved for IAB buyer-agent transactions on the "
+                    f"buyer's SGP tenant; excluded from booking"
+                )
+                logger.warning("SGP gate excluding seller %s: %s", seller.agent_id, reason)
+                await self._emit_sgp_gate(
+                    seller,
+                    domain=domain,
+                    outcome="denied",
+                    reason=reason,
+                    company_name=record.company_name or None,
+                )
+
+        logger.info(
+            "SGP vendor-approval gate: %d of %d sellers passed",
+            len(kept),
+            len(sellers),
+        )
+        return kept
 
     # ------------------------------------------------------------------
     # Stage 1.5: Cross-seller product resolution

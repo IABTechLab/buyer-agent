@@ -382,7 +382,7 @@ Provide specific, actionable recommendations based on user requirements.""",
         if self._sellers:
             from ...config.settings import get_settings
             from ...events.bus import get_event_bus_sync
-            from ...flows.deal_booking_flow import _make_catalog_client
+            from ...flows.deal_booking_flow import _build_sgp_client, _make_catalog_client
 
             _settings = get_settings()
             self._orchestrator = MultiSellerOrchestrator(
@@ -396,6 +396,12 @@ Provide specific, actionable recommendations based on user requirements.""",
                 catalog_client_factory=(
                     _make_catalog_client if _settings.product_resolution_enabled else None
                 ),
+                # Same SGP vendor-approval gate as the canonical
+                # build_default_orchestrator wiring (see its notes on the
+                # fail-closed enforce-without-key case).
+                sgp_client=_build_sgp_client(_settings),
+                sgp_enforce=_settings.sgp_enforce,
+                sgp_unknown_policy=_settings.sgp_unknown_vendor_policy,
             )
         else:
             self._orchestrator = build_default_orchestrator()

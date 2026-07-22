@@ -209,9 +209,9 @@ Optional integration that gates deal requests against the buyer's [IAB Diligence
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `SGP_API_KEY` | `str` | `""` | API key with the `iab:buyerAgent` scope. Empty = integration disabled. |
+| `SGP_API_KEY` | `str` | `""` | API key with the `iab:buyerAgent` scope. Empty with `SGP_ENFORCE=true` = the gate fails closed (no sellers pass discovery). |
 | `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | SGP base URL. Staging: `https://api.safeguardprivacy-demo.com`. |
-| `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery and Deal ID generation is blocked for them. SGP transport errors halt the flow. |
+| `SGP_ENFORCE` | `bool` | `False` | When `True`, the canonical booking pipeline excludes sellers without verified IAB buyer-agent approval at discovery, emitting `sgp.vendor_gate` events; SGP transport errors fail closed. When `False` (default): zero SGP calls, behavior unchanged. |
 | `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `block` | Behavior when the vendor is not in the buyer's SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime for approval lookups. |
 

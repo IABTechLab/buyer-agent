@@ -56,6 +56,17 @@ class EventType(str, Enum):
     # "catalog_error") so the rig can see WHY a seller was quoted or skipped.
     PRODUCT_RESOLUTION = "product.resolution"
 
+    # SGP vendor-approval gate: emitted once per seller when SGP_ENFORCE
+    # is on and the orchestrator checks the seller's IAB buyer-agent
+    # approval on the IAB Diligence Platform during discovery. Payload
+    # carries the outcome ("approved" | "denied" | "unknown_blocked" |
+    # "unknown_warned" | "unknown_allowed" | "no_domain" | "check_failed" |
+    # "unconfigured") so the rig can see WHY a seller passed or was
+    # excluded. Every excluding outcome carries a causeful, non-empty
+    # reason -- including the fail-closed paths (SGP unreachable, or
+    # enforcing with no client configured).
+    SGP_VENDOR_GATE = "sgp.vendor_gate"
+
     # Negotiation lifecycle
     NEGOTIATION_STARTED = "negotiation.started"
     NEGOTIATION_ROUND = "negotiation.round"

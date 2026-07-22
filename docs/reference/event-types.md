@@ -6,7 +6,7 @@
 Members of `ad_buyer.events.models.EventType`, the canonical set of
 event types published on the event bus.
 
-**Total: 39 event types**
+**Total: 40 event types**
 
 | Name | Value |
 | --- | --- |
@@ -49,3 +49,4 @@ event types published on the event bus.
 | `QUOTE_REQUESTED` | `quote.requested` |
 | `SESSION_CLOSED` | `session.closed` |
 | `SESSION_CREATED` | `session.created` |
+| `SGP_VENDOR_GATE` | `sgp.vendor_gate` |

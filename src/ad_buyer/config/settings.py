@@ -47,11 +47,16 @@ class Settings(BaseSettings):
     opendirect_token: str | None = None
     opendirect_api_key: str | None = None
 
-    # IAB Diligence Platform — vendor approval gate.
-    # The integration is inert when ``sgp_api_key`` is empty; enforcement
-    # only activates once an SGP API key is supplied AND ``sgp_enforce``
-    # is true. When enforcing, NOT APPROVED vendors are filtered out at
-    # discovery and the request-stage gate acts as a safety net.
+    # IAB Diligence Platform — vendor approval gate, wired into the
+    # canonical booking path (MultiSellerOrchestrator discovery stage).
+    # Default OFF: with ``sgp_enforce`` false, no SGP client is built, no
+    # SGP calls are made, and booking behavior is byte-identical. When
+    # enforcing, sellers whose IAB buyer-agent approval cannot be
+    # positively verified are excluded from quoting/booking, with one
+    # ``sgp.vendor_gate`` event per decision. FAIL-CLOSED: when enforcing
+    # and the SGP API is unreachable — or ``sgp_enforce`` is set without
+    # an ``sgp_api_key`` — NO seller passes the gate; the emitted reason
+    # always carries the cause.
     sgp_api_key: str = ""
     # Production endpoint. For testing, use the demo environment:
     # https://api.safeguardprivacy-demo.com
