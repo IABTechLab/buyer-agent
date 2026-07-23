@@ -125,7 +125,15 @@ def _mount_order_router() -> None:
 _mount_order_router()
 
 # Paths that never require authentication
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+_PUBLIC_PATHS = {
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/buyer",
+    "/buyer/openapi-client.js",
+    "/buyer/api/proxy",
+}
 
 
 @app.middleware("http")
@@ -206,6 +214,7 @@ def _get_order_store() -> OrderStore | None:
 
 
 # Mount buyer order status/audit endpoints
+from .buyer_ui import install_buyer_ui  # noqa: E402
 from .order_endpoints import create_order_router as _create_order_router  # noqa: E402
 
 
@@ -217,6 +226,9 @@ def _persist_job(job_id: str, job: dict[str, Any]) -> None:
     here so tests can inject a store via ``_deal_store``.
     """
     booking_service.persist_job(_get_store(), job_id, job)
+
+
+install_buyer_ui(app)
 
 
 # Request/Response Models
