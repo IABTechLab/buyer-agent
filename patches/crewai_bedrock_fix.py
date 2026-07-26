@@ -45,6 +45,7 @@ def apply_patches():
         return
 
     _patch_handle_converse()
+    _patch_parse_native_tool_call()
     _patched = True
     logger.info("CrewAI Bedrock patches applied successfully")
 
@@ -89,7 +90,8 @@ def _sanitize_tool_blocks(messages: list) -> list:
     - If not matched, strips the toolUse blocks (keeps text blocks)
     - For each user message with toolResult blocks, checks if the previous
       assistant message has matching toolUse blocks
-    - If not matched, strips the toolResult blocks (keeps text blocks)
+    - If not matched, strips only the unmatched toolResult blocks (keeps
+      text blocks and toolResult blocks whose toolUseId does match)
 
     This handles both directions of orphaning:
     - Executor added toolUse but result is in a different message format
@@ -205,3 +207,47 @@ def _sanitize_tool_blocks(messages: list) -> list:
         i += 1
 
     return fixed
+
+
+def _patch_parse_native_tool_call():
+    """Patch CrewAgentExecutor._parse_native_tool_call to fix arg extraction.
+
+    Bug: When Bedrock Converse returns a toolUse dict like:
+        {"toolUseId": "...", "name": "get_pricing", "input": {"product_id": "..."}}
+
+    The parser does:
+        func_info = tool_call.get("function", {})  # returns {}
+        func_args = func_info.get("arguments", "{}") or tool_call.get("input", {})
+
+    Since func_info.get("arguments", "{}") returns the DEFAULT string "{}",
+    which is truthy, the `or` short-circuits and never reaches
+    tool_call.get("input", {}). Result: tool gets "{}" (empty JSON string)
+    instead of the real args.
+
+    Fix: Check for actual arguments before falling back to input.
+    """
+    try:
+        from crewai.agents.crew_agent_executor import CrewAgentExecutor
+
+        original_parse = CrewAgentExecutor._parse_native_tool_call
+
+        def _patched_parse(self, tool_call):
+            """Fix Bedrock toolUse argument extraction."""
+            # Handle Bedrock-format dicts directly before falling to original
+            if isinstance(tool_call, dict) and "toolUseId" in tool_call:
+                from crewai.utilities.agent_utils import sanitize_tool_name
+                call_id = tool_call.get("toolUseId", f"call_{id(tool_call)}")
+                func_name = sanitize_tool_name(tool_call.get("name", ""))
+                func_args = tool_call.get("input", {})
+                if func_name:
+                    return call_id, func_name, func_args
+
+            return original_parse(self, tool_call)
+
+        CrewAgentExecutor._parse_native_tool_call = _patched_parse
+        logger.info("Patched CrewAgentExecutor._parse_native_tool_call (Bedrock arg fix)")
+
+    except ImportError:
+        logger.warning("CrewAgentExecutor not available — skipping parse patch")
+    except Exception as e:
+        logger.warning("Failed to patch _parse_native_tool_call: %s", e)
