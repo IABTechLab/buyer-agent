@@ -86,7 +86,7 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
 
 # LLM model overrides (optional)
 DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
-MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+MANAGER_LLM_MODEL=anthropic/claude-opus-4-8
 ```
 
 ## Step 6: Start the Server

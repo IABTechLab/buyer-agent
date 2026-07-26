@@ -52,7 +52,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
     # LLM model overrides — uses provider/model format (native Anthropic, OpenAI, Gemini, Azure, Bedrock)
     DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
-    MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+    MANAGER_LLM_MODEL=anthropic/claude-opus-4-8
     # DEFAULT_LLM_MODEL=openai/gpt-4o         # OpenAI example
     # DEFAULT_LLM_MODEL=ollama/llama3          # Local Ollama example
 

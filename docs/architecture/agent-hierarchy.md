@@ -61,7 +61,7 @@ The Portfolio Manager is the top-level orchestrator. It receives a campaign brie
 | Attribute | Value |
 |-----------|-------|
 | Role | Portfolio Manager |
-| LLM | `anthropic/claude-opus-4-20250514` (configurable via `MANAGER_LLM_MODEL`) |
+| LLM | `anthropic/claude-opus-4-8` (configurable via `MANAGER_LLM_MODEL`) |
 | Temperature | 0.3 |
 | Delegation | Enabled --- delegates to Level 2 agents |
 | Memory | Enabled |

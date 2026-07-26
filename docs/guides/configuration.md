@@ -20,7 +20,7 @@ IAB_SERVER_URL=http://localhost:8001
 
 # Optional overrides
 DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
-MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+MANAGER_LLM_MODEL=anthropic/claude-opus-4-8
 LOG_LEVEL=INFO
 ```
 
@@ -81,7 +81,7 @@ endpoints = settings.get_seller_endpoints()
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `DEFAULT_LLM_MODEL` | `str` | `anthropic/claude-sonnet-4-5-20250929` | Model for Level 2 channel specialists and Level 3 functional agents. |
-| `MANAGER_LLM_MODEL` | `str` | `anthropic/claude-opus-4-20250514` | Model for the Level 1 Portfolio Manager. Opus is used for strategic reasoning. |
+| `MANAGER_LLM_MODEL` | `str` | `anthropic/claude-opus-4-8` | Model for the Level 1 Portfolio Manager. Opus is used for strategic reasoning. |
 | `LLM_TEMPERATURE` | `float` | `0.3` | Default temperature for LLM calls. Individual agents may override this. |
 | `LLM_MAX_TOKENS` | `int` | `4096` | Maximum token output for LLM responses. |
 | `OPENAI_COMPATIBLE_LLM_API_KEY` | `str` | `None` | API key for a [custom OpenAI-compatible endpoint](#custom-openai-compatible-endpoints) (optional — some endpoints don't require one). |
@@ -92,7 +92,7 @@ Models are specified in `provider/model-name` format using CrewAI's native provi
 ```bash
 # Use a different model provider
 DEFAULT_LLM_MODEL=openai/gpt-4o
-MANAGER_LLM_MODEL=anthropic/claude-opus-4-20250514
+MANAGER_LLM_MODEL=anthropic/claude-opus-4-8
 ```
 
 ### Supported Providers
