@@ -13,9 +13,19 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.this.repository_url
 }
 
+output "ecr_repository_arn" {
+  description = "ARN of the ECR repository (used by the GitHub deploy IAM role)"
+  value       = aws_ecr_repository.this.arn
+}
+
 output "ecs_cluster_name" {
   description = "Name of the ECS cluster"
   value       = aws_ecs_cluster.this.name
+}
+
+output "ecs_cluster_arn" {
+  description = "ARN of the ECS cluster (used by the GitHub deploy IAM role)"
+  value       = aws_ecs_cluster.this.arn
 }
 
 output "ecs_service_name" {

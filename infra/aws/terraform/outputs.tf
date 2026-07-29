@@ -23,6 +23,11 @@ output "ecs_cluster_name" {
   value       = module.compute.ecs_cluster_name
 }
 
+output "ecs_cluster_arn" {
+  description = "ARN of the ECS cluster"
+  value       = module.compute.ecs_cluster_arn
+}
+
 output "ecs_service_name" {
   description = "Name of the ECS service"
   value       = module.compute.ecs_service_name

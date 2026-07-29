@@ -9,11 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "ad-buyer-system-terraform-state"
-    key            = "terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "ad-buyer-system-terraform-lock"
-    encrypt        = true
+    bucket       = "ad-buyer-system-terraform-state"
+    key          = "terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 
