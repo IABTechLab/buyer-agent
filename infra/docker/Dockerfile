@@ -4,14 +4,10 @@
 # Stage 1: Build dependencies (cached layer)
 # Stage 2: Production runtime (minimal image)
 #
-# Private git deps (iab-agentic-primitives) require a GitHub token.
-# Pass it at build time via BuildKit secret — never baked into any layer:
+# pyproject declares a git dependency (iab-agentic-primitives), which is a
+# public repository — no token or BuildKit secret is needed for the clone:
 #
-#   docker build \
-#     --secret id=github_token,env=GITHUB_TOKEN \
-#     -f infra/docker/Dockerfile -t buyer-agent:local .
-#
-# In GitHub Actions the GITHUB_TOKEN is passed automatically (see deploy.yml).
+#   docker build -f infra/docker/Dockerfile -t buyer-agent:local .
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -21,29 +17,22 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
+# git is required: pyproject declares a git dependency (iab-agentic-primitives)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies into a virtual env so we can copy it cleanly
+# Install everything into a virtual env so we can copy it cleanly.
+# No separate dependency layer: an editable hatchling build needs the
+# source tree present, so a pyproject-only install cannot succeed and
+# would only mask failures.
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --no-cache-dir --upgrade pip
-
-# Copy source and install all deps.
-# The GitHub token is mounted as a BuildKit secret — used only during this
-# RUN step and never written to any image layer.
-COPY pyproject.toml README.md ./
-COPY src ./src
-
-RUN --mount=type=secret,id=github_token \
-    export GH_TOKEN=$(cat /run/secrets/github_token) && \
-    GIT_CONFIG_COUNT=1 \
-    GIT_CONFIG_KEY_0="url.https://${GH_TOKEN}@github.com/.insteadOf" \
-    GIT_CONFIG_VALUE_0="https://github.com/" \
-    pip install --no-cache-dir -e .
+COPY . .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -e .
 
 # ---------------------------------------------------------------------------
 # Stage 2 — Runtime
@@ -68,7 +57,8 @@ COPY --from=builder /build/src ./src
 COPY --from=builder /build/pyproject.toml ./
 COPY --from=builder /build/README.md ./
 
-# Register the editable package — deps already in venv, skip resolution
+# Re-point the editable install at /app; dependencies already live in the
+# copied venv, so skip resolution (which would also need git at runtime)
 RUN pip install --no-cache-dir --no-deps -e .
 
 # Create data directory for SQLite (owned by non-root user)
