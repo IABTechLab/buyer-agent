@@ -68,6 +68,7 @@ def list_deals(
     deal_summaries = [
         {
             "deal_id": d["id"],
+            "seller_deal_id": d.get("seller_deal_id"),
             "display_name": d.get("display_name") or d.get("product_name") or "(unnamed)",
             "status": d.get("status", "unknown"),
             "deal_type": d.get("deal_type", "unknown"),
@@ -118,6 +119,7 @@ def search_deals(store: DealStore, query: str) -> dict[str, Any]:
             matches.append(
                 {
                     "deal_id": deal["id"],
+                    "seller_deal_id": deal.get("seller_deal_id"),
                     "display_name": (
                         deal.get("display_name") or deal.get("product_name") or "(unnamed)"
                     ),
@@ -217,9 +219,19 @@ def portfolio_summary(
     *,
     top_sellers_count: int = 5,
     expiring_within_days: int = 30,
+    seller_org: str | None = None,
+    seller_domain: str | None = None,
 ) -> dict[str, Any]:
-    """Aggregate portfolio statistics (counts, value, top sellers, expiring)."""
-    deals = store.list_deals(limit=10000)
+    """Aggregate portfolio statistics (counts, value, top sellers, expiring).
+
+    By default this summarizes every deal in the local deal library,
+    across all sellers and SSPs ever synced -- not just one account. Pass
+    seller_org and/or seller_domain to scope the summary down to a single
+    seller for an apples-to-apples comparison against that seller's API.
+    """
+    deals = store.list_deals(limit=10000, seller_domain=seller_domain)
+    if seller_org is not None:
+        deals = [d for d in deals if d.get("seller_org") == seller_org]
     total = len(deals)
 
     if total == 0:
@@ -356,14 +368,23 @@ def import_deals_csv(
     }
 
 
-def import_deals_ssp(store: DealStore, connector: Any) -> dict[str, Any]:
+def import_deals_ssp(
+    store: DealStore,
+    connector: Any,
+    *,
+    filters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Fetch deals from an already-configured SSP connector and persist them.
 
     The connector instance (and its configuration checks) are resolved by
     the caller; this function performs the fetch + persistence and shapes
     the result identically to ``import_deals_csv``.
+
+    Args:
+        filters: Optional connector-specific fetch filters, passed straight
+            through as keyword arguments to the connector's fetch_deals().
     """
-    fetch_result = connector.fetch_deals()
+    fetch_result = connector.fetch_deals(**(filters or {}))
 
     deal_ids: list[str] = []
     today = datetime.now(UTC).strftime("%Y-%m-%d")

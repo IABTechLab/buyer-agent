@@ -119,8 +119,17 @@ class TestListSSPConnectors:
         assert "index_exchange" in names
 
     @pytest.mark.asyncio
-    async def test_connectors_unconfigured_without_env_vars(self):
+    async def test_connectors_unconfigured_without_env_vars(self, monkeypatch):
         """All connectors should show configured=false when env vars are absent."""
+        for var in (
+            "PUBMATIC_API_TOKEN",
+            "PUBMATIC_SEAT_ID",
+            "MAGNITE_ACCESS_KEY",
+            "MAGNITE_SECRET_KEY",
+            "MAGNITE_SEAT_ID",
+            "IX_API_KEY",
+        ):
+            monkeypatch.delenv(var, raising=False)
         result = await mcp.call_tool("list_ssp_connectors", {})
         data = json.loads(_extract_text(result))
         for connector in data["connectors"]:
@@ -198,8 +207,9 @@ class TestImportDealsSSP:
         assert "error" in data
 
     @pytest.mark.asyncio
-    async def test_unconfigured_index_exchange_returns_error(self):
+    async def test_unconfigured_index_exchange_returns_error(self, monkeypatch):
         """Index Exchange import should return an error when not configured."""
+        monkeypatch.delenv("IX_API_KEY", raising=False)
         result = await mcp.call_tool("import_deals_ssp", {"ssp_name": "index_exchange"})
         data = json.loads(_extract_text(result))
         assert "error" in data
@@ -513,8 +523,9 @@ class TestSSPConnectionTest:
         assert "timestamp" in data
 
     @pytest.mark.asyncio
-    async def test_index_exchange_not_configured_returns_false(self):
+    async def test_index_exchange_not_configured_returns_false(self, monkeypatch):
         """Index Exchange connection test without env vars → connected=false."""
+        monkeypatch.delenv("IX_API_KEY", raising=False)
         result = await mcp.call_tool("test_ssp_connection", {"ssp_name": "index_exchange"})
         data = json.loads(_extract_text(result))
         assert data["connected"] is False

@@ -108,17 +108,17 @@ Magnite does not provide a buyer-facing deal creation API. The connector reads d
 
 **File:** `connectors/index_exchange.py`
 
-Index Exchange uses API key authentication and a simple REST endpoint. Publishers create deals in IX and specify buyer seat IDs; this connector discovers deals that have been targeted to the buyer's seat.
+Index Exchange uses bearer-token authentication against the real Deals API's `/v3/deals` route. Publishers create deals in Index and specify buyer seat IDs; this connector discovers deals that have been targeted to the buyer's seat. There is no client-supplied seat parameter — visibility is determined server-side by the caller's authenticated identity.
 
 | Detail | Value |
 |--------|-------|
-| Base URL | `https://api.indexexchange.com` |
-| Auth | API key in `X-API-Key` header |
-| Seat filtering | `seatId` query parameter |
-| Endpoints | `GET /deals`, `GET /deals/{deal_id}` |
-| Required env vars | `IX_API_KEY`, `IX_SEAT_ID` |
+| Base URL | `https://app.indexexchange.com/api/deals` |
+| Auth | `Authorization: Bearer <keycloak-jwt>` |
+| Seat filtering | None — server-side, based on the authenticated caller |
+| Endpoints | `GET /v3/deals`, `GET /v3/deals/{internalDealID}` |
+| Required env vars | `IX_API_KEY` |
 
-Deal type mapping: `PG` → `PG`, `PD` → `PD`, `PMP` → `PA`.
+Deal type mapping (derived from `classID` + `directConfigurations.programmaticGuaranteed` + `auctionType`, not a `dealType` field): `classID=1,PG=true` → `PG`; `classID=1,PG=false,auctionType=fixed` → `PD`; everything else → `PA` (there is no `PMP` DealStore type).
 
 ---
 
