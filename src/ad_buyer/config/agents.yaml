@@ -12,7 +12,7 @@ portfolio_manager:
     mix optimization, and cross-channel attribution.
   allow_delegation: true
   temperature: 0.3
-  model: anthropic/claude-opus-4-20250514
+  model: anthropic/claude-opus-4-8
 
 branding_agent:
   role: "Branding Specialist"
