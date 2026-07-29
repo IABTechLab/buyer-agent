@@ -20,8 +20,8 @@ import json
 
 import pytest
 
-from demo.campaign_demo import create_campaign_demo_app
 from ad_buyer.storage.campaign_store import CampaignStore
+from demo.campaign_demo import create_campaign_demo_app
 
 # ---------------------------------------------------------------------------
 # Fixtures

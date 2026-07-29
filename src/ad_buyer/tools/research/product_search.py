@@ -175,9 +175,7 @@ Returns:
             if p.targeting:
                 capabilities = p.targeting.get("capabilities", [])
                 if capabilities:
-                    targeting_str = sanitize_untrusted_text(
-                        ", ".join(str(c) for c in capabilities)
-                    )
+                    targeting_str = sanitize_untrusted_text(", ".join(str(c) for c in capabilities))
 
             avail_str = f"{p.available_impressions:,}" if p.available_impressions else "N/A"
 

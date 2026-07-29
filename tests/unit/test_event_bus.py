@@ -137,9 +137,7 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("*", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("*", lambda e: received.append(e)))
 
         e1 = Event(event_type=EventType.DEAL_BOOKED)
         e2 = Event(event_type=EventType.CAMPAIGN_CREATED)
@@ -183,9 +181,7 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         for _ in range(3):
-            asyncio.run(
-                bus.publish(Event(event_type=EventType.DEAL_BOOKED))
-            )
+            asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED)))
 
         events = asyncio.run(bus.list_events())
         assert len(events) == 3
@@ -194,12 +190,8 @@ class TestInMemoryEventBus:
         """Should filter events by flow_id."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f1"))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f2"))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f1")))
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED, flow_id="f2")))
 
         events = asyncio.run(bus.list_events(flow_id="f1"))
         assert len(events) == 1
@@ -209,28 +201,18 @@ class TestInMemoryEventBus:
         """Should filter events by event_type."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_BOOKED))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.CAMPAIGN_CREATED))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED)))
+        asyncio.run(bus.publish(Event(event_type=EventType.CAMPAIGN_CREATED)))
 
-        events = asyncio.run(
-            bus.list_events(event_type="deal.booked")
-        )
+        events = asyncio.run(bus.list_events(event_type="deal.booked"))
         assert len(events) == 1
 
     def test_list_events_by_session_id(self, bus):
         """Should filter events by session_id."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.SESSION_CREATED, session_id="s1"))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.SESSION_CLOSED, session_id="s2"))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.SESSION_CREATED, session_id="s1")))
+        asyncio.run(bus.publish(Event(event_type=EventType.SESSION_CLOSED, session_id="s2")))
 
         events = asyncio.run(bus.list_events(session_id="s1"))
         assert len(events) == 1
@@ -240,9 +222,7 @@ class TestInMemoryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         for _ in range(10):
-            asyncio.run(
-                bus.publish(Event(event_type=EventType.DEAL_BOOKED))
-            )
+            asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED)))
 
         events = asyncio.run(bus.list_events(limit=3))
         assert len(events) == 3
@@ -298,9 +278,7 @@ class TestEmitEvent:
             "ad_buyer.events.bus.get_event_bus",
             side_effect=RuntimeError("bus down"),
         ):
-            result = asyncio.run(
-                emit_event(event_type=EventType.QUOTE_REQUESTED)
-            )
+            result = asyncio.run(emit_event(event_type=EventType.QUOTE_REQUESTED))
             assert result is None
 
         bus_mod._event_bus_instance = None

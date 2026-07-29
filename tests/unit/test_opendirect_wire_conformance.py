@@ -109,9 +109,7 @@ class TestSpecLowercaseAliases:
     def test_account_wire_names(self):
         account = Account(advertiser_id="adv-1", buyer_id="buy-1", name="ACME")
         dump = account.model_dump(by_alias=True, exclude_none=True)
-        self._assert_dialect(
-            dump, {"advertiserId": "advertiserid", "buyerId": "buyerid"}
-        )
+        self._assert_dialect(dump, {"advertiserId": "advertiserid", "buyerId": "buyerid"})
 
     def test_order_wire_names(self):
         order = Order(

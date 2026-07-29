@@ -33,6 +33,29 @@ from ad_buyer.orchestration.multi_seller import (
 )
 
 
+def _listener_triggers(flow_cls, method_name):
+    """Return ``{"type": ..., "conditions": [...]}`` for a listener method.
+
+    CrewAI < 1.15 exposes a class-level ``_listeners`` registry populated by
+    ``FlowMeta``; CrewAI >= 1.15 removed it and stores the trigger condition
+    on the method's ``__flow_method_definition__`` (``listen`` is either a
+    plain trigger name or ``{"and"|"or": [...]}``). Normalize both layouts to
+    the pre-1.15 registry shape so the assertions stay version-independent.
+    """
+    registry = getattr(flow_cls, "_listeners", None)
+    if registry is not None:
+        return registry.get(method_name)
+
+    definition = getattr(getattr(flow_cls, method_name), "__flow_method_definition__", None)
+    listen = getattr(definition, "listen", None)
+    if isinstance(listen, str):
+        return {"type": "OR", "conditions": [listen]}
+    if isinstance(listen, dict) and len(listen) == 1:
+        condition_type, conditions = next(iter(listen.items()))
+        return {"type": condition_type.upper(), "conditions": conditions}
+    return None
+
+
 def _make_recommendation(product_id, channel, impressions=100000, cpm=10.0):
     return ProductRecommendation(
         product_id=product_id,
@@ -149,7 +172,7 @@ class TestResearchSocial:
 
     def test_consolidate_listens_to_research_social(self):
         """consolidate_recommendations must fire only after research_social too."""
-        triggers = DealBookingFlow._listeners.get("consolidate_recommendations")
+        triggers = _listener_triggers(DealBookingFlow, "consolidate_recommendations")
         assert triggers is not None
         assert triggers["type"] == "AND"
         assert "research_social" in triggers["conditions"]

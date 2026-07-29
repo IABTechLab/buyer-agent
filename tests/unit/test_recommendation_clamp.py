@@ -129,8 +129,16 @@ class TestParseClampsAndRejects:
     def test_out_of_bounds_cpm_clamped_via_parse(self):
         flow = _flow_with_bounds(max_cpm=20.0)
         payload = json.dumps(
-            [{"product_id": "p1", "product_name": "N", "publisher": "P",
-              "impressions": 100_000, "cpm": 200.0, "cost": 500.0}]
+            [
+                {
+                    "product_id": "p1",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": 100_000,
+                    "cpm": 200.0,
+                    "cost": 500.0,
+                }
+            ]
         )
         recs = flow._parse_recommendations(payload, "branding")
         assert len(recs) == 1
@@ -139,8 +147,16 @@ class TestParseClampsAndRejects:
     def test_per_line_cost_clamped_to_channel_budget_via_parse(self):
         flow = _flow_with_bounds()
         payload = json.dumps(
-            [{"product_id": "p1", "product_name": "N", "publisher": "P",
-              "impressions": 100_000, "cpm": 10.0, "cost": 999_999.0}]
+            [
+                {
+                    "product_id": "p1",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": 100_000,
+                    "cpm": 10.0,
+                    "cost": 999_999.0,
+                }
+            ]
         )
         recs = flow._parse_recommendations(payload, "branding")
         assert len(recs) == 1
@@ -149,8 +165,16 @@ class TestParseClampsAndRejects:
     def test_negative_impressions_clamped_via_parse(self):
         flow = _flow_with_bounds()
         payload = json.dumps(
-            [{"product_id": "p1", "product_name": "N", "publisher": "P",
-              "impressions": -100, "cpm": 10.0, "cost": 100.0}]
+            [
+                {
+                    "product_id": "p1",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": -100,
+                    "cpm": 10.0,
+                    "cost": 100.0,
+                }
+            ]
         )
         recs = flow._parse_recommendations(payload, "branding")
         assert len(recs) == 1
@@ -165,8 +189,14 @@ class TestParseClampsAndRejects:
         payload = json.dumps(
             [
                 {"product_id": "bad", "cpm": "free", "impressions": 10, "cost": 1.0},
-                {"product_id": "good", "product_name": "N", "publisher": "P",
-                 "impressions": 100_000, "cpm": 500.0, "cost": 100.0},
+                {
+                    "product_id": "good",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": 100_000,
+                    "cpm": 500.0,
+                    "cost": 100.0,
+                },
             ]
         )
         recs = flow._parse_recommendations(payload, "branding")
@@ -220,8 +250,16 @@ class TestBoundsFromKpisShapedBrief:
     def test_run13_shape_25_cpm_item_clamped_to_18_ceiling(self):
         flow = _flow_with_kpis_brief(kpis={"max_cpm_usd": 18.0})
         payload = json.dumps(
-            [{"product_id": "prod-b41e2339", "product_name": "N", "publisher": "P",
-              "impressions": 1_666_666, "cpm": 25.0, "cost": 24_999.99}]
+            [
+                {
+                    "product_id": "prod-b41e2339",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": 1_666_666,
+                    "cpm": 25.0,
+                    "cost": 24_999.99,
+                }
+            ]
         )
         recs = flow._parse_recommendations(payload, "branding")
         assert len(recs) == 1
@@ -288,8 +326,16 @@ class TestClampProtectsBooking:
 
         # An LLM proposes a CPM 10x the buyer's max and a wild cost.
         payload = json.dumps(
-            [{"product_id": "p1", "product_name": "N", "publisher": "P",
-              "impressions": 100_000, "cpm": 200.0, "cost": 999_999.0}]
+            [
+                {
+                    "product_id": "p1",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": 100_000,
+                    "cpm": 200.0,
+                    "cost": 999_999.0,
+                }
+            ]
         )
         recs = flow._parse_recommendations(payload, "branding")
         flow.state.pending_approvals = recs
@@ -318,8 +364,16 @@ class TestClampProtectsBooking:
         }
         flow._orchestrator = orchestrator
         payload = json.dumps(
-            [{"product_id": "p1", "product_name": "N", "publisher": "P",
-              "impressions": 100_000, "cpm": 10.0, "cost": 40_000.0}]
+            [
+                {
+                    "product_id": "p1",
+                    "product_name": "N",
+                    "publisher": "P",
+                    "impressions": 100_000,
+                    "cpm": 10.0,
+                    "cost": 40_000.0,
+                }
+            ]
         )
         recs = flow._parse_recommendations(payload, "branding")
         flow.state.pending_approvals = recs

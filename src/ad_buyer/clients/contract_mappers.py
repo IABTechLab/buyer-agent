@@ -289,9 +289,7 @@ def to_wire_quote_request(
     """Build the shared ``QuoteRequest`` envelope from the buyer's model."""
     media_type = MediaType(req.media_type)
     wire_linear_tv = (
-        _to_wire_linear_tv_params(req.linear_tv)
-        if media_type is MediaType.LINEAR_TV
-        else None
+        _to_wire_linear_tv_params(req.linear_tv) if media_type is MediaType.LINEAR_TV else None
     )
     return WireQuoteRequest(
         idempotency_key=idempotency_key or uuid4().hex,
@@ -305,9 +303,7 @@ def to_wire_quote_request(
         agent_url=req.agent_url,
         media_type=media_type,
         linear_tv=wire_linear_tv,
-        audience_plan=(
-            req.audience_plan.model_dump(mode="json") if req.audience_plan else None
-        ),
+        audience_plan=(req.audience_plan.model_dump(mode="json") if req.audience_plan else None),
     )
 
 
@@ -352,9 +348,7 @@ def to_wire_deal_booking_request(
         quote_id=req.quote_id,
         buyer_identity=_to_wire_buyer_identity(req.buyer_identity),
         notes=req.notes,
-        audience_plan=(
-            req.audience_plan.model_dump(mode="json") if req.audience_plan else None
-        ),
+        audience_plan=(req.audience_plan.model_dump(mode="json") if req.audience_plan else None),
     )
 
 

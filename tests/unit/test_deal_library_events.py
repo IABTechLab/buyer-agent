@@ -218,9 +218,7 @@ class TestDealLibraryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("deal.imported", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("deal.imported", lambda e: received.append(e)))
 
         event = Event(event_type=EventType.DEAL_IMPORTED)
         asyncio.run(bus.publish(event))
@@ -233,9 +231,7 @@ class TestDealLibraryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("deal.manual_action_required", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("deal.manual_action_required", lambda e: received.append(e)))
 
         event = Event(event_type=EventType.DEAL_MANUAL_ACTION_REQUIRED)
         asyncio.run(bus.publish(event))
@@ -247,19 +243,11 @@ class TestDealLibraryEventBus:
         """Should filter events by Phase 1 event types."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_IMPORTED))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_BOOKED))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.PORTFOLIO_INSPECTED))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_IMPORTED)))
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED)))
+        asyncio.run(bus.publish(Event(event_type=EventType.PORTFOLIO_INSPECTED)))
 
-        events = asyncio.run(
-            bus.list_events(event_type="deal.imported")
-        )
+        events = asyncio.run(bus.list_events(event_type="deal.imported"))
         assert len(events) == 1
         assert events[0].event_type == EventType.DEAL_IMPORTED
 
@@ -268,16 +256,10 @@ class TestDealLibraryEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("*", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("*", lambda e: received.append(e)))
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_IMPORTED))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_TEMPLATE_CREATED))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_IMPORTED)))
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_TEMPLATE_CREATED)))
 
         assert len(received) == 2
 

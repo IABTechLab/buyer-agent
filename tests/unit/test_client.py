@@ -247,9 +247,7 @@ class TestFilterWireProducts:
         display = self._wire_product("display_1", ["display"])
         video = self._wire_product("video_1", ["video"])
         undeclared = self._wire_product("undeclared_1", [])
-        result = _filter_wire_products(
-            [display, video, undeclared], {"adFormat": "display"}
-        )
+        result = _filter_wire_products([display, video, undeclared], {"adFormat": "display"})
         assert [p.product_id for p in result] == ["display_1", "undeclared_1"]
 
     def test_no_ad_format_filter_keeps_everything(self):

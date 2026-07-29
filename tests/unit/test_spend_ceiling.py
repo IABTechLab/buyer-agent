@@ -236,9 +236,7 @@ class TestBookingBudgetCeiling:
                 deal_type=deal_params.deal_type,
                 status="active",
                 quote_id=f"quote-{deal_params.product_id}",
-                product=ProductInfo(
-                    product_id=deal_params.product_id, name=deal_params.product_id
-                ),
+                product=ProductInfo(product_id=deal_params.product_id, name=deal_params.product_id),
                 pricing=PricingInfo(final_cpm=deal_params.target_cpm),
                 terms=TermsInfo(impressions=deal_params.impressions),
             )

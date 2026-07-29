@@ -234,9 +234,7 @@ class DealBookingFlow(Flow[BookingState]):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _pricing_rationale(
-        base_cpm: float | None, final_cpm: float | None
-    ) -> str | None:
+    def _pricing_rationale(base_cpm: float | None, final_cpm: float | None) -> str | None:
         """Assemble the truthful pricing audit line for a booked deal.
 
         The seller's own quote ``rationale`` is computed

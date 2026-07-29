@@ -114,8 +114,7 @@ class TestPlannerStepProducesAudiencePlan:
         result = run_audience_planner_step(brief)
 
         assert result.plan is not None, (
-            "The Audience Planner step MUST populate a "
-            "typed plan from the brief."
+            "The Audience Planner step MUST populate a typed plan from the brief."
         )
         assert isinstance(result.plan, AudiencePlan)
         # Legacy migration policy: first item -> primary, type=standard.

@@ -116,8 +116,7 @@ class TestBookingEngineImportClosureIsLLMFree:
         offenders = sorted(
             mod
             for mod in closure
-            if mod.split(".")[0] in _LLM_PACKAGES
-            or mod.startswith(_LLM_FIRST_PARTY_PREFIXES)
+            if mod.split(".")[0] in _LLM_PACKAGES or mod.startswith(_LLM_FIRST_PARTY_PREFIXES)
         )
         assert not offenders, (
             "The MultiSellerOrchestrator import closure must be LLM-free, but "
@@ -165,8 +164,10 @@ class TestDealBookingFlowBookingHalfIsLLMFree:
                 func_node = node.func
                 if isinstance(func_node, ast.Attribute) and func_node.attr == "kickoff":
                     return True
-                if isinstance(func_node, ast.Name) and func_node.id.startswith("create_") and (
-                    func_node.id.endswith("_crew")
+                if (
+                    isinstance(func_node, ast.Name)
+                    and func_node.id.startswith("create_")
+                    and (func_node.id.endswith("_crew"))
                 ):
                     return True
         return False
