@@ -78,19 +78,36 @@ def generate_mcp_tools() -> str:
     return "\n".join(lines)
 
 
-def generate_endpoints() -> str:
-    """Walk the FastAPI app and enumerate its REST routes."""
+def _iter_api_routes(routes, prefix: str = ""):
+    """Yield ``(path, APIRoute)`` pairs, descending into included routers.
+
+    FastAPI < 0.141 flattens ``include_router`` calls directly into
+    ``app.routes``; newer versions instead append a lazy proxy route that
+    keeps the included routes on its ``original_router``. Descend into both
+    shapes so the inventory is identical regardless of the installed
+    FastAPI version.
+    """
     from fastapi.routing import APIRoute
 
+    for route in routes:
+        if isinstance(route, APIRoute):
+            yield prefix + route.path, route
+            continue
+        nested = getattr(route, "original_router", None)
+        if nested is not None:
+            nested_prefix = getattr(getattr(route, "include_context", None), "prefix", "")
+            yield from _iter_api_routes(nested.routes, prefix + nested_prefix)
+
+
+def generate_endpoints() -> str:
+    """Walk the FastAPI app and enumerate its REST routes."""
     from ad_buyer.interfaces.api.main import app
 
     seen: dict[tuple[str, str], str] = {}
-    for route in app.routes:
-        if not isinstance(route, APIRoute):
-            continue
+    for path, route in _iter_api_routes(app.routes):
         methods = sorted(m for m in route.methods if m not in {"HEAD", "OPTIONS"})
         for method in methods:
-            seen[(method, route.path)] = route.name or ""
+            seen[(method, path)] = route.name or ""
 
     rows = sorted(seen.items(), key=lambda kv: (kv[0][1], kv[0][0]))
 
