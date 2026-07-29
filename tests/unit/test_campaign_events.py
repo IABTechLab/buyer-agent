@@ -681,9 +681,7 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("campaign.ready", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("campaign.ready", lambda e: received.append(e)))
 
         event = Event(event_type=EventType.CAMPAIGN_READY, campaign_id="camp-510")
         asyncio.run(bus.publish(event))
@@ -696,9 +694,7 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("pacing.reallocation_recommended", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("pacing.reallocation_recommended", lambda e: received.append(e)))
 
         event = Event(
             event_type=EventType.PACING_REALLOCATION_RECOMMENDED,
@@ -714,9 +710,7 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("creative.matched", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("creative.matched", lambda e: received.append(e)))
 
         event = Event(event_type=EventType.CREATIVE_MATCHED, campaign_id="camp-512")
         asyncio.run(bus.publish(event))
@@ -728,30 +722,18 @@ class TestCampaignAutomationEventBus:
         """Should filter events by campaign automation event types."""
         from ad_buyer.events.models import Event, EventType
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.CAMPAIGN_READY))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.PACING_SNAPSHOT_TAKEN))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.CREATIVE_UPLOADED))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.DEAL_BOOKED))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.CAMPAIGN_READY)))
+        asyncio.run(bus.publish(Event(event_type=EventType.PACING_SNAPSHOT_TAKEN)))
+        asyncio.run(bus.publish(Event(event_type=EventType.CREATIVE_UPLOADED)))
+        asyncio.run(bus.publish(Event(event_type=EventType.DEAL_BOOKED)))
 
         # Filter by campaign.ready
-        events = asyncio.run(
-            bus.list_events(event_type="campaign.ready")
-        )
+        events = asyncio.run(bus.list_events(event_type="campaign.ready"))
         assert len(events) == 1
         assert events[0].event_type == EventType.CAMPAIGN_READY
 
         # Filter by pacing.snapshot_taken
-        events = asyncio.run(
-            bus.list_events(event_type="pacing.snapshot_taken")
-        )
+        events = asyncio.run(bus.list_events(event_type="pacing.snapshot_taken"))
         assert len(events) == 1
         assert events[0].event_type == EventType.PACING_SNAPSHOT_TAKEN
 
@@ -760,19 +742,11 @@ class TestCampaignAutomationEventBus:
         from ad_buyer.events.models import Event, EventType
 
         received = []
-        asyncio.run(
-            bus.subscribe("*", lambda e: received.append(e))
-        )
+        asyncio.run(bus.subscribe("*", lambda e: received.append(e)))
 
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.CAMPAIGN_READY))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.PACING_DEVIATION_DETECTED))
-        )
-        asyncio.run(
-            bus.publish(Event(event_type=EventType.CREATIVE_VALIDATED))
-        )
+        asyncio.run(bus.publish(Event(event_type=EventType.CAMPAIGN_READY)))
+        asyncio.run(bus.publish(Event(event_type=EventType.PACING_DEVIATION_DETECTED)))
+        asyncio.run(bus.publish(Event(event_type=EventType.CREATIVE_VALIDATED)))
 
         assert len(received) == 3
 

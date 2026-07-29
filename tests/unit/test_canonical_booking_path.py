@@ -250,18 +250,14 @@ class TestCanonicalBookingEndToEnd:
         assert "order_pending" not in state_dump
         assert not booked.deal_id.startswith("DEAL-")  # buyer's legacy local-mint prefix
 
-    def test_seller_booking_failure_yields_no_booked_line(
-        self, fake_deals_clients, deal_store
-    ):
+    def test_seller_booking_failure_yields_no_booked_line(self, fake_deals_clients, deal_store):
         """A seller that never confirms produces NO booking record at all."""
 
         class RejectingDealsClient(FakeDealsClient):
             async def book_deal(self, booking_request):
                 from ad_buyer.clients.deals_client import DealsClientError
 
-                raise DealsClientError(
-                    "booking rejected", status_code=409, detail="inventory gone"
-                )
+                raise DealsClientError("booking rejected", status_code=409, detail="inventory gone")
 
         orchestrator = MultiSellerOrchestrator(
             registry_client=FakeRegistry(),
@@ -329,6 +325,4 @@ class TestNoFakeBookingIdentifiersInSource:
             if "deal_id import generate_deal_id" in path.read_text()
             or "generate_deal_id(" in path.read_text()
         ]
-        assert not offenders, (
-            f"Flows must never mint local DEAL-xxxx ids: {offenders}"
-        )
+        assert not offenders, f"Flows must never mint local DEAL-xxxx ids: {offenders}"

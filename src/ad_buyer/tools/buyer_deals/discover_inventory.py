@@ -396,9 +396,7 @@ Returns:
                 output_lines.append(f"{i}. {sanitize_untrusted_text(product)}")
                 output_lines.append("")
 
-        output_lines.append(
-            "[END UNTRUSTED seller-provided inventory listing]"
-        )
+        output_lines.append("[END UNTRUSTED seller-provided inventory listing]")
         output_lines.append("-" * 50)
         output_lines.append(f"Total products found: {len(product_list)}")
         summary_line = self._filter_summary_line(filter_summary)

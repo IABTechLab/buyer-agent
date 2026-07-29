@@ -122,8 +122,7 @@ def _filter_wire_products(
         result = [
             p
             for p in result
-            if not p.ad_formats
-            or requested in {_normalize_ad_format(f) for f in p.ad_formats}
+            if not p.ad_formats or requested in {_normalize_ad_format(f) for f in p.ad_formats}
         ]
 
     delivery_type = filters.get("deliveryType")
@@ -387,9 +386,7 @@ class OpenDirectClient:
         Returns:
             AvailsResponse with availability and pricing info
         """
-        spec_dialect = (
-            self.account_id is not None and self.advertiser_brand_id is not None
-        )
+        spec_dialect = self.account_id is not None and self.advertiser_brand_id is not None
         if spec_dialect:
             search = request.to_spec(
                 account_id=self.account_id,
@@ -416,9 +413,7 @@ class OpenDirectClient:
             # refuses to fabricate a volume if availability is absent
             # (ValueError surfaces to the caller).
             matches = [
-                record
-                for record in parsed.avails
-                if record.product_id == request.product_id
+                record for record in parsed.avails if record.product_id == request.product_id
             ] or parsed.avails
             if not matches:
                 raise ValueError(

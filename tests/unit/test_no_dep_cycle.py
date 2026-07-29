@@ -52,9 +52,7 @@ def test_top_level_import_both_orders(first: str, second: str) -> None:
         capture_output=True,
         text=True,
     )
-    assert result.returncode == 0, (
-        f"importing {first} then {second} failed:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"importing {first} then {second} failed:\n{result.stderr}"
 
 
 def test_clients_do_not_import_orchestration() -> None:
@@ -84,6 +82,4 @@ def test_clients_do_not_import_orchestration() -> None:
             ):
                 offenders.append(f"{path.name}:{lineno}: {stripped}")
 
-    assert not offenders, "clients/ must not import from orchestration/:\n" + "\n".join(
-        offenders
-    )
+    assert not offenders, "clients/ must not import from orchestration/:\n" + "\n".join(offenders)

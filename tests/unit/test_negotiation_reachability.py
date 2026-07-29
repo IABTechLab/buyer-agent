@@ -106,9 +106,7 @@ class GrantOrListDealsClient:
         return QuoteResponse(
             quote_id=quote_id,
             status="available",
-            product=ProductInfo(
-                product_id=quote_request.product_id, name="CTV Premium Streaming"
-            ),
+            product=ProductInfo(product_id=quote_request.product_id, name="CTV Premium Streaming"),
             pricing=PricingInfo(base_cpm=LIST_PRICE, final_cpm=final_cpm),
             terms=TermsInfo(
                 impressions=quote_request.impressions,
@@ -306,9 +304,7 @@ class TestBriefPriceSplitReachesOrchestrator:
     def test_partial_split_only_ceiling(self):
         """Only a ceiling in kpis: target still falls back to rec.cpm."""
         orch = CapturingOrchestrator()
-        flow = _flow(
-            orch, _brief(kpis={"max_cpm_usd": CEILING}), _rec(cpm=30.0)
-        )
+        flow = _flow(orch, _brief(kpis={"max_cpm_usd": CEILING}), _rec(cpm=30.0))
 
         flow.approve_all()
 
@@ -423,16 +419,12 @@ class TestBookedRationaleStatesTrueFinalPrice:
         def record_event(event_type, **kwargs):
             events.append((event_type, kwargs))
 
-        monkeypatch.setattr(
-            "ad_buyer.flows.deal_booking_flow.emit_event_sync", record_event
-        )
+        monkeypatch.setattr("ad_buyer.flows.deal_booking_flow.emit_event_sync", record_event)
 
         result = flow.approve_all()
         assert result["booked"] == 1
         booked = flow.state.booked_lines[0]
-        deal_events = [
-            kwargs for etype, kwargs in events if etype == EventType.DEAL_BOOKED
-        ]
+        deal_events = [kwargs for etype, kwargs in events if etype == EventType.DEAL_BOOKED]
         return booked, deal_events[0]["payload"]
 
     def test_rationale_reports_final_cpm_not_base(self, monkeypatch):

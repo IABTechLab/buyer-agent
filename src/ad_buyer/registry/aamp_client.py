@@ -182,11 +182,7 @@ class AampRegistryClient:
         cards = [_to_agent_card(agent) for agent in agents]
         if capabilities_filter:
             wanted = {c.lower() for c in capabilities_filter}
-            cards = [
-                card
-                for card in cards
-                if wanted & {c.name.lower() for c in card.capabilities}
-            ]
+            cards = [card for card in cards if wanted & {c.name.lower() for c in card.capabilities}]
 
         self._cache.put_list(cache_key, cards)
         for card in cards:
