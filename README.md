@@ -157,8 +157,8 @@ DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
 # OPENAI_COMPATIBLE_LLM_API_BASE_URL=http://localhost:11434/v1   # Local Ollama example
 # DEFAULT_LLM_MODEL=llama3
 
-# Seller connection
-SELLER_BASE_URL=http://localhost:8001        # Seller agent URL
+# Seller connection (comma-separated seller endpoint URLs)
+SELLER_ENDPOINTS=http://localhost:8001
 
 # Storage
 DATABASE_URL=sqlite:///./ad_buyer.db
@@ -202,7 +202,7 @@ curl http://localhost:8000/bookings
 
 The next two calls reach *outward* to a seller agent / OpenDirect backend, so they
 only work once a seller agent is running (see the [Seller Agent](https://github.com/IABTechLab/seller-agent)
-and `SELLER_BASE_URL` in `.env`):
+and `SELLER_ENDPOINTS` in `.env`):
 
 ```bash
 # Browse a seller's media kit (requires a seller agent on :8001)

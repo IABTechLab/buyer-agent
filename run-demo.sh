@@ -237,8 +237,8 @@ echo ""
 
 cd "$BUYER_DIR"
 # SELLER_ENDPOINTS is what the buyer actually reads (comma-separated, see
-# src/ad_buyer/config/settings.py); SELLER_BASE_URL is kept for README
-# compatibility.
+# src/ad_buyer/config/settings.py); SELLER_BASE_URL is kept for backward
+# compatibility with older docs that referenced it.
 SELLER_BASE_URL="http://localhost:$SELLER_PORT" \
     SELLER_ENDPOINTS="http://localhost:$SELLER_PORT" \
     "$BUYER_PYTHON" -m uvicorn ad_buyer.interfaces.api.main:app --port "$BUYER_PORT"
