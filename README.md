@@ -216,6 +216,34 @@ curl -X POST http://localhost:8000/products/search \
 
 → [Quickstart Guide](https://iabtechlab.github.io/buyer-agent/getting-started/quickstart/)
 
+### Two-Agent Demo (`run-demo.sh`)
+
+`./run-demo.sh` starts a locally checked-out [seller agent](https://github.com/IABTechLab/seller-agent)
+on `:8001` and the buyer agent on `:8000`, so you can exercise the cross-agent
+flow from the Verify section above. Two layouts are supported:
+
+- **Side-by-side clones** — the seller checkout lives next to this repo. The
+  script looks for, in order: a `SELLER_DIR` environment override, then
+  `../seller-agent` (public clone), then `../ad_seller_system` (legacy layout):
+
+  ```bash
+  # ~/aamp-lab/buyer-agent and ~/aamp-lab/seller-agent, each pip-installed
+  cd ~/aamp-lab/buyer-agent
+  ./run-demo.sh                                  # auto-detects ../seller-agent
+  SELLER_DIR=/path/to/seller-agent ./run-demo.sh # or point anywhere explicitly
+  ./run-demo.sh --dry-run                        # show resolved paths, start nothing
+  ```
+
+  Each repo needs its dependencies installed (`pip install -e .`, in a repo-local
+  `.venv`/`venv` or any active environment). `SELLER_PORT` / `BUYER_PORT`
+  override the default ports; Ctrl-C stops both agents.
+
+- **Docker Compose** — no second checkout needed; see [Docker](#docker) below
+  (`infra/docker/docker-compose.yml`).
+
+If no seller checkout is found, the script exits with instructions rather than
+starting anything.
+
 ### Campaign Automation Demo
 
 A self-contained, browser-based walkthrough of the campaign automation flow (budget
