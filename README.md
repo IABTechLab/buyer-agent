@@ -265,7 +265,7 @@ cd infra/docker
 docker compose up
 ```
 
-→ [Deployment Guide](https://iabtechlab.github.io/buyer-agent/guides/deployment/)
+→ [Deployment Guide](https://iabtechlab.github.io/buyer-agent/guides/deployment-ops-guide/)
 
 ## API Reference
 
