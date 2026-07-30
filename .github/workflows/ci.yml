@@ -9,7 +9,7 @@ on:
 permissions:
   contents: read
 
-# Dependencies are installed from uv.lock (uv sync --frozen), never resolved
+# Dependencies are installed from uv.lock (uv sync --locked), never resolved
 # fresh from pyproject ranges. This keeps CI byte-identical to the local
 # toolchain — a floating `pip install -e ".[dev]"` is what let newer
 # crewai/fastapi/ruff releases break main without any code change.
@@ -29,13 +29,13 @@ jobs:
           enable-cache: true
 
       - name: Install locked dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Run ruff check
-        run: uv run --frozen ruff check src/ tests/
+        run: uv run --locked ruff check src/ tests/
 
       - name: Run ruff format check
-        run: uv run --frozen ruff format --check src/ tests/
+        run: uv run --locked ruff format --check src/ tests/
 
   test:
     name: Test
@@ -60,12 +60,12 @@ jobs:
           enable-cache: true
 
       - name: Install locked dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Run tests
         env:
           REDIS_URL: redis://localhost:6379/0
-        run: uv run --frozen pytest tests/ -v --tb=short --cov=src/ad_buyer --cov-report=term-missing
+        run: uv run --locked pytest tests/ -v --tb=short --cov=src/ad_buyer --cov-report=term-missing
 
   docker-build:
     name: Docker Build
