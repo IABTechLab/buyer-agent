@@ -269,7 +269,7 @@ docker compose up
 
 ## API Reference
 
-11 endpoints across 5 groups:
+14 endpoints across 6 groups:
 
 | Group | Endpoints | Description |
 |-------|-----------|-------------|
@@ -277,6 +277,7 @@ docker compose up
 | Bookings | 5 | Create, list, poll, and approve bookings |
 | Products | 1 | Search seller product catalog |
 | Events | 2 | Query the in-memory event bus |
+| Reporting | 3 | Campaign reports and Meta campaign/report passthrough |
 | Buyer Orders | 2 | Order records and status-transition audit trail |
 
 → [Full API Reference](https://iabtechlab.github.io/buyer-agent/api/overview/)

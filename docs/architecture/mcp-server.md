@@ -44,7 +44,7 @@ The FastAPI `api_key_auth_middleware` applies to all HTTP paths. Neither `/mcp` 
 
 ## Tool Categories
 
-The server exposes 12 tool categories implemented in `interfaces/mcp_server.py`.
+The server exposes 13 tool categories implemented in `interfaces/mcp_server.py`.
 
 | Category | Tools | Description |
 |----------|-------|-------------|
@@ -60,8 +60,9 @@ The server exposes 12 tool categories implemented in `interfaces/mcp_server.py`.
 | SSP Connectors | `list_ssp_connectors`, `import_deals_ssp`, `test_ssp_connection` | SSP deal import and connectivity checks |
 | Templates | `list_templates`, `create_template`, `instantiate_from_template` | Deal and supply path templates |
 | Reporting | `get_deal_performance`, `get_campaign_report`, `get_pacing_report` | Deal, campaign, and pacing reports |
+| Contextual Enrichment | `classify_content`, `check_brand_safety`, `contextual_search` | Mixpeek-backed IAB classification, brand safety, and inventory search |
 
-See the [auto-generated inventory](../reference/mcp-tools.md) for the byte-exact 40-tool catalog.
+See the [auto-generated inventory](../reference/mcp-tools.md) for the byte-exact 43-tool catalog.
 
 ---
 
