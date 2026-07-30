@@ -2,6 +2,8 @@
 
 Complete catalog of all MCP tools exposed by the buyer agent at `/mcp` (Streamable HTTP; legacy SSE clients use `/mcp-sse/sse`). Tools are organized by category. All tools return JSON.
 
+The [auto-generated MCP tool inventory](../reference/mcp-tools.md) is the source of truth for the tool list — it is enumerated from the live FastMCP registry. If this page and the inventory disagree, trust the inventory.
+
 ---
 
 ## Foundation
@@ -154,3 +156,15 @@ Three SSP connectors are supported: **PubMatic**, **Magnite**, and **Index Excha
 | `list_ssp_connectors` | _(none)_ | List all available connectors with configuration status. Shows display name, whether required environment variables are set, and which variables are needed. |
 | `import_deals_ssp` | `ssp_name` (string: `pubmatic`, `magnite`, or `index_exchange`) | Fetch deals from the named SSP, normalize them to the deal store schema, and import. Returns the same result structure as `import_deals_csv`. |
 | `test_ssp_connection` | `ssp_name` (string) | Check whether the named SSP connector is configured and, if so, attempt a lightweight API call to verify the credentials. |
+
+---
+
+## Contextual Enrichment (Mixpeek)
+
+Classify content into the IAB taxonomy, screen it for brand safety, and search indexed inventory via [Mixpeek](https://mixpeek.com) retriever pipelines. These tools require `MIXPEEK_API_KEY` (plus optionally `MIXPEEK_BASE_URL` and `MIXPEEK_NAMESPACE`) to be configured; without a key they return an error.
+
+| Tool | Parameters | Description |
+|------|-----------|-------------|
+| `classify_content` | `text` (string), `retriever_id` (string, optional), `limit` (int, default 10) | Classify page or ad-creative text into IAB v3.0 taxonomy categories. Returns ranked category matches with hierarchical paths (e.g. Sports > American Football) and confidence scores. Auto-discovers an IAB retriever in the namespace when `retriever_id` is omitted. |
+| `check_brand_safety` | `text` (string), `retriever_id` (string, optional), `threshold` (float, default 0.80) | Evaluate content for brand-safety risk. Classifies into IAB categories and flags sensitive ones (gambling, adult, etc.). Returns a safe/unsafe verdict, risk level (low/medium/high), and flagged categories. |
+| `contextual_search` | `query` (string), `retriever_id` (string), `limit` (int, default 10) | Search indexed ad inventory through a Mixpeek retriever pipeline (multimodal search, brand-safety filtering, IAB enrichment, reranking). Returns matching inventory with relevance scores and enriched metadata. |

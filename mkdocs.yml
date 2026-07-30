@@ -67,6 +67,7 @@ nav:
       - Bookings: api/bookings.md
       - Seller Discovery: api/seller-discovery.md
       - Products: api/products.md
+      - AudiencePlan Wire Format: api/audience_plan_wire_format.md
   - Architecture:
       - Overview: architecture/overview.md
       - Agent Hierarchy: architecture/agent-hierarchy.md
@@ -78,6 +79,7 @@ nav:
       - MCP Server: architecture/mcp-server.md
       - Deal Library: architecture/deal-library.md
       - SSP Connectors: architecture/ssp-connectors.md
+      - AgentCore: architecture/agentcore.md
   - State Machines:
       - Order Lifecycle: state-machines/order-lifecycle.md
       - Change Request Flow: state-machines/change-request-flow.md
@@ -93,6 +95,7 @@ nav:
       - Linear TV Buying: guides/linear-tv.md
       - Configuration: guides/configuration.md
       - Deployment & Operations: guides/deployment-ops-guide.md
+      - AgentCore Deployment: guides/agentcore-deployment.md
       - Multi-Seller Orchestration: guides/multi-seller-orchestration.md
       - Budget Pacing: guides/budget-pacing.md
       - Creative Management: guides/creative-management.md

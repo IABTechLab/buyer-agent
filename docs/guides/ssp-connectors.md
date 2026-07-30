@@ -8,7 +8,7 @@ This guide covers credential setup and running an import for each SSP.
 
 ## Prerequisites
 
-- The buyer agent must be running (see [Deployment](deployment.md))
+- The buyer agent must be running (see [Deployment & Operations](deployment-ops-guide.md))
 - You need a buyer seat ID from each SSP you want to connect
 - API credentials from each SSP (see per-SSP sections below)
 - Environment variables must be set before starting the agent

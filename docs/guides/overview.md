@@ -73,7 +73,7 @@ Your [identity tier](identity.md) determines what the buyer can do with a given 
 | [Multi-Seller Discovery](multi-seller.md) | You are connecting to multiple sellers and need to understand the AAMP registry |
 | [Linear TV Buying](linear-tv.md) | You are buying linear TV inventory with DMA targeting and scatter/upfront pricing |
 | [Configuration](configuration.md) | You need to set environment variables, seller connections, or feature flags |
-| [Deployment](deployment.md) | You are deploying the buyer agent to production |
+| [Deployment & Operations](deployment-ops-guide.md) | You are deploying the buyer agent to production |
 
 ## Related
 
