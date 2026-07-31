@@ -6,7 +6,10 @@
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.meta_ads_client import MetaAdsClient, MetaAPIError, MetaAuthError
+from ...clients.meta_ads_mcp_client import MetaAdsMCPClient
+from ...clients.meta_ads_mcp_client import MetaAuthError as MCPAuthError
 from ...config.settings import settings
 
 
@@ -34,6 +37,12 @@ Args:
     def _run(self, campaign_ids: list[str], date_preset: str = "last_30d") -> str:
         if not settings.meta_access_token or not settings.meta_ad_account_id:
             return "Meta not configured. Set META_ACCESS_TOKEN and META_AD_ACCOUNT_ID in .env"
+
+        output = f"Meta Ads Performance Report — {len(campaign_ids)} campaign(s)\n{'=' * 50}\n\n"
+
+        if settings.meta_use_mcp:
+            return run_async(self._run_via_mcp(campaign_ids, date_preset, output))
+
         if not settings.meta_page_id:
             return "META_PAGE_ID not set in .env"
 
@@ -44,27 +53,10 @@ Args:
             api_version=settings.meta_api_version,
         )
 
-        output = f"Meta Ads Performance Report — {len(campaign_ids)} campaign(s)\n{'=' * 50}\n\n"
-
         for campaign_id in campaign_ids:
             try:
                 rows = client.get_insights(campaign_id, date_preset=date_preset)
-                for row in rows:
-                    spend = float(row.get("spend", 0))
-                    impressions = int(row.get("impressions", 0))
-                    reach = int(row.get("reach", 0))
-                    frequency = float(row.get("frequency", 0))
-                    ctr = float(row.get("ctr", 0))
-                    cpm = float(row.get("cpm", 0))
-                    output += f"""Campaign: {row.get("campaign_name", campaign_id)}
-  Spend:       ${spend:,.2f}
-  Impressions: {impressions:,}
-  Reach:       {reach:,} unique users
-  Frequency:   {frequency:.2f}x
-  CTR:         {ctr:.3f}%
-  CPM:         ${cpm:.2f}
-  ---
-"""
+                output += self._format_rows(campaign_id, rows)
             except MetaAuthError as e:
                 output += f"Campaign {campaign_id}: Auth error — {e}\n"
             except MetaAPIError as e:
@@ -73,3 +65,41 @@ Args:
                 output += f"Campaign {campaign_id}: Error — {e}\n"
 
         return output
+
+    async def _run_via_mcp(
+        self, campaign_ids: list[str], date_preset: str, output: str
+    ) -> str:
+        async with MetaAdsMCPClient(
+            access_token=settings.meta_access_token,
+            ad_account_id=settings.meta_ad_account_id,
+            page_id=settings.meta_page_id,
+        ) as client:
+            for campaign_id in campaign_ids:
+                try:
+                    rows = await client.get_insights(campaign_id, date_preset=date_preset)
+                    output += self._format_rows(campaign_id, rows)
+                except MCPAuthError as e:
+                    output += f"Campaign {campaign_id}: Auth error — {e}\n"
+                except Exception as e:
+                    output += f"Campaign {campaign_id}: Error — {e}\n"
+        return output
+
+    def _format_rows(self, campaign_id: str, rows: list[dict]) -> str:
+        out = ""
+        for row in rows:
+            spend = float(row.get("spend", 0))
+            impressions = int(row.get("impressions", 0))
+            reach = int(row.get("reach", 0))
+            frequency = float(row.get("frequency", 0))
+            ctr = float(row.get("ctr", 0))
+            cpm = float(row.get("cpm", 0))
+            out += f"""Campaign: {row.get("campaign_name", campaign_id)}
+  Spend:       ${spend:,.2f}
+  Impressions: {impressions:,}
+  Reach:       {reach:,} unique users
+  Frequency:   {frequency:.2f}x
+  CTR:         {ctr:.3f}%
+  CPM:         ${cpm:.2f}
+  ---
+"""
+        return out

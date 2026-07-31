@@ -188,14 +188,19 @@ class Settings(BaseSettings):
     # --------------------------------------------------------------------------
     # Meta Ads API integration
     # --------------------------------------------------------------------------
-    # System user access token (from Meta Business Manager → System Users)
+    # User access token (from Graph API Explorer scoped to your Meta app).
+    # For MCP: must be a real user token (not system user) from an app with
+    # Advanced Access for ads_management and the Ads MCP use case enabled.
     meta_access_token: str = ""
-    # Ad account ID (format: act_XXXXXXXXX — assign to system user in Business Manager)
+    # Ad account ID (format: act_XXXXXXXXX)
     meta_ad_account_id: str = ""
     # Facebook Page ID (required for ad creative creation)
     meta_page_id: str = ""
-    # Graph API version (used for reach estimates)
+    # Graph API version (used for reach estimates when MCP is disabled)
     meta_api_version: str = "v21.0"
+    # When true, use Meta's official MCP server (mcp.facebook.com/ads) instead
+    # of direct Graph API calls. Requires Advanced Access + Ads MCP use case.
+    meta_use_mcp: bool = False
 
     model_config = {
         "env_file": _ENV_FILE if _ENV_FILE else None,
