@@ -169,19 +169,34 @@ mkdir -p "$LOG_DIR"
 
 PIDS=()
 
+# shellcheck disable=SC2329  # invoked via the EXIT trap registered below
 cleanup() {
     echo ""
     echo "Shutting down demo servers..."
     for pid in ${PIDS[@]+"${PIDS[@]}"}; do
         if kill -0 "$pid" 2>/dev/null; then
             kill "$pid" 2>/dev/null || true
-            echo "  Stopped PID $pid"
+            echo "  Stopping PID $pid"
         fi
+    done
+    # Block until the servers have actually exited so the ports are free by
+    # the time we return (wait also reaps them; already-gone PIDs are a no-op).
+    for pid in ${PIDS[@]+"${PIDS[@]}"}; do
+        wait "$pid" 2>/dev/null || true
     done
     echo "Done. Logs saved in: $LOG_DIR"
 }
 
-trap cleanup EXIT INT TERM
+# Cleanup runs from the EXIT trap so it fires exactly once on every exit path;
+# INT/TERM merely translate the signal into an exit (130/143 = 128 + signal).
+# Bash defers trap handlers while a foreground command runs and does NOT
+# forward signals to children, so both servers are started in the background
+# and awaited with `wait` (which IS interruptible by trapped signals) --
+# previously a `kill -TERM` at this script was swallowed until the foreground
+# buyer exited, leaving both uvicorns running and the ports held.
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ---------------------------------------------------------------------------
 # Start the seller agent (background)
@@ -239,6 +254,15 @@ cd "$BUYER_DIR"
 # SELLER_ENDPOINTS is what the buyer actually reads (comma-separated, see
 # src/ad_buyer/config/settings.py); SELLER_BASE_URL is kept for backward
 # compatibility with older docs that referenced it.
+# Started in the background and awaited so INT/TERM reach our traps
+# immediately (see the trap comment above); output still goes to this
+# terminal.
 SELLER_BASE_URL="http://localhost:$SELLER_PORT" \
     SELLER_ENDPOINTS="http://localhost:$SELLER_PORT" \
-    "$BUYER_PYTHON" -m uvicorn ad_buyer.interfaces.api.main:app --port "$BUYER_PORT"
+    "$BUYER_PYTHON" -m uvicorn ad_buyer.interfaces.api.main:app --port "$BUYER_PORT" &
+BUYER_PID=$!
+PIDS+=("$BUYER_PID")
+
+BUYER_STATUS=0
+wait "$BUYER_PID" || BUYER_STATUS=$?
+exit "$BUYER_STATUS"
