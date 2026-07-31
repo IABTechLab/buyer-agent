@@ -145,6 +145,35 @@ if ! "$BUYER_PYTHON" -c "import ad_buyer" >/dev/null 2>&1; then
     exit 1
 fi
 
+# A pristine seller clone will not boot: the seller's Settings requires
+# ANTHROPIC_API_KEY at startup (any placeholder value satisfies it -- the
+# deterministic demo path never calls an LLM). Fail fast with instructions
+# instead of letting the seller die mid-startup with a pydantic traceback.
+# Deliberately no auto-written .env: this script does not own the seller
+# checkout, and silently planting config there could mask a real
+# misconfiguration -- the fix below is a single copy-paste command.
+SELLER_HAS_KEY=0
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    SELLER_HAS_KEY=1
+elif [ -f "$SELLER_DIR/.env" ] \
+    && grep -q '^[[:space:]]*ANTHROPIC_API_KEY=' "$SELLER_DIR/.env"; then
+    SELLER_HAS_KEY=1
+fi
+if [ "$SELLER_HAS_KEY" = "0" ]; then
+    cat >&2 <<EOF
+ERROR: the seller agent cannot boot -- ANTHROPIC_API_KEY is not available.
+
+The seller's settings require ANTHROPIC_API_KEY at startup. Any placeholder
+value lets it boot; a real key is only needed for LLM-backed flows.
+
+Fix -- give the seller checkout a .env (see its .env.example for the full set):
+  echo 'ANTHROPIC_API_KEY=demo-placeholder' >> "$SELLER_DIR/.env"
+
+or export the variable in your shell before running this script.
+EOF
+    exit 1
+fi
+
 if command -v lsof >/dev/null 2>&1; then
     for port_info in "$SELLER_PORT:Seller agent" "$BUYER_PORT:Buyer agent"; do
         port="${port_info%%:*}"
