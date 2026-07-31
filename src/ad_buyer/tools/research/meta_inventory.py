@@ -6,7 +6,9 @@
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from ...async_utils import run_async
 from ...clients.meta_ads_api_client import MetaAdsAPIClient
+from ...clients.meta_ads_mcp_client import MetaAdsMCPClient
 from ...config.settings import settings
 
 _CHANNEL_PLACEMENTS: dict[str, list[str]] = {
@@ -71,17 +73,19 @@ Returns: Available Meta placements with reach estimates and CPM."""
         if demographics.get("age_max"):
             targeting["age_max"] = int(demographics["age_max"])
 
-        client = MetaAdsAPIClient(
-            access_token=settings.meta_access_token,
-            ad_account_id=settings.meta_ad_account_id,
-            api_version=settings.meta_api_version,
-        )
-
         try:
-            reach_data = client.get_reach_estimate(
-                targeting=targeting,
-                daily_budget=budget / 30,
-            )
+            if settings.meta_use_mcp:
+                reach_data = run_async(self._reach_via_mcp(targeting, budget))
+            else:
+                client = MetaAdsAPIClient(
+                    access_token=settings.meta_access_token,
+                    ad_account_id=settings.meta_ad_account_id,
+                    api_version=settings.meta_api_version,
+                )
+                reach_data = client.get_reach_estimate(
+                    targeting=targeting,
+                    daily_budget=budget / 30,
+                )
             lower = reach_data.get("users_lower_bound", 0)
             upper = reach_data.get("users_upper_bound", 0)
             estimated_reach = (lower + upper) // 2 or int(budget * 100)
@@ -92,6 +96,14 @@ Returns: Available Meta placements with reach estimates and CPM."""
             )
 
         return self._format(placements, channel, budget, estimated_reach)
+
+    async def _reach_via_mcp(self, targeting: dict, budget: float) -> dict:
+        async with MetaAdsMCPClient(
+            access_token=settings.meta_access_token,
+            ad_account_id=settings.meta_ad_account_id,
+            page_id=settings.meta_page_id,
+        ) as client:
+            return await client.get_reach_estimate(targeting=targeting, daily_budget=budget / 30)
 
     def _format(
         self,
