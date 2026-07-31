@@ -83,6 +83,26 @@ class Settings(BaseSettings):
             return []
         return [url.strip() for url in self.seller_endpoints.split(",") if url.strip()]
 
+    def resolve_seller_base_url(self) -> str:
+        """Base URL for single-seller OpenDirect-style calls.
+
+        Precedence: the first ``SELLER_ENDPOINTS`` entry (the modern
+        seller wiring — what run-demo.sh exports and what the docs call
+        the primary seller connection) wins; ``OPENDIRECT_BASE_URL``
+        (legacy single-server mode) is the fallback. This mirrors the
+        chat interface's existing precedence. ``OPENDIRECT_BASE_URL``
+        has a non-empty default, so "was it explicitly set?" cannot be
+        detected — explicit SELLER_ENDPOINTS-first precedence is the
+        only coherent rule.
+
+        Returns:
+            The seller/OpenDirect base URL to use for direct API calls.
+        """
+        endpoints = self.get_seller_endpoints()
+        if endpoints:
+            return endpoints[0]
+        return self.opendirect_base_url
+
     # Negotiation in the real booking path. When a seller
     # quote exceeds the buyer's max_cpm ceiling but sits within the
     # negotiation band (quote <= ceiling * negotiation_band), the

@@ -282,9 +282,13 @@ class ProductSearchRequest(BaseModel):
 
 
 def _create_client() -> OpenDirectClient:
-    """Create OpenDirect client from settings."""
+    """Create OpenDirect client from settings.
+
+    Base URL precedence: first SELLER_ENDPOINTS entry, then the legacy
+    OPENDIRECT_BASE_URL — see ``Settings.resolve_seller_base_url``.
+    """
     return OpenDirectClient(
-        base_url=settings.opendirect_base_url,
+        base_url=settings.resolve_seller_base_url(),
         oauth_token=settings.opendirect_token,
         api_key=settings.opendirect_api_key,
         account_id=settings.opendirect_account_id,
@@ -580,7 +584,7 @@ async def get_campaign_report(
         )
 
     if seller_lines:
-        seller_url = settings.opendirect_base_url.rstrip("/")
+        seller_url = settings.resolve_seller_base_url().rstrip("/")
         seller_reports = []
         for b in seller_lines:
             deal_id = b["deal_id"]
