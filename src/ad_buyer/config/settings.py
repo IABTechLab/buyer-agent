@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Literal
 
 from dotenv import find_dotenv
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 # Find .env file by searching up from current working directory
@@ -73,6 +73,16 @@ class Settings(BaseSettings):
     # not in the buyer's SGP portfolio). One of: "block", "warn", "allow".
     sgp_unknown_vendor_policy: str = "block"
     sgp_cache_ttl_seconds: int = 900
+    # Per-request timeout for an approval lookup.
+    sgp_timeout_seconds: float = Field(default=15.0, gt=0)
+    # Extra attempts for transient failures (transport errors, 429/502/503/504).
+    # 0 disables retrying. Each attempt can consume the full timeout, so the
+    # worst-case wait for one batch is roughly
+    # (1 + SGP_MAX_RETRIES) * SGP_TIMEOUT_SECONDS plus backoff -- lower these
+    # if the deployment sits behind a tighter deadline.
+    sgp_max_retries: int = Field(default=2, ge=0)
+    # Base backoff, doubled per attempt (0.5 -> 1.0 -> 2.0...). 0 retries at once.
+    sgp_retry_backoff_seconds: float = Field(default=0.5, ge=0)
 
     @field_validator("sgp_unknown_vendor_policy")
     @classmethod

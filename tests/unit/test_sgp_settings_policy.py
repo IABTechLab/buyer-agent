@@ -73,3 +73,64 @@ class TestSgpUnknownVendorPolicy:
             check=True,
         )
         assert result.stdout.strip() == "False", result.stdout
+
+
+class TestSgpRetrySettings:
+    """Retry/timeout knobs are environment variables, not code edits."""
+
+    def test_defaults(self) -> None:
+        s = Settings()
+        assert s.sgp_timeout_seconds == 15.0
+        assert s.sgp_max_retries == 2
+        assert s.sgp_retry_backoff_seconds == 0.5
+
+    def test_values_are_read_from_the_environment(self, monkeypatch) -> None:
+        monkeypatch.setenv("SGP_TIMEOUT_SECONDS", "4.5")
+        monkeypatch.setenv("SGP_MAX_RETRIES", "5")
+        monkeypatch.setenv("SGP_RETRY_BACKOFF_SECONDS", "0")
+        s = Settings()
+        assert s.sgp_timeout_seconds == 4.5
+        assert s.sgp_max_retries == 5
+        assert s.sgp_retry_backoff_seconds == 0.0
+
+    def test_retries_can_be_disabled_via_env(self, monkeypatch) -> None:
+        monkeypatch.setenv("SGP_MAX_RETRIES", "0")
+        assert Settings().sgp_max_retries == 0
+
+    @pytest.mark.parametrize(
+        "var, value",
+        [
+            ("SGP_MAX_RETRIES", "-1"),
+            ("SGP_RETRY_BACKOFF_SECONDS", "-0.5"),
+            ("SGP_TIMEOUT_SECONDS", "0"),
+        ],
+    )
+    def test_nonsensical_values_are_rejected(self, monkeypatch, var, value) -> None:
+        """A zero timeout or negative retry budget is a config error, not a clamp."""
+        monkeypatch.setenv(var, value)
+        with pytest.raises(ValidationError):
+            Settings()
+
+    def test_settings_reach_the_constructed_client(self, monkeypatch) -> None:
+        """The whole point: editing .env must change client behavior.
+
+        Guards the wiring in ``deal_booking_flow._build_sgp_client`` -- settings
+        that exist but are never passed through would look configured and do
+        nothing.
+        """
+        from ad_buyer.flows.deal_booking_flow import _build_sgp_client
+
+        monkeypatch.setenv("SGP_ENFORCE", "true")
+        monkeypatch.setenv("SGP_API_KEY", "test-key")
+        monkeypatch.setenv("SGP_TIMEOUT_SECONDS", "3")
+        monkeypatch.setenv("SGP_MAX_RETRIES", "7")
+        monkeypatch.setenv("SGP_RETRY_BACKOFF_SECONDS", "0.25")
+        monkeypatch.setenv("SGP_CACHE_TTL_SECONDS", "60")
+
+        client = _build_sgp_client(Settings())
+
+        assert client is not None
+        assert client._timeout == 3.0
+        assert client._max_retries == 7
+        assert client._retry_backoff == 0.25
+        assert client._cache_ttl == 60

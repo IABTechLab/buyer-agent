@@ -214,8 +214,11 @@ Optional integration that gates deal requests against the buyer's [IAB Diligence
 | `SGP_ENFORCE` | `bool` | `False` | When `True`, the canonical booking pipeline excludes sellers without verified IAB buyer-agent approval at discovery, emitting `sgp.vendor_gate` events; SGP transport errors fail closed. When `False` (default): zero SGP calls, behavior unchanged. |
 | `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `block` | Behavior when the vendor is not in the buyer's SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`, matched case-insensitively. An unrecognized value fails at settings load. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime for approval lookups. |
+| `SGP_TIMEOUT_SECONDS` | `float` | `15.0` | Per-request timeout for one approval lookup. |
+| `SGP_MAX_RETRIES` | `int` | `2` | Extra attempts for transient SGP failures. `0` disables retrying. |
+| `SGP_RETRY_BACKOFF_SECONDS` | `float` | `0.5` | Base retry backoff, doubled per attempt. |
 
-Transient SGP failures (transport errors and HTTP `429`/`502`/`503`/`504`) are retried with exponential backoff before the gate concludes it cannot verify a vendor — three attempts by default. This is tuned via `SGPClient` constructor arguments rather than environment variables; see [Transient failures and retries](../integration/iab-diligence-platform.md#transient-failures-and-retries).
+Transient SGP failures (transport errors and HTTP `429`/`502`/`503`/`504`) are retried with exponential backoff before the gate concludes it cannot verify a vendor — three attempts by default. Because each attempt can consume the full timeout, the worst case for one batch is roughly `(1 + SGP_MAX_RETRIES) * SGP_TIMEOUT_SECONDS` plus backoff; see [Transient failures and retries](../integration/iab-diligence-platform.md#transient-failures-and-retries).
 
 See the [IAB Diligence Platform Approval](../integration/iab-diligence-platform.md) integration guide for endpoint contract, behavior matrix, and troubleshooting.
 

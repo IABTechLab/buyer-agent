@@ -72,18 +72,18 @@ Because enforcement fails closed, a failed lookup and a denial have the same eff
 |---|---|
 | Retried | Transport errors (connect, timeout, DNS, read) and HTTP `429`, `502`, `503`, `504` |
 | Never retried | `200`, `400`, `401`, `404` — these are answers, not blips, and retrying only delays the verdict |
-| Attempts | `1 + max_retries`; `max_retries` defaults to `2`, so three attempts |
-| Backoff | Exponential — `retry_backoff_seconds * 2**attempt`, base `0.5s` by default, so `0.5s` then `1.0s` |
+| Attempts | `1 + SGP_MAX_RETRIES`; defaults to `2`, so three attempts |
+| Backoff | Exponential — `SGP_RETRY_BACKOFF_SECONDS * 2**attempt`, base `0.5s` by default, so `0.5s` then `1.0s` |
 | On exhaustion | The original failure is raised as `SGPClientError`, so enforcing callers still fail closed |
 
-`max_retries` and `retry_backoff_seconds` are `SGPClient` constructor arguments rather than environment variables; the defaults suit the enforcing paths, and `max_retries=0` disables retrying entirely. Each retry is logged at `WARNING` with the reason and the attempt number, and the final error names the attempt count — so a one-off `503` and a sustained outage read differently in logs.
+All three knobs are environment variables — `SGP_MAX_RETRIES`, `SGP_RETRY_BACKOFF_SECONDS`, and `SGP_TIMEOUT_SECONDS` — so tuning them needs no code change. `SGP_MAX_RETRIES=0` disables retrying entirely. Each retry is logged at `WARNING` with the reason and the attempt number, and the final error names the attempt count, so a one-off `503` and a sustained outage read differently in logs.
 
 Retries do not change any verdict. They only affect how long the gate waits before concluding it cannot verify a vendor.
 
 !!! warning "Retries multiply the worst-case wait"
-    The backoff itself is small, but each retry is a fresh request that can burn the full `timeout`. With the defaults (15s timeout, three attempts), a chunk that keeps timing out takes up to roughly **46s** — three timeouts plus 1.5s of backoff — where it previously took 15s. Chunks of 10 domains are fetched **sequentially**, so a lookup spanning several chunks multiplies that again: 30 distinct seller domains is three chunks, hence up to ~140s in the pathological case.
+    The backoff itself is small, but each retry is a fresh request that can burn the full `SGP_TIMEOUT_SECONDS`. With the defaults (15s timeout, three attempts), a chunk that keeps timing out takes up to roughly **46s** — three timeouts plus 1.5s of backoff — where it previously took 15s. Chunks of 10 domains are fetched **sequentially**, so a lookup spanning several chunks multiplies that again: 30 distinct seller domains is three chunks, hence up to ~140s in the pathological case.
 
-    This only bites when SGP is timing out; a reachable SGP that answers or refuses does so on the first attempt. If your deployment sits behind a tighter deadline, lower `max_retries`, lower the client `timeout`, or both.
+    This only bites when SGP is timing out; a reachable SGP that answers or refuses does so on the first attempt. If your deployment sits behind a tighter deadline, lower `SGP_MAX_RETRIES`, `SGP_TIMEOUT_SECONDS`, or both.
 
 ## Configuration
 
@@ -94,6 +94,9 @@ Retries do not change any verdict. They only affect how long the gate waits befo
 | `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery, the deal-request gate blocks Deal ID generation, and SGP transport errors halt the flow.            |
 | `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow` — matched case-insensitively, so `BLOCK` and `Block` are accepted. An unrecognized value fails at settings load rather than being interpreted per call site. Applies at discovery, the deal-request stage, and the orchestrator gate when enforcement is on. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime. Discovery→pricing→booking reuse a single SGP call within the TTL.                                                                         |
+| `SGP_TIMEOUT_SECONDS` | `float` | `15.0` | Per-request timeout for one approval lookup. |
+| `SGP_MAX_RETRIES` | `int` | `2` | Extra attempts for transient failures. `0` disables retrying. See [Transient failures and retries](#transient-failures-and-retries). |
+| `SGP_RETRY_BACKOFF_SECONDS` | `float` | `0.5` | Base backoff, doubled per attempt. `0` retries immediately. |
 
 !!! warning "Enforcement without a key fails closed"
     If `SGP_ENFORCE=true` but `SGP_API_KEY` is empty, the canonical booking pipeline cannot verify any vendor and **fails closed**: no seller passes discovery until a key is configured. The buyer agent logs an error at orchestrator construction time, and each excluded seller gets an `sgp.vendor_gate` event with outcome `unconfigured` and a causeful reason. Enforcement never silently books unverified vendors because a key is missing.
