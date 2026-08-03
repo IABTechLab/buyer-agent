@@ -16,8 +16,10 @@ Limit: up to 10 domains per call (SGP-enforced).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
+from typing import Any
 from urllib.parse import urlparse
 
 import httpx
@@ -28,8 +30,13 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 15.0
 _MAX_BATCH = 10
-_RETRYABLE_STATUS_CODES = {502, 503, 504}
+# Statuses worth another attempt: gateway/availability blips and rate limiting.
+# Everything else (400/401/404) is a definite answer and is never retried.
+_RETRYABLE_STATUS_CODES = {429, 502, 503, 504}
+_DEFAULT_MAX_RETRIES = 2
+_DEFAULT_RETRY_BACKOFF_SECONDS = 0.5
 _ENDPOINT = "/api/v1/integrations/iab/buyer-agent-approval"
+
 
 # Ordered list of dict keys to probe when deriving a seller domain for an
 # SGP approval lookup.
@@ -117,6 +124,15 @@ class SGPClient:
             is at ``https://api.safeguardprivacy-demo.com``.
         timeout: Request timeout in seconds.
         cache_ttl_seconds: How long to cache per-domain results.
+        max_retries: Extra attempts for transport errors and the statuses in
+            ``_RETRYABLE_STATUS_CODES``. Callers enforcing approval fail
+            closed on exhaustion, so a transient blip should not be the same
+            event as a definite denial. ``0`` disables retrying.
+        retry_backoff_seconds: Base delay, doubled per attempt. ``0`` retries
+            immediately (used by tests).
+
+    Can be used as an async context manager, which closes the underlying
+    httpx client on exit.
     """
 
     def __init__(
@@ -125,20 +141,34 @@ class SGPClient:
         base_url: str = "https://api.safeguardprivacy.com",
         timeout: float = _DEFAULT_TIMEOUT,
         cache_ttl_seconds: int = 900,
+        max_retries: int = _DEFAULT_MAX_RETRIES,
+        retry_backoff_seconds: float = _DEFAULT_RETRY_BACKOFF_SECONDS,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._cache_ttl = cache_ttl_seconds
+        self._max_retries = max(0, max_retries)
+        self._retry_backoff = max(0.0, retry_backoff_seconds)
         self._cache: dict[str, tuple[float, ApprovalRecord | None]] = {}
+        self._closed = False
         self._http = httpx.AsyncClient(
             base_url=self._base_url,
             headers={"api-key": api_key},
             timeout=timeout,
         )
 
+    async def __aenter__(self) -> SGPClient:
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self.aclose()
+
     async def aclose(self) -> None:
-        """Close the underlying httpx client."""
+        """Close the underlying httpx client. Idempotent."""
+        if self._closed:
+            return
+        self._closed = True
         await self._http.aclose()
 
     # ------------------------------------------------------------------
@@ -212,17 +242,65 @@ class SGPClient:
     # ------------------------------------------------------------------
 
     async def _fetch_chunk(self, domains: list[str]) -> dict[str, ApprovalRecord | None]:
-        """Fetch approvals for up to 10 domains in a single HTTP call."""
+        """Fetch approvals for up to 10 domains, retrying transient failures.
+
+        Transport errors and the statuses in ``_RETRYABLE_STATUS_CODES`` get
+        up to ``max_retries`` extra attempts with exponential backoff. A
+        definite answer (200/400/401/404) is returned or raised on the first
+        attempt -- retrying those would only delay the verdict.
+
+        On exhaustion the original failure is raised as ``SGPClientError``,
+        so enforcing callers still fail closed.
+        """
         params = {"domain": ",".join(domains)}
-        try:
-            resp = await self._http.get(_ENDPOINT, params=params)
-        except httpx.RequestError as exc:
-            # Connection refused, timeout, DNS, read errors, etc. — surface
-            # as SGPClientError so callers catch it on a single type and
-            # the deal-request gate can fail closed.
-            raise SGPClientError(
-                f"IAB Diligence Platform request failed: {exc.__class__.__name__}: {exc}"
-            ) from exc
+        attempts = self._max_retries + 1
+
+        for attempt in range(attempts):
+            final = attempt == attempts - 1
+            try:
+                resp = await self._http.get(_ENDPOINT, params=params)
+            except httpx.RequestError as exc:
+                # Connection refused, timeout, DNS, read errors, etc. — surface
+                # as SGPClientError so callers catch it on a single type and
+                # the deal-request gate can fail closed.
+                if final:
+                    raise SGPClientError(
+                        f"IAB Diligence Platform request failed after "
+                        f"{attempts} attempt(s): {exc.__class__.__name__}: {exc}"
+                    ) from exc
+                await self._backoff(attempt, f"{exc.__class__.__name__}: {exc}")
+                continue
+
+            if resp.status_code in _RETRYABLE_STATUS_CODES and not final:
+                await self._backoff(attempt, f"HTTP {resp.status_code}")
+                continue
+
+            return self._parse_chunk_response(resp, domains, attempts=attempts)
+
+        # Unreachable: the final attempt always returns or raises above.
+        raise SGPClientError("IAB Diligence Platform retry loop exited unexpectedly")
+
+    async def _backoff(self, attempt: int, why: str) -> None:
+        """Wait before the next attempt, doubling the delay each time."""
+        delay = self._retry_backoff * (2**attempt)
+        logger.warning(
+            "IAB Diligence Platform lookup failed (%s); retrying in %.2fs (attempt %d of %d)",
+            why,
+            delay,
+            attempt + 1,
+            self._max_retries + 1,
+        )
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+    def _parse_chunk_response(
+        self,
+        resp: httpx.Response,
+        domains: list[str],
+        *,
+        attempts: int = 1,
+    ) -> dict[str, ApprovalRecord | None]:
+        """Turn one SGP response into per-domain records, or raise."""
 
         if resp.status_code == 404:
             # Entire batch unknown to SGP.
@@ -242,8 +320,12 @@ class SGPClient:
             )
 
         if resp.status_code in _RETRYABLE_STATUS_CODES or resp.status_code >= 500:
+            # Reached only once retries are exhausted (or disabled), so say so
+            # -- "returned 503" and "returned 503 three times" are different
+            # operational events for whoever reads this.
             raise SGPClientError(
-                f"IAB Diligence Platform returned {resp.status_code}: {resp.text}",
+                f"IAB Diligence Platform returned {resp.status_code} after "
+                f"{attempts} attempt(s): {resp.text}",
                 status_code=resp.status_code,
             )
 

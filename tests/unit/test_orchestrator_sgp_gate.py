@@ -492,3 +492,53 @@ class TestProductionWiring:
 
         assert iface._orchestrator._sgp_enforce is True
         assert isinstance(iface._orchestrator._sgp_client, SGPClient)
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle: the orchestrator owns the SGP client, so it must release it
+# ---------------------------------------------------------------------------
+
+
+class TestOrchestratorLifecycle:
+    @pytest.mark.asyncio
+    async def test_aclose_closes_the_sgp_client(self):
+        sgp = MagicMock()
+        sgp.aclose = AsyncMock()
+        orch, _ = _make_orchestrator([], sgp_client=sgp, sgp_enforce=True)
+
+        await orch.aclose()
+
+        sgp.aclose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_aclose_without_a_client_is_a_noop(self):
+        orch, _ = _make_orchestrator([], sgp_client=None, sgp_enforce=False)
+        await orch.aclose()  # must not raise
+
+    @pytest.mark.asyncio
+    async def test_aclose_swallows_client_failure(self):
+        """Teardown must never be the thing that raises."""
+        sgp = MagicMock()
+        sgp.aclose = AsyncMock(side_effect=RuntimeError("pool already gone"))
+        orch, _ = _make_orchestrator([], sgp_client=sgp, sgp_enforce=True)
+
+        await orch.aclose()  # must not raise
+
+        sgp.aclose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager_closes_the_client(self):
+        sgp = MagicMock()
+        sgp.aclose = AsyncMock()
+        orch, _ = _make_orchestrator([], sgp_client=sgp, sgp_enforce=True)
+
+        async with orch as entered:
+            assert entered is orch
+
+        sgp.aclose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_miscased_policy_is_canonicalized(self):
+        """SGP_UNKNOWN_VENDOR_POLICY=BLOCK must resolve, not raise."""
+        orch, _ = _make_orchestrator([], sgp_enforce=True, sgp_unknown_policy="BLOCK")
+        assert orch._sgp_unknown_policy == "block"

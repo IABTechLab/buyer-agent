@@ -212,8 +212,10 @@ Optional integration that gates deal requests against the buyer's [IAB Diligence
 | `SGP_API_KEY` | `str` | `""` | API key with the `iab:buyerAgent` scope. Empty with `SGP_ENFORCE=true` = the gate fails closed (no sellers pass discovery). |
 | `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | SGP base URL. Staging: `https://api.safeguardprivacy-demo.com`. |
 | `SGP_ENFORCE` | `bool` | `False` | When `True`, the canonical booking pipeline excludes sellers without verified IAB buyer-agent approval at discovery, emitting `sgp.vendor_gate` events; SGP transport errors fail closed. When `False` (default): zero SGP calls, behavior unchanged. |
-| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `block` | Behavior when the vendor is not in the buyer's SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. |
+| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `block` | Behavior when the vendor is not in the buyer's SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`, matched case-insensitively. An unrecognized value fails at settings load. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime for approval lookups. |
+
+Transient SGP failures (transport errors and HTTP `429`/`502`/`503`/`504`) are retried with exponential backoff before the gate concludes it cannot verify a vendor — three attempts by default. This is tuned via `SGPClient` constructor arguments rather than environment variables; see [Transient failures and retries](../integration/iab-diligence-platform.md#transient-failures-and-retries).
 
 See the [IAB Diligence Platform Approval](../integration/iab-diligence-platform.md) integration guide for endpoint contract, behavior matrix, and troubleshooting.
 

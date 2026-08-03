@@ -23,11 +23,9 @@ from ...models.buyer_identity import (
     DealResponse,
     DealType,
 )
-from ...models.sgp import ApprovalRecord
+from ...models.sgp import ApprovalRecord, normalize_unknown_policy
 
 logger = logging.getLogger(__name__)
-
-_VALID_UNKNOWN_POLICIES = {"block", "warn", "allow"}
 
 
 class RequestDealInput(BaseModel):
@@ -143,12 +141,7 @@ Returns:
         self._sgp_client = sgp_client
         self._sgp_enforce = sgp_enforce
         self._max_cpm = max_cpm
-        if sgp_unknown_policy not in _VALID_UNKNOWN_POLICIES:
-            raise ValueError(
-                f"Invalid sgp_unknown_policy '{sgp_unknown_policy}'. "
-                f"Must be one of: {', '.join(sorted(_VALID_UNKNOWN_POLICIES))}"
-            )
-        self._sgp_unknown_policy = sgp_unknown_policy
+        self._sgp_unknown_policy = normalize_unknown_policy(sgp_unknown_policy)
 
     def _run(
         self,

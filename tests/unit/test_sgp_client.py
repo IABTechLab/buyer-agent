@@ -14,11 +14,13 @@ import httpx
 import pytest
 
 from ad_buyer.clients.sgp_client import (
+    _RETRYABLE_STATUS_CODES,
     SGPAuthError,
     SGPClient,
     SGPClientError,
     extract_product_domain,
 )
+from ad_buyer.models.sgp import normalize_unknown_policy
 
 BASE_URL = "https://sgp.test"
 
@@ -486,6 +488,170 @@ class TestErrorHandling:
         with pytest.raises(SGPClientError) as exc_info:
             await client.check_approvals(["example.com"])
         assert "ConnectError" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Retry on transient failures
+#
+# Enforcing callers fail closed when a lookup fails, so "SGP blipped for a
+# second" must not be the same event as "the vendor is not approved".
+# ---------------------------------------------------------------------------
+
+
+def _retry_client(handler, *, max_retries: int = 2) -> SGPClient:
+    """Client with instant backoff so retry tests stay fast."""
+    c = _make_client(handler)
+    c._max_retries = max_retries
+    c._retry_backoff = 0.0
+    return c
+
+
+class TestRetry:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", sorted(_RETRYABLE_STATUS_CODES))
+    async def test_retryable_status_recovers(self, status: int) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(status, text="try later")
+            return httpx.Response(200, json=_success_body([_record("flaky.com", True)]))
+
+        client = _retry_client(handler)
+        results = await client.check_approvals(["flaky.com"])
+        assert calls["n"] == 2
+        assert results["flaky.com"] is not None
+
+    @pytest.mark.asyncio
+    async def test_transport_error_recovers(self) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise httpx.ConnectError("connection refused")
+            return httpx.Response(200, json=_success_body([_record("flaky.com", True)]))
+
+        client = _retry_client(handler)
+        results = await client.check_approvals(["flaky.com"])
+        assert calls["n"] == 2
+        assert results["flaky.com"] is not None
+
+    @pytest.mark.asyncio
+    async def test_exhausted_retries_still_fail_closed(self) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503, text="down")
+
+        client = _retry_client(handler, max_retries=2)
+        with pytest.raises(SGPClientError) as exc_info:
+            await client.check_approvals(["down.com"])
+        assert calls["n"] == 3, "should attempt once plus max_retries"
+        assert exc_info.value.status_code == 503
+        assert "3 attempt" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [400, 401, 404])
+    async def test_definite_answers_are_not_retried(self, status: int) -> None:
+        """400/401/404 are verdicts, not blips — retrying only delays them."""
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(status, text="definite")
+
+        client = _retry_client(handler)
+        try:
+            await client.check_approvals(["x.com"])
+        except SGPClientError:
+            pass
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_retries_can_be_disabled(self) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503, text="down")
+
+        client = _retry_client(handler, max_retries=0)
+        with pytest.raises(SGPClientError):
+            await client.check_approvals(["down.com"])
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_backoff_grows_and_is_awaited(self, monkeypatch) -> None:
+        slept: list[float] = []
+
+        async def fake_sleep(delay: float) -> None:
+            slept.append(delay)
+
+        monkeypatch.setattr("ad_buyer.clients.sgp_client.asyncio.sleep", fake_sleep)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503, text="down")
+
+        client = _make_client(handler)
+        client._max_retries = 3
+        client._retry_backoff = 0.5
+        with pytest.raises(SGPClientError):
+            await client.check_approvals(["down.com"])
+        assert slept == [0.5, 1.0, 2.0]
+
+
+# ---------------------------------------------------------------------------
+# Unknown-vendor policy canonicalization
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeUnknownPolicy:
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("block", "block"),
+            ("BLOCK", "block"),
+            ("  Warn  ", "warn"),
+            ("Allow", "allow"),
+        ],
+    )
+    def test_canonicalizes(self, raw: str, expected: str) -> None:
+        assert normalize_unknown_policy(raw) == expected
+
+    @pytest.mark.parametrize("raw", ["maybe", "", "  ", "blockk"])
+    def test_rejects_unrecognized(self, raw: str) -> None:
+        with pytest.raises(ValueError, match="sgp_unknown_policy"):
+            normalize_unknown_policy(raw)
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
+
+
+class TestLifecycle:
+    @pytest.mark.asyncio
+    async def test_aclose_is_idempotent(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([]))
+
+        client = _make_client(handler)
+        await client.aclose()
+        await client.aclose()  # must not raise
+        assert client._http.is_closed
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager_closes(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([]))
+
+        client = _make_client(handler)
+        async with client as c:
+            assert c is client
+        assert client._http.is_closed
 
 
 # ---------------------------------------------------------------------------

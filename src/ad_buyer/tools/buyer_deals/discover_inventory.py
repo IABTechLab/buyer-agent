@@ -14,7 +14,7 @@ from ...booking.pricing import PricingCalculator
 from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
 from ...clients.unified_client import UnifiedClient
 from ...models.buyer_identity import BuyerContext
-from ...models.sgp import ApprovalRecord
+from ...models.sgp import ApprovalRecord, normalize_unknown_policy
 from ...security.prompt_sanitizer import sanitize_untrusted_text
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,9 @@ Returns:
         self._buyer_context = buyer_context
         self._sgp_client = sgp_client
         self._sgp_enforce = sgp_enforce
-        self._sgp_unknown_policy = sgp_unknown_policy
+        # Validated here as well as in RequestDealTool: an unrecognized policy
+        # must not reach the filter, where "not block" previously meant "keep".
+        self._sgp_unknown_policy = normalize_unknown_policy(sgp_unknown_policy)
 
     def _run(
         self,
@@ -285,10 +287,14 @@ Returns:
             normalized = self._sgp_client.normalize_domain(raw_domain)
             record = approvals.get(normalized)
             if record is None:
-                if self._sgp_unknown_policy == "block":
-                    counts["unknown_blocked"] += 1
+                # Keep only for the two policies that explicitly permit an
+                # unknown vendor; anything else blocks. Stated positively so a
+                # future policy value defaults to excluding, not admitting.
+                if self._sgp_unknown_policy in ("warn", "allow"):
+                    filtered.append(product)
                     continue
-                filtered.append(product)
+                counts["unknown_blocked"] += 1
+                continue
             elif not record.iab_buyer_agent_approval:
                 counts["not_approved"] += 1
             else:

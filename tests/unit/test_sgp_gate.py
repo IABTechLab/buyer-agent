@@ -356,6 +356,64 @@ async def test_gate_blocks_when_sgp_answers_about_a_different_vendor(agency_cont
     assert "Unrelated Vendor Inc" not in result
 
 
+@pytest.mark.parametrize("raw, canonical", [("BLOCK", "block"), ("  Warn ", "warn")])
+def test_unknown_policy_is_canonicalized(mock_client, agency_context, raw, canonical):
+    """A mis-cased env value must resolve, not reach the gate uninterpreted."""
+    tool = RequestDealTool(
+        client=mock_client,
+        buyer_context=agency_context,
+        sgp_unknown_policy=raw,
+    )
+    assert tool._sgp_unknown_policy == canonical
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("policy", ["BLOCK", "Block"])
+async def test_discovery_does_not_fail_open_on_miscased_policy(agency_context, policy):
+    """Regression: an unrecognized policy used to mean "keep the unknown vendor".
+
+    `_apply_enforcement` branched on `== "block"`, so any other spelling fell
+    through to the append path and admitted vendors SGP could not vouch for.
+    """
+    from ad_buyer.clients.sgp_client import SGPClient
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    client = MagicMock()
+    client.search_products = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            data=[{"id": "p1", "name": "Unvouched Product", "domain": "unknown.example"}],
+        )
+    )
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=SGPClient.normalize_domain)
+    sgp.check_approvals = AsyncMock(return_value={})  # unknown to SGP
+
+    tool = DiscoverInventoryTool(
+        client=client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy=policy,
+    )
+    assert tool._sgp_unknown_policy == "block"
+    result = await tool._arun(query="anything")
+    assert "Unvouched Product" not in result
+    assert "unknown to SGP" in result
+
+
+def test_discovery_rejects_unrecognized_policy(agency_context):
+    """Both tools must agree that an unrecognized policy is a configuration error."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    with pytest.raises(ValueError, match="sgp_unknown_policy"):
+        DiscoverInventoryTool(
+            client=MagicMock(),
+            buyer_context=agency_context,
+            sgp_unknown_policy="maybe",
+        )
+
+
 def test_invalid_unknown_policy_rejected(mock_client, agency_context):
     with pytest.raises(ValueError, match="sgp_unknown_policy"):
         RequestDealTool(
