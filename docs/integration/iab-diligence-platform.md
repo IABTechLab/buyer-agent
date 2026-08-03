@@ -49,6 +49,21 @@ Three response states matter to the buyer agent:
 | `iabBuyerAgentApproval: false` | Vendor exists but is not approved | ❌ Deal blocked |
 | HTTP 404 | Vendor is not in the buyer's SGP portfolio | Governed by `SGP_UNKNOWN_VENDOR_POLICY` |
 
+### Domain matching
+
+SGP is not required to echo back the exact spelling that was queried — it may answer with the vendor's canonical (apex) domain for a queried subdomain, or the reverse. The client therefore pairs each returned record back to the domain that was actually requested:
+
+1. Exact match on the normalized domain.
+2. Otherwise a parent/child match on a label boundary — so an `example.com` record resolves a queried `news.example.com`, while `notexample.com` is never matched by an `example.com` record.
+
+Matching is deliberately conservative, and there is no third step: a record for an unrelated domain is **never** accepted as the verdict for a queried one, not even when it is the only record in the response. Attributing another vendor's approval would make the gate fail open, and the deal-request stage always queries exactly one domain — precisely the shape where a permissive fallback does the most damage.
+
+When more than one record legitimately matches, the **most specific** (longest) matching domain wins, so a verdict never depends on the order records happen to appear in the response. Among equally specific records, a non-approval wins — a response carrying contradictory records can never upgrade a vendor to approved.
+
+A record that cannot be paired with any requested domain is logged at `WARNING` and ignored rather than silently dropped.
+
+This matters for caching: whatever the client resolves is what gets cached for `SGP_CACHE_TTL_SECONDS`. An unresolved approval would otherwise report the vendor as UNKNOWN and suppress that verdict for the full TTL.
+
 ## Configuration
 
 | Variable | Type | Default | Description                                                                                                                                                          |
@@ -85,7 +100,9 @@ The integration also plugs into two example buyer-agent tools. Behavior at each 
 
 ### Inventory discovery
 
-`DiscoverInventoryTool` accepts an optional `SGPClient`. When provided, it extracts the seller domain from each returned product (checking `seller_url`, `publisher_domain`, then `publisherId`/`publisher` if they contain a `.`), batches distinct domains into groups of 10, and annotates each product row in the formatted output:
+`DiscoverInventoryTool` accepts an optional `SGPClient`. When provided, it extracts the seller domain from each returned product, batches distinct domains into groups of 10, and annotates each product row in the formatted output.
+
+Domain extraction probes, in order: `domain` (the field the OpenDirect Product resource defines), `seller_domain` / `sellerDomain`, then the deal / SSP-connector names `publisherDomain`, `publisher_domain`, `seller_url` — and finally `publisherId` / `publisher` if they contain a `.`. Products should populate `domain`; the connector names are accepted only so a deal dict derived from an SSP connector also resolves.
 
 ```
 1. Premium CTV - Sports
@@ -151,6 +168,8 @@ With enforcement on (`SGP_ENFORCE=true`, `SGP_API_KEY` set), behavior is consist
 | Transport error | ❌ flow halts | ❌ flow halts | ❌ flow halts |
 | Product has no seller domain field | ❌ filtered at discovery; blocked at request | ❌ | ❌ |
 
+The last row is the one to watch when enabling enforcement against a live catalog: a product the gate cannot resolve a domain for is blocked regardless of unknown-vendor policy, and SGP is never called. Populate the OpenDirect Product `domain` field — see [Domain matching](#domain-matching) for the full probe order.
+
 The `iabBuyerAgentApproval: false` row is intentionally the same across all three unknown-vendor policies — an explicit non-approval is always fatal. The policies only govern the "unknown to SGP" case.
 
 ## Agent tool
@@ -184,6 +203,8 @@ The class is prefixed `SGP` so future vendor-approval integrations can coexist u
 | `Deal blocked: <vendor> does not carry the IAB buyer-agent approval flag` | The vendor is onboarded but not marked approved for IAB buyer-agent purchases. Toggle the approval in SGP.                                     |
 | `Deal blocked: IAB Diligence Platform lookup failed` | SGP was unreachable or returned a transient error. Enforcement fails closed; retry once the service is reachable.                              |
 | Gate seems to do nothing | `SGP_ENFORCE=false` (the default) — the gate is fully inert. With `SGP_ENFORCE=true` and no key, the pipeline fails closed instead (no sellers pass discovery); check the logs and `sgp.vendor_gate` events. |
+| `Deal blocked: cannot determine seller domain` / discovery reports `N missing seller domain` | The product carries none of the domain fields the gate probes, so it is blocked without SGP being called. Populate the Product `domain` field — see [Domain matching](#domain-matching). |
+| Log: `SGP returned an approval record for <domain> that could not be paired with any requested domain` | SGP answered about a domain unrelated to any queried one. The record is ignored and the queried domain stays UNKNOWN. Confirm the vendor's domain in SGP matches the seller domain on the product. |
 
 ## Related
 

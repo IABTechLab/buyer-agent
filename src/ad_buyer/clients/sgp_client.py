@@ -31,17 +31,35 @@ _MAX_BATCH = 10
 _RETRYABLE_STATUS_CODES = {502, 503, 504}
 _ENDPOINT = "/api/v1/integrations/iab/buyer-agent-approval"
 
-# Ordered list of product-dict keys to probe when deriving a seller domain
-# for an SGP approval lookup. Explicit domain fields come first; publisher
-# identifiers are used only when they look like a hostname.
-_DOMAIN_KEYS = ("seller_url", "sellerUrl", "publisher_domain", "publisherDomain")
+# Ordered list of dict keys to probe when deriving a seller domain for an
+# SGP approval lookup.
+#
+# The first group is the product vocabulary: ``domain`` is the field the
+# OpenDirect Product resource defines (see models.opendirect.Product), and
+# ``seller_domain`` is this codebase's normalized name for it.
+#
+# The second group is the deal / SSP-connector vocabulary, kept so that a
+# connector-derived deal dict also resolves: ``publisherDomain`` comes from
+# Magnite and Index Exchange raw deals, ``publisher_domain`` from PubMatic
+# and CSV import, and ``seller_url`` from deal records (where it is the
+# seller *system endpoint*, hence lowest priority). These are not product
+# fields — do not treat them as authoritative for a product.
+_DOMAIN_KEYS = (
+    "domain",
+    "seller_domain",
+    "sellerDomain",
+    "publisherDomain",
+    "publisher_domain",
+    "seller_url",
+)
 _PUBLISHER_KEYS = ("publisherId", "publisher")
 
 
 def extract_product_domain(product: dict) -> str | None:
     """Best-guess seller domain from a product dict for an SGP lookup.
 
-    Checks explicit domain/URL fields first, then falls back to
+    Checks explicit domain fields first (product vocabulary before the
+    deal/SSP vocabulary — see ``_DOMAIN_KEYS``), then falls back to
     ``publisherId`` / ``publisher`` when those values contain a ``.``
     (i.e. look like a hostname rather than an opaque ID). Returns the
     raw value; ``SGPClient.normalize_domain`` handles cleanup.
@@ -55,6 +73,20 @@ def extract_product_domain(product: dict) -> str | None:
         if isinstance(value, str) and "." in value:
             return value
     return None
+
+
+def _same_site(requested: str, returned: str) -> bool:
+    """True when two hostnames are the same site, or one is a parent of the other.
+
+    Compares on a label boundary, so ``notexample.com`` never matches
+    ``example.com``. Used to pair an SGP response back to the domain that
+    was actually queried when the platform echoes a different spelling.
+    """
+    if not requested or not returned:
+        return False
+    if requested == returned:
+        return True
+    return requested.endswith("." + returned) or returned.endswith("." + requested)
 
 
 class SGPClientError(Exception):
@@ -117,8 +149,9 @@ class SGPClient:
     def normalize_domain(value: str) -> str:
         """Reduce a seller URL or raw domain to the form SGP accepts.
 
-        Strips scheme, ``www.``, path, query, and port; lowercases.
-        Returns an empty string for inputs that yield no host.
+        Strips scheme, ``www.``, path, query, port, and any trailing FQDN
+        dot; lowercases. Returns an empty string for inputs that yield no
+        host.
         """
         if not value:
             return ""
@@ -127,7 +160,7 @@ class SGPClient:
         if "://" not in raw:
             raw = "http://" + raw
         host = urlparse(raw).hostname or ""
-        host = host.lower()
+        host = host.lower().rstrip(".")
         if host.startswith("www."):
             host = host[4:]
         return host
@@ -227,13 +260,62 @@ class SGPClient:
 
         raw_records = payload.get("data") or []
         by_domain: dict[str, ApprovalRecord | None] = {d: None for d in domains}
+        requested = set(domains)
+
+        # Pass 1: records whose echoed domain matches a requested one exactly.
+        leftover: list[tuple[str, ApprovalRecord]] = []
         for raw in raw_records:
             try:
                 record = ApprovalRecord.model_validate(raw)
             except (ValueError, TypeError):
                 logger.warning("Skipping malformed SGP record: %r", raw)
                 continue
-            domain_key = self.normalize_domain(record.domain) or record.domain.lower()
-            by_domain[domain_key] = record
+            key = self.normalize_domain(record.domain) or record.domain.strip().lower()
+            if key in requested:
+                by_domain[key] = record
+            else:
+                leftover.append((key, record))
+
+        # Pass 2: SGP may answer with the vendor's canonical/apex domain for a
+        # queried subdomain (or the reverse). Resolve those against domains
+        # still unanswered so the record is not discarded -- dropping it would
+        # leave the requested domain looking UNKNOWN and, because
+        # ``check_approvals`` caches whatever lands here, would block an
+        # approved vendor for the full cache TTL.
+        #
+        # Matching is deliberately conservative: only a parent/child match on a
+        # label boundary counts. A record for an unrelated domain is never
+        # accepted as the verdict for a queried one, not even when it is the
+        # only record in the response -- attributing another vendor's approval
+        # would make this gate fail open.
+        used: set[int] = set()
+        for d in domains:
+            if by_domain[d] is not None:
+                continue
+            candidates = [
+                (key, record, i) for i, (key, record) in enumerate(leftover) if _same_site(d, key)
+            ]
+            if not candidates:
+                continue
+            # Most specific (longest) matching domain wins. Among equally
+            # specific records a non-approval wins, so a response carrying
+            # conflicting records can never upgrade a vendor to approved.
+            key, record, index = min(
+                candidates,
+                key=lambda c: (-len(c[0]), c[1].iab_buyer_agent_approval),
+            )
+            by_domain[d] = record
+            used.add(index)
+
+        for i, (key, record) in enumerate(leftover):
+            if i in used or any(_same_site(d, key) for d in domains):
+                # Either applied, or pairable but a more specific record won.
+                continue
+            logger.warning(
+                "SGP returned an approval record for %r that could not be paired "
+                "with any requested domain %s; ignoring it",
+                record.domain,
+                domains,
+            )
 
         return by_domain

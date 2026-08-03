@@ -27,16 +27,22 @@ def agency_context() -> BuyerContext:
 
 @pytest.fixture
 def mock_client() -> MagicMock:
-    """UnifiedClient mock that returns a product with a seller_url."""
+    """UnifiedClient mock returning a product in the canonical OpenDirect shape.
+
+    The seller domain lives in ``domain`` -- the field the OpenDirect Product
+    resource defines (see models.opendirect.Product), not ``seller_url``,
+    which on a deal record means the seller *system endpoint*.
+    """
     client = MagicMock()
     client.get_product = AsyncMock(
         return_value=MagicMock(
             success=True,
             data={
                 "id": "prod_1",
+                "publisherId": "pub_1",
                 "name": "Premium CTV",
                 "basePrice": 20.00,
-                "seller_url": "http://seller.example.com:8001",
+                "domain": "seller.example.com",
             },
         )
     )
@@ -257,6 +263,99 @@ async def test_product_without_domain_blocks_when_enforcing(agency_context):
     sgp.check_approvals.assert_not_called()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "domain_field",
+    ["domain", "seller_domain", "publisherDomain", "publisher_domain", "seller_url"],
+)
+async def test_gate_resolves_each_supported_domain_field(domain_field, agency_context):
+    """Every documented domain key reaches the SGP lookup rather than blocking."""
+    from ad_buyer.clients.sgp_client import SGPClient
+
+    mock_client = MagicMock()
+    mock_client.get_product = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            data={
+                "id": "prod_1",
+                "publisherId": "pub_1",
+                "name": "Premium CTV",
+                "basePrice": 20.00,
+                domain_field: "seller.example.com",
+            },
+        )
+    )
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=SGPClient.normalize_domain)
+    sgp.check_approvals = AsyncMock(
+        return_value={"seller.example.com": _approved("seller.example.com")}
+    )
+    tool = RequestDealTool(
+        client=mock_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+    )
+    result = await tool._arun(product_id="prod_1", impressions=100)
+    assert "DEAL CREATED SUCCESSFULLY" in result
+    assert "SGP: ✓" in result
+    sgp.check_approvals.assert_called_once_with(["seller.example.com"])
+
+
+@pytest.mark.asyncio
+async def test_gate_blocks_when_sgp_answers_about_a_different_vendor(agency_context):
+    """The gate must not accept an unrelated vendor's approval.
+
+    Regression: the deal gate always queries exactly one domain, so a
+    "lone record answers a lone query" fallback let SGP's answer about any
+    other vendor authorize a Deal ID for the queried seller.
+    """
+    import httpx
+
+    from ad_buyer.clients.sgp_client import SGPClient
+
+    body = {
+        "data": [
+            {
+                "vendorId": 9,
+                "vendorCompanyId": 99,
+                "companyName": "Unrelated Vendor Inc",
+                "domain": "totally-different-vendor.com",
+                "iabBuyerAgentApproval": True,
+            }
+        ]
+    }
+    sgp = SGPClient(api_key="k", base_url="https://sgp.test", timeout=5.0)
+    sgp._http = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=body)),
+        base_url="https://sgp.test",
+    )
+
+    mock_client = MagicMock()
+    mock_client.get_product = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            data={
+                "id": "prod_1",
+                "name": "Shady Inventory",
+                "basePrice": 5.00,
+                "domain": "shady.example",
+            },
+        )
+    )
+    tool = RequestDealTool(
+        client=mock_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="block",
+    )
+    result = await tool._arun(product_id="prod_1", impressions=100)
+    assert "DEAL CREATED SUCCESSFULLY" not in result
+    assert "Deal blocked" in result
+    assert "Unrelated Vendor Inc" not in result
+
+
 def test_invalid_unknown_policy_rejected(mock_client, agency_context):
     with pytest.raises(ValueError, match="sgp_unknown_policy"):
         RequestDealTool(
@@ -272,6 +371,7 @@ def test_invalid_unknown_policy_rejected(mock_client, agency_context):
 
 
 def _product(product_id: str, domain: str, price: float = 20.0) -> dict:
+    """A product in the canonical OpenDirect shape: seller domain in ``domain``."""
     return {
         "id": product_id,
         "name": f"Product {product_id}",
@@ -279,7 +379,7 @@ def _product(product_id: str, domain: str, price: float = 20.0) -> dict:
         "channel": "ctv",
         "basePrice": price,
         "availableImpressions": 1_000_000,
-        "seller_url": f"http://{domain}",
+        "domain": domain,
     }
 
 
@@ -314,6 +414,51 @@ def _discovery_sgp_mock() -> MagicMock:
         }
     )
     return sgp
+
+
+@pytest.mark.asyncio
+async def test_discovery_does_not_block_spec_conformant_product(agency_context):
+    """Regression: a Product built from the OpenDirect schema must survive.
+
+    The extractor previously ignored ``domain`` -- the only domain field the
+    Product resource defines -- so enforcement filtered every conformant
+    product as "missing seller domain" and emptied the catalog.
+    """
+    from ad_buyer.clients.sgp_client import SGPClient
+    from ad_buyer.models.opendirect import Product
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    # Constructed by field name (populate_by_name) rather than by wire alias,
+    # so this stays valid if the alias convention changes again.
+    product = Product(
+        id="espn-sports-pmp",
+        publisher_id="pub_espn",
+        name="ESPN Sports PMP",
+        base_price=18.5,
+        rate_type="CPM",
+        domain="espn.com",
+        available_impressions=1_000_000,
+    ).model_dump(by_alias=True)
+
+    client = MagicMock()
+    client.search_products = AsyncMock(return_value=MagicMock(success=True, data=[product]))
+
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=SGPClient.normalize_domain)
+    sgp.check_approvals = AsyncMock(return_value={"espn.com": _approved("espn.com")})
+
+    tool = DiscoverInventoryTool(
+        client=client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="block",
+    )
+    result = await tool._arun(query="sports inventory")
+    assert "ESPN Sports PMP" in result
+    assert "missing seller domain" not in result
+    assert "APPROVED" in result
+    sgp.check_approvals.assert_called_once_with(["espn.com"])
 
 
 @pytest.mark.asyncio

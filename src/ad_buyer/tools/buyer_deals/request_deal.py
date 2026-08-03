@@ -302,8 +302,9 @@ Returns:
         if not raw_domain:
             return (
                 "Deal blocked: cannot determine seller domain for IAB "
-                "Diligence Platform approval check. Add a seller_url / "
-                "publisher_domain field to the product, or disable SGP_ENFORCE.",
+                "Diligence Platform approval check. Populate the product's "
+                "`domain` field (OpenDirect Product resource), or disable "
+                "SGP_ENFORCE.",
                 None,
             )
 
