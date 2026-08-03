@@ -659,3 +659,97 @@ async def test_discovery_no_sgp_client_pass_through(discovery_client, agency_con
     assert "Product p3" in result
     assert "SGP Approval" not in result
     assert "Total products found: 3" in result
+
+
+# ---------------------------------------------------------------------------
+# Unreadable catalog entries must not slip past enforcement
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_discovery_blocks_unreadable_entries_when_enforcing(agency_context):
+    """Regression: a non-dict catalog entry used to bypass the gate entirely.
+
+    `_apply_enforcement` appended anything that was not a dict, so a malformed
+    row reached the agent unverified while a well-formed row merely missing a
+    domain was blocked.
+    """
+    from ad_buyer.clients.sgp_client import SGPClient
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    client = MagicMock()
+    client.search_products = AsyncMock(
+        return_value=MagicMock(
+            success=True,
+            data=[
+                "I am not a dict",
+                _product("p1", "approved.example.com"),
+            ],
+        )
+    )
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(side_effect=SGPClient.normalize_domain)
+    sgp.check_approvals = AsyncMock(
+        return_value={"approved.example.com": _approved("approved.example.com")}
+    )
+
+    tool = DiscoverInventoryTool(
+        client=client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="block",
+    )
+    result = await tool._arun(query="anything")
+    assert "I am not a dict" not in result
+    assert "unreadable" in result
+    # The verifiable, approved product is untouched.
+    assert "Product p1" in result
+
+
+@pytest.mark.asyncio
+async def test_discovery_keeps_unreadable_entries_when_not_enforcing(agency_context):
+    """Annotate-only mode must not start dropping rows."""
+    from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
+
+    client = MagicMock()
+    client.search_products = AsyncMock(
+        return_value=MagicMock(success=True, data=["I am not a dict"])
+    )
+    tool = DiscoverInventoryTool(
+        client=client,
+        buyer_context=agency_context,
+        sgp_client=None,
+        sgp_enforce=False,
+    )
+    result = await tool._arun(query="anything")
+    assert "I am not a dict" in result
+
+
+@pytest.mark.asyncio
+async def test_deal_gate_blocks_an_unreadable_product(agency_context):
+    """A non-dict product must be blocked by the gate, not raise AttributeError.
+
+    ``extract_product_domain`` returning None for unreadable input is what makes
+    this fail closed, so the gate needs no special case of its own.
+    """
+    mock_client = MagicMock()
+    mock_client.get_product = AsyncMock(
+        return_value=MagicMock(success=True, data="not-a-dict", error=None)
+    )
+    sgp = MagicMock()
+    sgp.normalize_domain = MagicMock(return_value="")
+    sgp.check_approvals = AsyncMock()
+
+    tool = RequestDealTool(
+        client=mock_client,
+        buyer_context=agency_context,
+        sgp_client=sgp,
+        sgp_enforce=True,
+        sgp_unknown_policy="block",
+    )
+    result = await tool._arun(product_id="prod_1", impressions=100)
+    assert "Deal blocked" in result
+    assert "seller domain" in result
+    assert "DEAL CREATED SUCCESSFULLY" not in result
+    sgp.check_approvals.assert_not_called()

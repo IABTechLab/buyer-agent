@@ -153,6 +153,11 @@ class TestExtractProductDomain:
     def test_no_domain_field_returns_none(self) -> None:
         assert extract_product_domain({"id": "p1", "name": "Untagged"}) is None
 
+    @pytest.mark.parametrize("value", ["a string", 42, None, ["list"], True])
+    def test_non_dict_input_returns_none_rather_than_raising(self, value) -> None:
+        """Catalog entries come off the wire; an unreadable one must not crash."""
+        assert extract_product_domain(value) is None
+
 
 # ---------------------------------------------------------------------------
 # Successful lookups
@@ -440,6 +445,54 @@ class TestDomainEchoMatching:
         assert first["news.foo.com"] is not None
         assert second["news.foo.com"] is not None
         assert second["news.foo.com"].iab_buyer_agent_approval is True
+
+
+# ---------------------------------------------------------------------------
+# Malformed response envelopes
+#
+# Valid JSON of the wrong type must surface as SGPClientError so enforcing
+# callers fail closed, rather than as an AttributeError that escapes the tool.
+# ---------------------------------------------------------------------------
+
+
+class TestMalformedEnvelope:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("body", [[{"x": 1}], "a string", 42, True])
+    async def test_non_object_payload_raises_client_error(self, body) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=body)
+
+        client = _make_client(handler)
+        with pytest.raises(SGPClientError, match="not a JSON object"):
+            await client.check_approvals(["foo.com"])
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("data", [{"foo.com": True}, "records", 7])
+    async def test_non_list_data_raises_client_error(self, data) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"data": data})
+
+        client = _make_client(handler)
+        with pytest.raises(SGPClientError, match="'data' was not a list"):
+            await client.check_approvals(["foo.com"])
+
+    @pytest.mark.asyncio
+    async def test_missing_data_key_is_treated_as_no_records(self) -> None:
+        """An object with no `data` is a valid empty answer, not a shape error."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"status": "success"})
+
+        client = _make_client(handler)
+        assert await client.check_approvals(["foo.com"]) == {"foo.com": None}
+
+    @pytest.mark.asyncio
+    async def test_null_data_is_treated_as_no_records(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"data": None})
+
+        client = _make_client(handler)
+        assert await client.check_approvals(["foo.com"]) == {"foo.com": None}
 
 
 # ---------------------------------------------------------------------------

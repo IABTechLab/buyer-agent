@@ -267,18 +267,27 @@ Returns:
         Returns ``(filtered_products, summary_counts)``. When enforcement
         is off, the product list is returned unchanged and counts are
         empty. ``summary_counts`` keys: ``not_approved``,
-        ``unknown_blocked``, ``no_domain_blocked``.
+        ``unknown_blocked``, ``no_domain_blocked``, ``unverifiable_blocked``.
         """
         product_list = products if isinstance(products, list) else [products]
         if not self._sgp_enforce or self._sgp_client is None:
             return product_list, {}
 
         filtered: list = []
-        counts = {"not_approved": 0, "unknown_blocked": 0, "no_domain_blocked": 0}
+        counts = {
+            "not_approved": 0,
+            "unknown_blocked": 0,
+            "no_domain_blocked": 0,
+            "unverifiable_blocked": 0,
+        }
 
         for product in product_list:
             if not isinstance(product, dict):
-                filtered.append(product)
+                # An entry we cannot read is an entry we cannot verify. Keeping
+                # it would let a malformed catalog row reach the agent without
+                # ever being checked, while a well-formed row merely missing a
+                # domain gets blocked -- fail closed in both cases.
+                counts["unverifiable_blocked"] += 1
                 continue
             raw_domain = extract_product_domain(product)
             if not raw_domain:
@@ -431,4 +440,6 @@ Returns:
             parts.append(f"{summary['unknown_blocked']} unknown to SGP")
         if summary.get("no_domain_blocked"):
             parts.append(f"{summary['no_domain_blocked']} missing seller domain")
+        if summary.get("unverifiable_blocked"):
+            parts.append(f"{summary['unverifiable_blocked']} unreadable")
         return f"SGP enforcement filtered {total} product(s): " + ", ".join(parts)

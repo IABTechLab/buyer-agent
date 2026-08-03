@@ -70,7 +70,13 @@ def extract_product_domain(product: dict) -> str | None:
     ``publisherId`` / ``publisher`` when those values contain a ``.``
     (i.e. look like a hostname rather than an opaque ID). Returns the
     raw value; ``SGPClient.normalize_domain`` handles cleanup.
+
+    Anything that is not a dict yields ``None`` rather than raising. Catalog
+    entries come off the wire, and an unreadable one should be reported as
+    having no derivable domain -- which the gate blocks -- not crash the tool.
     """
+    if not isinstance(product, dict):
+        return None
     for key in _DOMAIN_KEYS:
         value = product.get(key)
         if isinstance(value, str) and value:
@@ -340,7 +346,22 @@ class SGPClient:
         except ValueError as exc:
             raise SGPClientError(f"SGP response was not JSON: {exc}") from None
 
+        # Shape checks before indexing: a proxy or gateway can answer with
+        # perfectly valid JSON of the wrong type (an error array, a bare
+        # string). Reaching for ``.get`` on that raised AttributeError, which
+        # is not an SGPClientError, so it escaped the buyer-deal tools instead
+        # of failing the gate closed.
+        if not isinstance(payload, dict):
+            raise SGPClientError(
+                f"SGP response was not a JSON object (got {type(payload).__name__})"
+            )
+
         raw_records = payload.get("data") or []
+        if not isinstance(raw_records, list):
+            raise SGPClientError(
+                f"SGP response 'data' was not a list (got {type(raw_records).__name__})"
+            )
+
         by_domain: dict[str, ApprovalRecord | None] = {d: None for d in domains}
         requested = set(domains)
 
