@@ -66,7 +66,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "flask", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "iab-agentic-primitives", extras = ["client"], git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.3.0" },
+    { name = "iab-agentic-primitives", extras = ["client"], git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.5.0" },
     { name = "meta-ads-cli", marker = "extra == 'meta'", specifier = ">=0.1.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.5.0" },
     { name = "mkdocs-mermaid2-plugin", marker = "extra == 'docs'", specifier = ">=1.1.0" },
@@ -81,7 +81,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'production'", specifier = ">=5.0.0" },
     { name = "redis", marker = "extra == 'redis'", specifier = ">=5.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15,<0.16" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "typer", specifier = ">=0.12.0" },
     { name = "uvicorn", specifier = ">=0.32.0" },
@@ -1632,7 +1632,7 @@ wheels = [
 [[package]]
 name = "iab-agentic-primitives"
 version = "0.1.0"
-source = { git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.3.0#8709e79ae34100b54d0b6e63f37a9baeaa619471" }
+source = { git = "https://github.com/IABTechLab/iab-agentic-primitives.git?rev=v0.5.0#5fdbe5731c84d00e1529c78d4ec77c1f7169dcd7" }
 dependencies = [
     { name = "pydantic" },
 ]
