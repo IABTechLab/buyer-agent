@@ -235,8 +235,14 @@ flow from the Verify section above. Two layouts are supported:
   ```
 
   Each repo needs its dependencies installed (`pip install -e .`, in a repo-local
-  `.venv`/`venv` or any active environment). `SELLER_PORT` / `BUYER_PORT`
-  override the default ports; Ctrl-C stops both agents.
+  `.venv`/`venv` or any active environment). The seller checkout also needs
+  `ANTHROPIC_API_KEY` available — via its `.env` (see the seller's
+  `.env.example`) or exported in your shell. Any placeholder value boots the
+  seller; a real key is only needed for LLM-backed flows. The script checks
+  this up front and exits with instructions instead of letting the seller die
+  mid-startup. `SELLER_PORT` / `BUYER_PORT` override the default ports;
+  Ctrl-C — or a `SIGTERM` from supervising tooling — stops both agents and
+  frees both ports.
 
 - **Docker Compose** — no second checkout needed; see [Docker](#docker) below
   (`infra/docker/docker-compose.yml`).

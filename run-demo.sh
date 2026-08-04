@@ -145,6 +145,35 @@ if ! "$BUYER_PYTHON" -c "import ad_buyer" >/dev/null 2>&1; then
     exit 1
 fi
 
+# A pristine seller clone will not boot: the seller's Settings requires
+# ANTHROPIC_API_KEY at startup (any placeholder value satisfies it -- the
+# deterministic demo path never calls an LLM). Fail fast with instructions
+# instead of letting the seller die mid-startup with a pydantic traceback.
+# Deliberately no auto-written .env: this script does not own the seller
+# checkout, and silently planting config there could mask a real
+# misconfiguration -- the fix below is a single copy-paste command.
+SELLER_HAS_KEY=0
+if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+    SELLER_HAS_KEY=1
+elif [ -f "$SELLER_DIR/.env" ] \
+    && grep -q '^[[:space:]]*ANTHROPIC_API_KEY=' "$SELLER_DIR/.env"; then
+    SELLER_HAS_KEY=1
+fi
+if [ "$SELLER_HAS_KEY" = "0" ]; then
+    cat >&2 <<EOF
+ERROR: the seller agent cannot boot -- ANTHROPIC_API_KEY is not available.
+
+The seller's settings require ANTHROPIC_API_KEY at startup. Any placeholder
+value lets it boot; a real key is only needed for LLM-backed flows.
+
+Fix -- give the seller checkout a .env (see its .env.example for the full set):
+  echo 'ANTHROPIC_API_KEY=demo-placeholder' >> "$SELLER_DIR/.env"
+
+or export the variable in your shell before running this script.
+EOF
+    exit 1
+fi
+
 if command -v lsof >/dev/null 2>&1; then
     for port_info in "$SELLER_PORT:Seller agent" "$BUYER_PORT:Buyer agent"; do
         port="${port_info%%:*}"
@@ -169,19 +198,34 @@ mkdir -p "$LOG_DIR"
 
 PIDS=()
 
+# shellcheck disable=SC2329  # invoked via the EXIT trap registered below
 cleanup() {
     echo ""
     echo "Shutting down demo servers..."
     for pid in ${PIDS[@]+"${PIDS[@]}"}; do
         if kill -0 "$pid" 2>/dev/null; then
             kill "$pid" 2>/dev/null || true
-            echo "  Stopped PID $pid"
+            echo "  Stopping PID $pid"
         fi
+    done
+    # Block until the servers have actually exited so the ports are free by
+    # the time we return (wait also reaps them; already-gone PIDs are a no-op).
+    for pid in ${PIDS[@]+"${PIDS[@]}"}; do
+        wait "$pid" 2>/dev/null || true
     done
     echo "Done. Logs saved in: $LOG_DIR"
 }
 
-trap cleanup EXIT INT TERM
+# Cleanup runs from the EXIT trap so it fires exactly once on every exit path;
+# INT/TERM merely translate the signal into an exit (130/143 = 128 + signal).
+# Bash defers trap handlers while a foreground command runs and does NOT
+# forward signals to children, so both servers are started in the background
+# and awaited with `wait` (which IS interruptible by trapped signals) --
+# previously a `kill -TERM` at this script was swallowed until the foreground
+# buyer exited, leaving both uvicorns running and the ports held.
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # ---------------------------------------------------------------------------
 # Start the seller agent (background)
@@ -239,6 +283,15 @@ cd "$BUYER_DIR"
 # SELLER_ENDPOINTS is what the buyer actually reads (comma-separated, see
 # src/ad_buyer/config/settings.py); SELLER_BASE_URL is kept for backward
 # compatibility with older docs that referenced it.
+# Started in the background and awaited so INT/TERM reach our traps
+# immediately (see the trap comment above); output still goes to this
+# terminal.
 SELLER_BASE_URL="http://localhost:$SELLER_PORT" \
     SELLER_ENDPOINTS="http://localhost:$SELLER_PORT" \
-    "$BUYER_PYTHON" -m uvicorn ad_buyer.interfaces.api.main:app --port "$BUYER_PORT"
+    "$BUYER_PYTHON" -m uvicorn ad_buyer.interfaces.api.main:app --port "$BUYER_PORT" &
+BUYER_PID=$!
+PIDS+=("$BUYER_PID")
+
+BUYER_STATUS=0
+wait "$BUYER_PID" || BUYER_STATUS=$?
+exit "$BUYER_STATUS"
