@@ -282,6 +282,7 @@ class TestBookViaMetaApi:
             mock_settings.meta_ad_account_id = "act_1"
             mock_settings.meta_page_id = "page_1"
             mock_settings.meta_api_version = "v21.0"
+            mock_settings.meta_use_mcp = False
 
             campaign_id, ad_set_id, kind = flow._book_via_meta_api(rec)
 
@@ -293,3 +294,111 @@ class TestBookViaMetaApi:
         _, kwargs = client.create_campaign.call_args
         assert isinstance(kwargs["daily_budget_cents"], int)
         assert kwargs["daily_budget_cents"] >= 100
+
+    def test_meta_use_mcp_routes_to_mcp_booking(self):
+        """settings.meta_use_mcp=True must bypass the legacy client entirely."""
+        rec = _make_recommendation("meta:feed", "social")
+        flow = _flow_with_approved([rec])
+
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch.object(
+                flow,
+                "_book_via_meta_mcp",
+                new=AsyncMock(return_value=("mcp_camp_1", "mcp_adset_1", "meta")),
+            ) as mcp_mock,
+            patch("ad_buyer.clients.meta_ads_client.MetaAdsClient") as legacy_cls,
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+            mock_settings.meta_use_mcp = True
+
+            result = flow._book_via_meta_api(rec)
+
+        assert result == ("mcp_camp_1", "mcp_adset_1", "meta")
+        mcp_mock.assert_called_once()
+        legacy_cls.assert_not_called()
+
+
+class TestBookViaMetaMcp:
+    """The MCP counterpart of _book_via_meta_api's Graph API calls."""
+
+    @staticmethod
+    def _patch_mcp_client(create_campaign_result, create_adset_result):
+        mock_client = AsyncMock()
+        mock_client.create_campaign.return_value = create_campaign_result
+        mock_client.create_adset.return_value = create_adset_result
+
+        mock_client_cls = MagicMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        return mock_client, mock_client_cls
+
+    @pytest.mark.asyncio
+    async def test_creates_paused_campaign_and_adset_without_bid_amount(self):
+        rec = _make_recommendation("meta:feed", "social")
+        flow = _flow_with_approved([rec])
+
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "mcp_camp_1", "status": "PAUSED"},
+            create_adset_result={"ad_set_id": "mcp_adset_1", "status": "PAUSED"},
+        )
+
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch("ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient", mock_client_cls),
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+
+            campaign_id, ad_set_id, kind = await flow._book_via_meta_mcp(
+                campaign_name="Test Campaign",
+                objective="OUTCOME_AWARENESS",
+                daily_budget_cents=500,
+                adset_name="Facebook Feed",
+                optimization_goal="REACH",
+                targeting_countries=["US"],
+            )
+
+        assert (campaign_id, ad_set_id, kind) == ("mcp_camp_1", "mcp_adset_1", "meta")
+        mock_client.create_campaign.assert_called_once_with(
+            name="Test Campaign",
+            objective="OUTCOME_AWARENESS",
+            daily_budget_cents=500,
+        )
+        # Regression guard: create_campaign() always creates CBO campaigns,
+        # which reject bid_amount on the ad set (confirmed live against the
+        # real Meta MCP server) — must never be forwarded here.
+        _, adset_kwargs = mock_client.create_adset.call_args
+        assert "bid_amount_cents" not in adset_kwargs
+
+    @pytest.mark.asyncio
+    async def test_missing_campaign_id_raises(self):
+        rec = _make_recommendation("meta:feed", "social")
+        flow = _flow_with_approved([rec])
+
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"error_message": "VALIDATION failure"},
+            create_adset_result={"ad_set_id": "unused"},
+        )
+
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch("ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient", mock_client_cls),
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+
+            with pytest.raises(ValueError, match="Campaign creation failed"):
+                await flow._book_via_meta_mcp(
+                    campaign_name="Test Campaign",
+                    objective="OUTCOME_AWARENESS",
+                    daily_budget_cents=500,
+                    adset_name="Facebook Feed",
+                    optimization_goal="REACH",
+                    targeting_countries=["US"],
+                )
+        mock_client.create_adset.assert_not_called()
