@@ -145,13 +145,12 @@ if ! "$BUYER_PYTHON" -c "import ad_buyer" >/dev/null 2>&1; then
     exit 1
 fi
 
-# A pristine seller clone will not boot: the seller's Settings requires
-# ANTHROPIC_API_KEY at startup (any placeholder value satisfies it -- the
-# deterministic demo path never calls an LLM). Fail fast with instructions
-# instead of letting the seller die mid-startup with a pydantic traceback.
-# Deliberately no auto-written .env: this script does not own the seller
-# checkout, and silently planting config there could mask a real
-# misconfiguration -- the fix below is a single copy-paste command.
+# ANTHROPIC_API_KEY is no longer required for the seller to boot: since
+# seller v2.4.0 the key is optional at startup and only checked lazily when
+# an LLM-backed flow runs (the deterministic demo path never calls an LLM).
+# So the key's absence must NOT block startup -- note it here (non-fatal),
+# and if the seller does die during startup the readiness loop below points
+# at the key as a likely cause for older seller checkouts.
 SELLER_HAS_KEY=0
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
     SELLER_HAS_KEY=1
@@ -160,18 +159,10 @@ elif [ -f "$SELLER_DIR/.env" ] \
     SELLER_HAS_KEY=1
 fi
 if [ "$SELLER_HAS_KEY" = "0" ]; then
-    cat >&2 <<EOF
-ERROR: the seller agent cannot boot -- ANTHROPIC_API_KEY is not available.
-
-The seller's settings require ANTHROPIC_API_KEY at startup. Any placeholder
-value lets it boot; a real key is only needed for LLM-backed flows.
-
-Fix -- give the seller checkout a .env (see its .env.example for the full set):
-  echo 'ANTHROPIC_API_KEY=demo-placeholder' >> "$SELLER_DIR/.env"
-
-or export the variable in your shell before running this script.
-EOF
-    exit 1
+    echo "NOTE: ANTHROPIC_API_KEY is not set (env or $SELLER_DIR/.env)."
+    echo "      The deterministic demo path works without it; LLM-backed flows"
+    echo "      will fail at the point of use until a key is provided."
+    echo ""
 fi
 
 if command -v lsof >/dev/null 2>&1; then
@@ -251,7 +242,21 @@ MAX_WAIT=30
 elapsed=0
 until curl -fsS "http://localhost:$SELLER_PORT/health" >/dev/null 2>&1; do
     if ! kill -0 "$SELLER_PID" 2>/dev/null; then
-        echo "ERROR: seller agent exited during startup. Check $LOG_DIR/seller.log" >&2
+        echo "ERROR: seller agent exited during startup." >&2
+        echo "----- last lines of $LOG_DIR/seller.log -----" >&2
+        tail -n 20 "$LOG_DIR/seller.log" >&2 || true
+        echo "---------------------------------------------" >&2
+        if [ "$SELLER_HAS_KEY" = "0" ]; then
+            cat >&2 <<EOF
+
+Hint: ANTHROPIC_API_KEY is not available (env or $SELLER_DIR/.env).
+Seller v2.4.0+ boots without it (LLM-backed flows need a key at use time;
+the deterministic path does not). Older seller checkouts required the key
+at startup -- if the log above shows a missing-ANTHROPIC_API_KEY validation
+error, upgrade the seller checkout or provide a value:
+  echo 'ANTHROPIC_API_KEY=demo-placeholder' >> "$SELLER_DIR/.env"
+EOF
+        fi
         exit 1
     fi
     if [ "$elapsed" -ge "$MAX_WAIT" ]; then
