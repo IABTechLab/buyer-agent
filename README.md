@@ -130,8 +130,12 @@ Plug in an [IAB Diligence Platform](https://safeguardprivacy.com) tenant to keep
 ```bash
 git clone https://github.com/IABTechLab/buyer-agent.git
 cd buyer-agent
-pip install -e .
+uv sync --locked        # installs into .venv from uv.lock (same install CI uses)
 ```
+
+No [uv](https://docs.astral.sh/uv/)? `pip install -e .` in a virtualenv of your
+choice still works — but `uv sync --locked` is what CI runs, so it is the
+reproducible path.
 
 ### Configure
 
@@ -171,15 +175,18 @@ DATABASE_URL=sqlite:///./ad_buyer.db
 ### Run
 
 ```bash
-python -m ad_buyer.interfaces.api.main
+uv run python -m ad_buyer.interfaces.api.main
 # Server runs at http://localhost:8000
 ```
 
 This is equivalent to running the ASGI app directly with uvicorn:
 
 ```bash
-uvicorn ad_buyer.interfaces.api.main:app --port 8000
+uv run uvicorn ad_buyer.interfaces.api.main:app --port 8000
 ```
+
+(If you installed with `pip install -e .` instead of `uv sync`, drop the
+`uv run` prefix and run the same commands in your activated environment.)
 
 `ANTHROPIC_API_KEY` is optional to *start* the server (the API boots without it);
 it is only required once you run CrewAI-backed booking flows.
@@ -187,7 +194,8 @@ it is only required once you run CrewAI-backed booking flows.
 > **This quickstart is tested.** `tests/smoke/test_quickstart_smoke.py` boots the app at
 > the exact module path documented above (`ad_buyer.interfaces.api.main:app`) through its
 > real startup lifecycle and asserts `/health` and `/bookings` respond — no network or LLM
-> calls. Run it with `ANTHROPIC_API_KEY=test pytest tests/smoke/test_quickstart_smoke.py`.
+> calls. Run it with `ANTHROPIC_API_KEY=test uv run --locked pytest tests/smoke/test_quickstart_smoke.py`
+> (needs the `dev` extra — see [Development](#development)).
 > If it fails, the entrypoint above is wrong.
 
 ### Verify
@@ -234,8 +242,8 @@ flow from the Verify section above. Two layouts are supported:
   ./run-demo.sh --dry-run                        # show resolved paths, start nothing
   ```
 
-  Each repo needs its dependencies installed (`pip install -e .`, in a repo-local
-  `.venv`/`venv` or any active environment). The seller checkout also needs
+  Each repo needs its dependencies installed (`uv sync --locked` or
+  `pip install -e .`, in a repo-local `.venv`/`venv` or any active environment). The seller checkout also needs
   `ANTHROPIC_API_KEY` available — via its `.env` (see the seller's
   `.env.example`) or exported in your shell. Any placeholder value boots the
   seller; a real key is only needed for LLM-backed flows. The script checks
@@ -257,8 +265,8 @@ allocation → pacing → reporting). It runs entirely in-process — no seller 
 external services required — and needs Flask, which ships in the `dev` extra:
 
 ```bash
-pip install -e ".[dev]"
-python -m demo.campaign_demo
+uv sync --locked --extra dev
+uv run python -m demo.campaign_demo
 # Opens at http://localhost:5055 (override with CAMPAIGN_DEMO_PORT)
 ```
 
@@ -300,19 +308,30 @@ docker compose up
 
 ## Development
 
+CI installs straight from `uv.lock` (`uv sync --locked`) and never re-resolves,
+so use the same locked commands locally:
+
 ```bash
-# Install dev dependencies
-pip install -e ".[dev]"
+# Install dev dependencies (the exact install CI uses)
+uv sync --locked --extra dev
 
 # Run tests
-ANTHROPIC_API_KEY=test pytest tests/ -v
+ANTHROPIC_API_KEY=test uv run --locked pytest tests/ -v
 
-# Lint
-ruff check src/
+# Lint + format (CI enforces both)
+uv run --locked ruff check src/ tests/
+uv run --locked ruff format --check src/ tests/
 
 # Build docs locally
-pip install -e ".[docs]"
-mkdocs serve
+uv sync --locked --extra docs
+uv run --locked mkdocs serve
+```
+
+Changing dependencies in `pyproject.toml`? Re-resolve the lockfile and commit it
+alongside your change — otherwise CI fails with a stale-lockfile error:
+
+```bash
+uv lock
 ```
 
 ## Related
