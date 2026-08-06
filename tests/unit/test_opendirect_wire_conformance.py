@@ -39,6 +39,7 @@ from ad_buyer.models.opendirect import (
     LineBookingStatus,
     Order,
     OrderStatus,
+    Organization,
     Product,
     RateType,
 )
@@ -243,3 +244,61 @@ class TestEnumSpecSpellings:
             quantity=1,
         )
         assert line.quantity == 1
+
+
+class TestSpecNameLengthBounds:
+    """``name`` length validation matches the OpenDirect 2.1 normative tables.
+
+    Spec: InteractiveAdvertisingBureau/OpenDirect, ``OpenDirect.v2.1.final.md``,
+    per-object attribute tables.
+
+    These assert the behaviour of the ``name`` length constraint specifically —
+    a partial payload is validated and only ``string_too_long`` errors on
+    ``name`` are inspected, so no valid instance of each model is required.
+
+    Both directions are asserted because transcription slips go both ways: a
+    bound set too low silently rejects legal values (Product carried 38 against
+    a spec 100; Account carried 36, which is the spec's id/GUID length), while a
+    bound set too high silently accepts illegal ones (Organization carried 128
+    against a spec 120).
+    """
+
+    SPEC_NAME_MAX_LENGTH = [
+        (Account, 255),
+        (Creative, 255),
+        (Line, 200),
+        (Order, 100),
+        (Organization, 120),
+        (Product, 100),
+    ]
+
+    @staticmethod
+    def _name_too_long_errors(model: type, value: str) -> list[dict]:
+        """``string_too_long`` errors on ``name`` from validating ``{"name": value}``.
+
+        Errors for other fields (missing required values) are ignored, isolating
+        the name-length constraint.
+        """
+        try:
+            model.model_validate({"name": value})
+        except ValidationError as exc:
+            return [
+                err
+                for err in exc.errors()
+                if err["loc"] == ("name",) and err["type"] == "string_too_long"
+            ]
+        return []
+
+    @pytest.mark.parametrize(("model", "max_length"), SPEC_NAME_MAX_LENGTH)
+    def test_name_does_not_reject_spec_maximum(self, model: type, max_length: int) -> None:
+        assert self._name_too_long_errors(model, "a" * max_length) == [], (
+            f"{model.__name__}.name produces string_too_long for a value at the "
+            f"OpenDirect 2.1 maximum ({max_length}); the declared bound is below the spec"
+        )
+
+    @pytest.mark.parametrize(("model", "max_length"), SPEC_NAME_MAX_LENGTH)
+    def test_name_rejects_over_spec_maximum(self, model: type, max_length: int) -> None:
+        assert self._name_too_long_errors(model, "a" * (max_length + 1)), (
+            f"{model.__name__}.name accepts a value one character over the "
+            f"OpenDirect 2.1 maximum ({max_length}); the declared bound is above the spec"
+        )

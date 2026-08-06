@@ -275,7 +275,7 @@ class OpenDirectClient:
 
         The strict ``list_products`` maps the whole catalog through the
         OpenDirect model, so ONE invalid product (e.g. a name over the
-        38-char cap) fails the ENTIRE fetch. On the per-seller product
+        spec length bound) fails the ENTIRE fetch. On the per-seller product
         resolution path that turned a single bad catalog entry into a
         skipped seller and, fleet-wide, into zero bookings
         (Wave-B rig proof 2026-07-21).
