@@ -36,6 +36,7 @@ it is only needed to actually run CrewAI booking flows.
 
 from fastapi.testclient import TestClient
 
+from ad_buyer import __version__
 from ad_buyer.interfaces.api.main import app
 
 
@@ -47,7 +48,7 @@ def test_documented_entrypoint_boots_and_serves():
         # 1) Health — the quickstart's "Verify" step.
         resp = client.get("/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "healthy", "version": "1.0.0"}
+        assert resp.json() == {"status": "healthy", "version": __version__}
 
         # 2) Representative real endpoint that needs no external backend:
         #    the booking list. Proves the bookings surface is mounted and

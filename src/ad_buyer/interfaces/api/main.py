@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from ... import __version__
 from ...clients.meta_ads_client import MetaAdsClient
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
@@ -43,7 +44,7 @@ app = FastAPI(
         "Orchestrates budget allocation, inventory research, recommendation "
         "consolidation, and deal booking against seller agent APIs."
     ),
-    version="1.0.0",
+    version=__version__,
     contact={"name": "IAB Tech Lab", "url": "https://iabtechlab.com"},
     license_info={"name": "Apache 2.0", "url": "https://www.apache.org/licenses/LICENSE-2.0"},
     openapi_tags=[
@@ -299,7 +300,7 @@ def _create_client() -> OpenDirectClient:
 @app.get("/health", tags=["Health"])
 async def health_check() -> dict[str, str]:
     """Health check endpoint."""
-    return {"status": "healthy", "version": "1.0.0"}
+    return {"status": "healthy", "version": __version__}
 
 
 @app.post("/bookings", response_model=BookingResponse, tags=["Bookings"])
