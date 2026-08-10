@@ -75,7 +75,36 @@ jobs:
 
       - name: Wait for deployment to stabilize
         run: |
-          aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_SERVICE \
-            --region $AWS_REGION
+          # `aws ecs wait services-stable` gives up after ~10 minutes (40 checks
+          # x 15s), but this rollout routinely takes 9-11 minutes (ALB drain +
+          # Fargate provisioning + health ramp), so the bare waiter reports
+          # failure on deploys that succeed moments later. Poll the PRIMARY
+          # deployment's rolloutState instead, with a 20-minute deadline.
+          deadline=$(( $(date +%s) + 20 * 60 ))
+          while true; do
+            state=$(aws ecs describe-services \
+              --cluster $ECS_CLUSTER \
+              --services $ECS_SERVICE \
+              --region $AWS_REGION \
+              --query 'services[0].deployments[?status==`PRIMARY`] | [0].[rolloutState,runningCount,desiredCount]' \
+              --output text) || state=""
+            rollout=$(echo "$state" | awk '{print $1}')
+            running=$(echo "$state" | awk '{print $2}')
+            desired=$(echo "$state" | awk '{print $3}')
+            echo "$(date -u +%H:%M:%S) rolloutState=$rollout running/desired=$running/$desired"
+            case "$rollout" in
+              COMPLETED)
+                echo "Deployment completed."
+                exit 0
+                ;;
+              FAILED)
+                echo "Deployment rollout FAILED." >&2
+                exit 1
+                ;;
+            esac
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "Timed out after 20 minutes waiting for rollout to complete." >&2
+              exit 1
+            fi
+            sleep 20
+          done
