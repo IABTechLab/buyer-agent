@@ -5,7 +5,9 @@
 
 Wave-B rig proof 2026-07-21 (docs/reports/WAVE_B_RIG_PROOF_2026-07-21.md):
 every rig seller's 13-product catalog contains two names longer than the
-buyer OpenDirect model's 38-char ``name`` cap. Cross-seller resolution's Stage 1.5
+buyer OpenDirect model's ``name`` cap, which was then 38 (corrected to the
+OpenDirect 2.1 bound of 100 in #123; fixtures here are now synthetic).
+Cross-seller resolution's Stage 1.5
 resolution fetched the FULL catalog through the strict model, so ONE
 invalid product failed the entire fetch -> ``catalog_error`` -> seller
 skipped -> with PRODUCT_RESOLUTION_ENABLED default-on the fleet booked
@@ -47,10 +49,15 @@ from ad_buyer.registry.models import AgentCapability, AgentCard, TrustLevel
 
 SELLER_URL = "http://ctv-seller.example.com"
 
-# The two live rig catalog names that exceed the OpenDirect 38-char cap
-# (seller catalog_service.py:181; 44 and 46 chars respectively).
-OVERSIZED_NAME_1 = "Programmatic Linear Reach — A25-54 Primetime"
-OVERSIZED_NAME_2 = "Digital Out-of-Home — Times Square Spectacular"
+# Names that exceed the OpenDirect 2.1 Product.name bound of string(100).
+#
+# Until #123 the buyer capped name at 38, which rejected two LEGAL products
+# from the rig seller's own catalog (44 and 46 chars) and produced the Wave-B
+# regression this module covers. With the bound corrected those two names
+# parse cleanly and can no longer serve as invalid fixtures, so these are
+# synthetic records that remain invalid under the spec bound.
+OVERSIZED_NAME_1 = "Programmatic Linear Reach — A25-54 Primetime " + "x" * 60
+OVERSIZED_NAME_2 = "Digital Out-of-Home — Times Square Spectacular " + "y" * 60
 
 
 def _wire_product(product_id: str, name: str, **overrides) -> dict:
@@ -112,7 +119,7 @@ class TestListProductsTolerant:
         reject = rejects[0]
         assert reject["product_id"] == "prod-2"
         assert reject["name"] == OVERSIZED_NAME_1
-        assert "38" in reject["reason"]
+        assert "100" in reject["reason"]
         assert "name" in reject["reason"]
 
     async def test_wire_invalid_item_rejected_others_survive(self):
@@ -152,7 +159,7 @@ class TestListProductsTolerant:
         products, rejects = await client.list_products_tolerant(top=500)
         assert products == []
         assert {r["product_id"] for r in rejects} == {"prod-1", "prod-2"}
-        assert all("38" in r["reason"] for r in rejects)
+        assert all("100" in r["reason"] for r in rejects)
 
     async def test_filters_apply_to_valid_subset(self):
         client = _client_serving(
@@ -171,7 +178,7 @@ class TestListProductsTolerant:
     async def test_strict_list_products_behavior_unchanged(self):
         """The strict path must STILL fail whole-catalog on an invalid item.
 
-        Tolerance is scoped to the resolution path; the 38-char model
+        Tolerance is scoped to the resolution path; the model's name
         constraint itself is deliberately NOT loosened here.
         """
         client = _client_serving(
@@ -182,7 +189,7 @@ class TestListProductsTolerant:
                 ]
             )
         )
-        with pytest.raises(Exception, match="38"):
+        with pytest.raises(Exception, match="100"):
             await client.list_products(top=500)
 
 
@@ -301,12 +308,12 @@ def mock_deals_client_factory():
 REJECT_1 = {
     "product_id": "prod-linear",
     "name": OVERSIZED_NAME_1,
-    "reason": "name: String should have at most 38 characters",
+    "reason": "name: String should have at most 100 characters",
 }
 REJECT_2 = {
     "product_id": "prod-dooh",
     "name": OVERSIZED_NAME_2,
-    "reason": "name: String should have at most 38 characters",
+    "reason": "name: String should have at most 100 characters",
 }
 
 
@@ -396,7 +403,7 @@ class TestRigRegressionEndToEnd:
         self, mock_deals_client_factory, mock_event_bus
     ):
         """S1 regression mirror: a real OpenDirectClient catalog client
-        serving the rig's oversized names resolves via the valid subset."""
+        serving oversized names resolves via the valid subset."""
         payload = _envelope(
             [
                 _wire_product("prod-linear", OVERSIZED_NAME_1),

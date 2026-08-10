@@ -90,7 +90,8 @@ class Organization(BaseModel):
     """Organization resource (advertisers, agencies, publishers)."""
 
     id: str | None = None
-    name: str = Field(..., max_length=128)
+    # OpenDirect 2.1: Organization.name is string(120).
+    name: str = Field(..., max_length=120)
     type: str = Field(..., description="Type: advertiser, agency, publisher")
     address: str | None = None
     contacts: list[dict[str, Any]] | None = None
@@ -103,7 +104,9 @@ class Account(BaseModel):
     id: str | None = None
     advertiser_id: str = Field(..., alias="advertiserid")
     buyer_id: str = Field(..., alias="buyerid")
-    name: str = Field(..., max_length=36)
+    # OpenDirect 2.1: Account.name is string(255).
+    # 36 is the spec's id/GUID length, not a name bound.
+    name: str = Field(..., max_length=255)
     ext: dict[str, Any] | None = None
 
     model_config = {"populate_by_name": True}
@@ -114,7 +117,8 @@ class Product(BaseModel):
 
     id: str | None = None
     publisher_id: str = Field(..., alias="publisherid")
-    name: str = Field(..., max_length=38)
+    # OpenDirect 2.1: Product.name is string(100).
+    name: str = Field(..., max_length=100)
     description: str | None = None
     currency: str = Field(default="USD", description="ISO-4217 currency code")
     base_price: float = Field(..., alias="baseprice", ge=0)
