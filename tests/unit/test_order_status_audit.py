@@ -330,12 +330,24 @@ class TestBuyerOrderEndpoints:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 
+        from ad_buyer.auth.dependencies import require_operator_key
         from ad_buyer.interfaces.api.order_endpoints import create_order_router
+        from ad_buyer.models.api_key import ApiKeyRecord, ApiKeyRole
 
         test_app = FastAPI()
         router = create_order_router(order_store)
         test_app.include_router(router)
 
+        async def _ok():
+            return ApiKeyRecord(
+                key_id="key-test",
+                key_hash="test",
+                key_prefix_hint="abk_live_test...",
+                role=ApiKeyRole.OPERATOR,
+                label="test",
+            )
+
+        test_app.dependency_overrides[require_operator_key] = _ok
         return TestClient(test_app)
 
     def test_list_orders_empty(self, api_client):

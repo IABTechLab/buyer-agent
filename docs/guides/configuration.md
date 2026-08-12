@@ -44,10 +44,13 @@ print(settings.get_seller_endpoints())
 | `ANTHROPIC_API_KEY` | `str` | `""` | Anthropic API key for Claude models. Required when `DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` use the `anthropic/` prefix (the default). |
 | `OPENAI_API_KEY` | `str` | `None` | OpenAI API key. Required when using the `openai/` provider prefix. |
 | `GOOGLE_API_KEY` | `str` | `None` | Google API key. Required when using the `gemini/` provider prefix. |
-| `API_KEY` | `str` | `""` | Inbound API key for authenticating requests to this service. When empty, authentication is disabled (development mode). |
+| `API_KEY` | `str` | `""` | **Deprecated** inbound auth shim. Prefer hashed operator keys from `ad-buyer create-operator-key`. Accepted only when no DB operator keys exist yet. |
 
-!!! warning "Development mode"
-    When `API_KEY` is empty, the buyer agent's API endpoints are unauthenticated. Set a value in production to require `X-Api-Key` headers on incoming requests.
+!!! warning "Operator credentials required"
+    Protected REST and MCP-over-HTTP surfaces require an operator key.
+    Bootstrap with `ad-buyer create-operator-key`, then send
+    `Authorization: Bearer <key>` or `X-Api-Key: <key>`. See
+    [Authentication](../api/authentication.md).
 
 ### Seller Endpoints
 

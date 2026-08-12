@@ -175,6 +175,9 @@ DATABASE_URL=sqlite:///./ad_buyer.db
 ### Run
 
 ```bash
+# Bootstrap the first operator key (CLI only — same DATABASE_URL as the server)
+uv run ad-buyer create-operator-key --label "Primary operator"
+
 uv run python -m ad_buyer.interfaces.api.main
 # Server runs at http://localhost:8000
 ```
@@ -189,7 +192,9 @@ uv run uvicorn ad_buyer.interfaces.api.main:app --port 8000
 `uv run` prefix and run the same commands in your activated environment.)
 
 `ANTHROPIC_API_KEY` is optional to *start* the server (the API boots without it);
-it is only required once you run CrewAI-backed booking flows.
+it is only required once you run CrewAI-backed booking flows. Protected REST
+and MCP-over-HTTP routes require the operator key from
+`ad-buyer create-operator-key`.
 
 > **This quickstart is tested.** `tests/smoke/test_quickstart_smoke.py` boots the app at
 > the exact module path documented above (`ad_buyer.interfaces.api.main:app`) through its
@@ -201,11 +206,11 @@ it is only required once you run CrewAI-backed booking flows.
 ### Verify
 
 ```bash
-# Health check (served by the buyer agent itself — no backend needed)
+# Health check (public — no auth)
 curl http://localhost:8000/health
 
-# List bookings (empty on a fresh server)
-curl http://localhost:8000/bookings
+# List bookings (requires operator key)
+curl -H "Authorization: Bearer <operator_api_key>" http://localhost:8000/bookings
 ```
 
 The next two calls reach *outward* to a seller agent / OpenDirect backend, so they

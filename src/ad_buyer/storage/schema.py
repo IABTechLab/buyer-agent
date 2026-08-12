@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 # v3: Reserved for deal_templates
 # v4: Campaign automation tables
 # v5: Deal templates + supply path templates
-SCHEMA_VERSION = 5
+# v6: Operator API keys (inbound auth)
+SCHEMA_VERSION = 6
 
 # -- Schema version tracking ------------------------------------------------
 
@@ -479,6 +480,30 @@ AUDIENCE_AUDIT_LOG_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_audience_audit_created_at ON audience_audit_log(created_at);",
 ]
 
+# -- v6: inbound operator API keys ------------------------------------------
+
+API_KEYS_TABLE = """
+CREATE TABLE IF NOT EXISTS api_keys (
+    key_id          TEXT PRIMARY KEY,
+    key_hash        TEXT NOT NULL UNIQUE,
+    key_prefix_hint TEXT NOT NULL,
+    role            TEXT NOT NULL DEFAULT 'operator',
+    label           TEXT NOT NULL DEFAULT '',
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    expires_at      TEXT,
+    revoked         INTEGER NOT NULL DEFAULT 0,
+    revoked_at      TEXT,
+    last_used_at    TEXT,
+    use_count       INTEGER NOT NULL DEFAULT 0
+);
+"""
+
+API_KEYS_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_api_keys_role ON api_keys(role);",
+    "CREATE INDEX IF NOT EXISTS idx_api_keys_label ON api_keys(label);",
+    "CREATE INDEX IF NOT EXISTS idx_api_keys_revoked ON api_keys(revoked);",
+]
+
 
 def create_tables(conn: sqlite3.Connection) -> None:
     """Create all tables and indexes if they don't already exist.
@@ -514,6 +539,8 @@ def create_tables(conn: sqlite3.Connection) -> None:
         SUPPLY_PATH_TEMPLATE_TABLE,
         # Audience audit log (additive; idempotent CREATE IF NOT EXISTS)
         AUDIENCE_AUDIT_LOG_TABLE,
+        # v6 operator API keys
+        API_KEYS_TABLE,
     ]:
         cursor.execute(ddl)
 
@@ -540,6 +567,8 @@ def create_tables(conn: sqlite3.Connection) -> None:
         SUPPLY_PATH_TEMPLATE_INDEXES,
         # Audience audit log indexes (idempotent CREATE INDEX IF NOT EXISTS)
         AUDIENCE_AUDIT_LOG_INDEXES,
+        # v6 operator API keys
+        API_KEYS_INDEXES,
     ]:
         for idx in index_list:
             cursor.execute(idx)
@@ -748,6 +777,25 @@ def migrate_v4_to_v5(conn: sqlite3.Connection) -> None:
     logger.info("Migration v4 -> v5 complete: template tables created")
 
 
+def migrate_v5_to_v6(conn: sqlite3.Connection) -> None:
+    """Migrate schema from v5 to v6 (inbound operator API keys).
+
+    Creates the ``api_keys`` table used by OperatorKeyService.
+
+    This migration is idempotent: CREATE TABLE IF NOT EXISTS is a no-op
+    for existing tables.
+
+    Args:
+        conn: Active SQLite connection.
+    """
+    cursor = conn.cursor()
+    cursor.execute(API_KEYS_TABLE)
+    for idx in API_KEYS_INDEXES:
+        cursor.execute(idx)
+    conn.commit()
+    logger.info("Migration v5 -> v6 complete: api_keys table created")
+
+
 def run_migrations(conn: sqlite3.Connection) -> None:
     """Run pending schema migrations.
 
@@ -765,10 +813,12 @@ def run_migrations(conn: sqlite3.Connection) -> None:
     # Migration registry: version -> migration function
     # Note: v3 is reserved for deal_templates; skipped.
     # v5 adds deal_templates + supply_path_templates.
+    # v6 adds inbound operator API keys.
     migrations: dict[int, callable] = {
         2: migrate_v1_to_v2,
         4: migrate_v2_to_v4,
         5: migrate_v4_to_v5,
+        6: migrate_v5_to_v6,
     }
 
     for version in range(current + 1, SCHEMA_VERSION + 1):

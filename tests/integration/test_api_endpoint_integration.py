@@ -166,6 +166,10 @@ def _make_settings(api_key: str = "") -> Settings:
 class TestBookingEndpointLifecycle:
     """Tests the full booking job lifecycle via API."""
 
+    @pytest.fixture(autouse=True)
+    def _bypass_operator_auth(self, allow_operator_auth):
+        """Operator auth is covered by unit tests; lifecycle tests focus on flow."""
+
     @pytest.mark.asyncio
     async def test_create_booking_returns_job_id(self):
         """POST /bookings should return a job_id and pending status."""
@@ -274,6 +278,10 @@ class TestBookingApprovalLifecycle:
     cycle, so by the time POST /bookings returns the (mocked) flow has run
     and the job state is deterministic.
     """
+
+    @pytest.fixture(autouse=True)
+    def _bypass_operator_auth(self, allow_operator_auth):
+        """Operator auth is covered by unit tests; lifecycle tests focus on flow."""
 
     @staticmethod
     def _brief_payload(auto_approve: bool = False) -> dict:
@@ -422,55 +430,72 @@ class TestBookingApprovalLifecycle:
 
 
 class TestApiAuthIntegration:
-    """Tests authentication middleware with actual API requests."""
+    """Tests operator-key authentication with actual API requests."""
 
     @pytest.mark.asyncio
-    async def test_auth_enabled_rejects_unauthenticated(self):
-        """When api_key is set, unauthenticated requests should get 401."""
+    async def test_auth_rejects_unauthenticated(self, tmp_path, monkeypatch):
+        """Protected routes reject requests without an operator key."""
+        from ad_buyer.auth.factory import get_operator_key_service, reset_operator_key_service
+        from ad_buyer.config.settings import get_settings
+
+        db_url = f"sqlite:///{tmp_path / 'int_auth.db'}"
+        monkeypatch.setenv("DATABASE_URL", db_url)
+        monkeypatch.setenv("API_KEY", "")
+        get_settings.cache_clear()
+        reset_operator_key_service()
+        get_operator_key_service(db_url, force_new=True)
+
         transport = ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            with patch.object(api_module, "settings", _make_settings("my-secret")):
-                response = await client.get("/bookings")
+            response = await client.get("/bookings")
 
         assert response.status_code == 401
+        reset_operator_key_service()
+        get_settings.cache_clear()
 
     @pytest.mark.asyncio
-    async def test_auth_enabled_accepts_valid_key(self):
-        """When api_key is set, requests with correct key should succeed."""
+    async def test_auth_accepts_valid_operator_key(self, tmp_path, monkeypatch):
+        """Requests with a minted operator key succeed."""
+        from ad_buyer.auth.factory import get_operator_key_service, reset_operator_key_service
+        from ad_buyer.config.settings import get_settings
+        from ad_buyer.models.api_key import OperatorApiKeyCreateRequest
+
+        db_url = f"sqlite:///{tmp_path / 'int_auth2.db'}"
+        monkeypatch.setenv("DATABASE_URL", db_url)
+        monkeypatch.setenv("API_KEY", "")
+        get_settings.cache_clear()
+        reset_operator_key_service()
+        svc = get_operator_key_service(db_url, force_new=True)
+        raw = svc.create_operator_key(OperatorApiKeyCreateRequest(label="int")).api_key
+
         transport = ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            with patch.object(api_module, "settings", _make_settings("my-secret")):
-                response = await client.get(
-                    "/bookings",
-                    headers={"X-API-Key": "my-secret"},
-                )
+            response = await client.get(
+                "/bookings",
+                headers={"X-Api-Key": raw},
+            )
 
         assert response.status_code == 200
+        reset_operator_key_service()
+        get_settings.cache_clear()
 
     @pytest.mark.asyncio
     async def test_health_bypasses_auth(self):
         """Health endpoint should bypass authentication."""
         transport = ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            with patch.object(api_module, "settings", _make_settings("my-secret")):
-                response = await client.get("/health")
+            response = await client.get("/health")
 
         assert response.status_code == 200
         assert response.json()["status"] == "healthy"
 
-    @pytest.mark.asyncio
-    async def test_auth_disabled_allows_all_requests(self):
-        """When api_key is empty, all requests should succeed without headers."""
-        transport = ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            with patch.object(api_module, "settings", _make_settings("")):
-                response = await client.get("/bookings")
-
-        assert response.status_code == 200
-
 
 class TestApiValidationIntegration:
     """Tests input validation across the API boundary."""
+
+    @pytest.fixture(autouse=True)
+    def _bypass_operator_auth(self, allow_operator_auth):
+        """Validation tests need auth bypassed so 422 (not 401) is observable."""
 
     @pytest.mark.asyncio
     async def test_invalid_brief_missing_fields(self):

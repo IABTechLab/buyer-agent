@@ -11,13 +11,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from ... import __version__
+from ...auth.dependencies import require_operator_key
 from ...clients.meta_ads_client import MetaAdsClient
 from ...clients.opendirect_client import OpenDirectClient
 from ...config.settings import settings
@@ -125,37 +125,10 @@ def _mount_order_router() -> None:
 
 _mount_order_router()
 
-# Paths that never require authentication
-_PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
+# Operator API key lifecycle (requires existing operator credential)
+from .auth_endpoints import router as _auth_router  # noqa: E402
 
-
-@app.middleware("http")
-async def api_key_auth_middleware(request: Request, call_next):
-    """Validate X-API-Key header on all non-public endpoints.
-
-    Authentication is skipped entirely when settings.api_key is empty,
-    allowing easy local development without configuring a key.
-    """
-    current = _current_settings()
-
-    # Skip auth if no api_key is configured (dev mode)
-    if not current.api_key:
-        return await call_next(request)
-
-    # Skip auth for public/health endpoints
-    if request.url.path in _PUBLIC_PATHS:
-        return await call_next(request)
-
-    # Validate the API key
-    provided_key = request.headers.get("X-API-Key", "")
-    if not provided_key or provided_key != current.api_key:
-        return JSONResponse(
-            status_code=401,
-            content={"detail": "Invalid or missing API key"},
-        )
-
-    return await call_next(request)
-
+app.include_router(_auth_router)
 
 # In-memory job storage (use Redis/DB in production)
 jobs: dict[str, dict[str, Any]] = {}
@@ -307,6 +280,7 @@ async def health_check() -> dict[str, str]:
 async def create_booking(
     request: BookingRequest,
     background_tasks: BackgroundTasks,
+    _operator=Depends(require_operator_key),
 ) -> BookingResponse:
     """Start a new booking workflow.
 
@@ -339,7 +313,10 @@ async def create_booking(
 
 
 @app.get("/bookings/{job_id}", response_model=BookingStatus, tags=["Bookings"])
-async def get_booking_status(job_id: str) -> BookingStatus:
+async def get_booking_status(
+    job_id: str,
+    _operator=Depends(require_operator_key),
+) -> BookingStatus:
     """Get status of a booking workflow."""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -362,6 +339,7 @@ async def get_booking_status(job_id: str) -> BookingStatus:
 async def approve_recommendations(
     job_id: str,
     request: ApprovalRequest,
+    _operator=Depends(require_operator_key),
 ) -> dict[str, Any]:
     """Approve specific recommendations for booking.
 
@@ -395,7 +373,10 @@ async def approve_recommendations(
 
 
 @app.post("/bookings/{job_id}/approve-all", tags=["Bookings"])
-async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
+async def approve_all_recommendations(
+    job_id: str,
+    _operator=Depends(require_operator_key),
+) -> dict[str, Any]:
     """Approve all recommendations for booking."""
     if job_id not in jobs:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -428,6 +409,7 @@ async def approve_all_recommendations(job_id: str) -> dict[str, Any]:
 async def list_bookings(
     status: str | None = None,
     limit: int = 20,
+    _operator=Depends(require_operator_key),
 ) -> dict[str, Any]:
     """List all booking jobs."""
     job_list = []
@@ -451,7 +433,10 @@ async def list_bookings(
 
 
 @app.post("/products/search", tags=["Products"])
-async def search_products(request: ProductSearchRequest) -> dict[str, Any]:
+async def search_products(
+    request: ProductSearchRequest,
+    _operator=Depends(require_operator_key),
+) -> dict[str, Any]:
     """Search available advertising products."""
     from ...tools.research.product_search import ProductSearchTool
 
@@ -480,6 +465,7 @@ async def list_events(
     flow_id: str | None = None,
     session_id: str | None = None,
     limit: int = 50,
+    _operator=Depends(require_operator_key),
 ) -> dict[str, Any]:
     """List events from the event bus.
 
@@ -502,7 +488,10 @@ async def list_events(
 
 
 @app.get("/events/{event_id}", tags=["Events"])
-async def get_event(event_id: str) -> dict[str, Any]:
+async def get_event(
+    event_id: str,
+    _operator=Depends(require_operator_key),
+) -> dict[str, Any]:
     """Retrieve a single event by ID."""
     from ...events.bus import get_event_bus
 
@@ -522,6 +511,7 @@ async def get_event(event_id: str) -> dict[str, Any]:
 async def get_campaign_report(
     job_id: str,
     date_range: str = "last_30d",
+    _operator=Depends(require_operator_key),
 ) -> dict[str, Any]:
     """Get delivery reports for a completed booking job.
 
@@ -635,7 +625,10 @@ def _sanitize_meta_error(e: Exception) -> str:
 
 
 @app.get("/meta/campaigns", tags=["Reporting"])
-async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
+async def meta_list_campaigns(
+    limit: int = 10,
+    _operator=Depends(require_operator_key),
+) -> dict[str, Any]:
     """List Meta Ads campaigns directly from the ad account (no booking job required).
 
     Returns campaigns with id, name, status, and objective.
@@ -673,6 +666,7 @@ async def meta_list_campaigns(limit: int = 10) -> dict[str, Any]:
 async def meta_direct_report(
     campaign_ids: str,
     date_preset: str = "last_30d",
+    _operator=Depends(require_operator_key),
 ) -> dict[str, Any]:
     """Pull insights directly from Meta Ads by campaign ID(s).
 

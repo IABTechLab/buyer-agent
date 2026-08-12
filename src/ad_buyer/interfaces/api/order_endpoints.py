@@ -15,8 +15,9 @@ Order Status & Audit API Integration.
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from ...auth.dependencies import require_operator_key
 from ...storage.order_store import OrderStore
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,11 @@ def create_order_router(order_store: OrderStore) -> APIRouter:
     Returns:
         Configured APIRouter with order endpoints.
     """
-    router = APIRouter(prefix="/api/v1/buyer", tags=["Buyer Orders"])
+    router = APIRouter(
+        prefix="/api/v1/buyer",
+        tags=["Buyer Orders"],
+        dependencies=[Depends(require_operator_key)],
+    )
 
     @router.get("/orders")
     async def list_buyer_orders(status: str | None = None):

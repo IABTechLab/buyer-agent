@@ -36,9 +36,9 @@ mount_mcp(app)  # Creates /mcp (Streamable HTTP) and /mcp-sse (legacy SSE)
 `mount_mcp` calls `mcp.streamable_http_app()` (canonical) and `mcp.sse_app()` (legacy fallback).
 The canonical client URL is `http://<host>:8001/mcp/`. For legacy SSE clients, use `http://<host>:8001/mcp-sse/sse`.
 
-### Auth middleware note
+### Auth note (operator keys)
 
-The FastAPI `api_key_auth_middleware` applies to all HTTP paths. Neither `/mcp` nor `/mcp-sse` is in the public path exemption list (`/health`, `/docs`, `/openapi.json`, `/redoc`), so both pass through the key check. When `settings.api_key` is non-empty, MCP clients must send `X-API-Key: <key>` on the initial connection. When `settings.api_key` is empty (default for local development), the middleware skips authentication entirely.
+MCP tools over Streamable HTTP / SSE require an **operator** API key via `Authorization: Bearer <key>` or `X-Api-Key: <key>` (same credential as the REST control plane). Bootstrap the first key with `ad-buyer create-operator-key` (CLI only — no HTTP bootstrap). Local stdio MCP access is trusted like the CLI. The `health_check` tool remains ungated; all other tools enforce operator auth over HTTP.
 
 ---
 
