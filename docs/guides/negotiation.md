@@ -100,7 +100,7 @@ strategy = SimpleThresholdStrategy(
 )
 
 result = await client.auto_negotiate(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     proposal_id="prop-abc123",
     strategy=strategy,
 )
@@ -131,7 +131,7 @@ strategy = SimpleThresholdStrategy(target_cpm=20, max_cpm=30, concession_step=2,
 
 # Start with our opening offer
 session = await client.start_negotiation(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     proposal_id="prop-abc123",
     initial_price=20.0,
     strategy=strategy,

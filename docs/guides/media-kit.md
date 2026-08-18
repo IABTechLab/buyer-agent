@@ -17,7 +17,7 @@ The fastest way to evaluate a seller's inventory is to browse without authentica
 from ad_buyer.media_kit import MediaKitClient
 
 async with MediaKitClient() as client:
-    kit = await client.get_media_kit("http://seller.example.com:8001")
+    kit = await client.get_media_kit("http://seller.example.com:8000")
 
     print(f"Seller: {kit.seller_name}")
     print(f"Packages available: {kit.total_packages}")
@@ -44,11 +44,11 @@ Once you have identified interesting inventory, authenticate with an API key to 
 
 ```python
 async with MediaKitClient(api_key="your-seller-api-key") as client:
-    kit = await client.get_media_kit("http://seller.example.com:8001")
+    kit = await client.get_media_kit("http://seller.example.com:8000")
 
     for pkg in kit.all_packages:
         detail = await client.get_package(
-            "http://seller.example.com:8001",
+            "http://seller.example.com:8000",
             pkg.package_id,
         )
 
@@ -144,7 +144,7 @@ When you know what you are looking for, use `search_packages` instead of browsin
 ```python
 # Find sports video inventory
 results = await client.search_packages(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     query="sports video",
 )
 
@@ -161,7 +161,7 @@ Pass a `SearchFilter` to include buyer identity in the search request. The selle
 from ad_buyer.media_kit.models import SearchFilter
 
 results = await client.search_packages(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     query="premium video",
     filters=SearchFilter(
         buyer_tier="agency",
@@ -179,7 +179,7 @@ The `aggregate_across_sellers` method queries multiple sellers in parallel and r
 
 ```python
 sellers = [
-    "http://seller-a.example.com:8001",
+    "http://seller-a.example.com:8000",
     "http://seller-b.example.com:8002",
     "http://seller-c.example.com:8003",
 ]

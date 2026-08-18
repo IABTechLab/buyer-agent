@@ -259,7 +259,7 @@ Insert a new deal record. Returns the deal ID (auto-generated UUID if not provid
 
 ```python
 deal_id = store.save_deal(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     product_id="prod-ctv-sports-001",
     product_name="CTV Sports Premium",
     deal_type="PD",
@@ -284,7 +284,7 @@ Query deals with optional filters. Results ordered by `created_at` descending.
 
 ```python
 # All booked deals for a seller
-deals = store.list_deals(status="booked", seller_url="http://seller:8001")
+deals = store.list_deals(status="booked", seller_url="http://seller:8000")
 
 # Recent deals (last 24 hours)
 deals = store.list_deals(created_after="2026-03-09T00:00:00Z", limit=100)

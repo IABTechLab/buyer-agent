@@ -36,12 +36,12 @@ The `UnifiedClient` wraps both MCP and A2A behind a single interface. CrewAI too
 from ad_buyer.clients.unified_client import UnifiedClient, Protocol
 
 # MCP mode (default) -- direct tool execution
-client = UnifiedClient(base_url="http://seller:8001", protocol=Protocol.MCP)
+client = UnifiedClient(base_url="http://seller:8000", protocol=Protocol.MCP)
 await client.connect()
 result = await client.list_products()  # calls MCP list_products tool
 
 # A2A mode -- natural language interpretation
-client = UnifiedClient(base_url="http://seller:8001", protocol=Protocol.A2A)
+client = UnifiedClient(base_url="http://seller:8000", protocol=Protocol.A2A)
 await client.connect()
 result = await client.list_products()  # sends "List all available advertising products"
 ```
@@ -54,7 +54,7 @@ result = await client.list_products()  # sends "List all available advertising p
 Connect to both protocols simultaneously for workflows that mix structured operations with conversational queries:
 
 ```python
-async with UnifiedClient(base_url="http://seller:8001") as client:
+async with UnifiedClient(base_url="http://seller:8000") as client:
     await client.connect_both()
 
     # Use MCP for structured listing
@@ -128,7 +128,7 @@ The buyer agent's protocol behavior is controlled by these settings:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `iab_server_url` | Base URL for the seller agent | `http://localhost:8001` |
+| `iab_server_url` | Base URL for the seller agent | `http://localhost:8000` |
 | `seller_endpoints` | Comma-separated seller URLs (multi-seller) | `""` (empty) |
 
 Set via environment variables or `config/settings.py`. The default protocol (MCP) is an attribute of `UnifiedClient` (`clients/unified_client.py`), passed at construction — there is no `default_protocol` setting.

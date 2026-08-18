@@ -62,7 +62,7 @@ These paths never require authentication:
 With an existing operator credential:
 
 ```bash
-curl -X POST http://localhost:8000/auth/api-keys/operator \
+curl -X POST http://localhost:8001/auth/api-keys/operator \
   -H "Authorization: Bearer <operator_api_key>" \
   -H "Content-Type: application/json" \
   -d '{"label": "Ops secondary key", "expires_in_days": 365}'
@@ -149,7 +149,7 @@ store = ApiKeyStore(store_path=Path("/etc/ad_buyer/keys.json"))
 ### Store a Key
 
 ```python
-store.add_key("http://seller.example.com:8001", "sk-abc123secret")
+store.add_key("http://seller.example.com:8000", "sk-abc123secret")
 ```
 
 ### Full ApiKeyStore API
@@ -173,7 +173,7 @@ from ad_buyer.auth.key_store import ApiKeyStore
 from ad_buyer.auth.middleware import AuthMiddleware
 
 store = ApiKeyStore()
-store.add_key("http://seller.example.com:8001", "sk-abc123secret")
+store.add_key("http://seller.example.com:8000", "sk-abc123secret")
 middleware = AuthMiddleware(key_store=store, header_type="api_key")
 ```
 

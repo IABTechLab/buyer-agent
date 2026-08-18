@@ -781,7 +781,7 @@ async def _run_booking_flow(job_id: str, request: BookingRequest) -> None:
     )
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
+def run_server(host: str = "0.0.0.0", port: int = 8001) -> None:
     """Run the API server."""
     import uvicorn
 

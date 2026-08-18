@@ -67,8 +67,8 @@ class TestSettingsHasIABServerURL:
         from ad_buyer.config.settings import Settings
 
         field_info = Settings.model_fields["iab_server_url"]
-        assert field_info.default == "http://localhost:8001", (
-            "iab_server_url should default to localhost:8001"
+        assert field_info.default == "http://localhost:8000", (
+            "iab_server_url should default to localhost:8000"
         )
 
     def test_settings_loads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:

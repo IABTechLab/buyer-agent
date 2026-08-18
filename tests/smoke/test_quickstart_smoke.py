@@ -6,9 +6,9 @@
 The buyer quickstart (README.md → "Quick Start" / "Run" / "Verify") tells a
 fresh-clone developer to run:
 
-    python -m ad_buyer.interfaces.api.main      # serves on http://localhost:8000
+    python -m ad_buyer.interfaces.api.main      # serves on http://localhost:8001
 
-(equivalently ``uvicorn ad_buyer.interfaces.api.main:app --port 8000``) and
+(equivalently ``uvicorn ad_buyer.interfaces.api.main:app --port 8001``) and
 then hit ``GET /health`` and the booking/product endpoints. This test is the
 executable contract behind that promise. It:
 

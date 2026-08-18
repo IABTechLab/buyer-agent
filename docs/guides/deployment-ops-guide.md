@@ -428,8 +428,8 @@ Authentication is enforced via the `X-API-Key` header. Public paths (`/health`, 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `SELLER_ENDPOINTS` | No | `""` | Comma-separated list of seller MCP/A2A server URLs. Used by the `UnifiedClient` for multi-seller workflows. |
-| `IAB_SERVER_URL` | No | `http://localhost:8001` | Primary seller server URL. Used as the default `base_url` for single-seller flows and protocol clients. |
-| `OPENDIRECT_BASE_URL` | No | `http://localhost:3000/api/v2.1` | Base URL for the OpenDirect 2.1 REST API (legacy single-seller mode). |
+| `IAB_SERVER_URL` | No | `http://localhost:8000` | Primary seller server URL. Used as the default `base_url` for single-seller flows and protocol clients. |
+| `OPENDIRECT_BASE_URL` | No | `http://localhost:8000/api/v2.1` | Base URL for the OpenDirect 2.1 REST API (legacy single-seller mode). |
 | `OPENDIRECT_TOKEN` | No | `None` | Bearer token for OpenDirect authentication. |
 | `OPENDIRECT_API_KEY` | No | `None` | API key for OpenDirect authentication. |
 

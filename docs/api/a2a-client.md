@@ -189,7 +189,7 @@ A2A supports multi-turn conversations via `contextId`. The seller maintains conv
 ```python
 from ad_buyer.clients.a2a_client import A2AClient
 
-client = A2AClient(base_url="http://seller:8001")
+client = A2AClient(base_url="http://seller:8000")
 response = await client.send_message(
     "What premium video inventory do you have for Q2 with household targeting?"
 )
@@ -228,7 +228,7 @@ All A2A responses are parsed into an `A2AResponse` object:
 ```python
 from ad_buyer.clients.a2a_client import A2AClient
 
-async with A2AClient(base_url="http://seller:8001") as client:
+async with A2AClient(base_url="http://seller:8000") as client:
     # Discover inventory with complex criteria
     response = await client.send_message(
         "What premium video inventory do you have for Q2 "

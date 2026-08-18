@@ -207,7 +207,7 @@ selection = await orchestrator.select_and_book(
     ranked_quotes=ranked,
     budget=100_000.0,
     count=3,
-    quote_seller_map={"quote-abc": "http://seller-a:8001"},
+    quote_seller_map={"quote-abc": "http://seller-a:8000"},
 )
 
 print(f"Booked: {len(selection.booked_deals)}")

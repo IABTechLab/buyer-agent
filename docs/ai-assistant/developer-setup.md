@@ -31,8 +31,8 @@ Create a `.env` file:
 # Required
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Buyer Identity
-IAB_SERVER_URL=http://localhost:8001
+# Seller / IAB agentic-direct server
+IAB_SERVER_URL=http://localhost:8000
 
 # Storage (SQLite)
 DATABASE_URL=sqlite:///./ad_buyer.db
@@ -48,7 +48,7 @@ Set the `SELLER_ENDPOINTS` variable to a comma-separated list of seller agent MC
 
 ```env
 # Single seller
-SELLER_ENDPOINTS=http://localhost:3000
+SELLER_ENDPOINTS=http://localhost:8000
 
 # Multiple sellers
 SELLER_ENDPOINTS=http://espn.example.com,http://conde.example.com,http://nytimes.example.com
@@ -58,13 +58,13 @@ Each URL should point to a running seller agent. The buyer will use these endpoi
 
 ### Verify seller connectivity
 
-After starting the buyer agent, run:
+With the seller agent running on its default port, check:
 
 ```bash
-curl http://localhost:8001/health
+curl http://localhost:8000/health
 ```
 
-This returns `{"status": "healthy", "version": "1.0.0"}` when the service is up. To see per-service detail — including how many seller endpoints are configured — call the `health_check` MCP tool from your connected MCP client (it reports `database`, `seller_connections` with an endpoint count, and `event_bus`).
+This returns a healthy status when the seller is up. After the buyer agent is running, call the `health_check` MCP tool from your connected MCP client for per-service detail — including how many seller endpoints are configured (`database`, `seller_connections` with an endpoint count, and `event_bus`).
 
 ## Step 4: Configure SSP Connectors (Optional)
 

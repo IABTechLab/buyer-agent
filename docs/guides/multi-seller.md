@@ -110,7 +110,7 @@ async with MediaKitClient(api_key="your-api-key") as media_client:
 For a richer view of a specific seller, fetch their full media kit:
 
 ```python
-    kit = await media_client.get_media_kit("http://seller-a.example.com:8001")
+    kit = await media_client.get_media_kit("http://seller-a.example.com:8000")
 
     print(f"Seller: {kit.seller_name}")
     print(f"Total packages: {kit.total_packages}")
@@ -126,7 +126,7 @@ You can also search a seller's inventory by keyword:
     from ad_buyer.media_kit.models import SearchFilter
 
     results = await media_client.search_packages(
-        seller_url="http://seller-a.example.com:8001",
+        seller_url="http://seller-a.example.com:8000",
         query="premium video",
         filters=SearchFilter(buyer_tier="agency", agency_id="omnicom-456"),
     )
@@ -447,8 +447,8 @@ if not sellers:
     # Registry may be down -- fall back to known seller URLs
     print("Registry unavailable, using cached/known sellers")
     sellers = [
-        AgentCard(agent_id="known-1", name="Seller A", url="http://seller-a:8001"),
-        AgentCard(agent_id="known-2", name="Seller B", url="http://seller-b:8001"),
+        AgentCard(agent_id="known-1", name="Seller A", url="http://seller-a:8000"),
+        AgentCard(agent_id="known-2", name="Seller B", url="http://seller-b:8000"),
     ]
 ```
 
@@ -465,7 +465,7 @@ packages = await media_client.aggregate_across_sellers(seller_urls)
 
 # For individual calls, catch MediaKitError explicitly
 try:
-    detail = await media_client.get_package("http://seller-b:8001", "pkg-123")
+    detail = await media_client.get_package("http://seller-b:8000", "pkg-123")
 except MediaKitError as e:
     print(f"Seller error: {e} (status {e.status_code})")
     # Skip this seller or retry later

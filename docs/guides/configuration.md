@@ -16,7 +16,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 # Seller communication
 SELLER_ENDPOINTS=http://localhost:8000
-IAB_SERVER_URL=http://localhost:8001
+IAB_SERVER_URL=http://localhost:8000
 
 # Optional overrides
 DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
@@ -57,7 +57,7 @@ print(settings.get_seller_endpoints())
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `SELLER_ENDPOINTS` | `str` | `""` | Comma-separated list of seller MCP/A2A server URLs. |
-| `IAB_SERVER_URL` | `str` | `http://localhost:8001` | Primary IAB agentic-direct server URL. Used as the default `base_url` for flows and clients. |
+| `IAB_SERVER_URL` | `str` | `http://localhost:8000` | Primary IAB agentic-direct server URL. Used as the default `base_url` for flows and clients. |
 
 Parse seller endpoints as a list:
 
@@ -70,7 +70,7 @@ endpoints = settings.get_seller_endpoints()
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `OPENDIRECT_BASE_URL` | `str` | `http://localhost:3000/api/v2.1` | Base URL for the OpenDirect 2.1 REST API. |
+| `OPENDIRECT_BASE_URL` | `str` | `http://localhost:8000/api/v2.1` | Base URL for the OpenDirect 2.1 REST API. |
 | `OPENDIRECT_TOKEN` | `str` | `None` | Bearer token for OpenDirect authentication. |
 | `OPENDIRECT_API_KEY` | `str` | `None` | API key for OpenDirect authentication. |
 
