@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional
 
 from ..models.api_key import (
     ApiKeyCreateResponse,
@@ -36,9 +35,7 @@ class OperatorKeyService:
     def __init__(self, store: OperatorApiKeyStore):
         self._store = store
 
-    def create_operator_key(
-        self, request: OperatorApiKeyCreateRequest
-    ) -> ApiKeyCreateResponse:
+    def create_operator_key(self, request: OperatorApiKeyCreateRequest) -> ApiKeyCreateResponse:
         """Issue a new OPERATOR-role API key.
 
         Rejects if an active (non-revoked, non-expired) operator key
@@ -92,7 +89,7 @@ class OperatorKeyService:
             expires_at=expires_at,
         )
 
-    def validate_key(self, full_key: str) -> Optional[ApiKeyRecord]:
+    def validate_key(self, full_key: str) -> ApiKeyRecord | None:
         """Look up and validate an API key.
 
         Returns:
@@ -117,7 +114,7 @@ class OperatorKeyService:
         self._store.update(record)
         return record
 
-    def get_key_info(self, key_id: str) -> Optional[ApiKeyInfo]:
+    def get_key_info(self, key_id: str) -> ApiKeyInfo | None:
         """Get info about a key by its key_id (not the secret)."""
         record = self._store.get_by_id(key_id)
         if record is None:
@@ -153,8 +150,8 @@ class OperatorKeyService:
     def delete_operator_key(
         self,
         *,
-        key_id: Optional[str] = None,
-        label: Optional[str] = None,
+        key_id: str | None = None,
+        label: str | None = None,
     ) -> ApiKeyInfo:
         """Revoke an OPERATOR-role API key by key_id or label (bootstrap).
 
@@ -168,25 +165,20 @@ class OperatorKeyService:
         if not key_id and not label:
             raise ValueError("Provide key_id or label to delete an operator key")
 
-        target: Optional[ApiKeyInfo] = None
+        target: ApiKeyInfo | None = None
         if key_id:
             target = self.get_key_info(key_id)
             if target is None:
                 raise ValueError(f"API key {key_id!r} not found")
             if target.role != ApiKeyRole.OPERATOR:
                 raise ValueError(
-                    f"API key {key_id!r} is a {target.role.value} key, not an "
-                    "operator key."
+                    f"API key {key_id!r} is a {target.role.value} key, not an operator key."
                 )
         else:
             matches = [
                 info
                 for info in self.list_keys()
-                if (
-                    info.role == ApiKeyRole.OPERATOR
-                    and info.is_active
-                    and info.label == label
-                )
+                if (info.role == ApiKeyRole.OPERATOR and info.is_active and info.label == label)
             ]
             if not matches:
                 raise ValueError(f"No active operator key with label {label!r} found")
@@ -200,8 +192,7 @@ class OperatorKeyService:
 
         if not target.is_active:
             raise ValueError(
-                f"Operator key {target.key_id!r} is already inactive "
-                f"(revoked or expired)"
+                f"Operator key {target.key_id!r} is already inactive (revoked or expired)"
             )
 
         if not self.revoke_key(target.key_id):

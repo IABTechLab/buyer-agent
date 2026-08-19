@@ -17,7 +17,6 @@ from __future__ import annotations
 import logging
 import secrets
 from datetime import datetime
-from typing import Optional
 
 from fastapi import Header, HTTPException
 
@@ -31,9 +30,9 @@ _LEGACY_API_KEY_ID = "key-legacy-env"
 
 
 def _extract_key_from_headers(
-    authorization: Optional[str] = None,
-    x_api_key: Optional[str] = None,
-) -> Optional[str]:
+    authorization: str | None = None,
+    x_api_key: str | None = None,
+) -> str | None:
     """Extract API key from ``X-Api-Key`` or ``Authorization: Bearer``."""
     if x_api_key:
         return x_api_key
@@ -79,19 +78,15 @@ def validate_operator_credential(raw_key: str) -> ApiKeyRecord:
             raise PermissionError("Operator credential required")
         return record
 
-    if (
-        not has_db_keys
-        and settings.api_key
-        and secrets.compare_digest(raw_key, settings.api_key)
-    ):
+    if not has_db_keys and settings.api_key and secrets.compare_digest(raw_key, settings.api_key):
         return _legacy_operator_record(settings.api_key)
 
     raise ValueError("Invalid API key")
 
 
 async def require_operator_key(
-    authorization: Optional[str] = Header(None),
-    x_api_key: Optional[str] = Header(None, alias="X-Api-Key"),
+    authorization: str | None = Header(None),
+    x_api_key: str | None = Header(None, alias="X-Api-Key"),
 ) -> ApiKeyRecord:
     """Validate API key and require an OPERATOR-role credential.
 

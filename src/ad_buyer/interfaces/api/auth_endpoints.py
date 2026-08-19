@@ -9,8 +9,6 @@ operator key with ``ad-buyer create-operator-key`` (direct storage write).
 
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -25,7 +23,7 @@ class CreateOperatorApiKeyBody(BaseModel):
     """Request body for minting an additional operator key."""
 
     label: str = Field(default="", description="Human-readable label")
-    expires_in_days: Optional[int] = Field(
+    expires_in_days: int | None = Field(
         default=None,
         description="Days until expiry; omit for never-expires",
     )

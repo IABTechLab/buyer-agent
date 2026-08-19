@@ -14,7 +14,6 @@ import hashlib
 import secrets
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -60,10 +59,10 @@ class ApiKeyRecord(BaseModel):
     role: ApiKeyRole = ApiKeyRole.OPERATOR
     label: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     revoked: bool = False
-    revoked_at: Optional[datetime] = None
-    last_used_at: Optional[datetime] = None
+    revoked_at: datetime | None = None
+    last_used_at: datetime | None = None
     use_count: int = 0
 
     @property
@@ -83,7 +82,7 @@ class OperatorApiKeyCreateRequest(BaseModel):
     """Request to create an OPERATOR-role API key."""
 
     label: str = ""
-    expires_in_days: Optional[int] = None
+    expires_in_days: int | None = None
 
 
 class ApiKeyCreateResponse(BaseModel):
@@ -97,7 +96,7 @@ class ApiKeyCreateResponse(BaseModel):
     api_key: str
     role: ApiKeyRole = ApiKeyRole.OPERATOR
     label: str
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     warning: str = "Store this key securely. It will not be shown again."
 
 
@@ -109,8 +108,8 @@ class ApiKeyInfo(BaseModel):
     role: ApiKeyRole = ApiKeyRole.OPERATOR
     label: str
     created_at: datetime
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     revoked: bool = False
     is_active: bool = True
-    last_used_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
     use_count: int = 0

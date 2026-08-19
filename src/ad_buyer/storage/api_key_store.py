@@ -14,7 +14,7 @@ import logging
 import sqlite3
 import threading
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from ..models.api_key import ApiKeyRecord, ApiKeyRole
 from .schema import initialize_schema
@@ -82,9 +82,7 @@ class OperatorApiKeyStore:
 
     def _require_conn(self) -> sqlite3.Connection:
         if self._conn is None:
-            raise RuntimeError(
-                "OperatorApiKeyStore is not connected; call connect() first"
-            )
+            raise RuntimeError("OperatorApiKeyStore is not connected; call connect() first")
         return self._conn
 
     def insert(self, record: ApiKeyRecord) -> None:
@@ -115,7 +113,7 @@ class OperatorApiKeyStore:
             )
             conn.commit()
 
-    def get_by_hash(self, key_hash: str) -> Optional[ApiKeyRecord]:
+    def get_by_hash(self, key_hash: str) -> ApiKeyRecord | None:
         """Look up a key by SHA-256 hash."""
         conn = self._require_conn()
         with self._lock:
@@ -125,7 +123,7 @@ class OperatorApiKeyStore:
             ).fetchone()
         return self._row_to_record(row) if row else None
 
-    def get_by_id(self, key_id: str) -> Optional[ApiKeyRecord]:
+    def get_by_id(self, key_id: str) -> ApiKeyRecord | None:
         """Look up a key by key_id."""
         conn = self._require_conn()
         with self._lock:
@@ -139,9 +137,7 @@ class OperatorApiKeyStore:
         """Return all key records."""
         conn = self._require_conn()
         with self._lock:
-            rows = conn.execute(
-                "SELECT * FROM api_keys ORDER BY created_at ASC"
-            ).fetchall()
+            rows = conn.execute("SELECT * FROM api_keys ORDER BY created_at ASC").fetchall()
         return [self._row_to_record(r) for r in rows]
 
     def update(self, record: ApiKeyRecord) -> None:

@@ -43,8 +43,7 @@ class TestResolveSellerBaseUrl:
     def test_opendirect_field_default_is_seller_port(self):
         """Documented default points at the seller agent on :8000."""
         assert (
-            Settings.model_fields["opendirect_base_url"].default
-            == "http://localhost:8000/api/v2.1"
+            Settings.model_fields["opendirect_base_url"].default == "http://localhost:8000/api/v2.1"
         )
 
     def test_falls_back_to_legacy_opendirect_default(self, monkeypatch):
@@ -94,9 +93,7 @@ class TestCreateClientUsesResolution:
         monkeypatch.setattr(
             api_main,
             "settings",
-            self._fresh_settings(
-                monkeypatch, OPENDIRECT_BASE_URL="http://localhost:8000/api/v2.1"
-            ),
+            self._fresh_settings(monkeypatch, OPENDIRECT_BASE_URL="http://localhost:8000/api/v2.1"),
         )
         client = api_main._create_client()
         assert client.base_url == "http://localhost:8000/api/v2.1"
