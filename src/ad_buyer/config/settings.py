@@ -86,7 +86,7 @@ class Settings(BaseSettings):
 
     @field_validator("sgp_unknown_vendor_policy")
     @classmethod
-    def _canonicalize_unknown_vendor_policy(cls, value: str) -> str:
+    def _canonicalize_sgp_unknown_vendor_policy(cls, value: str) -> str:
         """Lowercase the policy and reject unrecognized values at startup.
 
         ``SGP_UNKNOWN_VENDOR_POLICY=BLOCK`` resolves to ``block`` rather than
