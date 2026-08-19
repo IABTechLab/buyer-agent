@@ -128,7 +128,7 @@ The buyer agent's protocol behavior is controlled by these settings:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `iab_server_url` | Base URL for the seller agent | `http://localhost:8000` |
+| `iab_server_url` | Base URL for the seller agent | `http://localhost:8001` |
 | `seller_endpoints` | Comma-separated seller URLs (multi-seller) | `""` (empty) |
 
 Set via environment variables or `config/settings.py`. The default protocol (MCP) is an attribute of `UnifiedClient` (`clients/unified_client.py`), passed at construction — there is no `default_protocol` setting.

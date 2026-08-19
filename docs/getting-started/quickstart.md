@@ -43,7 +43,7 @@ ANTHROPIC_API_KEY=sk-ant-...
     API_KEY=
 
     # OpenDirect seller connection
-    OPENDIRECT_BASE_URL=http://localhost:8000/api/v2.1
+    OPENDIRECT_BASE_URL=http://localhost:3000/api/v2.1
     OPENDIRECT_TOKEN=              # OAuth bearer token (optional)
     OPENDIRECT_API_KEY=            # API key for seller (optional)
 
@@ -121,7 +121,7 @@ The buyer agent connects to seller agents to discover inventory and book deals. 
 - Seller agent installed and running --- follow the [Seller Agent Quickstart](https://iabtechlab.github.io/seller-agent/getting-started/quickstart/)
 
 !!! tip "Default Ports"
-    The seller agent runs on port **8000** by default, the buyer agent on port **8001**. Point `SELLER_ENDPOINTS` / `IAB_SERVER_URL` at the seller (e.g. `http://localhost:8000`).
+    The seller agent runs on port **8000** by default, the buyer agent on port **8001**. Point `SELLER_ENDPOINTS` at the seller (e.g. `http://localhost:8000`).
 
 ### Start Both Agents
 

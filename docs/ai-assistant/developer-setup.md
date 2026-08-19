@@ -31,8 +31,8 @@ Create a `.env` file:
 # Required
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Seller / IAB agentic-direct server
-IAB_SERVER_URL=http://localhost:8000
+# IAB agentic-direct server
+IAB_SERVER_URL=http://localhost:8001
 
 # Storage (SQLite)
 DATABASE_URL=sqlite:///./ad_buyer.db

@@ -10,7 +10,7 @@ The `OpenDirectClient` is configured through environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENDIRECT_BASE_URL` | Base URL of the seller's OpenDirect API | `http://localhost:8000/api/v2.1` |
+| `OPENDIRECT_BASE_URL` | Base URL of the seller's OpenDirect API | `http://localhost:3000/api/v2.1` |
 | `OPENDIRECT_TOKEN` | OAuth 2.0 bearer token for seller auth | (none) |
 | `OPENDIRECT_API_KEY` | API key for seller auth (fallback if no token) | (none) |
 

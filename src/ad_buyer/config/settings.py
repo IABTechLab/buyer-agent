@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # IAB agentic-direct server URL
     # Override via IAB_SERVER_URL env var or .env file
-    iab_server_url: str = "http://localhost:8000"
+    iab_server_url: str = "http://localhost:8001"
 
     # Real IAB AAMP agent registry (EP-5.1). When aamp_registry_url is set
     # (env AAMP_REGISTRY_URL), seller discovery and agent-card fetch go
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     seller_endpoints: str = ""
 
     # OpenDirect API Configuration (legacy single-server mode)
-    opendirect_base_url: str = "http://localhost:8000/api/v2.1"
+    opendirect_base_url: str = "http://localhost:3000/api/v2.1"
     opendirect_token: str | None = None
     opendirect_api_key: str | None = None
     # OpenDirect 2.1 spec-dialect account context. When BOTH are set the

@@ -29,6 +29,7 @@ import httpx
 import pytest
 from httpx import ASGITransport
 
+from ad_buyer.auth import factory as auth_factory
 from ad_buyer.config.settings import Settings
 from ad_buyer.flows.deal_booking_flow import DealBookingFlow
 from ad_buyer.interfaces.api import main as api_module
@@ -436,7 +437,10 @@ class TestApiAuthIntegration:
     async def test_auth_rejects_unauthenticated(self, tmp_path, monkeypatch):
         """Protected routes reject requests without an operator key."""
         from ad_buyer.auth.factory import get_operator_key_service, reset_operator_key_service
-        from ad_buyer.config.settings import get_settings
+
+        # Clear the cache the request path actually consults: tests that reload
+        # ad_buyer.config.settings leave the factory bound to the old module.
+        get_settings = auth_factory.get_settings
 
         db_url = f"sqlite:///{tmp_path / 'int_auth.db'}"
         monkeypatch.setenv("DATABASE_URL", db_url)
@@ -457,8 +461,9 @@ class TestApiAuthIntegration:
     async def test_auth_accepts_valid_operator_key(self, tmp_path, monkeypatch):
         """Requests with a minted operator key succeed."""
         from ad_buyer.auth.factory import get_operator_key_service, reset_operator_key_service
-        from ad_buyer.config.settings import get_settings
         from ad_buyer.models.api_key import OperatorApiKeyCreateRequest
+
+        get_settings = auth_factory.get_settings
 
         db_url = f"sqlite:///{tmp_path / 'int_auth2.db'}"
         monkeypatch.setenv("DATABASE_URL", db_url)
