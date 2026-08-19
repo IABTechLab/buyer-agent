@@ -94,7 +94,7 @@ Each entry in the `diffs` array describes one field-level change:
 A 2-day shift falls within the 3-day threshold, so it receives `minor` classification and is auto-approved.
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/change-requests \
+curl -X POST http://seller.example.com:8000/api/v1/change-requests \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -129,7 +129,7 @@ curl -X POST http://seller.example.com:8001/api/v1/change-requests \
 ### Example: Creative Swap (Auto-Approved)
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/change-requests \
+curl -X POST http://seller.example.com:8000/api/v1/change-requests \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -146,7 +146,7 @@ curl -X POST http://seller.example.com:8001/api/v1/change-requests \
 ### Example: Impression Adjustment (Requires Review)
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/change-requests \
+curl -X POST http://seller.example.com:8000/api/v1/change-requests \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -180,7 +180,7 @@ curl -X POST http://seller.example.com:8001/api/v1/change-requests \
 ### Example: Pricing Change (Critical, Senior Review)
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/change-requests \
+curl -X POST http://seller.example.com:8000/api/v1/change-requests \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -198,7 +198,7 @@ curl -X POST http://seller.example.com:8001/api/v1/change-requests \
 ### Example: Order Cancellation (Critical)
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/change-requests \
+curl -X POST http://seller.example.com:8000/api/v1/change-requests \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -221,7 +221,7 @@ After submitting a change request, poll its status to track progress through the
 
 ```bash
 curl -H "X-Api-Key: your-api-key" \
-  http://seller.example.com:8001/api/v1/change-requests/CR-X1Y2Z3
+  http://seller.example.com:8000/api/v1/change-requests/CR-X1Y2Z3
 ```
 
 ### List Change Requests for an Order
@@ -231,11 +231,11 @@ curl -H "X-Api-Key: your-api-key" \
 ```bash
 # All change requests for an order
 curl -H "X-Api-Key: your-api-key" \
-  "http://seller.example.com:8001/api/v1/change-requests?order_id=ORD-A1B2C3D4E5F6"
+  "http://seller.example.com:8000/api/v1/change-requests?order_id=ORD-A1B2C3D4E5F6"
 
 # Filter by status
 curl -H "X-Api-Key: your-api-key" \
-  "http://seller.example.com:8001/api/v1/change-requests?order_id=ORD-A1B2C3D4E5F6&status=pending_approval"
+  "http://seller.example.com:8000/api/v1/change-requests?order_id=ORD-A1B2C3D4E5F6&status=pending_approval"
 ```
 
 | Query Parameter | Type | Description |

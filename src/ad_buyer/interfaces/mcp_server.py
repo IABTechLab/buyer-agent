@@ -30,16 +30,23 @@ This creates an SSE endpoint at /mcp/sse for MCP client connections
 
 from __future__ import annotations
 
+import functools
+import inspect
 import json
 import logging
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts.base import Message
 
+from ..auth.dependencies import (
+    _extract_key_from_headers,
+    validate_operator_credential,
+)
 from ..auth.key_store import ApiKeyStore
 from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 from ..config.settings import Settings
@@ -57,6 +64,8 @@ from ..tools.deal_library.connectors import (
     MagniteConnector,  # noqa: F401
     PubMaticConnector,  # noqa: F401
 )
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 logger = logging.getLogger(__name__)
 
@@ -192,12 +201,79 @@ def _get_order_store() -> OrderStore:
     return store
 
 
+def _deny_unless_operator() -> str | None:
+    """Enforce operator-key auth on MCP tools over HTTP transports.
+
+    Returns None when authorized, otherwise an error JSON string.
+
+    - HTTP transports (Streamable HTTP / SSE): require an OPERATOR API key
+      via ``Authorization: Bearer`` or ``X-Api-Key``.
+    - stdio / in-process (no HTTP request): trusted like the CLI.
+    """
+    try:
+        request = mcp.get_context().request_context.request
+    except Exception:
+        request = None
+    if request is None or not hasattr(request, "headers"):
+        return None
+
+    headers = request.headers
+    raw_key = _extract_key_from_headers(
+        authorization=headers.get("authorization"),
+        x_api_key=headers.get("x-api-key"),
+    )
+    if not raw_key:
+        return json.dumps(
+            {
+                "error": "authentication_required",
+                "detail": (
+                    "This tool requires an operator API key. Send it as "
+                    "'Authorization: Bearer <key>' or 'X-Api-Key: <key>'. "
+                    "Bootstrap the first key with: ad-buyer create-operator-key"
+                ),
+            }
+        )
+
+    try:
+        validate_operator_credential(raw_key)
+    except PermissionError as exc:
+        return json.dumps({"error": "operator_required", "detail": str(exc)})
+    except ValueError as exc:
+        return json.dumps({"error": "invalid_credential", "detail": str(exc)})
+    return None
+
+
+def _require_operator(fn: F) -> F:
+    """Decorator: deny non-operator HTTP callers; allow local stdio."""
+
+    if inspect.iscoroutinefunction(fn):
+
+        @functools.wraps(fn)
+        async def async_wrapper(*args: Any, **kwargs: Any):
+            denied = _deny_unless_operator()
+            if denied is not None:
+                return denied
+            return await fn(*args, **kwargs)
+
+        return async_wrapper  # type: ignore[return-value]
+
+    @functools.wraps(fn)
+    def sync_wrapper(*args: Any, **kwargs: Any):
+        denied = _deny_unless_operator()
+        if denied is not None:
+            return denied
+        return fn(*args, **kwargs)
+
+    return sync_wrapper  # type: ignore[return-value]
+
+
 # ---------------------------------------------------------------------------
 # Foundation Tools
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
+@_require_operator
 def get_setup_status() -> str:
     """Check the current setup and configuration state of the buyer agent.
 
@@ -215,8 +291,15 @@ def get_setup_status() -> str:
     # Check database accessibility (raw sqlite probe lives in the storage layer)
     checks["database_accessible"] = storage_health.database_accessible(settings.database_url)
 
-    # Check API key configuration
-    checks["api_key_configured"] = bool(settings.api_key)
+    # Check operator credential configuration (DB keys or deprecated env shim)
+    from ..auth.factory import get_operator_key_service
+
+    try:
+        has_db_keys = get_operator_key_service().has_active_operator_keys()
+    except Exception:
+        has_db_keys = False
+    checks["api_key_configured"] = has_db_keys or bool(settings.api_key)
+    checks["operator_key_configured"] = has_db_keys
 
     # Check LLM configuration
     checks["llm_configured"] = bool(settings.anthropic_api_key)
@@ -289,6 +372,7 @@ def health_check() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_config() -> str:
     """Get the current buyer agent configuration.
 
@@ -344,6 +428,7 @@ def _set_wizard(wizard: SetupWizard | None) -> None:
 
 
 @mcp.tool()
+@_require_operator
 def run_setup_wizard() -> str:
     """Run the setup wizard and get the current status of all steps.
 
@@ -365,6 +450,7 @@ def run_setup_wizard() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_wizard_step(step_number: int) -> str:
     """Get detailed information about a specific wizard step.
 
@@ -396,6 +482,7 @@ def get_wizard_step(step_number: int) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def complete_wizard_step(step_number: int, config: str = "{}") -> str:
     """Complete a wizard step with the given configuration.
 
@@ -435,6 +522,7 @@ def complete_wizard_step(step_number: int, config: str = "{}") -> str:
 
 
 @mcp.tool()
+@_require_operator
 def skip_wizard_step(step_number: int) -> str:
     """Skip a wizard step, applying its sensible defaults.
 
@@ -478,6 +566,7 @@ def skip_wizard_step(step_number: int) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_campaigns(status: str | None = None) -> str:
     """List all campaigns with optional status filter.
 
@@ -523,6 +612,7 @@ def list_campaigns(status: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_campaign_status(campaign_id: str) -> str:
     """Get detailed status of a specific campaign.
 
@@ -586,6 +676,7 @@ def get_campaign_status(campaign_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def check_pacing(campaign_id: str) -> str:
     """Check budget pacing for a campaign.
 
@@ -677,6 +768,7 @@ def check_pacing(campaign_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def review_budgets() -> str:
     """Review budget allocation and spend across all campaigns.
 
@@ -745,6 +837,7 @@ def review_budgets() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_deals(
     status: str | None = None,
     deal_type: str | None = None,
@@ -783,6 +876,7 @@ def list_deals(
 
 
 @mcp.tool()
+@_require_operator
 def search_deals(query: str) -> str:
     """Search deals in the portfolio by free-text query.
 
@@ -818,6 +912,7 @@ def search_deals(query: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 async def discover_sellers(capability: str | None = None) -> str:
     """Discover available seller agents from the IAB AAMP registry.
 
@@ -839,6 +934,7 @@ async def discover_sellers(capability: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 async def get_seller_media_kit(seller_url: str) -> str:
     """Fetch a specific seller's media kit with inventory and pricing.
 
@@ -861,6 +957,7 @@ async def get_seller_media_kit(seller_url: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 async def compare_sellers(seller_urls: list[str]) -> str:
     """Compare pricing and capabilities across multiple sellers.
 
@@ -886,6 +983,7 @@ async def compare_sellers(seller_urls: list[str]) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def start_negotiation(
     seller_url: str,
     product_id: str,
@@ -948,6 +1046,7 @@ def start_negotiation(
 
 
 @mcp.tool()
+@_require_operator
 def get_negotiation_status(deal_id: str) -> str:
     """Check the status of a specific negotiation.
 
@@ -1003,6 +1102,7 @@ def get_negotiation_status(deal_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def inspect_deal(deal_id: str) -> str:
     """Get detailed information on a specific deal.
 
@@ -1029,6 +1129,7 @@ def inspect_deal(deal_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def import_deals_csv(
     csv_data: str,
     default_seller_url: str = "",
@@ -1070,6 +1171,7 @@ def import_deals_csv(
 
 
 @mcp.tool()
+@_require_operator
 def create_deal_manual(
     display_name: str,
     seller_url: str,
@@ -1163,6 +1265,7 @@ def create_deal_manual(
 
 
 @mcp.tool()
+@_require_operator
 def get_portfolio_summary(
     top_sellers_count: int = 5,
     expiring_within_days: int = 30,
@@ -1200,6 +1303,7 @@ def get_portfolio_summary(
 
 
 @mcp.tool()
+@_require_operator
 def list_active_negotiations() -> str:
     """List all active/pending negotiations.
 
@@ -1248,6 +1352,7 @@ def list_active_negotiations() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_orders(status: str | None = None) -> str:
     """List all orders with optional status filter.
 
@@ -1278,6 +1383,7 @@ def list_orders(status: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_order_status(order_id: str) -> str:
     """Get detailed status of a specific order.
 
@@ -1304,6 +1410,7 @@ def get_order_status(order_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def transition_order(
     order_id: str,
     to_status: str,
@@ -1354,6 +1461,7 @@ def transition_order(
 
 
 @mcp.tool()
+@_require_operator
 def list_pending_approvals(campaign_id: str | None = None) -> str:
     """List approval requests that are awaiting a decision.
 
@@ -1402,6 +1510,7 @@ def list_pending_approvals(campaign_id: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def approve_or_reject(
     approval_request_id: str,
     decision: str,
@@ -1484,6 +1593,7 @@ def approve_or_reject(
 
 
 @mcp.tool()
+@_require_operator
 def list_api_keys() -> str:
     """List configured API keys for seller integrations.
 
@@ -1517,6 +1627,7 @@ def list_api_keys() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def create_api_key(seller_url: str, api_key: str) -> str:
     """Store or replace an API key for a seller integration.
 
@@ -1547,6 +1658,7 @@ def create_api_key(seller_url: str, api_key: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def revoke_api_key(seller_url: str) -> str:
     """Revoke (remove) an API key for a seller integration.
 
@@ -1579,6 +1691,7 @@ def revoke_api_key(seller_url: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_templates(template_type: str | None = None) -> str:
     """List available deal and supply path templates.
 
@@ -1641,6 +1754,7 @@ def list_templates(template_type: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def create_template(
     template_type: str | None = None,
     name: str | None = None,
@@ -1727,6 +1841,7 @@ def create_template(
 
 
 @mcp.tool()
+@_require_operator
 def instantiate_from_template(
     template_id: str | None = None,
     overrides: Any = None,
@@ -1819,6 +1934,7 @@ def instantiate_from_template(
 
 
 @mcp.tool()
+@_require_operator
 def get_deal_performance(deal_id: str) -> str:
     """Get performance metrics for a specific deal.
 
@@ -1863,6 +1979,7 @@ def get_deal_performance(deal_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_campaign_report(campaign_id: str) -> str:
     """Generate a campaign performance report.
 
@@ -1927,6 +2044,7 @@ def get_campaign_report(campaign_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_pacing_report(campaign_id: str) -> str:
     """Get budget pacing report for a campaign.
 
@@ -2053,6 +2171,7 @@ def _get_ssp_connector_class(name: str) -> type | None:
 
 
 @mcp.tool()
+@_require_operator
 def list_ssp_connectors() -> str:
     """List available SSP connectors and their configuration status.
 
@@ -2092,6 +2211,7 @@ def list_ssp_connectors() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def import_deals_ssp(ssp_name: str) -> str:
     """Import deals from a specified SSP connector into the deal portfolio.
 
@@ -2154,6 +2274,7 @@ def import_deals_ssp(ssp_name: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def test_ssp_connection(ssp_name: str) -> str:
     """Test connectivity to a specific SSP connector.
 
@@ -2391,6 +2512,7 @@ async def _discover_iab_retriever(client: MixpeekClient) -> str | None:
         "contextual targeting."
     ),
 )
+@_require_operator
 async def classify_content(
     text: str,
     retriever_id: str | None = None,
@@ -2444,6 +2566,7 @@ async def classify_content(
         "verdict, risk level (low/medium/high), and flagged categories."
     ),
 )
+@_require_operator
 async def check_brand_safety(
     text: str,
     retriever_id: str | None = None,
@@ -2482,6 +2605,7 @@ async def check_brand_safety(
         "with relevance scores and enriched metadata."
     ),
 )
+@_require_operator
 async def contextual_search(
     query: str,
     retriever_id: str,

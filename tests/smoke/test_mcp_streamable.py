@@ -5,12 +5,12 @@ Separate from test_mcp_e2e.py which covers the legacy SSE transport.
 
 Usage:
     # Start the buyer server first:
-    #   uvicorn ad_buyer.interfaces.api.main:app --port 8000
+    #   uvicorn ad_buyer.interfaces.api.main:app --port 8001
     #
     # Then run:
     #   pytest tests/smoke/test_mcp_streamable.py -v
 
-Requires a running buyer server on port 8000 (or set BUYER_MCP_HTTP_URL).
+Requires a running buyer server on port 8001 (or set BUYER_MCP_HTTP_URL).
 
 Note: no @pytest.mark.asyncio decorators needed — pyproject.toml sets
 asyncio_mode = "auto" which handles all async test functions automatically.
@@ -44,7 +44,7 @@ except ImportError:
     except ImportError:
         MCP_HTTP_AVAILABLE = False
 
-MCP_HTTP_URL = os.environ.get("BUYER_MCP_HTTP_URL", "http://127.0.0.1:8000/mcp")
+MCP_HTTP_URL = os.environ.get("BUYER_MCP_HTTP_URL", "http://127.0.0.1:8001/mcp")
 TOOL_TIMEOUT = float(os.environ.get("MCP_TOOL_TIMEOUT", "15"))
 
 pytestmark = [

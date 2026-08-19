@@ -5,7 +5,7 @@ user would experience it.  This is the UAT gate for the Phase 3 epic.
 
 Usage:
     # Start the buyer server first:
-    #   uvicorn src.ad_buyer.interfaces.api.main:app --port 8000
+    #   uvicorn src.ad_buyer.interfaces.api.main:app --port 8001
     #
     # Then run this test:
     #   pytest tests/smoke/test_mcp_e2e.py -v
@@ -13,7 +13,7 @@ Usage:
 This test is marked with @pytest.mark.smoke so it can be run independently:
     pytest tests/smoke/ -v -m smoke
 
-Note: Requires a running buyer server on port 8000.
+Note: Requires a running buyer server on port 8001.
 """
 
 import asyncio
@@ -34,7 +34,7 @@ try:
 except ImportError:
     MCP_AVAILABLE = False
 
-SERVER_URL = os.environ.get("BUYER_MCP_URL", "http://127.0.0.1:8000/mcp/sse/sse")
+SERVER_URL = os.environ.get("BUYER_MCP_URL", "http://127.0.0.1:8001/mcp/sse/sse")
 
 pytestmark = [
     pytest.mark.smoke,

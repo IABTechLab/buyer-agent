@@ -218,7 +218,7 @@ When the background booking flow fails (seller unreachable, budget allocation er
   "job_id": "a1b2c3d4-...",
   "status": "failed",
   "errors": [
-    "Seller agent unreachable at http://seller:8001",
+    "Seller agent unreachable at http://seller:8000",
     "Budget allocation failed: no valid channel splits found"
   ]
 }

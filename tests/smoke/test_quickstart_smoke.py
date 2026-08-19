@@ -6,9 +6,9 @@
 The buyer quickstart (README.md → "Quick Start" / "Run" / "Verify") tells a
 fresh-clone developer to run:
 
-    python -m ad_buyer.interfaces.api.main      # serves on http://localhost:8000
+    python -m ad_buyer.interfaces.api.main      # serves on http://localhost:8001
 
-(equivalently ``uvicorn ad_buyer.interfaces.api.main:app --port 8000``) and
+(equivalently ``uvicorn ad_buyer.interfaces.api.main:app --port 8001``) and
 then hit ``GET /health`` and the booking/product endpoints. This test is the
 executable contract behind that promise. It:
 
@@ -40,12 +40,14 @@ from ad_buyer import __version__
 from ad_buyer.interfaces.api.main import app
 
 
-def test_documented_entrypoint_boots_and_serves():
+def test_documented_entrypoint_boots_and_serves(allow_operator_auth):
     """Boot the app through its real lifespan and hit the documented endpoints."""
     # Context-manager form runs startup + shutdown (lifespan), i.e. the same
     # path `python -m ad_buyer.interfaces.api.main` / uvicorn takes.
+    # Operator auth is overridden here; production callers send a key from
+    # ``ad-buyer create-operator-key``.
     with TestClient(app) as client:
-        # 1) Health — the quickstart's "Verify" step.
+        # 1) Health — the quickstart's "Verify" step (public, no auth).
         resp = client.get("/health")
         assert resp.status_code == 200
         assert resp.json() == {"status": "healthy", "version": __version__}

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # run-demo.sh -- One-command two-agent demo startup
 #
-# Starts a locally checked-out seller agent on :8001 in the background, waits
-# for it to be ready, then launches the buyer agent API on :8000 in the
+# Starts a locally checked-out seller agent on :8000 in the background, waits
+# for it to be ready, then launches the buyer agent API on :8001 in the
 # foreground. Once both are up you can exercise the cross-agent flow (see
 # "Verify" in the README): /media-kit, /products/search, and the booking
 # endpoints.
@@ -17,7 +17,7 @@
 #   ./run-demo.sh --dry-run    # resolve paths and print the plan, start nothing
 #
 # Ports (override via environment):
-#   SELLER_PORT=8001  BUYER_PORT=8000
+#   SELLER_PORT=8000  BUYER_PORT=8001
 #
 # Prefer containers? The docker-compose demo path is infra/docker/docker-compose.yml
 # (see the "Docker" section of the README).
@@ -28,8 +28,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUYER_DIR="$SCRIPT_DIR"
 PARENT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-SELLER_PORT="${SELLER_PORT:-8001}"
-BUYER_PORT="${BUYER_PORT:-8000}"
+SELLER_PORT="${SELLER_PORT:-8000}"
+BUYER_PORT="${BUYER_PORT:-8001}"
 
 DRY_RUN=0
 if [ "${1:-}" = "--dry-run" ]; then

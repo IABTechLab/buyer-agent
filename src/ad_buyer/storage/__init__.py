@@ -9,6 +9,7 @@ cannot safely cross an event loop, along with the aggregate stores
 extracted from DealStore (EP-2.4).
 """
 
+from .api_key_store import OperatorApiKeyStore
 from .booking_record_store import BookingRecordStore
 from .creative_asset_store import CreativeAssetStore
 from .deal_activation_store import DealActivationStore
@@ -50,6 +51,7 @@ __all__ = [
     "create_tables",
     "initialize_schema",
     # Aggregate stores extracted from DealStore (EP-2.4)
+    "OperatorApiKeyStore",
     "BookingRecordStore",
     "CreativeAssetStore",
     "DealActivationStore",

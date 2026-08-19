@@ -9,6 +9,27 @@ import pytest
 
 
 @pytest.fixture
+def allow_operator_auth():
+    """Bypass inbound operator auth on the main FastAPI app (non-auth tests)."""
+    from ad_buyer.auth.dependencies import require_operator_key
+    from ad_buyer.interfaces.api.main import app
+    from ad_buyer.models.api_key import ApiKeyRecord, ApiKeyRole
+
+    async def _ok():
+        return ApiKeyRecord(
+            key_id="key-test",
+            key_hash="test",
+            key_prefix_hint="abk_live_test...",
+            role=ApiKeyRole.OPERATOR,
+            label="test",
+        )
+
+    app.dependency_overrides[require_operator_key] = _ok
+    yield
+    app.dependency_overrides.pop(require_operator_key, None)
+
+
+@pytest.fixture
 def fake_booking_orchestrator():
     """AsyncMock MultiSellerOrchestrator booking one seller-issued deal per call.
 

@@ -49,7 +49,7 @@ Fetch the seller's full catalog with featured packages highlighted:
 
 ```python
 async with MediaKitClient(api_key="my-key") as client:
-    kit = await client.get_media_kit("http://seller.example.com:8001")
+    kit = await client.get_media_kit("http://seller.example.com:8000")
 
     print(f"Seller: {kit.seller_name}")
     print(f"Total packages: {kit.total_packages}")
@@ -62,10 +62,10 @@ async with MediaKitClient(api_key="my-key") as client:
 
 ```bash
 # Public (no auth)
-curl http://seller.example.com:8001/media-kit
+curl http://seller.example.com:8000/media-kit
 
 # Authenticated
-curl http://seller.example.com:8001/media-kit \
+curl http://seller.example.com:8000/media-kit \
   -H "X-API-Key: your-key"
 ```
 
@@ -75,17 +75,17 @@ Filter packages by layer or featured status:
 
 ```python
 # All packages
-packages = await client.list_packages("http://seller.example.com:8001")
+packages = await client.list_packages("http://seller.example.com:8000")
 
 # Only curated packages
 curated = await client.list_packages(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     layer="curated",
 )
 
 # Only featured packages
 featured = await client.list_packages(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     featured_only=True,
 )
 ```
@@ -96,7 +96,7 @@ Retrieve a single package. Authenticated requests receive a `PackageDetail` with
 
 ```python
 pkg = await client.get_package(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     "pkg-abc12345",
 )
 
@@ -120,13 +120,13 @@ from ad_buyer.media_kit.models import SearchFilter
 
 # Simple search
 results = await client.search_packages(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     query="sports video",
 )
 
 # Search with identity context (may unlock better pricing)
 results = await client.search_packages(
-    "http://seller.example.com:8001",
+    "http://seller.example.com:8000",
     query="sports video",
     filters=SearchFilter(
         buyer_tier="agency",
@@ -142,7 +142,7 @@ Query multiple sellers in parallel and combine their packages:
 
 ```python
 sellers = [
-    "http://seller-a.example.com:8001",
+    "http://seller-a.example.com:8000",
     "http://seller-b.example.com:8002",
     "http://seller-c.example.com:8003",
 ]

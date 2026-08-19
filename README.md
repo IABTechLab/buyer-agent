@@ -69,7 +69,7 @@ Browse seller inventory catalogs. Unauthenticated access shows price ranges; aut
 from ad_buyer.media_kit import MediaKitClient
 
 async with MediaKitClient(api_key="your-key") as client:
-    kit = await client.get_media_kit("http://seller.example.com:8001")
+    kit = await client.get_media_kit("http://seller.example.com:8000")
     for pkg in kit.featured:
         print(f"{pkg.name}: ${pkg.price_range}")
 ```
@@ -162,7 +162,7 @@ DEFAULT_LLM_MODEL=anthropic/claude-sonnet-4-5-20250929
 # DEFAULT_LLM_MODEL=llama3
 
 # Seller connection (comma-separated seller endpoint URLs)
-SELLER_ENDPOINTS=http://localhost:8001
+SELLER_ENDPOINTS=http://localhost:8000
 
 # Storage
 DATABASE_URL=sqlite:///./ad_buyer.db
@@ -175,21 +175,26 @@ DATABASE_URL=sqlite:///./ad_buyer.db
 ### Run
 
 ```bash
+# Bootstrap the first operator key (CLI only — same DATABASE_URL as the server)
+uv run ad-buyer create-operator-key --label "Primary operator"
+
 uv run python -m ad_buyer.interfaces.api.main
-# Server runs at http://localhost:8000
+# Server runs at http://localhost:8001
 ```
 
 This is equivalent to running the ASGI app directly with uvicorn:
 
 ```bash
-uv run uvicorn ad_buyer.interfaces.api.main:app --port 8000
+uv run uvicorn ad_buyer.interfaces.api.main:app --host 0.0.0.0 --port 8001
 ```
 
 (If you installed with `pip install -e .` instead of `uv sync`, drop the
 `uv run` prefix and run the same commands in your activated environment.)
 
 `ANTHROPIC_API_KEY` is optional to *start* the server (the API boots without it);
-it is only required once you run CrewAI-backed booking flows.
+it is only required once you run CrewAI-backed booking flows. Protected REST
+and MCP-over-HTTP routes require the operator key from
+`ad-buyer create-operator-key`.
 
 > **This quickstart is tested.** `tests/smoke/test_quickstart_smoke.py` boots the app at
 > the exact module path documented above (`ad_buyer.interfaces.api.main:app`) through its
@@ -201,11 +206,11 @@ it is only required once you run CrewAI-backed booking flows.
 ### Verify
 
 ```bash
-# Health check (served by the buyer agent itself — no backend needed)
-curl http://localhost:8000/health
+# Health check (public — no auth)
+curl http://localhost:8001/health
 
-# List bookings (empty on a fresh server)
-curl http://localhost:8000/bookings
+# List bookings (requires operator key)
+curl -H "Authorization: Bearer <operator_api_key>" http://localhost:8001/bookings
 ```
 
 The next two calls reach *outward* to a seller agent / OpenDirect backend, so they
@@ -213,11 +218,11 @@ only work once a seller agent is running (see the [Seller Agent](https://github.
 and `SELLER_ENDPOINTS` in `.env`):
 
 ```bash
-# Browse a seller's media kit (requires a seller agent on :8001)
-curl http://localhost:8001/media-kit
+# Browse a seller's media kit (requires a seller agent on :8000)
+curl http://localhost:8000/media-kit
 
 # Search products across sellers (requires a reachable seller/OpenDirect backend)
-curl -X POST http://localhost:8000/products/search \
+curl -X POST http://localhost:8001/products/search \
   -H "Content-Type: application/json" \
   -d '{"channel": "ctv", "limit": 5}'
 ```
@@ -227,7 +232,7 @@ curl -X POST http://localhost:8000/products/search \
 ### Two-Agent Demo (`run-demo.sh`)
 
 `./run-demo.sh` starts a locally checked-out [seller agent](https://github.com/IABTechLab/seller-agent)
-on `:8001` and the buyer agent on `:8000`, so you can exercise the cross-agent
+on `:8000` and the buyer agent on `:8001`, so you can exercise the cross-agent
 flow from the Verify section above. Two layouts are supported:
 
 - **Side-by-side clones** — the seller checkout lives next to this repo. The
@@ -283,11 +288,12 @@ docker compose up
 
 ## API Reference
 
-14 endpoints across 6 groups:
+18 endpoints across 7 groups:
 
 | Group | Endpoints | Description |
 |-------|-----------|-------------|
 | Health | 1 | Service health check |
+| Authentication | 4 | Operator API key lifecycle (mint, list, get, revoke) |
 | Bookings | 5 | Create, list, poll, and approve bookings |
 | Products | 1 | Search seller product catalog |
 | Events | 2 | Query the in-memory event bus |

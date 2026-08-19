@@ -121,18 +121,18 @@ The buyer agent connects to seller agents to discover inventory and book deals. 
 - Seller agent installed and running --- follow the [Seller Agent Quickstart](https://iabtechlab.github.io/seller-agent/getting-started/quickstart/)
 
 !!! tip "Default Ports"
-    The seller agent runs on port **3000** by default, the buyer agent on port **8001**. The buyer's `OPENDIRECT_BASE_URL` should point to the seller's API (e.g. `http://localhost:3000/api/v2.1`).
+    The seller agent runs on port **8000** by default, the buyer agent on port **8001**. Point `SELLER_ENDPOINTS` at the seller (e.g. `http://localhost:8000`).
 
 ### Start Both Agents
 
 **1. Start the seller agent** (in a separate terminal):
 
 ```bash
-cd seller_agent
-uvicorn seller_agent.api.main:app --reload --port 3000
+cd seller-agent
+uvicorn ad_seller.interfaces.api.main:app --reload --port 8000
 ```
 
-Verify: `curl http://localhost:3000/health`
+Verify: `curl http://localhost:8000/health`
 
 **2. Start the buyer agent** (in another terminal):
 

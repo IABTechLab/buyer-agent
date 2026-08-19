@@ -414,6 +414,160 @@ def chat() -> None:
     console.print("\n[dim]Goodbye![/dim]")
 
 
+@app.command("create-operator-key")
+def create_operator_key(
+    label: str = typer.Option(
+        "Operator key",
+        "--label",
+        "-l",
+        help="Human-readable label for the key",
+    ),
+    expires_in_days: int | None = typer.Option(
+        None,
+        "--expires-in-days",
+        "-e",
+        help="Days until the key expires (default: never)",
+    ),
+) -> None:
+    """Mint an OPERATOR-role API key directly in storage (bootstrap).
+
+    Operator keys are required for all non-public REST endpoints and for
+    MCP tools over HTTP. This command writes directly to storage — no
+    network surface — so it is the safe way to create the FIRST operator
+    key. Subsequent operator keys can be minted via
+    POST /auth/api-keys/operator using an existing operator credential.
+    """
+    from ...auth.factory import get_operator_key_service, reset_operator_key_service
+    from ...models.api_key import OperatorApiKeyCreateRequest
+
+    try:
+        service = get_operator_key_service(force_new=True)
+        response = service.create_operator_key(
+            OperatorApiKeyCreateRequest(
+                label=label,
+                expires_in_days=expires_in_days,
+            )
+        )
+    except Exception as exc:
+        console.print(f"[red]Failed to create operator key: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    finally:
+        reset_operator_key_service()
+
+    console.print(Panel("Operator API key created", title="Bootstrap"))
+    console.print(f"Key ID:  [cyan]{response.key_id}[/cyan]")
+    console.print(f"Label:   {response.label}")
+    if response.expires_at:
+        console.print(f"Expires: {response.expires_at}")
+    console.print(f"\n[bold]API key (shown once — store securely):[/bold]\n{response.api_key}")
+    console.print(
+        "\nUse it on admin endpoints and MCP:\n"
+        "  Authorization: Bearer <key>   or   X-Api-Key: <key>\n"
+        "Run this with the same DATABASE_URL (.env) as the server so the\n"
+        "key lands in the database the server reads."
+    )
+
+
+@app.command("list-operator-keys")
+def list_operator_keys(
+    include_inactive: bool = typer.Option(
+        False,
+        "--include-inactive",
+        "-a",
+        help="Include revoked/expired operator keys",
+    ),
+) -> None:
+    """List OPERATOR-role API keys (metadata only, no secrets).
+
+    Reads directly from storage — same bootstrap surface as
+    ``create-operator-key`` / ``delete-operator-key``. Secrets are never
+    shown (they are only printed once at creation time).
+    """
+    from ...auth.factory import get_operator_key_service, reset_operator_key_service
+
+    try:
+        service = get_operator_key_service(force_new=True)
+        keys = service.list_operator_keys(include_inactive=include_inactive)
+    except Exception as exc:
+        console.print(f"[red]Failed to list operator keys: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    finally:
+        reset_operator_key_service()
+
+    if not keys:
+        console.print("[yellow]No operator keys found.[/yellow]")
+        if not include_inactive:
+            console.print("Tip: pass --include-inactive to show revoked/expired keys.")
+        return
+
+    table = Table(title="Operator API Keys")
+    table.add_column("Key ID", style="cyan")
+    table.add_column("Label")
+    table.add_column("Active")
+    table.add_column("Created")
+    table.add_column("Expires")
+    table.add_column("Last used")
+    table.add_column("Uses", justify="right")
+
+    for info in keys:
+        table.add_row(
+            info.key_id,
+            info.label or "",
+            "[green]yes[/green]" if info.is_active else "[red]no[/red]",
+            info.created_at.isoformat() if info.created_at else "",
+            info.expires_at.isoformat() if info.expires_at else "never",
+            info.last_used_at.isoformat() if info.last_used_at else "never",
+            str(info.use_count),
+        )
+
+    console.print(table)
+
+
+@app.command("delete-operator-key")
+def delete_operator_key(
+    label: str | None = typer.Option(
+        None,
+        "--label",
+        "-l",
+        help="Label of the active operator key to revoke",
+    ),
+    key_id: str | None = typer.Option(
+        None,
+        "--key-id",
+        "-k",
+        help="Key id to revoke (e.g. key-a1b2c3d4); takes precedence over --label",
+    ),
+) -> None:
+    """Revoke an OPERATOR-role API key directly in storage (bootstrap).
+
+    Soft-revokes the key so it can no longer authenticate, and frees its
+    label for reuse by ``ad-buyer create-operator-key``. Provide
+    ``--key-id`` or ``--label`` (key-id wins if both are set).
+    """
+    from ...auth.factory import get_operator_key_service, reset_operator_key_service
+
+    if not key_id and not label:
+        console.print("[red]Provide --key-id or --label[/red]")
+        raise typer.Exit(1)
+
+    try:
+        service = get_operator_key_service(force_new=True)
+        info = service.delete_operator_key(key_id=key_id, label=label)
+    except Exception as exc:
+        console.print(f"[red]Failed to delete operator key: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    finally:
+        reset_operator_key_service()
+
+    console.print(Panel("Operator API key revoked", title="Bootstrap"))
+    console.print(f"Key ID:  [cyan]{info.key_id}[/cyan]")
+    console.print(f"Label:   {info.label}")
+    console.print(
+        "\nThe key can no longer authenticate. Its label may be reused with\n"
+        "`ad-buyer create-operator-key --label ...`."
+    )
+
+
 @app.command()
 def init() -> None:
     """Initialize a new campaign brief template.

@@ -54,7 +54,7 @@ A lightweight HTTP client that does not require the MCP SDK. It calls simple RES
 Both clients discover seller tools on connect. The seller exposes tools following the IAB OpenDirect 2.1 data model. After connecting, inspect `client.tools` to see what the seller offers:
 
 ```python
-client = IABMCPClient(base_url="http://seller:8001")
+client = IABMCPClient(base_url="http://seller:8000")
 await client.connect()
 
 for name, tool in client.tools.items():
@@ -83,7 +83,7 @@ Direct usage via the `UnifiedClient` (recommended for CrewAI tools):
 ```python
 from ad_buyer.clients.unified_client import UnifiedClient, Protocol
 
-client = UnifiedClient(base_url="http://seller:8001")
+client = UnifiedClient(base_url="http://seller:8000")
 await client.connect(Protocol.MCP)
 products = await client.list_products()
 pricing = await client.get_pricing("premium-video", volume=5000000)
@@ -95,7 +95,7 @@ Direct usage via `IABMCPClient`:
 ```python
 from ad_buyer.clients.mcp_client import IABMCPClient
 
-async with IABMCPClient(base_url="http://seller:8001") as client:
+async with IABMCPClient(base_url="http://seller:8000") as client:
     products = await client.list_products()
     account = await client.create_account("Acme Corp", account_type="advertiser")
     order = await client.create_order(
@@ -123,7 +123,7 @@ MCP client errors fall into two categories: connection-level failures (cannot re
 from ad_buyer.clients.mcp_client import IABMCPClient
 
 try:
-    async with IABMCPClient(base_url="http://seller:8001") as client:
+    async with IABMCPClient(base_url="http://seller:8000") as client:
         result = await client.list_products()
 except ConnectionError:
     # Seller agent is not running or SSE endpoint is unavailable
