@@ -283,6 +283,94 @@ def _from_wire_openrtb(params: WireOpenRTBParams | None) -> OpenRTBParams | None
 # ---------------------------------------------------------------------------
 
 
+def _moneyify_pricing_dict(pricing: dict) -> dict:
+    """Convert a legacy pricing sub-object's plain-float CPM fields to Money.
+
+    ``base_cpm``/``final_cpm``/``base_cpp``/``final_cpp`` become
+    ``{"amount_micros": ..., "currency": ...}`` dicts; every other field
+    (tier_discount_pct, rationale, ...) already matches the wire shape and
+    passes through unchanged.
+    """
+    currency = pricing.get("currency", "USD")
+    result = dict(pricing)
+    for field in ("base_cpm", "final_cpm", "base_cpp", "final_cpp"):
+        value = result.get(field)
+        if isinstance(value, int | float):
+            result[field] = {
+                "amount_micros": int(round(value * _MICROS_PER_UNIT)),
+                "currency": currency,
+            }
+    return result
+
+
+def coerce_legacy_quote_response(raw: dict) -> dict:
+    """Wrap a legacy flat quote response into the shape ``WireQuoteResponse`` expects.
+
+    Some sellers (confirmed live against seller-agent's hosted instance,
+    2026-08-21) implement the older flat quote shape this codebase used
+    before adopting ``iab_agentic_primitives``: a top-level ``product``/
+    ``pricing``/``terms``/``availability`` nesting -- the same field names
+    the shared ``ProductRef``/``QuotePricing``/``QuoteTerms``/
+    ``QuoteAvailability`` wire types use -- but not wrapped in the newer
+    ``{"quote": ...}`` envelope, and with plain-float CPMs instead of the
+    structured ``Money`` type. Everything else (``deal_type``: "PD"/"PG"/
+    "PA", ``status``: "available"/..., ``buyer_tier``: "public"/...)
+    already matches the wire enums' values directly and needs no change.
+
+    A response that already carries a ``quote`` key is assumed
+    wire-compliant and passed through untouched.
+    """
+    if not isinstance(raw, dict) or "quote" in raw:
+        return raw
+
+    quote = dict(raw)
+    if isinstance(quote.get("pricing"), dict):
+        quote["pricing"] = _moneyify_pricing_dict(quote["pricing"])
+    return {"quote": quote}
+
+
+def _moneyify_openrtb_params(params: dict) -> dict:
+    """Convert a legacy openrtb_params' plain-float bidfloor to Money.
+
+    The wire ``OpenRTBParams.bidfloor`` is a structured ``Money``; the legacy
+    shape pairs a plain-float ``bidfloor`` with a separate ``bidfloorcur``
+    field the wire type doesn't have -- folded into the Money instead.
+    """
+    result = dict(params)
+    bidfloor = result.get("bidfloor")
+    if isinstance(bidfloor, int | float):
+        currency = result.pop("bidfloorcur", "USD")
+        result["bidfloor"] = {
+            "amount_micros": int(round(bidfloor * _MICROS_PER_UNIT)),
+            "currency": currency,
+        }
+    return result
+
+
+def coerce_legacy_deal_response(raw: dict) -> dict:
+    """Wrap a legacy flat deal response into the shape ``WireDealBookingResponse`` expects.
+
+    Same legacy shape as ``coerce_legacy_quote_response`` (confirmed live
+    against seller-agent's real ``/api/v1/deals`` response, 2026-08-21): a
+    top-level ``product``/``pricing``/``terms``/``activation_instructions``/
+    ``openrtb_params`` nesting that already matches the wire types field for
+    field, just not wrapped in ``{"deal": ...}`` and with plain-float CPMs
+    (in both ``pricing`` and ``openrtb_params.bidfloor``) instead of Money.
+
+    A response that already carries a ``deal`` key is assumed
+    wire-compliant and passed through untouched.
+    """
+    if not isinstance(raw, dict) or "deal" in raw:
+        return raw
+
+    deal = dict(raw)
+    if isinstance(deal.get("pricing"), dict):
+        deal["pricing"] = _moneyify_pricing_dict(deal["pricing"])
+    if isinstance(deal.get("openrtb_params"), dict):
+        deal["openrtb_params"] = _moneyify_openrtb_params(deal["openrtb_params"])
+    return {"deal": deal}
+
+
 def to_wire_quote_request(
     req: QuoteRequest, *, idempotency_key: str | None = None
 ) -> WireQuoteRequest:

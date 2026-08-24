@@ -4,6 +4,7 @@
 """HTTP client for IAB OpenDirect 2.1 API."""
 
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -78,6 +79,21 @@ def _normalize_ad_format(term: str) -> str:
     discrimination is preserved for any vocabulary not in the alias table.
     """
     return _AD_FORMAT_ALIASES.get(term.strip().lower(), term.strip().lower())
+
+
+def _backfill_seller_organization_id(item: dict[str, Any], fallback: str) -> dict[str, Any]:
+    """Default a raw product record's seller_organization_id when absent.
+
+    The shared wire model requires this field, but some sellers' real
+    catalog responses omit it entirely (confirmed against a live hosted
+    instance -- not a hypothetical). It only ever flows into
+    `Product.publisher_id`, a display/filter field, so a stand-in derived
+    from the seller's own base URL is safe: no security or trust decision
+    depends on this value.
+    """
+    if item.get("seller_organization_id"):
+        return item
+    return {**item, "seller_organization_id": fallback}
 
 
 def _filter_wire_products(
@@ -245,7 +261,14 @@ class OpenDirectClient:
         params = {"limit": limit, "offset": offset}
         response = await self._request("GET", "/products", params=params)
         response.raise_for_status()
-        wire = WireProductListResponse.model_validate(response.json())
+        body = response.json()
+        fallback_org_id = urlparse(self.base_url).netloc or self.base_url
+        if isinstance(body, dict) and isinstance(body.get("products"), list):
+            body["products"] = [
+                _backfill_seller_organization_id(item, fallback_org_id)
+                for item in body["products"]
+            ]
+        wire = WireProductListResponse.model_validate(body)
         return list(wire.products)
 
     async def list_products(self, skip: int = 0, top: int = 50, **filters: Any) -> list[Product]:
@@ -305,11 +328,18 @@ class OpenDirectClient:
             # ``products`` yields its defaulted (empty) list.
             items = list(WireProductListResponse.model_validate(body).products)
 
+        fallback_org_id = urlparse(self.base_url).netloc or self.base_url
         rejects: list[dict[str, Any]] = []
         valid_wire: list[WireProduct] = []
         for item in items:
             try:
-                valid_wire.append(WireProduct.model_validate(item))
+                valid_wire.append(
+                    WireProduct.model_validate(
+                        _backfill_seller_organization_id(item, fallback_org_id)
+                        if isinstance(item, dict)
+                        else item
+                    )
+                )
             except ValidationError as exc:
                 rejects.append(_product_reject_record(item, exc))
 

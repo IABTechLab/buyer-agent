@@ -39,6 +39,8 @@ from ..models.deals import (
 )
 from ..models.linear_tv import CancellationRequest, MakegoodRequest
 from .contract_mappers import (
+    coerce_legacy_deal_response,
+    coerce_legacy_quote_response,
     from_wire_deal_booking_response,
     from_wire_quote_response,
     to_wire_deal_booking_request,
@@ -177,7 +179,13 @@ class DealsClient:
         wire_request = to_wire_quote_request(quote_request)
         body = wire_request.model_dump(mode="json", exclude_none=True)
         response = await self._request_with_retry("POST", "/api/v1/quotes", json=body)
-        wire_response = WireQuoteResponse.model_validate(response.json())
+        # Some sellers reply with the older flat/unwrapped shape rather than
+        # the current wire envelope (confirmed live against seller-agent's
+        # hosted instance) -- coerce before validating; already-compliant
+        # responses pass through untouched.
+        wire_response = WireQuoteResponse.model_validate(
+            coerce_legacy_quote_response(response.json())
+        )
         result = from_wire_quote_response(wire_response)
 
         # Persist to DealStore if available
@@ -200,7 +208,9 @@ class DealsClient:
             DealsClientError: On HTTP or transport errors.
         """
         response = await self._request_with_retry("GET", f"/api/v1/quotes/{quote_id}")
-        wire_response = WireQuoteResponse.model_validate(response.json())
+        wire_response = WireQuoteResponse.model_validate(
+            coerce_legacy_quote_response(response.json())
+        )
         return from_wire_quote_response(wire_response)
 
     async def book_deal(self, booking_request: DealBookingRequest) -> DealResponse:
@@ -263,7 +273,10 @@ class DealsClient:
         if headers:
             kwargs["headers"] = headers
         response = await self._request_with_retry("POST", "/api/v1/deals", **kwargs)
-        wire_response = WireDealBookingResponse.model_validate(response.json())
+        # Same legacy-shape gap as request_quote (see coerce_legacy_quote_response).
+        wire_response = WireDealBookingResponse.model_validate(
+            coerce_legacy_deal_response(response.json())
+        )
         result = from_wire_deal_booking_response(wire_response)
 
         # Persist to DealStore if available
@@ -286,7 +299,9 @@ class DealsClient:
             DealsClientError: On HTTP or transport errors.
         """
         response = await self._request_with_retry("GET", f"/api/v1/deals/{deal_id}")
-        wire_response = WireDealBookingResponse.model_validate(response.json())
+        wire_response = WireDealBookingResponse.model_validate(
+            coerce_legacy_deal_response(response.json())
+        )
         result = from_wire_deal_booking_response(wire_response)
 
         # Update stored status if DealStore is available

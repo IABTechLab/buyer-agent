@@ -125,6 +125,10 @@ def _mount_order_router() -> None:
 
 _mount_order_router()
 
+from .multi_seller_endpoints import router as _multi_seller_router  # noqa: E402
+
+app.include_router(_multi_seller_router)
+
 # Paths that never require authentication
 _PUBLIC_PATHS = {"/health", "/docs", "/openapi.json", "/redoc"}
 
