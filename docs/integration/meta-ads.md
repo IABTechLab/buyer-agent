@@ -12,6 +12,7 @@ The buyer agent calls `graph.facebook.com` directly using a system user access t
 | `META_AD_ACCOUNT_ID` | `str` | `""` | Ad account ID — format `act_XXXXXXXXX` |
 | `META_PAGE_ID` | `str` | `""` | Facebook Page ID — required for ad creative creation |
 | `META_API_VERSION` | `str` | `v21.0` | Meta Graph API version |
+| `META_USE_MCP` | `bool` | `false` | Route campaign/ad-set/ad creation and campaign insights through Meta's official Ads MCP server instead of direct Graph API calls |
 
 Add these to your `.env` file:
 
@@ -20,6 +21,7 @@ META_ACCESS_TOKEN=your-system-user-token
 META_AD_ACCOUNT_ID=act_XXXXXXXXX
 META_PAGE_ID=XXXXXXXXX
 META_API_VERSION=v21.0
+META_USE_MCP=false
 ```
 
 ### Generating a System User Token
@@ -142,6 +144,62 @@ POST /bookings/{job_id}/approve-all
 ```
 
 Booked lines for the social channel will have `booking_status: "paused"`.
+
+---
+
+## Meta Ads MCP (optional)
+
+Set `META_USE_MCP=true` to route campaign/ad-set creation (`MetaAdsMCPClient` in
+`_book_via_meta_mcp`) and campaign insights (`MetaReportingTool._run_via_mcp`) through
+Meta's official Ads MCP server ([`https://mcp.facebook.com/ads`](https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ads-mcp-server-overview))
+instead of calling `graph.facebook.com` directly. This is a drop-in alternative
+transport — the booking flow, objective mapping, and PAUSED-by-default behavior are
+unchanged.
+
+### Requirements
+
+- A **user access token** (not the system-user token used for the Graph API path),
+  scoped to: `ads_mcp_management`, `ads_read`, `ads_management`, `catalog_management`,
+  `business_management`, `pages_show_list`, `instagram_basic`.
+- The rest of the configuration (`META_AD_ACCOUNT_ID`, `META_PAGE_ID`) is shared with
+  the Graph API path.
+- For programmatic/backend use (as opposed to an interactive chat client like Claude
+  Desktop), Meta's docs show authenticating with a plain bearer token over HTTP POST:
+
+  ```bash
+  curl -i -X POST "https://mcp.facebook.com/ads" \
+      -H "Authorization: Bearer <ACCESS_TOKEN>" \
+      --data-raw '{"jsonrpc":"2.0","method":"tools/list","id":1}'
+  ```
+
+### Tool mapping
+
+| Client method | MCP tool |
+|---|---|
+| `create_campaign` | `ads_create_campaign` |
+| `create_adset` | `ads_create_ad_set` |
+| `create_ad` | `ads_create_ad` |
+| `create_creative` | `ads_create_creative` |
+| `update_campaign` / `update_ad` (non-`ACTIVE` status) | `ads_update_entity` |
+| `update_campaign` / `update_ad` (`ACTIVE` status) | `ads_activate_entity` |
+| `list_campaigns`, `get_insights` | `ads_get_ad_entities` |
+
+`MetaAdsMCPClient` discovers the server's real tool catalog via `tools/list` on
+connect and checks each mapped name against it before calling — a renamed or removed
+tool fails immediately with a clear error listing the tools the server actually
+advertises, rather than a generic JSON-RPC error.
+
+### Known gaps
+
+- **Reach estimates** (`MetaInventoryTool`, research phase) have no MCP equivalent in
+  the current tool catalog and always use the Graph API path (`MetaAdsAPIClient`),
+  regardless of `META_USE_MCP`.
+- Meta's documentation publishes tool names and one-line descriptions but not full
+  JSON-RPC argument schemas; the request shapes in `meta_ads_mcp_client.py` follow
+  Meta Marketing API naming conventions and are not independently verified against a
+  live account as of this writing. Re-verify against a real ad account (via
+  `client.available_tools` and the schema each tool self-reports in `tools/list`)
+  before relying on this in production.
 
 ---
 
