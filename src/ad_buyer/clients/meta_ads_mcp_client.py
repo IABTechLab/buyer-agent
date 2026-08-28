@@ -3,41 +3,11 @@
 
 """Meta Ads MCP client — calls Meta's official Ads MCP server (mcp.facebook.com/ads).
 
-Replaces direct Graph API calls (meta_ads_client.py / meta_ads_api_client.py) when
-META_USE_MCP=true. All write operations create resources in PAUSED state by default,
-matching Meta's own MCP behavior (a human must explicitly activate a resource).
-
-Reference: https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/
-(fetched 2026-08-27). Meta's docs publish tool names and one-line descriptions but do
-not publish full JSON-RPC request/response schemas in prose — argument shapes below
-follow the naming conventions Meta uses elsewhere in the Marketing API. Each mapped
-tool name is verified against ``available_tools`` (populated from the server's own
-``tools/list`` response) before it is called, so a renamed/removed tool fails fast
-with a clear error instead of a cryptic JSON-RPC ``-32601``.
-
-Confirmed from the official docs (2026-08-27 snapshot):
-    - Transport: JSON-RPC 2.0 over HTTP POST to https://mcp.facebook.com/ads,
-      authenticated via ``Authorization: Bearer <user access token>`` for
-      programmatic/non-interactive clients (the OAuth-dialog flow is the
-      alternative for chat clients like Claude Desktop/ChatGPT).
-    - Required token scopes: ads_mcp_management, ads_read, ads_management,
-      catalog_management, business_management, pages_show_list, instagram_basic.
-    - Campaign-lifecycle tools: ads_create_campaign, ads_create_ad_set,
-      ads_create_ad, ads_create_creative, ads_update_entity, ads_activate_entity.
-    - Reporting tool: ads_get_ad_entities — lists campaigns/ad sets/ads together
-      with performance metrics (spend, impressions, CTR, CPC, CPM, conversions),
-      with filtering, breakdowns, sorting, and date ranges. This supersedes the
-      earlier (undocumented, no-longer-listed) async report-scheduling tools an
-      earlier iteration of this client assumed.
-    - No MCP tool exists for reach estimation as of this snapshot — callers must
-      fall back to MetaAdsAPIClient (Graph API) for that.
-
-Not independently re-verified against a live account for this rewrite: the exact
-JSON-RPC argument shapes for the write tools, and whether ``ad_account_id`` is
-expected bare (no ``act_`` prefix) or with it. This client strips the ``act_``
-prefix, matching a live-tested finding from 2026-07-31 (see project memory) and
-Meta's own bare-ID convention elsewhere; re-verify before relying on this in
-production.
+Alternative to meta_ads_client.py's direct Graph API calls, used when META_USE_MCP
+is true. Writes always create PAUSED resources. Tool names follow
+https://developers.facebook.com/documentation/ads-commerce/ads-ai-connectors/ads-mcp-server/ ;
+Meta doesn't publish JSON-RPC argument schemas, so shapes below follow Marketing API
+conventions. No MCP tool exists yet for reach estimates — use MetaAdsAPIClient for that.
 """
 
 import json
@@ -63,12 +33,8 @@ class MetaAPIError(Exception):
 class MetaAdsMCPClient:
     """Meta Ads client via Meta's official MCP server (mcp.facebook.com/ads).
 
-    Uses JSON-RPC 2.0 over HTTP POST with a user access token — the programmatic
-    auth path Meta's own get-started docs document via curl, as opposed to the
-    OAuth-dialog flow used by interactive chat clients.
-
-    Auth: user access token (not system user token) in Authorization: Bearer,
-    scoped per the module docstring above.
+    JSON-RPC 2.0 over HTTP POST with a bearer user access token (not a system
+    user token) — the programmatic auth path from Meta's get-started docs.
     """
 
     def __init__(
@@ -80,8 +46,7 @@ class MetaAdsMCPClient:
         timeout: float = _TOOL_TIMEOUT,
     ) -> None:
         self._token = access_token
-        # Ads MCP tools take the bare numeric account ID, no "act_" prefix —
-        # see the module docstring for how confident we are in this default.
+        # Ads MCP tools take the bare numeric account ID, no "act_" prefix.
         self._ad_account_id = ad_account_id.removeprefix("act_")
         self._page_id = page_id
         self._mcp_url = mcp_url
@@ -109,12 +74,7 @@ class MetaAdsMCPClient:
             self._client = None
 
     async def _discover_tools(self) -> None:
-        """Populate ``available_tools`` from the server's own catalog.
-
-        Best-effort: a discovery failure must not block connecting, since a
-        stale/unreachable tool list only degrades error messages later, it
-        does not affect correctness of a subsequent successful call.
-        """
+        """Populate available_tools; best-effort so a failure here doesn't block connecting."""
         try:
             result = await self._call("tools/list", {})
             tools = result.get("tools", [])
@@ -145,10 +105,7 @@ class MetaAdsMCPClient:
         if resp.status_code >= 400:
             raise MetaAPIError(f"Meta MCP HTTP {resp.status_code}: {resp.text}")
 
-        # The server may answer with a plain JSON body or an SSE-framed one
-        # (SSE responses commonly carry an "event: message" line before the
-        # "data:" line, so the "data:" line is looked for anywhere, not only
-        # as the very first line of the body).
+        # Response may be plain JSON or SSE-framed; find the "data:" line either way.
         body = resp.text.strip()
         for line in body.splitlines():
             if line.startswith("data:"):
@@ -162,14 +119,7 @@ class MetaAdsMCPClient:
         return data.get("result", data)
 
     async def _call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
-        """Call an MCP tool, failing fast if it isn't in the discovered catalog.
-
-        A pre-flight check against ``available_tools`` turns a renamed/removed
-        tool into a clear error here rather than a generic JSON-RPC -32601 from
-        the server — this is what made the earlier iteration's tool-name drift
-        hard to diagnose (see project memory: a bogus tool name and a real but
-        wrong one returned identical opaque errors).
-        """
+        """Call an MCP tool, failing fast (not with a generic JSON-RPC -32601) if unknown."""
         if self._tools and tool_name not in self._tools:
             raise MetaAPIError(
                 f"'{tool_name}' is not in the Meta Ads MCP server's advertised tool "
@@ -208,13 +158,7 @@ class MetaAdsMCPClient:
     async def _update_entity_status(
         self, entity_id: str, entity_type: str, status: str
     ) -> dict[str, Any]:
-        """Update a campaign/ad_set/ad's status: ACTIVE | PAUSED | DELETED.
-
-        Per the official tool descriptions, activation is a dedicated tool
-        (``ads_activate_entity``) separate from the general-purpose field
-        updater (``ads_update_entity``) — activation is treated as the
-        spend-starting action, everything else is a plain field update.
-        """
+        """Update status: ACTIVE uses ads_activate_entity, everything else ads_update_entity."""
         if status == "ACTIVE":
             return await self._call_tool(
                 "ads_activate_entity",
@@ -273,10 +217,8 @@ class MetaAdsMCPClient:
     ) -> dict[str, Any]:
         """Create an ad set under a campaign in PAUSED state.
 
-        No bid_amount here: create_campaign() always creates CBO
-        (campaign-budget-optimized) campaigns, which reject ad-set-level bid
-        fields — confirmed live against the Graph API, and the ad set/campaign
-        object model is shared between the Graph API and the MCP tools.
+        No bid_amount: create_campaign() always creates CBO campaigns, which
+        reject ad-set-level bid fields.
         """
         targeting = {
             "age_min": 18,
@@ -347,12 +289,7 @@ class MetaAdsMCPClient:
         date_preset: str = "last_30d",
         fields: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Get performance insights for a campaign via ads_get_ad_entities.
-
-        ads_get_ad_entities returns campaigns/ad sets/ads together with
-        performance metrics directly — there is no separate async
-        schedule/poll report flow in the current tool catalog.
-        """
+        """Get performance insights for a campaign via ads_get_ad_entities."""
         report_fields = fields or [
             "name",
             "spend",

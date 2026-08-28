@@ -1485,15 +1485,7 @@ class DealBookingFlow(Flow[BookingState]):
         ad_account_id: str,
         page_id: str,
     ) -> tuple[str, str, str]:
-        """MCP counterpart of ``_book_via_meta_api``.
-
-        create_adset() takes no bid_amount here: create_campaign() always
-        creates CBO campaigns, which reject ad-set-level bid fields.
-
-        Credentials are passed in rather than read from settings here
-        directly, since the caller (``_book_via_meta_api``) has already
-        resolved and validated them.
-        """
+        """MCP counterpart of ``_book_via_meta_api``; no bid_amount, CBO campaigns reject it."""
         async with MetaAdsMCPClient(
             access_token=access_token,
             ad_account_id=ad_account_id,

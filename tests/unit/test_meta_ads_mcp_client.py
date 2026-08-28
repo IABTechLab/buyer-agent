@@ -1,14 +1,7 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for MetaAdsMCPClient (Meta's official mcp.facebook.com/ads server).
-
-These verify the client's own request-building, response-parsing, and
-error-handling logic against a mocked transport — not the live server's
-current tool catalog or argument schemas, which Meta does not publish in
-full (see the module docstring in meta_ads_mcp_client.py for what is and
-isn't confirmed from official docs as of 2026-08-27).
-"""
+"""Tests for MetaAdsMCPClient (Meta's official mcp.facebook.com/ads server)."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -218,10 +211,7 @@ class TestCallTool:
 
     @pytest.mark.asyncio
     async def test_unknown_tool_rejected_before_network_call_when_catalog_known(self):
-        """Pre-flight check against the discovered catalog fails fast and lists
-        the real tool names — the earlier iteration of this client had no such
-        check, so a renamed/removed tool surfaced only as a generic JSON-RPC
-        -32601 from the server (hard to diagnose)."""
+        """Unknown tool names fail fast with the real catalog, no network call made."""
         client = _client()
         client._tools = {"ads_create_campaign": {}}
         mock_call = AsyncMock()
@@ -242,9 +232,7 @@ class TestCallTool:
 
     @pytest.mark.asyncio
     async def test_empty_catalog_does_not_gate_calls(self):
-        """When discovery found nothing (e.g. it failed), don't block every
-        call on an empty catalog — let the server itself be the source of
-        truth in that degraded case."""
+        """An empty catalog (e.g. discovery failed) must not block every call."""
         client = _client()
         assert client._tools == {}
         with patch.object(
@@ -359,9 +347,7 @@ class TestCampaignAndEntityMethods:
 class TestAdSet:
     @pytest.mark.asyncio
     async def test_create_adset_has_no_bid_amount_param(self):
-        """CBO campaigns reject ad-set-level bid fields; the method signature
-        deliberately has no bid_amount parameter to make that impossible to
-        pass by mistake."""
+        """No bid_amount param at all — CBO campaigns reject ad-set-level bid fields."""
         client = _client()
         mock_tool = AsyncMock(return_value={"ad_set_id": "as1"})
         with patch.object(client, "_call_tool", new=mock_tool):
