@@ -338,7 +338,7 @@ class TestBookViaMetaMcp:
         with (
             patch("ad_buyer.config.settings.settings") as mock_settings,
             patch(
-                "ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient",
+                "ad_buyer.flows.deal_booking_flow.MetaAdsMCPClient",
                 return_value=mcp_client,
             ) as mcp_client_cls,
             patch("ad_buyer.clients.meta_ads_client.MetaAdsClient") as graph_client_cls,
@@ -372,7 +372,7 @@ class TestBookViaMetaMcp:
         with (
             patch("ad_buyer.config.settings.settings") as mock_settings,
             patch(
-                "ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient",
+                "ad_buyer.flows.deal_booking_flow.MetaAdsMCPClient",
                 return_value=mcp_client,
             ),
         ):
@@ -397,7 +397,7 @@ class TestBookViaMetaMcp:
         with (
             patch("ad_buyer.config.settings.settings") as mock_settings,
             patch(
-                "ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient",
+                "ad_buyer.flows.deal_booking_flow.MetaAdsMCPClient",
                 return_value=mcp_client,
             ),
         ):
@@ -422,7 +422,7 @@ class TestBookViaMetaMcp:
         with (
             patch("ad_buyer.config.settings.settings") as mock_settings,
             patch(
-                "ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient",
+                "ad_buyer.flows.deal_booking_flow.MetaAdsMCPClient",
                 return_value=mcp_client,
             ),
         ):

@@ -20,6 +20,7 @@ from ..booking.recommendation_guard import (
     validate_and_clamp_recommendation,
 )
 from ..booking.spend_ceiling import SpendCeilingExceeded, enforce_spend_ceiling
+from ..clients.meta_ads_mcp_client import MetaAdsMCPClient
 from ..clients.opendirect_client import OpenDirectClient
 from ..crews.channel_crews import (
     create_branding_crew,
@@ -1435,6 +1436,9 @@ class DealBookingFlow(Flow[BookingState]):
                     rec.product_name,
                     optimization_goal,
                     targeting_countries,
+                    access_token=_settings.meta_access_token,
+                    ad_account_id=_settings.meta_ad_account_id,
+                    page_id=_settings.meta_page_id,
                 )
             )
 
@@ -1476,19 +1480,24 @@ class DealBookingFlow(Flow[BookingState]):
         adset_name: str,
         optimization_goal: str,
         targeting_countries: list[str],
+        *,
+        access_token: str,
+        ad_account_id: str,
+        page_id: str,
     ) -> tuple[str, str, str]:
         """MCP counterpart of ``_book_via_meta_api``.
 
         create_adset() takes no bid_amount here: create_campaign() always
         creates CBO campaigns, which reject ad-set-level bid fields.
-        """
-        from ..clients.meta_ads_mcp_client import MetaAdsMCPClient
-        from ..config.settings import settings as _settings
 
+        Credentials are passed in rather than read from settings here
+        directly, since the caller (``_book_via_meta_api``) has already
+        resolved and validated them.
+        """
         async with MetaAdsMCPClient(
-            access_token=_settings.meta_access_token,
-            ad_account_id=_settings.meta_ad_account_id,
-            page_id=_settings.meta_page_id,
+            access_token=access_token,
+            ad_account_id=ad_account_id,
+            page_id=page_id,
         ) as client:
             camp = await client.create_campaign(
                 name=campaign_name,
