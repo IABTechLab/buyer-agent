@@ -7,16 +7,18 @@ Bootstrap: the first operator key is minted out-of-band with
 ``ad-buyer create-operator-key`` (writes directly to storage — no
 network surface). Subsequent keys use ``POST /auth/api-keys/operator``.
 
-Deprecated migration shim: when ``settings.api_key`` is set and no
-hashed operator keys exist yet, that plaintext value is accepted as a
-single synthetic operator credential (compare only; never minted via HTTP).
+Deprecated migration shim: when ``settings.api_key`` is set and the
+``api_keys`` table has never held an operator key, that plaintext value is
+accepted as a single synthetic operator credential (compare only; never
+minted via HTTP). Minting one hashed key disables the shim permanently —
+revoking every key does NOT reopen it, so recovery is another CLI mint.
 """
 
 from __future__ import annotations
 
 import logging
 import secrets
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import Header, HTTPException
 
@@ -27,6 +29,10 @@ logger = logging.getLogger(__name__)
 
 # Synthetic key_id used when authenticating via deprecated settings.api_key
 _LEGACY_API_KEY_ID = "key-legacy-env"
+
+# Uniform 401 detail: never disclose whether a presented key is unknown,
+# revoked, or expired.
+INVALID_KEY_DETAIL = "Invalid API key"
 
 
 def _extract_key_from_headers(
@@ -51,7 +57,7 @@ def _legacy_operator_record(api_key: str) -> ApiKeyRecord:
         key_prefix_hint=(api_key[:12] + "...") if len(api_key) > 12 else "****",
         role=ApiKeyRole.OPERATOR,
         label="legacy-env-api-key",
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -59,19 +65,24 @@ def validate_operator_credential(raw_key: str) -> ApiKeyRecord:
     """Validate a raw key string as an operator credential.
 
     Raises:
-        ValueError: with a message suitable for HTTP 401 detail.
+        ValueError: ``INVALID_KEY_DETAIL`` — deliberately uniform so a caller
+            cannot distinguish unknown from revoked or expired keys. The
+            specific reason is logged, not returned.
         PermissionError: when the key is valid but not operator-role (403).
     """
     from ..config.settings import get_settings
 
     service = get_operator_key_service()
     settings = get_settings()
-    has_db_keys = service.has_active_operator_keys()
+    # Any operator row ever minted — including revoked/expired — retires the
+    # shim, so revoking the last key cannot silently reopen plaintext auth.
+    has_db_keys = service.has_any_operator_keys()
 
     try:
         record = service.validate_key(raw_key)
-    except ValueError:
-        raise
+    except ValueError as exc:
+        logger.warning("Operator key rejected: %s", exc)
+        raise ValueError(INVALID_KEY_DETAIL) from exc
 
     if record is not None:
         if record.role != ApiKeyRole.OPERATOR:
@@ -79,9 +90,14 @@ def validate_operator_credential(raw_key: str) -> ApiKeyRecord:
         return record
 
     if not has_db_keys and settings.api_key and secrets.compare_digest(raw_key, settings.api_key):
+        logger.warning(
+            "DEPRECATED: authenticated with the plaintext API_KEY env shim. "
+            "No operator key has ever been minted in this database. Run "
+            "'ad-buyer create-operator-key' — the shim is removed next release."
+        )
         return _legacy_operator_record(settings.api_key)
 
-    raise ValueError("Invalid API key")
+    raise ValueError(INVALID_KEY_DETAIL)
 
 
 async def require_operator_key(

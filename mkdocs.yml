@@ -94,6 +94,7 @@ nav:
       - Multi-Seller Discovery: guides/multi-seller.md
       - Linear TV Buying: guides/linear-tv.md
       - Configuration: guides/configuration.md
+      - Upgrade to v2.5.0: guides/upgrade-v2.5.0.md
       - Deployment & Operations: guides/deployment-ops-guide.md
       - AgentCore Deployment: guides/agentcore-deployment.md
       - Multi-Seller Orchestration: guides/multi-seller-orchestration.md

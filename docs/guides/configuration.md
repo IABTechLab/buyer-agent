@@ -44,7 +44,7 @@ print(settings.get_seller_endpoints())
 | `ANTHROPIC_API_KEY` | `str` | `""` | Anthropic API key for Claude models. Required when `DEFAULT_LLM_MODEL`/`MANAGER_LLM_MODEL` use the `anthropic/` prefix (the default). |
 | `OPENAI_API_KEY` | `str` | `None` | OpenAI API key. Required when using the `openai/` provider prefix. |
 | `GOOGLE_API_KEY` | `str` | `None` | Google API key. Required when using the `gemini/` provider prefix. |
-| `API_KEY` | `str` | `""` | **Deprecated** inbound auth shim. Prefer hashed operator keys from `ad-buyer create-operator-key`. Accepted only when no DB operator keys exist yet. |
+| `API_KEY` | `str` | `""` | **Deprecated** inbound auth shim, removed in v2.6.0. Prefer hashed operator keys from `ad-buyer create-operator-key`. Accepted only while no operator key has *ever* been minted — revoking every key does not reopen it. See the [v2.5.0 upgrade guide](upgrade-v2.5.0.md). |
 
 !!! warning "Operator credentials required"
     Protected REST and MCP-over-HTTP surfaces require an operator key.
@@ -283,9 +283,14 @@ Everything else uses defaults: local SQLite database, localhost seller, Sonnet f
 
 ### Production
 
+Inbound auth comes from a minted operator key, not an env var:
+
+```bash
+uv run ad-buyer create-operator-key --label "Primary operator"
+```
+
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
-API_KEY=your-service-api-key
 
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
 IAB_SERVER_URL=https://primary-seller.example.com
@@ -305,7 +310,6 @@ LOG_LEVEL=WARNING
 
 ```bash
 ANTHROPIC_API_KEY=test-key
-API_KEY=test-api-key
 DATABASE_URL=sqlite:///./test_ad_buyer.db
 ENVIRONMENT=testing
 LOG_LEVEL=DEBUG

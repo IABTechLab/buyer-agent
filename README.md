@@ -194,7 +194,11 @@ uv run uvicorn ad_buyer.interfaces.api.main:app --host 0.0.0.0 --port 8001
 `ANTHROPIC_API_KEY` is optional to *start* the server (the API boots without it);
 it is only required once you run CrewAI-backed booking flows. Protected REST
 and MCP-over-HTTP routes require the operator key from
-`ad-buyer create-operator-key`.
+`ad-buyer create-operator-key` — there is no keyless mode.
+
+> **Upgrading from v2.4.x?** Operator keys replace the shared `API_KEY`, and the
+> buyer's default listen port moved from `8000` to `8001` (sellers own `8000`).
+> See the [v2.5.0 upgrade guide](https://iabtechlab.github.io/buyer-agent/guides/upgrade-v2.5.0/).
 
 > **This quickstart is tested.** `tests/smoke/test_quickstart_smoke.py` boots the app at
 > the exact module path documented above (`ad_buyer.interfaces.api.main:app`) through its

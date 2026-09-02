@@ -428,6 +428,12 @@ def create_operator_key(
         "-e",
         help="Days until the key expires (default: never)",
     ),
+    quiet: bool = typer.Option(
+        False,
+        "--quiet",
+        "-q",
+        help="Print only the key, for scripting (e.g. KEY=$(... --quiet))",
+    ),
 ) -> None:
     """Mint an OPERATOR-role API key directly in storage (bootstrap).
 
@@ -453,6 +459,13 @@ def create_operator_key(
         raise typer.Exit(1) from exc
     finally:
         reset_operator_key_service()
+
+    if quiet:
+        # Bare key on stdout so callers can capture it without parsing panels.
+        # flush=True: the ``__main__`` path exits via os._exit(), which skips
+        # buffer flushing, and command substitution makes stdout a pipe.
+        print(response.api_key, flush=True)
+        return
 
     console.print(Panel("Operator API key created", title="Bootstrap"))
     console.print(f"Key ID:  [cyan]{response.key_id}[/cyan]")

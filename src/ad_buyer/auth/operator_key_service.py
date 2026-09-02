@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from ..models.api_key import (
     ApiKeyCreateResponse,
@@ -46,24 +46,13 @@ class OperatorKeyService:
         Raises:
             ValueError: If an active operator key already has this label.
         """
-        for existing in self.list_keys():
-            if (
-                existing.role == ApiKeyRole.OPERATOR
-                and existing.is_active
-                and existing.label == request.label
-            ):
-                raise ValueError(
-                    f"An active operator key with label {request.label!r} "
-                    f"already exists ({existing.key_id})"
-                )
-
         full_key = generate_api_key()
         key_hash = hash_api_key(full_key)
         key_id = f"key-{uuid.uuid4().hex[:8]}"
 
         expires_at = None
         if request.expires_in_days is not None:
-            expires_at = datetime.utcnow() + timedelta(days=request.expires_in_days)
+            expires_at = datetime.now(UTC) + timedelta(days=request.expires_in_days)
 
         record = ApiKeyRecord(
             key_id=key_id,
@@ -73,7 +62,9 @@ class OperatorKeyService:
             label=request.label,
             expires_at=expires_at,
         )
-        self._store.insert(record)
+        # Atomic label claim: concurrent mints cannot both win the label.
+        if not self._store.insert_if_label_free(record):
+            raise ValueError(f"An active operator key with label {request.label!r} already exists")
 
         logger.info(
             "Operator API key %s created (label: %s)",
@@ -109,7 +100,7 @@ class OperatorKeyService:
         if record.is_expired:
             raise ValueError(f"API key {record.key_id} has expired")
 
-        record.last_used_at = datetime.utcnow()
+        record.last_used_at = datetime.now(UTC)
         record.use_count += 1
         self._store.update(record)
         return record
@@ -136,13 +127,21 @@ class OperatorKeyService:
         """True if at least one active (non-revoked, non-expired) operator key exists."""
         return any(info.is_active for info in self.list_operator_keys())
 
+    def has_any_operator_keys(self) -> bool:
+        """True if an operator key has ever been minted, revoked or not.
+
+        Gates the deprecated ``API_KEY`` shim: revoking every key must not
+        re-enable plaintext-env authentication.
+        """
+        return self._store.count_operator_keys() > 0
+
     def revoke_key(self, key_id: str) -> bool:
         """Revoke an API key. Returns True if found and revoked."""
         record = self._store.get_by_id(key_id)
         if record is None:
             return False
         record.revoked = True
-        record.revoked_at = datetime.utcnow()
+        record.revoked_at = datetime.now(UTC)
         self._store.update(record)
         logger.info("API key %s revoked", key_id)
         return True

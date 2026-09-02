@@ -99,24 +99,29 @@ Verify: `curl http://localhost:8001/health`
 
 ## Step 7: Generate Operator Credentials
 
-Create an inbound API key for your business team. Set `API_KEY` in your `.env`:
+Mint an operator key for your business team. Keys are hashed into the database, so the CLI must run with the same `DATABASE_URL` as the server:
 
-```env
-# Inbound API key — business team will use this in Claude Desktop
-# Leave empty to disable auth (development only)
-API_KEY=sk-operator-XXXXX
+```bash
+uv run ad-buyer create-operator-key --label "Business team"
 ```
 
-> Generate a strong random key: `python -c "import secrets; print('sk-operator-' + secrets.token_urlsafe(32))"`
+The full key is printed **once** — store it in your secret manager. Useful companions:
 
-Restart the server after setting `API_KEY`. All incoming requests (REST and MCP alike) must now carry the key in the **`X-API-Key` header** — the buyer agent does not accept `Authorization: Bearer` tokens.
+```bash
+uv run ad-buyer list-operator-keys
+uv run ad-buyer delete-operator-key --label "Business team"
+```
+
+There is no keyless mode: every REST route except `/health`, `/docs`, `/redoc`, and `/openapi.json`, and every MCP tool except `health_check`, answers `401` without a key. Requests may carry it as either **`X-Api-Key: <key>`** or **`Authorization: Bearer <key>`**.
+
+The deprecated `API_KEY` env var still authenticates for one release, but only while no operator key has ever been minted. See the [v2.5.0 upgrade guide](../guides/upgrade-v2.5.0.md).
 
 ## Step 8: Hand Off
 
 Give your media buying team:
 
 1. **MCP URL**: `http://your-server:8001/mcp/` (Streamable HTTP, canonical — or your public URL)
-2. **API key**: the value you set in `API_KEY`
+2. **API key**: the operator key printed by `ad-buyer create-operator-key`
 
 They'll connect Claude Desktop using the [Claude Desktop Setup Guide](../claude-desktop-setup.md) and complete the business configuration (deal templates, approval thresholds, seller API keys) through the interactive setup wizard.
 

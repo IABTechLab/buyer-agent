@@ -9,7 +9,7 @@ the suite has **~3076 tests** organized into three tiers.
 |-----------|------:|---------|----------|
 | `tests/unit/` | ~100 files | Pure-Python unit tests; no network, no LLM, no real seller. Fast. | ~5–10 s per file, ~3 min total |
 | `tests/integration/` | ~15 files | Cross-module / cross-flow tests, mocked seller endpoints. May spin up `httpx.Mock` or in-process FastAPI. | ~30 s per file, ~5 min total |
-| `tests/smoke/` | 1 file | Live-server smoke (currently `test_mcp_e2e.py`). Marked `@pytest.mark.smoke`; only run on demand. | seconds per test, but requires a running MCP server |
+| `tests/smoke/` | 3 files | Live-server smoke (`test_mcp_e2e.py`, `test_mcp_streamable.py`, `test_quickstart_smoke.py`). Marked `@pytest.mark.smoke`; only run on demand. | seconds per test, but the MCP ones require a running server and an operator key |
 
 ## Running
 
@@ -27,11 +27,18 @@ PYTHONPATH=src venv/bin/pytest tests/ --tb=short -q
 
 Expected: **3076 passed, 41 skipped, 0 failed** (occasionally 1 known flake — see [Flakes](#flakes)).
 
-### Smoke — requires live MCP server
+### Smoke — requires live MCP server and an operator key
+
+MCP tools over HTTP are gated (only `health_check` is public), so mint a key
+against the server's `DATABASE_URL` first:
 
 ```bash
+export BUYER_OPERATOR_KEY="$(uv run ad-buyer create-operator-key --label smoke --quiet)"
 PYTHONPATH=src venv/bin/pytest tests/smoke/ -m smoke -v
 ```
+
+Without `BUYER_OPERATOR_KEY` the MCP smoke tests skip rather than assert
+anonymous access, which a correctly gated server refuses.
 
 ### Single test (any tier)
 

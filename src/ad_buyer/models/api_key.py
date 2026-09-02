@@ -12,12 +12,24 @@ Key format: abk_live_{token} (ad-buyer-key)
 
 import hashlib
 import secrets
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
 API_KEY_PREFIX = "abk_live_"
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Treat naive timestamps as UTC so comparisons never raise.
+
+    Rows written before timezone-aware storage carry naive values.
+    """
+    return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
 class ApiKeyRole(str, Enum):
@@ -58,7 +70,7 @@ class ApiKeyRecord(BaseModel):
     key_prefix_hint: str
     role: ApiKeyRole = ApiKeyRole.OPERATOR
     label: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     expires_at: datetime | None = None
     revoked: bool = False
     revoked_at: datetime | None = None
@@ -70,7 +82,7 @@ class ApiKeyRecord(BaseModel):
         """Whether the key has expired."""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return _utcnow() > _as_utc(self.expires_at)
 
     @property
     def is_active(self) -> bool:

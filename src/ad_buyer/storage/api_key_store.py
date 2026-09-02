@@ -13,13 +13,21 @@ from __future__ import annotations
 import logging
 import sqlite3
 import threading
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from ..models.api_key import ApiKeyRecord, ApiKeyRole
 from .schema import initialize_schema
 
 logger = logging.getLogger(__name__)
+
+_INSERT_SQL = """
+INSERT INTO api_keys (
+    key_id, key_hash, key_prefix_hint, role, label,
+    created_at, expires_at, revoked, revoked_at,
+    last_used_at, use_count
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+"""
 
 
 def _parse_url(url: str) -> str:
@@ -49,6 +57,22 @@ def _fmt_dt(value: datetime | None) -> str | None:
     return value.isoformat()
 
 
+def _insert_params(record: ApiKeyRecord) -> tuple[Any, ...]:
+    return (
+        record.key_id,
+        record.key_hash,
+        record.key_prefix_hint,
+        record.role.value,
+        record.label,
+        _fmt_dt(record.created_at),
+        _fmt_dt(record.expires_at),
+        1 if record.revoked else 0,
+        _fmt_dt(record.revoked_at),
+        _fmt_dt(record.last_used_at),
+        record.use_count,
+    )
+
+
 class OperatorApiKeyStore:
     """SQLite store for hashed inbound operator API keys.
 
@@ -67,7 +91,9 @@ class OperatorApiKeyStore:
 
     def connect(self) -> None:
         """Open the database connection and ensure schema is current."""
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        # isolation_level=None (autocommit) so ``insert_if_label_free`` can
+        # own an explicit BEGIN IMMEDIATE transaction.
+        self._conn = sqlite3.connect(self._db_path, check_same_thread=False, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
@@ -89,29 +115,33 @@ class OperatorApiKeyStore:
         """Insert a new API key record."""
         conn = self._require_conn()
         with self._lock:
-            conn.execute(
-                """
-                INSERT INTO api_keys (
-                    key_id, key_hash, key_prefix_hint, role, label,
-                    created_at, expires_at, revoked, revoked_at,
-                    last_used_at, use_count
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    record.key_id,
-                    record.key_hash,
-                    record.key_prefix_hint,
-                    record.role.value,
-                    record.label,
-                    _fmt_dt(record.created_at),
-                    _fmt_dt(record.expires_at),
-                    1 if record.revoked else 0,
-                    _fmt_dt(record.revoked_at),
-                    _fmt_dt(record.last_used_at),
-                    record.use_count,
-                ),
-            )
+            conn.execute(_INSERT_SQL, _insert_params(record))
             conn.commit()
+
+    def insert_if_label_free(self, record: ApiKeyRecord) -> bool:
+        """Insert unless an active operator key already holds the same label.
+
+        The check and the insert share one BEGIN IMMEDIATE transaction, so
+        concurrent mints cannot both observe a free label. Returns False when
+        the label is taken.
+        """
+        conn = self._require_conn()
+        with self._lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM api_keys WHERE role = ? AND label = ? AND revoked = 0",
+                    (record.role.value, record.label),
+                ).fetchall()
+                if any(self._row_to_record(row).is_active for row in rows):
+                    conn.execute("ROLLBACK")
+                    return False
+                conn.execute(_INSERT_SQL, _insert_params(record))
+                conn.execute("COMMIT")
+                return True
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
 
     def get_by_hash(self, key_hash: str) -> ApiKeyRecord | None:
         """Look up a key by SHA-256 hash."""
@@ -188,6 +218,20 @@ class OperatorApiKeyStore:
             ).fetchone()
         return int(row["n"]) if row else 0
 
+    def count_operator_keys(self) -> int:
+        """Count every operator key row, including revoked and expired ones.
+
+        The deprecated ``API_KEY`` shim keys off this count, so revoking the
+        last key must not reopen plaintext-env authentication.
+        """
+        conn = self._require_conn()
+        with self._lock:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM api_keys WHERE role = ?",
+                (ApiKeyRole.OPERATOR.value,),
+            ).fetchone()
+        return int(row["n"]) if row else 0
+
     @staticmethod
     def _row_to_record(row: Any) -> ApiKeyRecord:
         return ApiKeyRecord(
@@ -196,7 +240,7 @@ class OperatorApiKeyStore:
             key_prefix_hint=row["key_prefix_hint"],
             role=ApiKeyRole(row["role"]),
             label=row["label"] or "",
-            created_at=_parse_dt(row["created_at"]) or datetime.utcnow(),
+            created_at=_parse_dt(row["created_at"]) or datetime.now(UTC),
             expires_at=_parse_dt(row["expires_at"]),
             revoked=bool(row["revoked"]),
             revoked_at=_parse_dt(row["revoked_at"]),

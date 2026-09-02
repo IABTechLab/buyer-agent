@@ -54,6 +54,7 @@ These paths never require authentication:
 |------|---------|
 | `/health` | Health check |
 | `/docs` | Swagger UI |
+| `/docs/oauth2-redirect` | Swagger OAuth redirect |
 | `/openapi.json` | OpenAPI schema |
 | `/redoc` | ReDoc documentation |
 
@@ -82,11 +83,25 @@ Keys are stored as SHA-256 hashes in the `api_keys` SQLite table (schema v6). Pl
 
 ### Deprecated `API_KEY` env shim
 
-If `API_KEY` is set **and** no hashed operator keys exist yet, that env value is accepted as a single synthetic operator credential (compare only). Once any DB operator key exists, `API_KEY` is ignored for auth. Prefer `ad-buyer create-operator-key`.
+If `API_KEY` is set **and** the `api_keys` table has **never held an operator key**, that env value is accepted as a single synthetic operator credential (compare only). Every shim authentication logs a deprecation warning telling the operator to mint a hashed key.
+
+The shim is gated on *any operator row ever created*, not on active rows:
+
+| DB state | `API_KEY` accepted? |
+|----------|--------------------|
+| No operator key ever minted | Yes (deprecated) |
+| At least one active operator key | No |
+| Operator keys minted, then **all revoked or expired** | **No** |
+
+That last row is deliberate. Gating on active keys would let revoking the last hashed key silently downgrade the control plane back to plaintext env auth. If you revoke every key, recover by minting a new one with `ad-buyer create-operator-key` — the shim does not come back.
+
+The shim is removed in the next release. See the [v2.5.0 upgrade guide](../guides/upgrade-v2.5.0.md).
 
 ### MCP over HTTP
 
-MCP tools over Streamable HTTP / SSE require the same operator key (`Authorization: Bearer` or `X-Api-Key`). Local stdio MCP access is trusted like the CLI. `health_check` remains ungated.
+MCP tools over Streamable HTTP / SSE require the same operator key (`Authorization: Bearer` or `X-Api-Key`). `health_check` remains ungated so probes keep working.
+
+Local stdio MCP access is trusted like the CLI, but only when the process has **not** mounted an MCP HTTP transport. The gate fails closed: in a server process, a tool call that cannot be attributed to an HTTP request is denied rather than treated as trusted stdio, so an MCP SDK change cannot silently un-gate the tools. Both the trusted-local path and every fail-closed denial are logged.
 
 ---
 
@@ -129,6 +144,9 @@ The tier the buyer receives depends on the identity fields associated with its A
 The `ApiKeyStore` provides file-backed credential storage for **seller** API keys (outbound). It stores one key per seller URL in a JSON file at `~/.ad_buyer/seller_keys.json`. Values are base64-encoded on disk to prevent accidental exposure in casual file reads.
 
 This is distinct from inbound operator keys in SQLite.
+
+!!! warning "MediaKitClient still reads the inbound `API_KEY`"
+    The `get_seller_media_kit` and `compare_sellers` MCP tools build `MediaKitClient` with `settings.api_key`. That is the deprecated **inbound** shim, reused as outbound seller auth. Other outbound clients already pick up per-seller keys from `ApiKeyStore` via `AuthMiddleware`. When the shim is removed in v2.6.0, those media-kit calls will go out unauthenticated (public-tier) unless `MediaKitClient` is given a seller credential. Do not rely on `API_KEY` for seller access.
 
 !!! warning "Not encryption"
     Base64 encoding is an obfuscation layer, not encryption. For production deployments, back the store with a secrets manager or encrypted file system.

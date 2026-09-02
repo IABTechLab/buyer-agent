@@ -179,14 +179,29 @@ def _mask_key(key: str) -> str:
     return "*" * (len(key) - 4) + key[-4:]
 
 
+_logged_media_kit_shim = False
+
+
 def _get_media_kit_client() -> MediaKitClient:
     """Get a MediaKitClient instance.
 
-    Uses the API key from settings for authenticated access.
+    Still reads the deprecated inbound ``API_KEY`` shim for outbound seller
+    auth. That coupling is removed next release; log once so operators can
+    move the credential onto ``MediaKitClient`` / a seller key before then.
     Returns a new instance each time so that test patches are reflected.
     """
+    global _logged_media_kit_shim
     settings = _get_settings()
-    return MediaKitClient(api_key=settings.api_key)
+    api_key = settings.api_key or None
+    if api_key and not _logged_media_kit_shim:
+        _logged_media_kit_shim = True
+        logger.warning(
+            "DEPRECATED: MediaKitClient is sending the inbound API_KEY env "
+            "value as outbound seller auth. Store a seller credential on the "
+            "client; the env shim is removed next release and these calls "
+            "will then go out unauthenticated."
+        )
+    return MediaKitClient(api_key=api_key)
 
 
 def _get_order_store() -> OrderStore:
@@ -201,6 +216,80 @@ def _get_order_store() -> OrderStore:
     return store
 
 
+# Set by mount_mcp(): this process serves MCP over HTTP, so every tool call
+# must be attributable to an HTTP request. Absent that attribution we deny
+# rather than assume trusted stdio (fail closed).
+_http_transport_mounted = False
+_logged_local_trust = False
+
+_AUTH_REQUIRED_DETAIL = (
+    "This tool requires an operator API key. Send it as "
+    "'Authorization: Bearer <key>' or 'X-Api-Key: <key>'. "
+    "Bootstrap the first key with: ad-buyer create-operator-key"
+)
+
+
+def _log_local_trust(reason: str) -> None:
+    """Record that the trusted (unauthenticated) local path was taken."""
+    global _logged_local_trust
+    if not _logged_local_trust:
+        _logged_local_trust = True
+        logger.info(
+            "MCP tools are running without operator-key enforcement (%s). "
+            "Enforcement applies to MCP over HTTP only.",
+            reason,
+        )
+    else:
+        logger.debug("MCP tool call trusted without operator key (%s)", reason)
+
+
+class _Transport:
+    """How the current tool call arrived."""
+
+    HTTP = "http"  # a readable HTTP request: enforce the operator key
+    IN_PROCESS = "in_process"  # direct Python call, no MCP request at all
+    STDIO = "stdio"  # MCP request with no HTTP request behind it
+    UNKNOWN = "unknown"  # could not classify: deny
+
+
+def _classify_transport() -> tuple[str, Any | None]:
+    """Classify the caller, returning ``(transport, request)``.
+
+    Only the MCP SDK's *documented* "no active request context" signals are
+    read as a local call: ``FastMCP.get_context()`` swallows the context-var
+    ``LookupError`` and ``Context.request_context`` then raises ``ValueError``.
+    Anything else — an unexpected exception, or a request object whose headers
+    we cannot read — is UNKNOWN so the caller fails closed instead of
+    silently un-gating every tool on an SDK behavior change.
+    """
+    try:
+        context = mcp.get_context()
+    except Exception:
+        logger.exception("Unexpected error obtaining MCP context; denying tool call")
+        return _Transport.UNKNOWN, None
+
+    try:
+        request = context.request_context.request
+    except (LookupError, ValueError) as exc:
+        # No MCP request is in flight: this is a direct in-process call
+        # (CLI, chat interface, tests), not a network caller.
+        logger.debug("No active MCP request context (%s: %s)", type(exc).__name__, exc)
+        return _Transport.IN_PROCESS, None
+    except Exception:
+        logger.exception("Unexpected error resolving MCP request context; denying tool call")
+        return _Transport.UNKNOWN, None
+
+    if request is None:
+        return _Transport.STDIO, None
+    if not hasattr(request, "headers"):
+        logger.error(
+            "MCP request context carries an unrecognized request object (%s); denying tool call",
+            type(request).__name__,
+        )
+        return _Transport.UNKNOWN, None
+    return _Transport.HTTP, request
+
+
 def _deny_unless_operator() -> str | None:
     """Enforce operator-key auth on MCP tools over HTTP transports.
 
@@ -208,13 +297,36 @@ def _deny_unless_operator() -> str | None:
 
     - HTTP transports (Streamable HTTP / SSE): require an OPERATOR API key
       via ``Authorization: Bearer`` or ``X-Api-Key``.
-    - stdio / in-process (no HTTP request): trusted like the CLI.
+    - stdio: trusted like the CLI, but only in a process that has not mounted
+      an MCP HTTP transport — a server process cannot be serving stdio.
+    - Direct in-process calls (CLI, chat, tests): trusted, and logged.
+    - Anything we cannot classify: denied.
     """
-    try:
-        request = mcp.get_context().request_context.request
-    except Exception:
-        request = None
-    if request is None or not hasattr(request, "headers"):
+    transport, request = _classify_transport()
+
+    if transport == _Transport.UNKNOWN:
+        return json.dumps(
+            {
+                "error": "authentication_required",
+                "detail": (
+                    "Operator authentication could not be verified for this transport. "
+                    + _AUTH_REQUIRED_DETAIL
+                ),
+            }
+        )
+
+    if transport == _Transport.IN_PROCESS:
+        _log_local_trust("direct in-process call, no MCP request in flight")
+        return None
+
+    if transport == _Transport.STDIO:
+        if _http_transport_mounted:
+            logger.warning(
+                "MCP tool call claims stdio transport in a process serving MCP over "
+                "HTTP; denying. Send an operator key over /mcp."
+            )
+            return json.dumps({"error": "authentication_required", "detail": _AUTH_REQUIRED_DETAIL})
+        _log_local_trust("stdio transport, no MCP HTTP transport mounted in this process")
         return None
 
     headers = request.headers
@@ -226,11 +338,7 @@ def _deny_unless_operator() -> str | None:
         return json.dumps(
             {
                 "error": "authentication_required",
-                "detail": (
-                    "This tool requires an operator API key. Send it as "
-                    "'Authorization: Bearer <key>' or 'X-Api-Key: <key>'. "
-                    "Bootstrap the first key with: ad-buyer create-operator-key"
-                ),
+                "detail": _AUTH_REQUIRED_DETAIL,
             }
         )
 
@@ -2641,6 +2749,11 @@ def mount_mcp(app: FastAPI) -> None:
     Args:
         app: The FastAPI application to mount onto.
     """
+    global _http_transport_mounted
+
     app.mount("/mcp", mcp.streamable_http_app())
     app.mount("/mcp-sse", mcp.sse_app())
+    # Tools are now reachable over the network: _deny_unless_operator must
+    # stop treating unattributable calls as trusted stdio.
+    _http_transport_mounted = True
     logger.info("MCP server mounted: Streamable HTTP at /mcp, legacy SSE at /mcp-sse/sse")
