@@ -1,0 +1,105 @@
+name: Release
+
+# Manually triggered, version-based release — mirrors the pattern used by
+# IABTechLab/iabgpp-es: bump the version, run the test suite, tag the exact
+# commit, push it, and record a GitHub Release. The final step then fires
+# the existing Deploy workflow against that commit, so cutting a release
+# also ships it.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 2.5.0, no leading v)'
+        required: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11'
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Run ruff check
+        run: uv run --locked ruff check src/ tests/
+
+      - name: Run ruff format check
+        run: uv run --locked ruff format --check src/ tests/
+
+      - name: Run tests
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        run: uv run --locked pytest tests/ -v --tb=short --cov=src/ad_buyer --cov-report=term-missing
+
+      - name: Bump version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "Releasing v$VERSION"
+          uv version "$VERSION"
+          uv lock
+
+      - name: Check if release tag already exists
+        id: check
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if git show-ref --tags --verify --quiet "refs/tags/v$VERSION"; then
+            echo "Tag v$VERSION already exists"
+            echo "version_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag v$VERSION does not exist"
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit, tag, and push
+        if: steps.check.outputs.version_changed == 'true'
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git add pyproject.toml uv.lock
+          git commit -m "Release v$VERSION"
+          git tag "v$VERSION"
+          git push origin HEAD:main
+          git push origin "v$VERSION"
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.version_changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+
+      # Pushing with the default GITHUB_TOKEN (above) does not itself
+      # re-trigger the push-based Deploy workflow, so we kick it off
+      # explicitly against the commit we just pushed to main.
+      - name: Trigger deployment of this release
+        if: steps.check.outputs.version_changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run deploy.yml --ref main -f environment=staging
