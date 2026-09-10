@@ -3,6 +3,8 @@
 
 """Ad Buyer System - CrewAI-based advertising buyer agent using IAB OpenDirect standards."""
 
+from importlib.metadata import version
+
 from ad_buyer import _telemetry_shim  # noqa: F401  # MUST be first import
 
-__version__ = "2.4.2"
+__version__ = version("ad-buyer-system")
