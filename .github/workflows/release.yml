@@ -72,23 +72,61 @@ jobs:
           uv version "$VERSION"
           uv lock
 
+      - name: Update CHANGELOG
+        run: |
+          python3 - "${{ github.event.inputs.version }}" <<'EOF'
+          import re, sys, datetime
+          version = sys.argv[1]
+          date = datetime.date.today().isoformat()
+          path = "CHANGELOG.md"
+          text = open(path).read()
+          pattern = r"(## \[Unreleased\]\n)(.*?)(\n## \[|\Z)"
+          def repl(m):
+              return f"{m.group(1)}\n## [{version}] — {date}\n{m.group(2)}{m.group(3)}"
+          new_text, n = re.subn(pattern, repl, text, count=1, flags=re.S)
+          if n == 0:
+              sys.exit("Could not find an '## [Unreleased]' section in CHANGELOG.md")
+          open(path, "w").write(new_text)
+          EOF
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          python3 - "${{ github.event.inputs.version }}" <<'EOF'
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md").read()
+          pattern = rf"## \[{re.escape(version)}\][^\n]*\n(.*?)(?=\n## \[|\Z)"
+          m = re.search(pattern, text, re.S)
+          body = (m.group(1) if m else "").strip()
+          open("release_notes.md", "w").write(body)
+          EOF
+
       - name: Commit, tag, and push
         run: |
           VERSION="${{ github.event.inputs.version }}"
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git add pyproject.toml uv.lock
+          git add pyproject.toml uv.lock CHANGELOG.md
           git commit -m "Release v$VERSION"
           git tag "v$VERSION"
           git push origin HEAD:main
           git push origin "v$VERSION"
 
+      # Prefer the curated CHANGELOG entry; fall back to GitHub's
+      # auto-generated PR list only if that entry is empty (e.g. nobody
+      # updated CHANGELOG.md's Unreleased section in their PRs), so a
+      # release is never left with a blank description.
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+          if [ -s release_notes.md ]; then
+            gh release create "v$VERSION" --title "v$VERSION" --notes-file release_notes.md
+          else
+            echo "No CHANGELOG entry for v$VERSION — falling back to auto-generated notes."
+            gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+          fi
 
       # Pushing with the default GITHUB_TOKEN (above) does not itself
       # re-trigger the push-based Deploy workflow, so we kick it off
