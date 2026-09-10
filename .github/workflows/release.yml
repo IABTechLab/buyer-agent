@@ -19,17 +19,6 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    services:
-      redis:
-        image: redis:7.2-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -61,8 +50,6 @@ jobs:
         run: uv run --locked ruff format --check src/ tests/
 
       - name: Run tests
-        env:
-          REDIS_URL: redis://localhost:6379/0
         run: uv run --locked pytest tests/ -v --tb=short --cov=src/ad_buyer --cov-report=term-missing
 
       - name: Bump version
