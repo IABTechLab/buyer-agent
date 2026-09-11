@@ -69,6 +69,25 @@ def _force_memory_enabled(monkeypatch):
     monkeypatch.setattr(settings, "crew_memory_enabled", True)
 
 
+# The default model is now Claude Sonnet 5, a tier on which Anthropic rejects
+# the `temperature` parameter (build_llm therefore omits it, leaving
+# llm.temperature is None). This module's assertions are about per-agent
+# temperature *wiring* and the L3<L2 ordering, not about the default model
+# choice, so pin a temperature-ACCEPTING model here to keep those assertions
+# meaningful. (See tests/unit/test_llm.py for the temperature-omission behavior
+# of the Sonnet 5 / Opus 4.7+ / Fable / Mythos families.)
+@pytest.fixture(autouse=True)
+def _pin_temperature_accepting_model(monkeypatch):
+    from ad_buyer.config import get_settings
+
+    accepting = "anthropic/claude-sonnet-4-5-20250929"
+    monkeypatch.setattr(settings, "default_llm_model", accepting)
+    monkeypatch.setattr(settings, "manager_llm_model", accepting)
+    cached = get_settings()
+    monkeypatch.setattr(cached, "default_llm_model", accepting, raising=False)
+    monkeypatch.setattr(cached, "manager_llm_model", accepting, raising=False)
+
+
 # ---------------------------------------------------------------------------
 # Helper: create valid BaseTool instances for injection tests
 # ---------------------------------------------------------------------------

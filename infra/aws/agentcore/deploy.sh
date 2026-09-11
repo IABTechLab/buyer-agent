@@ -25,10 +25,34 @@
 
 set -euo pipefail
 
+# Load a gitignored .env at repo root if present, so local AWS credentials
+# (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN or AWS_PROFILE)
+# and the Bedrock endpoint config below can be supplied without exporting them
+# by hand. .env is listed in .gitignore and must never be committed.
+_SCRIPT_DIR_EARLY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT_EARLY="$(cd "${_SCRIPT_DIR_EARLY}/../../.." && pwd)"
+if [[ -f "${_REPO_ROOT_EARLY}/.env" ]]; then
+  echo ">>> Loading environment from ${_REPO_ROOT_EARLY}/.env"
+  set -a
+  # shellcheck disable=SC1091
+  source "${_REPO_ROOT_EARLY}/.env"
+  set +a
+fi
+
 REGION="${AWS_REGION:-us-west-2}"
 AGENT_NAME="${AGENT_NAME:-}"
 AWS_PROFILE="${AWS_PROFILE:-}"
-LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0}"
+# Default model: current-generation Claude on Bedrock via the Anthropic
+# Messages endpoint (see ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL below). This
+# replaces the retired Amazon Nova Pro default. The model id is the Bedrock
+# model / inference-profile id passed to the Anthropic provider.
+LLM_MODEL="${DEFAULT_LLM_MODEL:-us.anthropic.claude-sonnet-5}"
+MEMORY_MODEL="${MEMORY_LLM_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
+# Bedrock's Anthropic-compatible (Messages API) base URL + API key. Setting
+# these routes Claude through CrewAI's native Anthropic provider against
+# Bedrock, so the Converse toolUse/toolResult sanitizer is not applied.
+ANTHROPIC_BASE_URL="${ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL:-https://bedrock-runtime.${REGION}.amazonaws.com/anthropic}"
+BEDROCK_API_KEY="${ANTHROPIC_COMPATIBLE_LLM_API_KEY:-${AWS_BEARER_TOKEN_BEDROCK:-}}"
 SELLER_AGENT_URL="${SELLER_AGENT_URL:-}"
 DEPLOY_MODE="http"
 DO_TEST=false
@@ -188,6 +212,8 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
     --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
     --env "PYTHONPATH=/app/src" \
+    --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
+    --env "ANTHROPIC_COMPATIBLE_LLM_API_KEY=${BEDROCK_API_KEY}" \
     --env "STORAGE_TYPE=sqlite" \
     --env "DATABASE_URL=sqlite:///:memory:" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \
@@ -195,7 +221,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     --env "AWS_REGION=${REGION}" \
     --env "AWS_DEFAULT_REGION=${REGION}" \
     --env "CREW_MEMORY_ENABLED=true" \
-    --env "MEMORY_LLM_MODEL=${MEMORY_LLM_MODEL:-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0}" \
+    --env "MEMORY_LLM_MODEL=${MEMORY_MODEL}" \
     --auto-update-on-conflict
 
   echo ""

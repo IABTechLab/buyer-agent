@@ -196,6 +196,11 @@ class TestCrewPlanCampaign:
                 ),
                 "routing_mode": "crew",
             },
+            # Crew mode fans out a multi-agent crew over multi-turn tool calls on
+            # Claude Sonnet 5; observed end-to-end latency is ~4 min, well past the
+            # 120s default. Give real headroom so a correct plan isn't scored as a
+            # failure purely on latency.
+            timeout=360,
         )
         assert result["success"], f"Invoke failed: {result['error']}"
         response = result["response"].lower()
@@ -211,6 +216,7 @@ class TestCrewPlanCampaign:
                 "prompt": "Plan a $200K Q1 campaign for mobile and display",
                 "routing_mode": "crew",
             },
+            timeout=360,
         )
         assert result["success"], f"Invoke failed: {result['error']}"
         response = result["response"].lower()
@@ -226,6 +232,7 @@ class TestCrewPlanCampaign:
                 "prompt": "Plan a $1M Q3 brand awareness campaign",
                 "routing_mode": "crew",
             },
+            timeout=360,
         )
         assert result["success"], f"Invoke failed: {result['error']}"
         # The raw output should contain campaign plan indicators

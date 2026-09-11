@@ -96,10 +96,13 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
     from ad_buyer.flows.deal_booking_flow import DealBookingFlow
     from ad_buyer.models.flow_state import BookingState
 
-    # Override buyer settings to use Bedrock instead of Anthropic.
+    # Override buyer settings to use the Bedrock-hosted model. Deploy.sh sets
+    # DEFAULT_LLM_MODEL plus ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL so this
+    # routes through the Anthropic Messages endpoint (no Converse patch). The
+    # fallback is a current-generation, Messages-supported Claude id.
     bedrock_model = os.environ.get(
         "DEFAULT_LLM_MODEL",
-        "bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "us.anthropic.claude-sonnet-5-v1:0",
     )
     from ad_buyer.config.settings import settings as buyer_settings
 

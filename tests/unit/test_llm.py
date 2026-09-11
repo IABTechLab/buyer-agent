@@ -8,8 +8,20 @@ from ad_buyer.llm import _model_accepts_temperature, build_llm
 
 
 def _settings(**overrides) -> Settings:
-    """Build an isolated Settings instance that ignores any local .env file."""
+    """Build an isolated Settings instance that ignores any local .env file.
+
+    Explicitly nulls the custom-endpoint fields unless a test overrides them,
+    so an ambient repo ``.env`` (or exported ``*_COMPATIBLE_*`` env vars) can't
+    bleed in and flip which provider branch ``build_llm`` takes. Without this,
+    a checkout that has a real ``.env`` pointing at the Bedrock Anthropic
+    endpoint would make the OpenAI-compatible-branch tests see the anthropic
+    branch instead.
+    """
     overrides.setdefault("anthropic_api_key", "sk-ant-test")
+    overrides.setdefault("openai_compatible_llm_api_base_url", None)
+    overrides.setdefault("openai_compatible_llm_api_key", None)
+    overrides.setdefault("anthropic_compatible_llm_api_base_url", None)
+    overrides.setdefault("anthropic_compatible_llm_api_key", None)
     return Settings(_env_file=None, **overrides)
 
 
@@ -80,6 +92,58 @@ class TestCustomOpenAICompatibleEndpoint:
         assert llm.provider == "openai"
         assert llm.model == "llama3"
         assert llm.base_url == "http://localhost:11434/v1"
+
+
+class TestBedrockAnthropicCompatibleEndpoint:
+    """ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL configured — routes Claude through
+    CrewAI's native Anthropic provider (Messages API) against a custom base URL
+    such as Amazon Bedrock's /anthropic endpoint. This is the path that lets
+    Claude run on Bedrock WITHOUT the Converse toolUse/toolResult sanitizer."""
+
+    def test_bedrock_messages_routes_via_anthropic_with_base_url(self, monkeypatch):
+        monkeypatch.setattr(
+            "ad_buyer.llm.get_settings",
+            lambda: _settings(
+                anthropic_compatible_llm_api_key="bedrock-key-test",
+                anthropic_compatible_llm_api_base_url="https://bedrock-runtime.us-west-2.amazonaws.com/anthropic",
+            ),
+        )
+        llm = build_llm(
+            model="us.anthropic.claude-sonnet-5-v1:0",
+            temperature=0.3,
+            max_tokens=4096,
+        )
+        assert llm.provider == "anthropic"
+        assert llm.base_url == "https://bedrock-runtime.us-west-2.amazonaws.com/anthropic"
+        assert llm.api_key == "bedrock-key-test"
+
+    def test_anthropic_compatible_takes_precedence_over_openai_compatible(self, monkeypatch):
+        """When both custom endpoints are set, the Anthropic-compatible branch
+        wins so Claude never gets misrouted to the OpenAI client (Claude is not
+        served on Bedrock's OpenAI Chat Completions path)."""
+        monkeypatch.setattr(
+            "ad_buyer.llm.get_settings",
+            lambda: _settings(
+                anthropic_compatible_llm_api_key="bedrock-key-test",
+                anthropic_compatible_llm_api_base_url="https://bedrock-runtime.us-west-2.amazonaws.com/anthropic",
+                openai_compatible_llm_api_key="should-not-win",
+                openai_compatible_llm_api_base_url="https://integrate.api.nvidia.com/v1",
+            ),
+        )
+        llm = build_llm(model="us.anthropic.claude-sonnet-5-v1:0", temperature=0.3, max_tokens=4096)
+        assert llm.provider == "anthropic"
+        assert llm.base_url == "https://bedrock-runtime.us-west-2.amazonaws.com/anthropic"
+
+    def test_sonnet_5_omits_temperature_on_bedrock_messages(self, monkeypatch):
+        monkeypatch.setattr(
+            "ad_buyer.llm.get_settings",
+            lambda: _settings(
+                anthropic_compatible_llm_api_base_url="https://bedrock-runtime.us-west-2.amazonaws.com/anthropic",
+            ),
+        )
+        llm = build_llm(model="us.anthropic.claude-sonnet-5-v1:0", temperature=0.3, max_tokens=4096)
+        assert llm.provider == "anthropic"
+        assert llm.temperature is None
 
 
 class TestModelAcceptsTemperature:

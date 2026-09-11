@@ -1,5 +1,11 @@
 # Requirements for AgentCore CLI deployment path.
-# Used by: agentcore configure --requirements-file requirements-agentcore.txt
+# Used by: agentcore configure --requirements-file infra/aws/agentcore/requirements.txt
+#
+# Kept in sync with pyproject.toml [project.dependencies]. The AgentCore
+# toolkit-generated Dockerfile installs THIS file (it does not `pip install`
+# the ad_buyer package), so every runtime import dependency must be listed
+# here — including the git-based shared contract library — or the container
+# fails at import with ModuleNotFoundError.
 bedrock-agentcore
 # Shared IAB agentic contract catalog. The crew path, deals_client, and the
 # AgentCoreSellerProxy import iab_agentic_primitives, so it must be in the
@@ -24,3 +30,8 @@ sqlalchemy>=2.0.0
 aiosqlite>=0.20.0
 pyyaml>=6.0.0
 nest-asyncio>=1.6.0
+# NOTE: the AgentCore build image (astral uv slim) has no `git` binary, so a
+# `git+https://` source fails with "Git executable not found". Use the GitHub
+# archive tarball instead — a plain HTTPS download that needs no git. Keep this
+# pinned to the same tag as pyproject.toml's git ref (v0.5.1).
+iab-agentic-primitives[client] @ https://github.com/IABTechLab/iab-agentic-primitives/archive/refs/tags/v0.5.1.tar.gz
