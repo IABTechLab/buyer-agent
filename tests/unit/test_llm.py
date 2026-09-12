@@ -4,7 +4,11 @@
 """Unit tests for the custom OpenAI-compatible endpoint alternative (build_llm)."""
 
 from ad_buyer.config.settings import Settings
-from ad_buyer.llm import _model_accepts_temperature, build_llm
+from ad_buyer.llm import (
+    _model_accepts_temperature,
+    _model_uses_max_completion_tokens,
+    build_llm,
+)
 
 
 def _settings(**overrides) -> Settings:
@@ -212,3 +216,59 @@ class TestTemperatureOmittedWhereRejected:
         llm = build_llm(model="claude-opus-4-8", temperature=0.3, max_tokens=4096)
         assert llm.provider == "openai"
         assert llm.temperature is None
+
+
+class TestModelUsesMaxCompletionTokens:
+    """OpenAI's GPT-5.x and o-series reasoning models reject the legacy
+    ``max_tokens`` parameter (400 invalid_request_error: 'max_tokens' is not
+    supported with this model) and take ``max_completion_tokens`` instead.
+    Other models keep ``max_tokens``."""
+
+    def test_gpt_5_uses_max_completion_tokens(self):
+        assert _model_uses_max_completion_tokens("us.openai.gpt-5.6-sol") is True
+
+    def test_bare_gpt_5_uses_max_completion_tokens(self):
+        assert _model_uses_max_completion_tokens("openai/gpt-5") is True
+
+    def test_o1_uses_max_completion_tokens(self):
+        assert _model_uses_max_completion_tokens("o1") is True
+
+    def test_o3_uses_max_completion_tokens(self):
+        assert _model_uses_max_completion_tokens("openai/o3-mini") is True
+
+    def test_match_is_case_insensitive(self):
+        assert _model_uses_max_completion_tokens("US.OpenAI.GPT-5.6-SOL") is True
+
+    def test_gpt_4o_uses_legacy_max_tokens(self):
+        assert _model_uses_max_completion_tokens("openai/gpt-4o") is False
+
+    def test_claude_uses_legacy_max_tokens(self):
+        assert _model_uses_max_completion_tokens("us.anthropic.claude-sonnet-5") is False
+
+
+class TestMaxTokensRoutedToCorrectParam:
+    """build_llm routes the token cap to max_completion_tokens for models that
+    require it, and to max_tokens for everything else."""
+
+    def test_gpt_5_routes_to_max_completion_tokens(self, monkeypatch):
+        monkeypatch.setattr(
+            "ad_buyer.llm.get_settings",
+            lambda: _settings(
+                openai_compatible_llm_api_base_url="https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1",
+                openai_compatible_llm_api_key="bedrock-key",
+            ),
+        )
+        llm = build_llm(model="us.openai.gpt-5.6-sol", temperature=0.5, max_tokens=4096)
+        assert llm.max_completion_tokens == 4096
+        assert llm.max_tokens is None
+
+    def test_gpt_4o_keeps_max_tokens(self, monkeypatch):
+        monkeypatch.setattr(
+            "ad_buyer.llm.get_settings",
+            lambda: _settings(
+                openai_compatible_llm_api_base_url="https://bedrock-runtime.us-west-2.amazonaws.com/openai/v1",
+                openai_compatible_llm_api_key="bedrock-key",
+            ),
+        )
+        llm = build_llm(model="gpt-4o", temperature=0.5, max_tokens=4096)
+        assert llm.max_tokens == 4096

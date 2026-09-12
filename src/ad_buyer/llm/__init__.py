@@ -55,6 +55,28 @@ def _model_accepts_temperature(model: str) -> bool:
     return not any(family in model_id for family in _TEMPERATURE_REJECTING_MODEL_FAMILIES)
 
 
+# OpenAI's newer models (GPT-5.x and the o-series reasoning models) reject the
+# legacy ``max_tokens`` parameter — sending it returns
+# "400 invalid_request_error: Unsupported parameter: 'max_tokens' is not
+# supported with this model." They take ``max_completion_tokens`` instead.
+# Matched as substrings so a Bedrock inference-profile id
+# ("us.openai.gpt-5.6-sol", ...) or a raw OpenAI id ("gpt-5", "o1", ...) is
+# covered. Other models (gpt-4o, gpt-oss, Claude, Nova, ...) keep ``max_tokens``.
+_MAX_COMPLETION_TOKENS_MODEL_FAMILIES = (
+    "gpt-5",
+    "gpt-6",
+    "o1",
+    "o3",
+    "o4",
+)
+
+
+def _model_uses_max_completion_tokens(model: str) -> bool:
+    """Return ``True`` if ``model`` needs ``max_completion_tokens`` (not ``max_tokens``)."""
+    model_id = model.lower()
+    return any(family in model_id for family in _MAX_COMPLETION_TOKENS_MODEL_FAMILIES)
+
+
 def build_llm(model: str, temperature: float, max_tokens: int) -> LLM:
     """Build an ``LLM`` for ``model``, honoring a custom base URL if configured.
 
@@ -64,7 +86,13 @@ def build_llm(model: str, temperature: float, max_tokens: int) -> LLM:
     """
     settings = get_settings()
 
-    kwargs: dict[str, Any] = {"model": model, "max_tokens": max_tokens}
+    kwargs: dict[str, Any] = {"model": model}
+    # GPT-5.x / o-series reject legacy ``max_tokens``; they take
+    # ``max_completion_tokens``. Everything else keeps ``max_tokens``.
+    if _model_uses_max_completion_tokens(model):
+        kwargs["max_completion_tokens"] = max_tokens
+    else:
+        kwargs["max_tokens"] = max_tokens
     if _model_accepts_temperature(model):
         kwargs["temperature"] = temperature
 
