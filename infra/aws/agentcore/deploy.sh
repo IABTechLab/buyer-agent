@@ -28,7 +28,7 @@ set -euo pipefail
 REGION="${AWS_REGION:-us-west-2}"
 AGENT_NAME="${AGENT_NAME:-}"
 AWS_PROFILE="${AWS_PROFILE:-}"
-LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.amazon.nova-pro-v1:0}"
+LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0}"
 SELLER_AGENT_URL="${SELLER_AGENT_URL:-}"
 DEPLOY_MODE="http"
 DO_TEST=false
@@ -143,6 +143,31 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     rm -f "${_GENERATED_DOCKERFILE}"
   fi
 
+  # ── Auth stack (opt-in): provision the buyer runtime execution role with a
+  # scoped grant to invoke the seller runtimes, and pass it to agentcore
+  # configure. Only when SELLER_AGENT_URL is an AgentCore ARN (buyer->seller
+  # over InvokeAgentRuntime). For a plain HTTP seller URL or no seller, the CLI
+  # auto-creates the default role as before. See auth-agentcore.yaml for the
+  # security model (same-account / trusted cross-account only; cross-org uses
+  # the gateway + CUSTOM_JWT path).
+  EXECUTION_ROLE_ARN=""
+  if [[ "${SELLER_AGENT_URL}" == arn:* ]]; then
+    AUTH_STACK="aamp-buyer-auth-${ENVIRONMENT:-staging}"
+    echo ""
+    echo ">>> Deploying auth stack (buyer runtime role + seller-invoke): ${AUTH_STACK}"
+    aws cloudformation deploy \
+      --stack-name "${AUTH_STACK}" \
+      --template-file infra/aws/agentcore/auth-agentcore.yaml \
+      --capabilities CAPABILITY_NAMED_IAM \
+      --parameter-overrides "Environment=${ENVIRONMENT:-staging}" \
+      --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"}
+    EXECUTION_ROLE_ARN=$(aws cloudformation describe-stacks \
+      --stack-name "${AUTH_STACK}" --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+      --query "Stacks[0].Outputs[?OutputKey=='BuyerRuntimeExecutionRoleArn'].OutputValue" \
+      --output text 2>/dev/null || true)
+    echo "  execution role: ${EXECUTION_ROLE_ARN:-<none>}"
+  fi
+
   # Configure
   echo ""
   echo ">>> Configuring agent..."
@@ -152,6 +177,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     -rf infra/aws/agentcore/requirements.txt \
     -p HTTP \
     -r "${REGION}" \
+    ${EXECUTION_ROLE_ARN:+--execution-role "${EXECUTION_ROLE_ARN}"} \
     --non-interactive \
     --deployment-type container
 
@@ -161,6 +187,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
     --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
+    --env "PYTHONPATH=/app/src" \
     --env "STORAGE_TYPE=sqlite" \
     --env "DATABASE_URL=sqlite:///:memory:" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \
@@ -168,7 +195,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     --env "AWS_REGION=${REGION}" \
     --env "AWS_DEFAULT_REGION=${REGION}" \
     --env "CREW_MEMORY_ENABLED=true" \
-    --env "MEMORY_LLM_MODEL=bedrock/us.amazon.nova-lite-v1:0" \
+    --env "MEMORY_LLM_MODEL=${MEMORY_LLM_MODEL:-bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0}" \
     --auto-update-on-conflict
 
   echo ""
