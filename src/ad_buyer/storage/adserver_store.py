@@ -3,6 +3,11 @@
 
 """SQLite-backed ad server integration record persistence.
 
+EXPERIMENTAL / NOT YET OPERATIONAL: AdServerStore is never constructed
+anywhere in the live application, only in tests. There is no Innovid
+or Flashtalking client, and nothing calls this store to traffic
+creatives or sync delivery data. Retained for future development.
+
 Uses synchronous sqlite3 (not aiosqlite) following the same thread-safety
 pattern as DealStore: check_same_thread=False with a threading.Lock().
 

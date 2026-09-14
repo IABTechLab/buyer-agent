@@ -1,12 +1,15 @@
 # Budget Pacing & Reallocation
 
-The budget pacing engine monitors campaign spend against plan in real time, detects over-delivery and under-delivery, and proposes cross-channel budget reallocations mid-flight. After a campaign's deals are booked via the [booking flow](../architecture/booking-flow.md), pacing answers three questions continuously: **Are we on pace? What is off? What should we do about it?**
+!!! danger "Experimental — not operational"
+    Budget pacing is design-stage code, not a running feature. `BudgetPacingEngine` is never constructed by the live application, no pacing snapshot is ever written outside tests and the demo script, no `PACING_HOLD` state transition ever fires, and the `check_pacing` / `get_pacing_report` MCP tools always report `no_data` because there is nothing for them to read. Everything below describes the **design intent** for this subsystem — what it is meant to do once it is wired into a live path — not current runtime behavior. It is retained for future development.
 
-The pacing engine is implemented by `BudgetPacingEngine` in `ad_buyer.pacing.engine`. Snapshots are persisted by `PacingStore` in `ad_buyer.storage.pacing_store`, and pacing events flow through the [event bus](../event-bus/overview.md).
+The budget pacing engine is designed to monitor campaign spend against plan in real time, detect over-delivery and under-delivery, and propose cross-channel budget reallocations mid-flight. Once wired in, after a campaign's deals are booked via the [booking flow](../architecture/booking-flow.md), pacing would answer three questions continuously: **Are we on pace? What is off? What should we do about it?** Today none of this runs automatically.
+
+The pacing engine is implemented by `BudgetPacingEngine` in `ad_buyer.pacing.engine`. Snapshots would be persisted by `PacingStore` in `ad_buyer.storage.pacing_store`, and pacing events would flow through the [event bus](../event-bus/overview.md) — but nothing in the live application calls any of this today.
 
 ---
 
-## How It Works
+## How It Works (Design Intent)
 
 The engine uses a **linear pacing model**: expected spend at any point is proportional to the fraction of the flight window that has elapsed. It calculates pacing at three levels --- campaign, channel, and deal --- and generates reallocation recommendations when channels deviate from plan.
 
@@ -24,6 +27,8 @@ flowchart LR
 ---
 
 ## Quick Example
+
+This example works if you construct the pieces yourself, as shown. Nothing in the live application does this for you today — there is no scheduler, background task, or crew step that constructs `BudgetPacingEngine` or calls `generate_snapshot()` on your behalf.
 
 ```python
 from datetime import datetime, timezone
@@ -205,8 +210,8 @@ for p in proposals:
     print(f"  Reason: {p.reason}")
 ```
 
-!!! warning "Proposals require approval"
-    Reallocation proposals are **recommendations**, not automatic actions. By default, the `PACING_ADJUSTMENT` approval stage is disabled, meaning proposals can be applied automatically. Enable it in the campaign brief's `approval_config` to require human sign-off before budget is moved.
+!!! warning "Proposals require approval (design intent)"
+    Reallocation proposals are designed to be **recommendations**, not automatic actions. The `PACING_ADJUSTMENT` approval stage exists in `approval_config` for this purpose. But since nothing generates reallocation proposals in the live application today, there is nothing for this approval stage to gate in practice --- treat this as a design note for when the engine is wired in, not a description of an operational approval gate.
 
 ---
 
@@ -303,9 +308,9 @@ The `pacing_snapshots` table is indexed on `campaign_id` and `timestamp` for eff
 
 ---
 
-## Events Emitted
+## Events Emitted (Design Intent)
 
-The pacing engine emits three event types:
+When invoked with an event bus, the engine emits three event types:
 
 | Event | When | Payload |
 |-------|------|---------|
@@ -313,20 +318,22 @@ The pacing engine emits three event types:
 | `pacing.deviation_detected` | When campaign-level deviation exceeds a threshold | `alert_level`, `direction`, `deviation_pct`, `message` |
 | `pacing.reallocation_recommended` | For each reallocation proposal | `source_channel`, `target_channel`, `amount`, `reason` |
 
-Subscribe to these events to build dashboards, trigger alerts, or automate reallocation approval workflows.
+These event types exist in the `EventType` enum and would be suitable for dashboards, alerts, or reallocation approval workflows once the engine is wired into a live path. Today nothing calls `generate_snapshot()` in production, so these events are never published outside tests and the demo script.
 
 ---
 
-## Integration with the Campaign Lifecycle
+## Integration with the Campaign Lifecycle (Design Intent, Not Implemented)
 
-Budget pacing operates on campaigns that have reached **ACTIVE** status. The typical flow:
+The intended flow, none of which currently runs automatically:
 
 1. Campaign pipeline books deals and moves campaign to READY
 2. Campaign is activated (manually or on flight start date) --- status becomes ACTIVE
-3. Pacing engine begins generating snapshots at regular intervals
-4. If deviation exceeds the critical threshold, the state machine can transition the campaign to **PACING_HOLD** --- an automated hold distinct from manual PAUSED
-5. When deviation resolves, PACING_HOLD auto-transitions back to ACTIVE
-6. If it does not resolve, it can be escalated to PAUSED for manual intervention
+3. Pacing engine would begin generating snapshots at regular intervals --- **no scheduler or background task exists to do this today**
+4. If deviation exceeds the critical threshold, the state machine is designed to be able to transition the campaign to **PACING_HOLD** --- an automated hold distinct from manual PAUSED --- **but no live code path ever triggers this transition**
+5. When deviation resolves, PACING_HOLD would auto-transition back to ACTIVE
+6. If it does not resolve, it could be escalated to PAUSED for manual intervention
+
+Operators should not expect PACING_HOLD to ever appear on a real campaign until this subsystem is built out and wired in.
 
 ---
 
@@ -347,7 +354,7 @@ Budget pacing operates on campaigns that have reached **ACTIVE** status. The typ
 
 ## Related
 
-- [Booking Flow](../architecture/booking-flow.md) --- Initial campaign setup (pacing monitors what the flow books)
+- [Booking Flow](../architecture/booking-flow.md) --- Initial campaign setup (pacing is designed to monitor what the flow books, once wired in)
 - [Deals API](../api/deals.md) --- Deal status and modification endpoints
 - [Multi-Seller Orchestration](multi-seller-orchestration.md) --- Cross-seller portfolio management
 - [Architecture Overview](../architecture/overview.md) --- Agent hierarchy and system design

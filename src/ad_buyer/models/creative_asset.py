@@ -3,6 +3,12 @@
 
 """CreativeAsset data model for campaign creative management.
 
+EXPERIMENTAL / NOT YET OPERATIONAL: no automated validator runs
+against this model anywhere in the live application. validation_status
+only changes when a caller sets it by hand through the CRUD layer;
+there is no IAB spec check that does it automatically, no trafficking,
+and no ad-server client. Retained for future development.
+
 Defines the CreativeAsset dataclass and supporting enums (AssetType,
 ValidationStatus) used by the creative asset CRUD layer. The model
 maps to the ``creative_assets`` table in the SQLite schema.
@@ -13,7 +19,8 @@ Design notes:
     validation_errors) transparently.
   - format_spec is a free-form dict whose structure varies by asset_type
     (e.g., width/height for display, duration_sec/vast_version for video).
-  - validation_status tracks IAB spec compliance checks.
+  - validation_status tracks IAB spec compliance checks (design intent;
+    no automated check exists yet, see EXPERIMENTAL note above).
 
 References:
   - Campaign Automation Strategic Plan, Section 6.3

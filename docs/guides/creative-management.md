@@ -1,6 +1,9 @@
 # Creative Management
 
-Creative management covers the lifecycle of ad creative assets within the buyer system --- from uploading and storing assets, through format validation against IAB standards, to binding creatives to deals on external ad servers. The system tracks creative assets per campaign, validates them before they can be attached to deals, and maintains integration records with ad server platforms like Innovid and Flashtalking.
+!!! danger "Experimental — not operational"
+    Creative management is models and CRUD stores only, not a running pipeline. There is no validator that checks a creative against IAB format specs, no trafficking logic, no Innovid or Flashtalking ad-server client, and no code that emits the creative lifecycle events listed below. `AdServerStore` is never constructed outside tests. `validation_status` only changes when something calls `update_creative_asset()` by hand; nothing checks a creative automatically. Everything below describes the **design intent** for this subsystem — what it is meant to do once it is built out and wired into a live path — not current runtime behavior. It is retained for future development.
+
+Creative management is designed to cover the lifecycle of ad creative assets within the buyer system --- from uploading and storing assets, through format validation against IAB standards, to binding creatives to deals on external ad servers. Today the system only tracks creative assets per campaign via plain CRUD; it does not validate them, and it does not maintain any live integration with ad server platforms like Innovid and Flashtalking. Model classes and schema tables that reference those platforms exist, but no client code talks to them.
 
 ---
 
@@ -34,15 +37,15 @@ The system supports five asset types, each with its own format specification str
 | Interactive | `interactive` | `width`, `height`, `simid_version` (e.g., `{"width": 300, "height": 250, "simid_version": "1.1"}`) |
 | Native | `native` | `headline_length`, `body_length`, `image_dimensions` |
 
-### Validation Status
+### Validation Status (Design Intent)
 
-Every asset starts in `pending` status and must pass validation before it can be attached to a deal:
+Every asset starts in `pending` status and is intended to pass validation before it is attached to a deal. Today there is no automated IAB spec check and no gate that enforces this: `validation_status` only ever changes when a caller sets it explicitly through `update_creative_asset()`, and nothing in the live application currently blocks an unvalidated creative from being associated with a deal.
 
 ```mermaid
 stateDiagram-v2
     [*] --> pending : asset created
-    pending --> valid : passes IAB spec check
-    pending --> invalid : fails IAB spec check
+    pending --> valid : passes IAB spec check (not implemented)
+    pending --> invalid : fails IAB spec check (not implemented)
     invalid --> pending : re-upload / fix
 ```
 
@@ -108,7 +111,7 @@ video_assets = store.list_creative_assets(
 
 ### Updating Validation Status
 
-After running spec validation, update the asset's status:
+There is no automated spec validation to run. The store lets you set the status directly, which is useful once a validator exists but today only reflects whatever a caller decides to record:
 
 ```python
 # Mark as valid
@@ -155,13 +158,13 @@ restored = CreativeAsset.from_dict(asset_dict)
 
 ---
 
-## Ad Server Integration
+## Ad Server Integration (Design Intent, Not Implemented)
 
-After creatives are validated, they need to be trafficked to an external ad server for delivery. The buyer system supports integration with **Innovid** and **Flashtalking** through the ad server campaign binding model.
+The design intent is that after creatives are validated, they get trafficked to an external ad server for delivery, with the buyer system integrating with **Innovid** and **Flashtalking** through the ad server campaign binding model below. None of this exists today: there is no Innovid or Flashtalking client, and nothing in the live application calls any trafficking or sync logic. What does exist is the data model and a CRUD store (`AdServerStore`) to hold records in this shape, but `AdServerStore` is never constructed outside tests, so nothing populates these tables in production either.
 
 ### How It Works
 
-An `AdServerCampaign` record links a buyer campaign to its representation on the ad server. Within that record, `AdServerBinding` entries map individual deal + creative pairs to ad server line items.
+An `AdServerCampaign` record is designed to link a buyer campaign to its representation on the ad server. Within that record, `AdServerBinding` entries would map individual deal + creative pairs to ad server line items --- once something exists to create and sync them.
 
 ```mermaid
 flowchart TD
@@ -213,6 +216,8 @@ flowchart TD
 
 ### Creating Ad Server Bindings
 
+These are CRUD calls against local storage only --- calling them does not talk to Innovid, Flashtalking, or any other ad server. Setting `status="ACTIVE"` records that value in the local table; it does not mean anything was actually trafficked.
+
 Use `CampaignStore` or the dedicated `AdServerStore`:
 
 ```python
@@ -221,7 +226,7 @@ from ad_buyer.storage.campaign_store import CampaignStore
 store = CampaignStore("sqlite:///./ad_buyer.db")
 store.connect()
 
-# Create an ad server campaign binding
+# Create an ad server campaign binding record (local storage only)
 binding_id = store.save_ad_server_campaign(
     campaign_id="campaign-abc",
     ad_server="INNOVID",
@@ -233,7 +238,7 @@ binding_id = store.save_ad_server_campaign(
     }),
 )
 
-# Update status after trafficking
+# Manually record a status change --- no real trafficking happens here
 store.update_ad_server_campaign(
     binding_id=binding_id,
     status="ACTIVE",
@@ -280,11 +285,11 @@ records = adserver_store.list_ad_server_campaigns(campaign_id="campaign-abc")
 
 ---
 
-## Creative Events
+## Creative Events (Design Intent, Not Implemented)
 
-The event bus tracks creative lifecycle events:
+These five event types exist in the `EventType` enum, but nothing in the live application publishes any of them. There is no code that emits `creative.uploaded` when `save_creative_asset()` is called, no validator to emit `creative.validated`, and no trafficking logic to emit `creative.matched` or `creative.ad_server_pushed`.
 
-| Event | When | Payload |
+| Event | When (once implemented) | Payload |
 |-------|------|---------|
 | `creative.uploaded` | A new creative asset is stored | Asset metadata |
 | `creative.validated` | Spec validation completes (pass or fail) | Validation result, errors |
@@ -294,15 +299,15 @@ The event bus tracks creative lifecycle events:
 
 ---
 
-## Integration with the Campaign Workflow
+## Integration with the Campaign Workflow (Design Intent, Not Implemented)
 
-The creative management system integrates with the campaign workflow at two points:
+The design intent is for creative management to integrate with the campaign workflow at two points, but neither is implemented today:
 
-1. **Brief submission** --- The campaign brief can include `creative_ids` referencing pre-uploaded assets. These are validated and associated with the campaign during ingestion.
+1. **Brief submission** --- The campaign brief can include `creative_ids` referencing pre-uploaded assets. The intent is for these to be validated and associated with the campaign during ingestion; today there is no automated validation step, so this is bookkeeping only.
 
-2. **Approval gate** --- The `CREATIVE` approval stage (disabled by default) can be enabled in the brief's `approval_config` to require human sign-off before creatives are pushed to ad servers.
+2. **Approval gate** --- The `CREATIVE` approval stage exists as an enum value and can be enabled in the brief's `approval_config`, but since nothing pushes creatives to ad servers, there is currently nothing for this stage to gate.
 
-After deals are booked and the campaign reaches READY status, the creative-to-deal binding happens: validated creatives are matched to booked deals and trafficked to the appropriate ad server.
+There is no code today that performs creative-to-deal binding or ad-server trafficking after deals are booked. `valid`/`invalid` counts you see anywhere in reporting reflect only whatever a caller set by hand via `update_creative_asset()`.
 
 ---
 
@@ -323,4 +328,4 @@ The `AdServerStore` provides a separate, model-aware interface to the `ad_server
 
 - [Architecture Overview](../architecture/overview.md) --- Agent hierarchy and system design
 - [Deals API](../api/deals.md) --- Deal booking and management
-- [Budget Pacing & Reallocation](budget-pacing.md) --- Pacing engine that monitors deal delivery
+- [Budget Pacing & Reallocation](budget-pacing.md) --- Pacing engine design (also experimental, not operational)
