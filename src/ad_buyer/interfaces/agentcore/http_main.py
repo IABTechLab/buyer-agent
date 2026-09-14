@@ -84,71 +84,6 @@ logger = logging.getLogger(__name__)
 
 app = BedrockAgentCoreApp()
 
-# Internal port for FastAPI background server (for DealBookingFlow)
-_INTERNAL_PORT = int(os.environ.get("INTERNAL_API_PORT", "8001"))
-
-# Track whether the background FastAPI server has been started
-_fastapi_started = False
-
-
-def _start_fastapi_background():
-    """Start FastAPI on internal port in a background thread.
-
-    Required for DealBookingFlow which uses the buyer's REST API internally.
-    Uses uvicorn.Server with a dedicated asyncio event loop in a daemon thread.
-    Health check loop: 30 attempts × 0.5s = 15s timeout.
-
-    Idempotent — safe to call multiple times; only starts once.
-    """
-    global _fastapi_started
-
-    if _fastapi_started:
-        return
-
-    import threading
-    import time
-
-    import uvicorn
-
-    from ad_buyer.interfaces.api.main import app as fastapi_app
-
-    os.environ["BUYER_API_URL"] = f"http://localhost:{_INTERNAL_PORT}"
-
-    config = uvicorn.Config(
-        fastapi_app,
-        host="0.0.0.0",
-        port=_INTERNAL_PORT,
-        log_level="info",
-    )
-    server = uvicorn.Server(config)
-
-    def _run():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(server.serve())
-
-    thread = threading.Thread(target=_run, daemon=True, name="fastapi-bg")
-    thread.start()
-
-    for _ in range(30):
-        try:
-            import httpx
-
-            resp = httpx.get(f"http://localhost:{_INTERNAL_PORT}/health", timeout=1.0)
-            if resp.status_code == 200:
-                logger.info(
-                    "FastAPI background server ready on port %d",
-                    _INTERNAL_PORT,
-                )
-                _fastapi_started = True
-                return
-        except Exception:
-            time.sleep(0.5)
-
-    logger.error("FastAPI failed to start on port %d within 15s", _INTERNAL_PORT)
-    raise RuntimeError(f"FastAPI background server failed to start on port {_INTERNAL_PORT}")
-
-
 # ---------------------------------------------------------------------------
 # Lazy-initialized ChatInterface (fallback for non-planning queries)
 # ---------------------------------------------------------------------------
@@ -345,5 +280,4 @@ def invoke(payload, context):
 
 
 if __name__ == "__main__":
-    _start_fastapi_background()
     app.run()
