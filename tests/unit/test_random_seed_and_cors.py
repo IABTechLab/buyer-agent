@@ -61,14 +61,15 @@ class TestCORSConfiguration:
     """Test that CORS middleware uses specific origins, not wildcard."""
 
     def test_settings_default_cors_origins(self):
-        """Default CORS origins should be wildcard for MCP server (auth lives in API keys)."""
+        """Default CORS origins should be a localhost allowlist, not a wildcard."""
         s = Settings(
             anthropic_api_key="test",
             _env_file=None,
         )
         origins = s.get_cors_origins()
-        # MCP server default: wildcard — auth is enforced via X-API-Key, not origin
-        assert origins == ["*"], f"Expected wildcard default for MCP server, got: {origins}"
+        assert origins == ["http://localhost:3000", "http://localhost:8080"], (
+            f"Expected localhost allowlist default, got: {origins}"
+        )
 
     def test_settings_custom_cors_origins(self):
         """CORS origins should be configurable."""
@@ -81,7 +82,7 @@ class TestCORSConfiguration:
         assert origins == ["https://app.example.com", "https://admin.example.com"]
 
     def test_app_cors_middleware_uses_settings(self):
-        """The FastAPI app should use settings-based origins (wildcard is acceptable for MCP server)."""  # noqa: E501
+        """The FastAPI app should use settings-based origins."""
         from ad_buyer.interfaces.api.main import app
 
         # Find the CORSMiddleware in the app's middleware stack
@@ -95,9 +96,9 @@ class TestCORSConfiguration:
             current = current.app
 
         if cors_middleware is not None:
-            # Wildcard is the correct default for an MCP server — auth lives in API keys.
-            # We only verify that allow_credentials is False when origins is wildcard
-            # (browser security requirement: wildcard + credentials is invalid).
+            # If origins is ever configured to wildcard (e.g. via env override),
+            # allow_credentials must be False (browser security requirement:
+            # wildcard + credentials is invalid).
             if "*" in getattr(cors_middleware, "allow_origins", []):
                 assert not getattr(cors_middleware, "allow_credentials", False), (
                     "allow_credentials must be False when CORS origins is wildcard"
