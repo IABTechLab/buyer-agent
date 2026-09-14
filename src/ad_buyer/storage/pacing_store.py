@@ -3,6 +3,12 @@
 
 """SQLite-backed pacing snapshot persistence.
 
+EXPERIMENTAL / NOT YET OPERATIONAL: nothing in the live application
+calls save_pacing_snapshot() outside tests and demo/campaign_demo.py.
+get_latest_pacing_snapshot() always returns None in production, which
+is why the check_pacing and get_pacing_report MCP tools always report
+no_data. Retained for future development.
+
 Uses synchronous sqlite3 (not aiosqlite) following the same thread-safety
 pattern as DealStore: check_same_thread=False with a threading.Lock().
 

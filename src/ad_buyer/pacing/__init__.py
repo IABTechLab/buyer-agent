@@ -3,8 +3,12 @@
 
 """Budget pacing and reallocation engine for campaign automation.
 
-Provides real-time budget pacing analysis, deviation detection, and
-cross-channel reallocation recommendations.
+EXPERIMENTAL / NOT YET OPERATIONAL: not wired into any live path.
+See ad_buyer.pacing.engine for details. Retained for future
+development.
+
+Design intent (not yet live): real-time budget pacing analysis,
+deviation detection, and cross-channel reallocation recommendations.
 
 2C: Budget Pacing & Reallocation.
 """

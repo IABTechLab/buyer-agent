@@ -605,6 +605,10 @@ class CampaignStore:
 
     # ------------------------------------------------------------------
     # Pacing Snapshots
+    #
+    # EXPERIMENTAL / NOT YET OPERATIONAL: nothing in the live application
+    # calls save_pacing_snapshot() outside tests and demo/campaign_demo.py.
+    # These methods are retained for future development.
     # ------------------------------------------------------------------
 
     def save_pacing_snapshot(
@@ -713,6 +717,11 @@ class CampaignStore:
 
     # ------------------------------------------------------------------
     # Creative Assets
+    #
+    # EXPERIMENTAL / NOT YET OPERATIONAL: these are CRUD methods only.
+    # No validator runs against stored assets, and validation_status only
+    # changes when a caller sets it by hand. Retained for future
+    # development.
     # ------------------------------------------------------------------
 
     def save_creative_asset(
@@ -883,6 +892,11 @@ class CampaignStore:
 
     # ------------------------------------------------------------------
     # Ad Server Campaigns
+    #
+    # EXPERIMENTAL / NOT YET OPERATIONAL: there is no Innovid or
+    # Flashtalking client and nothing traffics creatives or syncs
+    # delivery data through these methods outside tests. Retained for
+    # future development.
     # ------------------------------------------------------------------
 
     def save_ad_server_campaign(

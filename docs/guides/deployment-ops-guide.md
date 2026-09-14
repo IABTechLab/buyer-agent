@@ -582,18 +582,18 @@ curl "http://localhost:8001/events?limit=50"
 # Events for a specific flow
 curl "http://localhost:8001/events?flow_id=<flow-id>"
 
-# Events by type (e.g., pacing alerts)
-curl "http://localhost:8001/events?event_type=pacing.deviation_detected"
+# Events by type (e.g., negotiation completions)
+curl "http://localhost:8001/events?event_type=negotiation.completed"
 ```
 
 Key event types to monitor:
 
 | Event Type | Significance |
 |-----------|-------------|
-| `pacing.deviation_detected` | Campaign is over/underpacing — may need intervention |
-| `pacing.reallocation_recommended` | Budget reallocation proposal generated |
 | `booking.failed` | Deal booking failed — check `errors` on the job |
 | `negotiation.completed` | Price negotiation finished |
+
+The `pacing.deviation_detected` and `pacing.reallocation_recommended` event types also exist, but the budget pacing engine that would emit them is not wired into any live path (see [Budget Pacing & Reallocation](budget-pacing.md)) — do not set up monitoring for them expecting to see traffic.
 
 ### CloudWatch Logging (AWS)
 
@@ -618,23 +618,9 @@ aws logs filter-log-events \
   --region us-east-1
 ```
 
-### Budget Pacing Monitoring
+### Budget Pacing Monitoring (Not Operational)
 
-The pacing engine generates snapshots that capture campaign delivery health. Use the event bus to watch for deviation alerts:
-
-```bash
-# Check for critical pacing alerts
-curl "http://localhost:8001/events?event_type=pacing.deviation_detected"
-```
-
-A `deviation_detected` event with `alert_level: critical` means the campaign is more than 25% off expected pace and may need manual intervention.
-
-Pacing alert levels:
-
-| Direction | Warning (>10% deviation) | Critical (>25% deviation) |
-|-----------|--------------------------|---------------------------|
-| Underpacing | Monitor; may self-correct | Investigate delivery issues |
-| Overpacing | Monitor budget burn | Pause or reduce bids |
+The budget pacing engine is experimental and not wired into any live path: no pacing snapshot is ever generated in production, and no `pacing.deviation_detected` event will ever appear on the event bus. There is nothing to monitor here today. See [Budget Pacing & Reallocation](budget-pacing.md) for the design intent and current status.
 
 ---
 
@@ -1048,7 +1034,7 @@ A full campaign run makes 20–50+ LLM calls. For high-volume environments:
 
 - [Configuration Reference](configuration.md) — Full environment variable documentation
 - [Architecture Overview](../architecture/overview.md) — Agent hierarchy and system components
-- [Budget Pacing](budget-pacing.md) — Pacing engine and reallocation logic
+- [Budget Pacing](budget-pacing.md) — Pacing engine design (experimental, not operational)
 - [Deal Booking Guide](deal-booking.md) — Booking flow and deal lifecycle
 - [Event Bus](../event-bus/overview.md) — Structured observability events
 - [Quickstart](../getting-started/quickstart.md) — First-run walkthrough

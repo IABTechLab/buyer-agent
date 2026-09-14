@@ -3,9 +3,19 @@
 
 """Budget Pacing & Reallocation Engine.
 
-Monitors campaign spend against plan, detects pacing deviations, and
-proposes cross-channel budget reallocations. Integrates with the
-PacingStore for snapshot persistence and EventBus for pacing events.
+EXPERIMENTAL / NOT YET OPERATIONAL: this module is not wired into any
+live path. BudgetPacingEngine is never constructed by the running
+application, only by tests and demo/campaign_demo.py. No pacing
+snapshots are generated or persisted in production, no PACING_HOLD
+state transition ever fires, and the check_pacing / get_pacing_report
+MCP tools always report no_data because no snapshot exists to read.
+This module is retained for future development, not as a description
+of current runtime behavior.
+
+Design intent (not yet live): monitors campaign spend against plan,
+detects pacing deviations, and proposes cross-channel budget
+reallocations. Integrates with the PacingStore for snapshot
+persistence and EventBus for pacing events.
 
 Key capabilities:
   - Linear pacing model: expected spend proportional to elapsed time
