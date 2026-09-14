@@ -341,8 +341,7 @@ class TestNoCrewAgentCarriesAnOrderWritingTool:
             "LLM may delegate to ANY agent in `agents=[]`, whether or not a "
             "task was ever assigned to it, so this is a live booking "
             "loophole -- all order writes must go through the deterministic "
-            "DealBookingFlow path instead. Offending agents:\n  - "
-            + "\n  - ".join(offenders)
+            "DealBookingFlow path instead. Offending agents:\n  - " + "\n  - ".join(offenders)
         )
 
     def test_the_tool_classes_checked_are_the_real_execution_tool_bundle(self):
