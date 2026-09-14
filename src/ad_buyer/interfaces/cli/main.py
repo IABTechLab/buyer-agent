@@ -359,9 +359,9 @@ def chat() -> None:
             "[bold blue]Ad Buyer Chat Interface[/bold blue]\n\n"
             "Type your requests in natural language.\n"
             "Examples:\n"
-            "  - 'Search for CTV inventory under $20 CPM'\n"
-            "  - 'What branding options are available?'\n"
-            "  - 'Help me plan a campaign for $50,000'\n\n"
+            "  - 'Get me quotes for product PROD-123'\n"
+            "  - 'Book product PROD-123 within a $5,000 budget'\n"
+            "  - 'What sellers are connected right now?'\n\n"
             "Type 'quit' or 'exit' to leave.",
             title="Welcome",
         )
