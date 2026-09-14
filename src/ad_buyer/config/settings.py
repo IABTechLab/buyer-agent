@@ -205,7 +205,7 @@ class Settings(BaseSettings):
     crew_max_iterations: int = 15
 
     # CORS
-    cors_allowed_origins: str = "*"
+    cors_allowed_origins: str = "http://localhost:3000,http://localhost:8080"
 
     def get_cors_origins(self) -> list[str]:
         """Parse CORS allowed origins from comma-separated string."""
