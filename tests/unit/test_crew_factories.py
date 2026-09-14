@@ -117,25 +117,29 @@ class TestCrewStructure:
         assert len(crew.agents) == 4
 
     def test_branding_crew_has_correct_agent_count(self, mock_client, channel_brief):
-        """Branding crew should have 2 agents (not 3) after removing manager."""
+        """Branding crew should have 1 agent: research_agent only.
+
+        No execution_agent: research/recommendation crews carry no
+        order-writing tools and no agent without an assigned task. See
+        tests/unit/test_booking_path_llm_free.py for the hardening guard.
+        """
         crew = create_branding_crew(mock_client, channel_brief)
-        # research_agent + execution_agent, branding_agent is manager
-        assert len(crew.agents) == 2
+        assert len(crew.agents) == 1
 
     def test_mobile_crew_has_correct_agent_count(self, mock_client, channel_brief):
-        """Mobile crew should have 2 agents after removing manager."""
+        """Mobile crew should have 1 agent: research_agent only."""
         crew = create_mobile_crew(mock_client, channel_brief)
-        assert len(crew.agents) == 2
+        assert len(crew.agents) == 1
 
     def test_ctv_crew_has_correct_agent_count(self, mock_client, channel_brief):
-        """CTV crew should have 2 agents after removing manager."""
+        """CTV crew should have 1 agent: research_agent only."""
         crew = create_ctv_crew(mock_client, channel_brief)
-        assert len(crew.agents) == 2
+        assert len(crew.agents) == 1
 
     def test_performance_crew_has_correct_agent_count(self, mock_client, channel_brief):
-        """Performance crew should have 2 agents after removing manager."""
+        """Performance crew should have 1 agent: research_agent only."""
         crew = create_performance_crew(mock_client, channel_brief)
-        assert len(crew.agents) == 2
+        assert len(crew.agents) == 1
 
     def test_all_crews_use_hierarchical_process(self, mock_client, campaign_brief, channel_brief):
         """All crews should use hierarchical process."""
