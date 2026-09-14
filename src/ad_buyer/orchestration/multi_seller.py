@@ -52,6 +52,7 @@ from ..models.deals import (
     QuoteRequest,
     QuoteResponse,
 )
+from ..models.sgp import normalize_unknown_policy
 from ..registry.models import AgentCard, TrustLevel
 from ..storage import audience_audit_log
 from .audience_degradation import (
@@ -89,11 +90,10 @@ def _failure_reason(
     return f"{base}: {detail}" if detail else base
 
 
-# Valid values for the orchestrator's ``sgp_unknown_policy`` (how to treat
-# sellers absent from the buyer's SGP portfolio while enforcing). Mirrors
-# the example tools' vocabulary so SGP_UNKNOWN_VENDOR_POLICY means the same
-# thing everywhere.
-_VALID_SGP_UNKNOWN_POLICIES = ("block", "warn", "allow")
+# Valid values for ``sgp_unknown_policy`` (how to treat sellers absent from
+# the buyer's SGP portfolio while enforcing) now live with the client as
+# ``UNKNOWN_VENDOR_POLICIES`` / ``normalize_unknown_policy``, so
+# SGP_UNKNOWN_VENDOR_POLICY means the same thing everywhere.
 
 
 # Error code emitted by the seller per proposal §5.7 layer 3 when the
@@ -532,14 +532,41 @@ class MultiSellerOrchestrator:
         # buyer-agent approval cannot be positively verified on the
         # buyer's SGP (IAB Diligence Platform) tenant -- and FAILS CLOSED
         # (no seller passes) when the check itself cannot complete.
-        if sgp_unknown_policy not in _VALID_SGP_UNKNOWN_POLICIES:
-            raise ValueError(
-                f"Invalid sgp_unknown_policy {sgp_unknown_policy!r}. "
-                f"Must be one of {_VALID_SGP_UNKNOWN_POLICIES}."
-            )
         self._sgp_client = sgp_client
         self._sgp_enforce = sgp_enforce
-        self._sgp_unknown_policy = sgp_unknown_policy
+        # Shared canonicalizer, so "BLOCK" from an env var resolves the same
+        # way here as in the buyer-deal tools instead of raising in one place
+        # and being reinterpreted in another.
+        self._sgp_unknown_policy = normalize_unknown_policy(sgp_unknown_policy)
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    async def aclose(self) -> None:
+        """Release resources this orchestrator owns.
+
+        Closes the SGP client's connection pool. Idempotent and best-effort:
+        teardown must never be the thing that raises, so a failure to close is
+        logged and swallowed. Callers that build an orchestrator per process
+        can skip this; anything constructing them repeatedly should call it.
+        """
+        client = self._sgp_client
+        if client is None:
+            return
+        closer = getattr(client, "aclose", None)
+        if closer is None:
+            return
+        try:
+            await closer()
+        except Exception as exc:  # noqa: BLE001 - teardown must not raise
+            logger.warning("Failed to close the SGP client: %s", exc)
+
+    async def __aenter__(self) -> MultiSellerOrchestrator:
+        return self
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self.aclose()
 
     # ------------------------------------------------------------------
     # Event helpers

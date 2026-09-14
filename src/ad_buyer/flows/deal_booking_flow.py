@@ -160,6 +160,9 @@ def _build_sgp_client(settings: Any) -> Any | None:
         api_key=settings.sgp_api_key,
         base_url=settings.sgp_base_url,
         cache_ttl_seconds=settings.sgp_cache_ttl_seconds,
+        timeout=settings.sgp_timeout_seconds,
+        max_retries=settings.sgp_max_retries,
+        retry_backoff_seconds=settings.sgp_retry_backoff_seconds,
     )
 
 

@@ -14,7 +14,7 @@ from ...booking.pricing import PricingCalculator
 from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
 from ...clients.unified_client import UnifiedClient
 from ...models.buyer_identity import BuyerContext
-from ...models.sgp import ApprovalRecord
+from ...models.sgp import ApprovalRecord, normalize_unknown_policy
 from ...security.prompt_sanitizer import sanitize_untrusted_text
 
 logger = logging.getLogger(__name__)
@@ -117,7 +117,9 @@ Returns:
         self._buyer_context = buyer_context
         self._sgp_client = sgp_client
         self._sgp_enforce = sgp_enforce
-        self._sgp_unknown_policy = sgp_unknown_policy
+        # Validated here as well as in RequestDealTool: an unrecognized policy
+        # must not reach the filter, where "not block" previously meant "keep".
+        self._sgp_unknown_policy = normalize_unknown_policy(sgp_unknown_policy)
 
     def _run(
         self,
@@ -265,18 +267,27 @@ Returns:
         Returns ``(filtered_products, summary_counts)``. When enforcement
         is off, the product list is returned unchanged and counts are
         empty. ``summary_counts`` keys: ``not_approved``,
-        ``unknown_blocked``, ``no_domain_blocked``.
+        ``unknown_blocked``, ``no_domain_blocked``, ``unverifiable_blocked``.
         """
         product_list = products if isinstance(products, list) else [products]
         if not self._sgp_enforce or self._sgp_client is None:
             return product_list, {}
 
         filtered: list = []
-        counts = {"not_approved": 0, "unknown_blocked": 0, "no_domain_blocked": 0}
+        counts = {
+            "not_approved": 0,
+            "unknown_blocked": 0,
+            "no_domain_blocked": 0,
+            "unverifiable_blocked": 0,
+        }
 
         for product in product_list:
             if not isinstance(product, dict):
-                filtered.append(product)
+                # An entry we cannot read is an entry we cannot verify. Keeping
+                # it would let a malformed catalog row reach the agent without
+                # ever being checked, while a well-formed row merely missing a
+                # domain gets blocked -- fail closed in both cases.
+                counts["unverifiable_blocked"] += 1
                 continue
             raw_domain = extract_product_domain(product)
             if not raw_domain:
@@ -285,10 +296,14 @@ Returns:
             normalized = self._sgp_client.normalize_domain(raw_domain)
             record = approvals.get(normalized)
             if record is None:
-                if self._sgp_unknown_policy == "block":
-                    counts["unknown_blocked"] += 1
+                # Keep only for the two policies that explicitly permit an
+                # unknown vendor; anything else blocks. Stated positively so a
+                # future policy value defaults to excluding, not admitting.
+                if self._sgp_unknown_policy in ("warn", "allow"):
+                    filtered.append(product)
                     continue
-                filtered.append(product)
+                counts["unknown_blocked"] += 1
+                continue
             elif not record.iab_buyer_agent_approval:
                 counts["not_approved"] += 1
             else:
@@ -425,4 +440,6 @@ Returns:
             parts.append(f"{summary['unknown_blocked']} unknown to SGP")
         if summary.get("no_domain_blocked"):
             parts.append(f"{summary['no_domain_blocked']} missing seller domain")
+        if summary.get("unverifiable_blocked"):
+            parts.append(f"{summary['unverifiable_blocked']} unreadable")
         return f"SGP enforcement filtered {total} product(s): " + ", ".join(parts)

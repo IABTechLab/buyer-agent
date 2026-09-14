@@ -14,9 +14,42 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+# Accepted values for the unknown-vendor policy, shared by every caller so the
+# gate cannot disagree with itself about what a policy string means.
+#
+# This lives with the models rather than the client so that ``config.settings``
+# can validate the policy without importing ``ad_buyer.clients``, which pulls in
+# every client module -- one of which reads settings itself.
+UNKNOWN_VENDOR_POLICIES = frozenset({"block", "warn", "allow"})
+
+
+def normalize_unknown_policy(value: str) -> str:
+    """Canonicalize an unknown-vendor policy, raising on unrecognized input.
+
+    Case- and whitespace-insensitive, so ``"BLOCK"`` from an env var resolves
+    to ``"block"`` rather than silently falling through to whichever branch
+    happens to be the fallback.
+
+    Raises:
+        ValueError: if the value is not one of ``UNKNOWN_VENDOR_POLICIES``.
+    """
+    candidate = (value or "").strip().lower()
+    if candidate not in UNKNOWN_VENDOR_POLICIES:
+        raise ValueError(
+            f"Invalid sgp_unknown_policy {value!r}. "
+            f"Must be one of: {', '.join(sorted(UNKNOWN_VENDOR_POLICIES))}"
+        )
+    return candidate
+
 
 class ApprovalRecord(BaseModel):
-    """A single vendor's IAB buyer-agent approval status from IAB Diligence Platform."""
+    """A single vendor's IAB buyer-agent approval status from IAB Diligence Platform.
+
+    ``domain`` is the vendor's canonical domain as registered in SGP;
+    ``requested_domain`` is the queried domain this record answers. Pair on
+    ``requested_domain`` -- it is the only field that says which question a
+    record answers.
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -28,3 +61,7 @@ class ApprovalRecord(BaseModel):
     iab_buyer_agent_approved_at: datetime | None = Field(
         alias="iabBuyerAgentApprovedAt", default=None
     )
+    # Null when SGP could not pair the record with a queried domain.
+    requested_domain: str | None = Field(alias="requestedDomain", default=None)
+    # How SGP paired the record: "exact", "parent", "internalId", "unresolved".
+    match_type: str = Field(alias="matchType", default="")

@@ -14,10 +14,13 @@ import httpx
 import pytest
 
 from ad_buyer.clients.sgp_client import (
+    _RETRYABLE_STATUS_CODES,
     SGPAuthError,
     SGPClient,
     SGPClientError,
+    extract_product_domain,
 )
+from ad_buyer.models.sgp import normalize_unknown_policy
 
 BASE_URL = "https://sgp.test"
 
@@ -50,12 +53,38 @@ def _success_body(records: list[dict]) -> dict:
     }
 
 
-def _record(domain: str, approved: bool, approved_at: str | None = "2026-03-14T12:00:00Z") -> dict:
+_UNSET = object()
+
+
+def _record(
+    domain: str,
+    approved: bool,
+    approved_at: str | None = "2026-03-14T12:00:00Z",
+    requested_domain: str | None = _UNSET,  # type: ignore[assignment]
+    match_type: str | None = None,
+) -> dict:
+    """One IabBuyerAgentResource in the shape SGP returns it.
+
+    By default the record echoes the domain it was queried with, which is what
+    SGP sends for a vendor registered under exactly the domain asked about.
+    Pass ``requested_domain`` to model a parent match (vendor at the apex,
+    query for a subdomain), or ``None`` to model a record SGP could not pair.
+    """
+    echoed = domain if requested_domain is _UNSET else requested_domain
+    if match_type is None:
+        if not echoed:
+            match_type = "unresolved"
+        elif echoed == domain:
+            match_type = "exact"
+        else:
+            match_type = "parent"
     return {
         "vendorId": hash(domain) & 0xFFFF,
         "vendorCompanyId": (hash(domain) + 1) & 0xFFFF,
         "companyName": domain.split(".")[0].title() + " Inc.",
         "domain": domain,
+        "requestedDomain": echoed,
+        "matchType": match_type,
         "iabBuyerAgentApproval": approved,
         "iabBuyerAgentApprovedAt": approved_at,
     }
@@ -76,12 +105,84 @@ class TestNormalizeDomain:
             ("http://example.com", "example.com"),
             ("https://www.example.com/path?q=1", "example.com"),
             ("http://seller.example.com:8001", "seller.example.com"),
+            ("example.com.", "example.com"),
+            ("https://www.example.com./path", "example.com"),
             ("", ""),
             ("   ", ""),
         ],
     )
     def test_normalizes(self, raw: str, expected: str) -> None:
         assert SGPClient.normalize_domain(raw) == expected
+
+
+# ---------------------------------------------------------------------------
+# Product domain extraction
+# ---------------------------------------------------------------------------
+
+
+class TestExtractProductDomain:
+    def test_reads_domain_from_opendirect_product_schema(self) -> None:
+        """The field the Product resource actually defines must be honored.
+
+        Regression: the extractor originally probed only deal-record and
+        SSP-connector field names, so a spec-conformant product with
+        ``domain`` populated was reported as having no seller domain and
+        blocked under SGP_ENFORCE.
+        """
+        from ad_buyer.models.opendirect import Product
+
+        # Constructed by field name (populate_by_name) rather than by wire
+        # alias, so this stays valid if the alias convention changes again.
+        product = Product(
+            id="espn-sports-pmp",
+            publisher_id="pub_espn",
+            name="ESPN Sports PMP",
+            base_price=18.5,
+            rate_type="CPM",
+            domain="espn.com",
+            available_impressions=1_000_000,
+        ).model_dump(by_alias=True)
+
+        assert extract_product_domain(product) == "espn.com"
+
+    @pytest.mark.parametrize(
+        "key",
+        ["domain", "seller_domain", "sellerDomain"],
+    )
+    def test_product_vocabulary_keys(self, key: str) -> None:
+        assert extract_product_domain({"id": "p1", key: "example.com"}) == "example.com"
+
+    @pytest.mark.parametrize(
+        "key, value",
+        [
+            ("publisherDomain", "roku.com"),
+            ("publisher_domain", "pub1.example.com"),
+            ("seller_url", "http://seller.example.com:8001"),
+        ],
+    )
+    def test_deal_and_ssp_vocabulary_keys_still_resolve(self, key: str, value: str) -> None:
+        """Connector-derived deal dicts must keep working."""
+        assert extract_product_domain({"id": "p1", key: value}) == value
+
+    def test_product_domain_preferred_over_seller_endpoint(self) -> None:
+        """`domain` identifies the vendor; `seller_url` is only a transport endpoint."""
+        product = {
+            "id": "p1",
+            "domain": "espn.com",
+            "seller_url": "http://broker.example.com:8001",
+        }
+        assert extract_product_domain(product) == "espn.com"
+
+    def test_opaque_publisher_id_is_not_a_domain(self) -> None:
+        assert extract_product_domain({"id": "p1", "publisherId": "pub_abc"}) is None
+
+    def test_no_domain_field_returns_none(self) -> None:
+        assert extract_product_domain({"id": "p1", "name": "Untagged"}) is None
+
+    @pytest.mark.parametrize("value", ["a string", 42, None, ["list"], True])
+    def test_non_dict_input_returns_none_rather_than_raising(self, value) -> None:
+        """Catalog entries come off the wire; an unreadable one must not crash."""
+        assert extract_product_domain(value) is None
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +289,251 @@ class TestUnknownVendor:
 
 
 # ---------------------------------------------------------------------------
+# Response-to-request domain matching
+#
+# SGP does not guarantee it echoes the exact spelling that was queried -- it
+# may answer with the vendor's canonical/apex domain. Records must still be
+# paired back to the requested domain, or an approved vendor is reported
+# UNKNOWN and that verdict is cached for the full TTL.
+# ---------------------------------------------------------------------------
+
+
+class TestDomainEchoMatching:
+    """Pairing is a lookup on the domain SGP echoes, never an inference.
+
+    Apex-versus-subdomain resolution lives on the SGP platform. What is
+    exercised here is that the client trusts ``requestedDomain`` and refuses
+    to attribute anything else.
+    """
+
+    @pytest.mark.asyncio
+    async def test_parent_echo_resolves_to_queried_subdomain(self) -> None:
+        """Vendor registered at the apex, product on a subdomain."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json=_success_body([_record("foo.com", True, requested_domain="news.foo.com")]),
+            )
+
+        client = _make_client(handler)
+        results = await client.check_approvals(["news.foo.com"])
+        record = results["news.foo.com"]
+        assert record is not None, "an echoed parent match must resolve"
+        assert record.iab_buyer_agent_approval is True
+        assert record.domain == "foo.com"
+        assert record.match_type == "parent"
+
+    @pytest.mark.asyncio
+    async def test_exact_echo_resolves(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([_record("foo.com", True)]))
+
+        client = _make_client(handler)
+        results = await client.check_approvals(["foo.com"])
+        assert results["foo.com"] is not None
+        assert results["foo.com"].match_type == "exact"
+
+    @pytest.mark.asyncio
+    async def test_one_record_per_requested_domain(self) -> None:
+        """SGP answers each queried domain separately, even for one vendor."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json=_success_body(
+                    [
+                        _record("foo.com", True),
+                        _record("foo.com", True, requested_domain="news.foo.com"),
+                    ]
+                ),
+            )
+
+        client = _make_client(handler)
+        results = await client.check_approvals(["foo.com", "news.foo.com"])
+        assert results["foo.com"] is not None
+        assert results["news.foo.com"] is not None
+
+    @pytest.mark.asyncio
+    async def test_client_does_not_infer_a_parent_relationship(self) -> None:
+        """Without an echo naming it, a subdomain query stays UNKNOWN.
+
+        The apex-to-subdomain rule is SGP's to apply. If SGP answers about
+        ``foo.com`` when ``news.foo.com`` was queried, the client must not
+        quietly decide the two are the same seller.
+        """
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([_record("foo.com", True)]))
+
+        client = _make_client(handler)
+        results = await client.check_approvals(["news.foo.com"])
+        assert results["news.foo.com"] is None
+
+    @pytest.mark.asyncio
+    async def test_unresolved_record_is_logged_not_silently_dropped(self, caplog) -> None:
+        """SGP could not pair it, so neither does the client."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json=_success_body([_record("stray.com", True, requested_domain=None)]),
+            )
+
+        client = _make_client(handler)
+        with caplog.at_level("WARNING"):
+            results = await client.check_approvals(["foo.com"])
+        assert results["foo.com"] is None
+        assert "stray.com" in caplog.text
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("also_requested", [[], ["other.com"]])
+    async def test_record_echoing_an_unrequested_domain_is_ignored(
+        self, also_requested, caplog
+    ) -> None:
+        """An echo we did not ask for is never accepted.
+
+        Parametrized over a single-domain and a multi-domain request: the rule
+        must hold even when the response contains exactly one record, which is
+        the shape the deal-request gate always produces.
+        """
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json=_success_body(
+                    [_record("vendor-canonical.com", True, requested_domain="somewhere-else.com")]
+                ),
+            )
+
+        client = _make_client(handler)
+        with caplog.at_level("WARNING"):
+            results = await client.check_approvals(["seller-alias.com", *also_requested])
+        assert results["seller-alias.com"] is None
+        assert "somewhere-else.com" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_record_without_an_echo_is_ignored(self, caplog) -> None:
+        """A record carrying no requestedDomain is not attributed to anything.
+
+        There is nothing on the record saying which query it answers, so the
+        gate reports UNKNOWN and fails closed rather than guessing.
+        """
+        legacy = {
+            "vendorId": 1,
+            "vendorCompanyId": 2,
+            "companyName": "Foo Inc.",
+            "domain": "foo.com",
+            "iabBuyerAgentApproval": True,
+            "iabBuyerAgentApprovedAt": None,
+        }
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([legacy]))
+
+        client = _make_client(handler)
+        with caplog.at_level("WARNING"):
+            results = await client.check_approvals(["foo.com"])
+        assert results["foo.com"] is None
+        assert "foo.com" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_empty_domain_record_is_not_attributed(self) -> None:
+        """A record with no domain must not be pinned onto the queried domain."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([_record("", True)]))
+
+        client = _make_client(handler)
+        results = await client.check_approvals(["foo.com"])
+        assert results["foo.com"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("echo", ["foo.com.", "https://www.foo.com/x", "FOO.com"])
+    async def test_echo_is_normalized_before_pairing(self, echo) -> None:
+        """The echo goes through the same normalization as the query."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json=_success_body([_record("foo.com", True, requested_domain=echo)]),
+            )
+
+        client = _make_client(handler)
+        results = await client.check_approvals(["foo.com", "other.com"])
+        assert results["foo.com"] is not None
+        assert results["other.com"] is None
+
+    @pytest.mark.asyncio
+    async def test_resolved_record_is_what_gets_cached(self) -> None:
+        """Regression: a parent match used to cache None, blocking for the TTL."""
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(
+                200,
+                json=_success_body([_record("foo.com", True, requested_domain="news.foo.com")]),
+            )
+
+        client = _make_client(handler)
+        first = await client.check_approvals(["news.foo.com"])
+        second = await client.check_approvals(["news.foo.com"])
+        assert calls["n"] == 1, "second lookup should be served from cache"
+        assert first["news.foo.com"] is not None
+        assert second["news.foo.com"] is not None
+        assert second["news.foo.com"].iab_buyer_agent_approval is True
+
+
+# ---------------------------------------------------------------------------
+# Malformed response envelopes
+#
+# Valid JSON of the wrong type must surface as SGPClientError so enforcing
+# callers fail closed, rather than as an AttributeError that escapes the tool.
+# ---------------------------------------------------------------------------
+
+
+class TestMalformedEnvelope:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("body", [[{"x": 1}], "a string", 42, True])
+    async def test_non_object_payload_raises_client_error(self, body) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=body)
+
+        client = _make_client(handler)
+        with pytest.raises(SGPClientError, match="not a JSON object"):
+            await client.check_approvals(["foo.com"])
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("data", [{"foo.com": True}, "records", 7])
+    async def test_non_list_data_raises_client_error(self, data) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"data": data})
+
+        client = _make_client(handler)
+        with pytest.raises(SGPClientError, match="'data' was not a list"):
+            await client.check_approvals(["foo.com"])
+
+    @pytest.mark.asyncio
+    async def test_missing_data_key_is_treated_as_no_records(self) -> None:
+        """An object with no `data` is a valid empty answer, not a shape error."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"status": "success"})
+
+        client = _make_client(handler)
+        assert await client.check_approvals(["foo.com"]) == {"foo.com": None}
+
+    @pytest.mark.asyncio
+    async def test_null_data_is_treated_as_no_records(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"data": None})
+
+        client = _make_client(handler)
+        assert await client.check_approvals(["foo.com"]) == {"foo.com": None}
+
+
+# ---------------------------------------------------------------------------
 # Error paths
 # ---------------------------------------------------------------------------
 
@@ -233,6 +579,170 @@ class TestErrorHandling:
         with pytest.raises(SGPClientError) as exc_info:
             await client.check_approvals(["example.com"])
         assert "ConnectError" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
+# Retry on transient failures
+#
+# Enforcing callers fail closed when a lookup fails, so "SGP blipped for a
+# second" must not be the same event as "the vendor is not approved".
+# ---------------------------------------------------------------------------
+
+
+def _retry_client(handler, *, max_retries: int = 2) -> SGPClient:
+    """Client with instant backoff so retry tests stay fast."""
+    c = _make_client(handler)
+    c._max_retries = max_retries
+    c._retry_backoff = 0.0
+    return c
+
+
+class TestRetry:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", sorted(_RETRYABLE_STATUS_CODES))
+    async def test_retryable_status_recovers(self, status: int) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return httpx.Response(status, text="try later")
+            return httpx.Response(200, json=_success_body([_record("flaky.com", True)]))
+
+        client = _retry_client(handler)
+        results = await client.check_approvals(["flaky.com"])
+        assert calls["n"] == 2
+        assert results["flaky.com"] is not None
+
+    @pytest.mark.asyncio
+    async def test_transport_error_recovers(self) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise httpx.ConnectError("connection refused")
+            return httpx.Response(200, json=_success_body([_record("flaky.com", True)]))
+
+        client = _retry_client(handler)
+        results = await client.check_approvals(["flaky.com"])
+        assert calls["n"] == 2
+        assert results["flaky.com"] is not None
+
+    @pytest.mark.asyncio
+    async def test_exhausted_retries_still_fail_closed(self) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503, text="down")
+
+        client = _retry_client(handler, max_retries=2)
+        with pytest.raises(SGPClientError) as exc_info:
+            await client.check_approvals(["down.com"])
+        assert calls["n"] == 3, "should attempt once plus max_retries"
+        assert exc_info.value.status_code == 503
+        assert "3 attempt" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [400, 401, 404])
+    async def test_definite_answers_are_not_retried(self, status: int) -> None:
+        """400/401/404 are verdicts, not blips — retrying only delays them."""
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(status, text="definite")
+
+        client = _retry_client(handler)
+        try:
+            await client.check_approvals(["x.com"])
+        except SGPClientError:
+            pass
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_retries_can_be_disabled(self) -> None:
+        calls = {"n": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            calls["n"] += 1
+            return httpx.Response(503, text="down")
+
+        client = _retry_client(handler, max_retries=0)
+        with pytest.raises(SGPClientError):
+            await client.check_approvals(["down.com"])
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_backoff_grows_and_is_awaited(self, monkeypatch) -> None:
+        slept: list[float] = []
+
+        async def fake_sleep(delay: float) -> None:
+            slept.append(delay)
+
+        monkeypatch.setattr("ad_buyer.clients.sgp_client.asyncio.sleep", fake_sleep)
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(503, text="down")
+
+        client = _make_client(handler)
+        client._max_retries = 3
+        client._retry_backoff = 0.5
+        with pytest.raises(SGPClientError):
+            await client.check_approvals(["down.com"])
+        assert slept == [0.5, 1.0, 2.0]
+
+
+# ---------------------------------------------------------------------------
+# Unknown-vendor policy canonicalization
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeUnknownPolicy:
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("block", "block"),
+            ("BLOCK", "block"),
+            ("  Warn  ", "warn"),
+            ("Allow", "allow"),
+        ],
+    )
+    def test_canonicalizes(self, raw: str, expected: str) -> None:
+        assert normalize_unknown_policy(raw) == expected
+
+    @pytest.mark.parametrize("raw", ["maybe", "", "  ", "blockk"])
+    def test_rejects_unrecognized(self, raw: str) -> None:
+        with pytest.raises(ValueError, match="sgp_unknown_policy"):
+            normalize_unknown_policy(raw)
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle
+# ---------------------------------------------------------------------------
+
+
+class TestLifecycle:
+    @pytest.mark.asyncio
+    async def test_aclose_is_idempotent(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([]))
+
+        client = _make_client(handler)
+        await client.aclose()
+        await client.aclose()  # must not raise
+        assert client._http.is_closed
+
+    @pytest.mark.asyncio
+    async def test_async_context_manager_closes(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json=_success_body([]))
+
+        client = _make_client(handler)
+        async with client as c:
+            assert c is client
+        assert client._http.is_closed
 
 
 # ---------------------------------------------------------------------------

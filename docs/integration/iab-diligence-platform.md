@@ -22,7 +22,7 @@ GET /api/v1/integrations/iab/buyer-agent-approval?domain=a.com,b.com
 | Domain       | `domain` query parameter - Up to 10 domains per request |
 | Tenant scope | Results are scoped to the caller's SGP tenant           |
 
-The response contains one `IabBuyerAgentResource` per matched vendor:
+The response contains one `IabBuyerAgentResource` per **resolved domain**, not per vendor — query two domains that resolve to the same vendor and two records come back, each naming the domain it answers:
 
 ```json
 {
@@ -34,6 +34,8 @@ The response contains one `IabBuyerAgentResource` per matched vendor:
       "vendorCompanyId": 456,
       "companyName": "Example Publisher",
       "domain": "example.com",
+      "requestedDomain": "news.example.com",
+      "matchType": "parent",
       "iabBuyerAgentApproval": true,
       "iabBuyerAgentApprovedAt": "2026-03-14T12:00:00Z"
     }
@@ -49,6 +51,45 @@ Three response states matter to the buyer agent:
 | `iabBuyerAgentApproval: false` | Vendor exists but is not approved | ❌ Deal blocked |
 | HTTP 404 | Vendor is not in the buyer's SGP portfolio | Governed by `SGP_UNKNOWN_VENDOR_POLICY` |
 
+### Domain matching
+
+The seller domain read off an ad product is frequently a subdomain of the domain its vendor is registered under in SGP — a product on `news.example.com` belonging to the vendor `example.com`. **SGP resolves this server-side** and states on every record which query it answers:
+
+| Field | Meaning |
+|---|---|
+| `domain` | The vendor's canonical domain, as registered in SGP |
+| `requestedDomain` | The domain from the `domain` query parameter that this record answers, echoed in the spelling it was sent in |
+| `matchType` | `exact` — the vendor is registered under the queried domain · `parent` — the queried domain is a subdomain of it · `unresolved` — SGP could not pair the record with anything queried |
+
+The client pairs on `requestedDomain` and nothing else.
+
+A record SGP marks `unresolved`, or one echoing a domain this client did not ask about, is logged at `WARNING` and ignored. A record is **never** attributed to a queried domain it does not name, not even when it is the only record in the response.
+
+Resolution is one-directional. An `example.com` vendor answers a queried `news.example.com`; a vendor registered at `ads.example.com` does **not** answer a queried `example.com`. Approving a subdomain never approves the domain above it.
+
+This matters for caching: whatever resolves here is what gets cached for `SGP_CACHE_TTL_SECONDS`.
+
+### Transient failures and retries
+
+Because enforcement fails closed, a failed lookup and a denial have the same effect on a deal — and at the orchestrator stage a single failed lookup excludes *every* seller. A momentary blip should not carry that weight, so the client retries before giving up.
+
+| Aspect | Behavior |
+|---|---|
+| Retried | Transport errors (connect, timeout, DNS, read) and HTTP `429`, `502`, `503`, `504` |
+| Never retried | `200`, `400`, `401`, `404` — these are answers, not blips, and retrying only delays the verdict |
+| Attempts | `1 + SGP_MAX_RETRIES`; defaults to `2`, so three attempts |
+| Backoff | Exponential — `SGP_RETRY_BACKOFF_SECONDS * 2**attempt`, base `0.5s` by default, so `0.5s` then `1.0s` |
+| On exhaustion | The original failure is raised as `SGPClientError`, so enforcing callers still fail closed |
+
+All three knobs are environment variables — `SGP_MAX_RETRIES`, `SGP_RETRY_BACKOFF_SECONDS`, and `SGP_TIMEOUT_SECONDS` — so tuning them needs no code change. `SGP_MAX_RETRIES=0` disables retrying entirely. Each retry is logged at `WARNING` with the reason and the attempt number, and the final error names the attempt count, so a one-off `503` and a sustained outage read differently in logs.
+
+Retries do not change any verdict. They only affect how long the gate waits before concluding it cannot verify a vendor.
+
+!!! warning "Retries multiply the worst-case wait"
+    The backoff itself is small, but each retry is a fresh request that can burn the full `SGP_TIMEOUT_SECONDS`. With the defaults (15s timeout, three attempts), a chunk that keeps timing out takes up to roughly **46s** — three timeouts plus 1.5s of backoff — where it previously took 15s. Chunks of 10 domains are fetched **sequentially**, so a lookup spanning several chunks multiplies that again: 30 distinct seller domains is three chunks, hence up to ~140s in the pathological case.
+
+    This only bites when SGP is timing out; a reachable SGP that answers or refuses does so on the first attempt. If your deployment sits behind a tighter deadline, lower `SGP_MAX_RETRIES`, `SGP_TIMEOUT_SECONDS`, or both.
+
 ## Configuration
 
 | Variable | Type | Default | Description                                                                                                                                                          |
@@ -56,8 +97,11 @@ Three response states matter to the buyer agent:
 | `SGP_API_KEY` | `str` | `""` | API key from the SGP api. Empty = integration disabled.                                                                                                              |
 | `SGP_BASE_URL` | `str` | `https://api.safeguardprivacy.com` | Production endpoint. The staging environment is `https://api.safeguardprivacy-demo.com`.                                                                             |
 | `SGP_ENFORCE` | `bool` | `False` | When `True`, NOT APPROVED vendors are filtered out at discovery, the deal-request gate blocks Deal ID generation, and SGP transport errors halt the flow.            |
-| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow`. Applies at both discovery and deal-request stages when enforcement is on. |
+| `SGP_UNKNOWN_VENDOR_POLICY` | `str` | `"block"` | Behavior for domains not in the SGP portfolio (HTTP 404). One of `block`, `warn`, `allow` — matched case-insensitively, so `BLOCK` and `Block` are accepted. An unrecognized value fails at settings load rather than being interpreted per call site. Applies at discovery, the deal-request stage, and the orchestrator gate when enforcement is on. |
 | `SGP_CACHE_TTL_SECONDS` | `int` | `900` | Per-domain cache lifetime. Discovery→pricing→booking reuse a single SGP call within the TTL.                                                                         |
+| `SGP_TIMEOUT_SECONDS` | `float` | `15.0` | Per-request timeout for one approval lookup. |
+| `SGP_MAX_RETRIES` | `int` | `2` | Extra attempts for transient failures. `0` disables retrying. See [Transient failures and retries](#transient-failures-and-retries). |
+| `SGP_RETRY_BACKOFF_SECONDS` | `float` | `0.5` | Base backoff, doubled per attempt. `0` retries immediately. |
 
 !!! warning "Enforcement without a key fails closed"
     If `SGP_ENFORCE=true` but `SGP_API_KEY` is empty, the canonical booking pipeline cannot verify any vendor and **fails closed**: no seller passes discovery until a key is configured. The buyer agent logs an error at orchestrator construction time, and each excluded seller gets an `sgp.vendor_gate` event with outcome `unconfigured` and a causeful reason. Enforcement never silently books unverified vendors because a key is missing.
@@ -85,7 +129,9 @@ The integration also plugs into two example buyer-agent tools. Behavior at each 
 
 ### Inventory discovery
 
-`DiscoverInventoryTool` accepts an optional `SGPClient`. When provided, it extracts the seller domain from each returned product (checking `seller_url`, `publisher_domain`, then `publisherId`/`publisher` if they contain a `.`), batches distinct domains into groups of 10, and annotates each product row in the formatted output:
+`DiscoverInventoryTool` accepts an optional `SGPClient`. When provided, it extracts the seller domain from each returned product, batches distinct domains into groups of 10, and annotates each product row in the formatted output.
+
+Domain extraction probes, in order: `domain` (the field the OpenDirect Product resource defines), `seller_domain` / `sellerDomain`, then the deal / SSP-connector names `publisherDomain`, `publisher_domain`, `seller_url` — and finally `publisherId` / `publisher` if they contain a `.`. Products should populate `domain`; the connector names are accepted only so a deal dict derived from an SSP connector also resolves.
 
 ```
 1. Premium CTV - Sports
@@ -148,8 +194,10 @@ With enforcement on (`SGP_ENFORCE=true`, `SGP_API_KEY` set), behavior is consist
 | `iabBuyerAgentApproval: true` | ✅ kept + approved banner | same | same |
 | `iabBuyerAgentApproval: false` | ❌ filtered at discovery; blocked at request | ❌ | ❌ |
 | 404 (not onboarded in SGP) | ❌ filtered at discovery; blocked at request | ✅ kept + warning annotation/banner | ✅ kept silently |
-| Transport error | ❌ flow halts | ❌ flow halts | ❌ flow halts |
+| Transport error (after retries) | ❌ flow halts | ❌ flow halts | ❌ flow halts |
 | Product has no seller domain field | ❌ filtered at discovery; blocked at request | ❌ | ❌ |
+
+The last row is the one to watch when enabling enforcement against a live catalog: a product the gate cannot resolve a domain for is blocked regardless of unknown-vendor policy, and SGP is never called. Populate the OpenDirect Product `domain` field — see [Domain matching](#domain-matching) for the full probe order.
 
 The `iabBuyerAgentApproval: false` row is intentionally the same across all three unknown-vendor policies — an explicit non-approval is always fatal. The policies only govern the "unknown to SGP" case.
 
@@ -182,8 +230,13 @@ The class is prefixed `SGP` so future vendor-approval integrations can coexist u
 | `IAB Diligence Platform rejected the api-key` (401) | The key is missing, revoked, or lacks the proper scope. Request a new key from SGP.                                                            |
 | `Deal blocked: <domain> is not in your IAB Diligence Platform portfolio` | The vendor is not onboarded in SGP. Add and approve the vendor in SGP, or switch `SGP_UNKNOWN_VENDOR_POLICY` to `warn` for soft-fail behavior. |
 | `Deal blocked: <vendor> does not carry the IAB buyer-agent approval flag` | The vendor is onboarded but not marked approved for IAB buyer-agent purchases. Toggle the approval in SGP.                                     |
-| `Deal blocked: IAB Diligence Platform lookup failed` | SGP was unreachable or returned a transient error. Enforcement fails closed; retry once the service is reachable.                              |
+| `Deal blocked: IAB Diligence Platform lookup failed` | SGP stayed unreachable across every attempt (the client already retried — see [Transient failures and retries](#transient-failures-and-retries)). Enforcement fails closed; retry once the service is reachable. The message and the preceding `WARNING` lines carry the attempt count and the underlying failure. |
+| `sgp.vendor_gate` events with outcome `check_failed` for every seller | One SGP lookup failed after retries, so the orchestrator failed closed for the whole discovery batch rather than booking unverified vendors. Check the event `reason` for the exception class and detail. |
+| `ValidationError` for `sgp_unknown_vendor_policy` at startup | `SGP_UNKNOWN_VENDOR_POLICY` is set to something outside `block` / `warn` / `allow`. Casing is not the problem (it is normalized); a typo is. |
 | Gate seems to do nothing | `SGP_ENFORCE=false` (the default) — the gate is fully inert. With `SGP_ENFORCE=true` and no key, the pipeline fails closed instead (no sellers pass discovery); check the logs and `sgp.vendor_gate` events. |
+| `Deal blocked: cannot determine seller domain` / discovery reports `N missing seller domain` | The product carries none of the domain fields the gate probes, so it is blocked without SGP being called. Populate the Product `domain` field — see [Domain matching](#domain-matching). |
+| Log: `SGP returned an approval record for <domain> that it could not pair with any requested domain` | SGP answered with a record it marked `unresolved`. It is ignored and the queried domain stays UNKNOWN. Confirm the vendor's domain in SGP matches the seller domain on the product. |
+| Log: `SGP returned an approval record echoing <domain>, which was not requested` | The echoed `requestedDomain` is not one this client asked about. The record is ignored. |
 
 ## Related
 
