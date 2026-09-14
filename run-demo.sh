@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # run-demo.sh -- One-command two-agent demo startup
 #
-# Starts a locally checked-out seller agent on :8001 in the background, waits
-# for it to be ready, then launches the buyer agent API on :8000 in the
+# Starts a locally checked-out seller agent on :8000 in the background, waits
+# for it to be ready, then launches the buyer agent API on :8001 in the
 # foreground. Once both are up you can exercise the cross-agent flow (see
 # "Verify" in the README): /media-kit, /products/search, and the booking
 # endpoints.
@@ -17,7 +17,7 @@
 #   ./run-demo.sh --dry-run    # resolve paths and print the plan, start nothing
 #
 # Ports (override via environment):
-#   SELLER_PORT=8001  BUYER_PORT=8000
+#   SELLER_PORT=8000  BUYER_PORT=8001
 #
 # Prefer containers? The docker-compose demo path is infra/docker/docker-compose.yml
 # (see the "Docker" section of the README).
@@ -28,8 +28,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUYER_DIR="$SCRIPT_DIR"
 PARENT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-SELLER_PORT="${SELLER_PORT:-8001}"
-BUYER_PORT="${BUYER_PORT:-8000}"
+SELLER_PORT="${SELLER_PORT:-8000}"
+BUYER_PORT="${BUYER_PORT:-8001}"
 
 DRY_RUN=0
 if [ "${1:-}" = "--dry-run" ]; then
@@ -273,6 +273,29 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
+# Bootstrap an operator key for the buyer control plane
+#
+# Every buyer route except /health (and every MCP tool except health_check)
+# requires an operator key, so the demo mints one up front — otherwise the
+# curls printed below would all 401. The CLI writes straight to the same
+# DATABASE_URL the server reads; there is no HTTP bootstrap path.
+# ---------------------------------------------------------------------------
+
+cd "$BUYER_DIR"
+OPERATOR_KEY=""
+OPERATOR_LABEL="run-demo $(date -u +%Y%m%dT%H%M%SZ)"
+if OPERATOR_KEY=$("$BUYER_PYTHON" -m ad_buyer.interfaces.cli.main \
+    create-operator-key --label "$OPERATOR_LABEL" --quiet 2>"$LOG_DIR/operator-key.log"); then
+    echo "  Operator key minted (label: $OPERATOR_LABEL)"
+else
+    OPERATOR_KEY=""
+    echo "WARNING: could not mint an operator key; protected endpoints will 401." >&2
+    echo "         See $LOG_DIR/operator-key.log, then run:" >&2
+    echo "         uv run ad-buyer create-operator-key --label demo" >&2
+fi
+echo ""
+
+# ---------------------------------------------------------------------------
 # Launch the buyer agent (foreground)
 # ---------------------------------------------------------------------------
 
@@ -280,11 +303,20 @@ echo "========================================"
 echo "Starting buyer agent on port $BUYER_PORT..."
 echo "  Try:  curl http://localhost:$BUYER_PORT/health"
 echo "        curl http://localhost:$SELLER_PORT/media-kit"
+if [ -n "$OPERATOR_KEY" ]; then
+    echo ""
+    echo "  Protected endpoints need the operator key:"
+    echo "    export BUYER_OPERATOR_KEY='$OPERATOR_KEY'"
+    echo "    curl -H \"Authorization: Bearer \$BUYER_OPERATOR_KEY\" \\"
+    echo "         http://localhost:$BUYER_PORT/bookings"
+    echo ""
+    echo "  Same key works for MCP over HTTP (/mcp) and the smoke tests:"
+    echo "    BUYER_OPERATOR_KEY=\$BUYER_OPERATOR_KEY pytest tests/smoke -m smoke"
+fi
 echo "  Ctrl-C stops both agents."
 echo "========================================"
 echo ""
 
-cd "$BUYER_DIR"
 # SELLER_ENDPOINTS is what the buyer actually reads (comma-separated, see
 # src/ad_buyer/config/settings.py); SELLER_BASE_URL is kept for backward
 # compatibility with older docs that referenced it.

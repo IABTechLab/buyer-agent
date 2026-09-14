@@ -5,12 +5,18 @@ Separate from test_mcp_e2e.py which covers the legacy SSE transport.
 
 Usage:
     # Start the buyer server first:
-    #   uvicorn ad_buyer.interfaces.api.main:app --port 8000
+    #   uvicorn ad_buyer.interfaces.api.main:app --port 8001
+    #
+    # Mint an operator key against the server's DATABASE_URL — MCP tools over
+    # HTTP require one (only health_check is public):
+    #   export BUYER_OPERATOR_KEY="$(ad-buyer create-operator-key --label smoke --quiet)"
     #
     # Then run:
     #   pytest tests/smoke/test_mcp_streamable.py -v
 
-Requires a running buyer server on port 8000 (or set BUYER_MCP_HTTP_URL).
+Requires a running buyer server on port 8001 (or set BUYER_MCP_HTTP_URL) and
+BUYER_OPERATOR_KEY. Without the key these tests skip rather than assert
+anonymous access, which a correctly gated server refuses.
 
 Note: no @pytest.mark.asyncio decorators needed — pyproject.toml sets
 asyncio_mode = "auto" which handles all async test functions automatically.
@@ -18,6 +24,7 @@ Adding the decorator alongside AUTO mode causes double collection.
 """
 
 import asyncio
+import inspect
 import json
 import os
 from contextlib import asynccontextmanager
@@ -44,13 +51,31 @@ except ImportError:
     except ImportError:
         MCP_HTTP_AVAILABLE = False
 
-MCP_HTTP_URL = os.environ.get("BUYER_MCP_HTTP_URL", "http://127.0.0.1:8000/mcp")
+# The two client generations take request headers differently: the older
+# ``streamablehttp_client`` has a ``headers`` kwarg, the newer
+# ``streamable_http_client`` expects a caller-supplied httpx client.
+_HEADERS_KWARG = MCP_HTTP_AVAILABLE and (
+    "headers" in inspect.signature(streamable_http_client).parameters
+)
+
+MCP_HTTP_URL = os.environ.get("BUYER_MCP_HTTP_URL", "http://127.0.0.1:8001/mcp")
 TOOL_TIMEOUT = float(os.environ.get("MCP_TOOL_TIMEOUT", "15"))
+OPERATOR_KEY = os.environ.get("BUYER_OPERATOR_KEY", "")
+
+_NO_KEY_REASON = (
+    "BUYER_OPERATOR_KEY not set — MCP tools over HTTP require an operator key. "
+    "Mint one with: ad-buyer create-operator-key --label smoke"
+)
 
 pytestmark = [
     pytest.mark.smoke,
     pytest.mark.skipif(not MCP_HTTP_AVAILABLE, reason="mcp streamable_http client not available"),
+    pytest.mark.skipif(not OPERATOR_KEY, reason=_NO_KEY_REASON),
 ]
+
+
+def _auth_headers() -> dict[str, str]:
+    return {"Authorization": f"Bearer {OPERATOR_KEY}"} if OPERATOR_KEY else {}
 
 
 # ---------------------------------------------------------------------------
@@ -59,14 +84,51 @@ pytestmark = [
 
 
 @asynccontextmanager
-async def _mcp_session():
-    """Open a fresh Streamable HTTP MCP session for one test."""
+async def _transport(headers: dict[str, str]):
+    """Open the Streamable HTTP transport, passing headers whichever way the
+    installed SDK generation accepts."""
+    if _HEADERS_KWARG:
+        async with streamable_http_client(MCP_HTTP_URL, headers=headers) as streams:
+            yield streams
+        return
+
+    import httpx
+
+    # follow_redirects mirrors the SDK's own client factory: the mount answers
+    # /mcp with a 307 to /mcp/.
+    async with httpx.AsyncClient(
+        headers=headers, timeout=TOOL_TIMEOUT, follow_redirects=True
+    ) as http_client:
+        async with streamable_http_client(MCP_HTTP_URL, http_client=http_client) as streams:
+            yield streams
+
+
+def _is_client_misuse(exc: BaseException) -> bool:
+    """True for our own bugs (bad kwargs, missing attrs), which must not skip."""
+    if isinstance(exc, TypeError | AttributeError):
+        return True
+    nested = getattr(exc, "exceptions", None)
+    return bool(nested) and any(_is_client_misuse(inner) for inner in nested)
+
+
+@asynccontextmanager
+async def _mcp_session(headers: dict[str, str] | None = None):
+    """Open a fresh Streamable HTTP MCP session for one test.
+
+    Sends the operator key by default; pass ``headers={}`` to exercise the
+    anonymous path. Only connection failures skip — a client API mismatch
+    raises, so a broken harness cannot masquerade as "no server running".
+    """
+    if headers is None:
+        headers = _auth_headers()
     try:
-        async with streamable_http_client(MCP_HTTP_URL) as (read, write, _):
+        async with _transport(headers) as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 yield session
     except Exception as exc:
+        if _is_client_misuse(exc):
+            raise
         pytest.skip(f"Buyer /mcp not reachable at {MCP_HTTP_URL}: {exc}")
 
 
@@ -101,6 +163,24 @@ async def test_streamable_http_connection():
     """/mcp must accept a session and initialize successfully."""
     async with _mcp_session() as session:
         assert session is not None
+
+
+async def test_anonymous_tool_call_is_denied():
+    """A live server must refuse gated tools without an operator key."""
+    async with _mcp_session(headers={}) as session:
+        err, data = await _call(session, "get_setup_status")
+    assert not err, f"transport-level failure: {data}"
+    assert data.get("error") == "authentication_required", (
+        f"gated tool answered anonymously: {data}"
+    )
+
+
+async def test_health_check_is_public():
+    """health_check stays reachable without a key (probe parity with /health)."""
+    async with _mcp_session(headers={}) as session:
+        err, data = await _call(session, "health_check")
+    assert not err, f"health_check error: {data}"
+    assert data.get("status") == "healthy"
 
 
 async def test_streamable_http_tool_list():

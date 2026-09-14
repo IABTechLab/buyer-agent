@@ -60,7 +60,7 @@ The products endpoint returns structured error responses with an HTTP status cod
 ```json
 {
   "error": "seller_unreachable",
-  "detail": "Cannot connect to seller agent at http://seller:8001"
+  "detail": "Cannot connect to seller agent at http://seller:8000"
 }
 ```
 

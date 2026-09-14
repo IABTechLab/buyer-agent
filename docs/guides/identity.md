@@ -254,13 +254,13 @@ from ad_buyer.auth.key_store import ApiKeyStore
 store = ApiKeyStore()
 
 # Store a key for a seller
-store.add_key("http://seller.example.com:8001", "my-api-key")
+store.add_key("http://seller.example.com:8000", "my-api-key")
 
 # Retrieve it
-key = store.get_key("http://seller.example.com:8001")
+key = store.get_key("http://seller.example.com:8000")
 
 # Rotate a key
-store.rotate_key("http://seller.example.com:8001", "new-api-key")
+store.rotate_key("http://seller.example.com:8000", "new-api-key")
 
 # List all sellers with stored keys
 sellers = store.list_sellers()

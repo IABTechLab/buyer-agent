@@ -1,6 +1,6 @@
 # API Overview
 
-The Ad Buyer Agent API exposes **14 endpoints** across **6 tags**. All endpoints are served from a single FastAPI application. The [auto-generated endpoint inventory](../reference/endpoints.md) is the byte-exact source of truth.
+The Ad Buyer Agent API exposes **18 endpoints** across **7 tags**. All endpoints are served from a single FastAPI application. The [auto-generated endpoint inventory](../reference/endpoints.md) is the byte-exact source of truth.
 
 **Base URL:** `http://localhost:8001`
 **OpenAPI docs:** `http://localhost:8001/docs`
@@ -14,6 +14,17 @@ The buyer agent is primarily a **client** that consumes seller APIs, not a serve
 | Method | Path | Summary |
 |--------|------|---------|
 | `GET` | `/health` | Service health check |
+
+## Authentication
+
+| Method | Path | Summary |
+|--------|------|---------|
+| `POST` | `/auth/api-keys/operator` | Mint an additional operator API key |
+| `GET` | `/auth/api-keys` | List API keys (metadata only) |
+| `GET` | `/auth/api-keys/{key_id}` | Get metadata for a single API key |
+| `DELETE` | `/auth/api-keys/{key_id}` | Revoke an API key |
+
+Bootstrap the first operator key with `ad-buyer create-operator-key` (CLI only). See [Authentication](authentication.md).
 
 ## Bookings
 

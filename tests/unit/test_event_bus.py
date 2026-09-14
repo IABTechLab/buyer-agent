@@ -363,8 +363,8 @@ class TestEventAPIEndpoints:
     """Tests for GET /events and GET /events/{event_id} endpoints."""
 
     @pytest.fixture
-    def client(self):
-        """Create a test client."""
+    def client(self, allow_operator_auth):
+        """Create a test client with operator auth bypassed."""
         from fastapi.testclient import TestClient
 
         from ad_buyer.interfaces.api.main import app

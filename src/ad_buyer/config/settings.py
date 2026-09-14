@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     google_api_key: str | None = None
 
-    # Inbound API key for authenticating requests to this service.
-    # When empty/not set, authentication is disabled (development mode).
+    # Deprecated inbound API key shim. Prefer hashed operator keys minted
+    # via ``ad-buyer create-operator-key``. When set AND no operator keys
+    # exist in the database yet, this value is accepted as a single
+    # synthetic operator credential. Once any DB operator key exists,
+    # this env value is ignored for auth.
     api_key: str = ""
 
     # IAB agentic-direct server URL

@@ -41,7 +41,7 @@ from ad_buyer.clients.deals_client import DealsClient
 
 # Minimal — API key auth
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     api_key="your-api-key",
 )
 
@@ -52,7 +52,7 @@ store = DealStore("sqlite:///./ad_buyer.db")
 store.connect()
 
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     bearer_token="eyJhbGci...",
     timeout=60.0,
     max_retries=5,
@@ -127,7 +127,7 @@ async with DealsClient(seller_url, api_key="key") as client:
 **curl equivalent:**
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/quotes \
+curl -X POST http://seller.example.com:8000/api/v1/quotes \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -190,7 +190,7 @@ if deal.openrtb_params:
 **curl equivalent:**
 
 ```bash
-curl -X POST http://seller.example.com:8001/api/v1/deals \
+curl -X POST http://seller.example.com:8000/api/v1/deals \
   -H "Content-Type: application/json" \
   -H "X-Api-Key: your-api-key" \
   -d '{
@@ -407,7 +407,7 @@ store.connect()
 
 # Attach to the client
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     api_key="your-key",
     deal_store=store,
 )
@@ -430,7 +430,7 @@ The `DealsClient` persists data at three points:
 
 ```python
 # List all deals for a seller
-deals = store.list_deals(seller_url="http://seller.example.com:8001")
+deals = store.list_deals(seller_url="http://seller.example.com:8000")
 
 # Filter by status
 booked = store.list_deals(status="booked")
@@ -531,7 +531,7 @@ from ad_buyer.storage.deal_store import DealStore
 store = DealStore("sqlite:///./ad_buyer.db")
 store.connect()
 
-seller_url = "http://seller.example.com:8001"
+seller_url = "http://seller.example.com:8000"
 identity = BuyerIdentityPayload(
     seat_id="ttd-seat-123",
     agency_id="omnicom-456",

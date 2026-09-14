@@ -67,8 +67,8 @@ Full development configuration:
 # LLM provider (Anthropic default; install crewai[openai] etc. for others)
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Inbound API key for this service (leave empty to disable auth in dev)
-API_KEY=
+# Inbound auth is a minted operator key, not an env var — there is no
+# keyless mode: uv run ad-buyer create-operator-key --label "Local dev"
 
 # Seller connection
 SELLER_ENDPOINTS=http://localhost:8000
@@ -486,11 +486,10 @@ DATABASE_URL=sqlite:///./ad_buyer.db
 ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-**Full production:**
+**Full production:** (inbound auth comes from `ad-buyer create-operator-key`, not from `.env`)
 
 ```dotenv
 ANTHROPIC_API_KEY=sk-ant-...
-API_KEY=your-service-api-key
 
 SELLER_ENDPOINTS=https://seller1.example.com,https://seller2.example.com
 IAB_SERVER_URL=https://primary-seller.example.com
@@ -509,7 +508,6 @@ LOG_LEVEL=WARNING
 
 ```dotenv
 ANTHROPIC_API_KEY=test-key
-API_KEY=test-api-key
 DATABASE_URL=sqlite:///./test_ad_buyer.db
 ENVIRONMENT=testing
 LOG_LEVEL=DEBUG

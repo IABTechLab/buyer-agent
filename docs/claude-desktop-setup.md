@@ -185,7 +185,7 @@ If it fails to start, check that your `.env` has a valid `ANTHROPIC_API_KEY` and
 
 ### Tools appear but calls return errors
 
-**`seller_endpoints_configured: false`** — No sellers are configured. Set `SELLER_ENDPOINTS=http://localhost:3000` in your `.env` and restart the server.
+**`seller_endpoints_configured: false`** — No sellers are configured. Set `SELLER_ENDPOINTS=http://localhost:8000` in your `.env` and restart the server.
 
 **`database_accessible: false`** — The SQLite database file cannot be created or opened. Check that the process has write permission in the project directory.
 

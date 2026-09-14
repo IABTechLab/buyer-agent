@@ -30,16 +30,23 @@ This creates an SSE endpoint at /mcp/sse for MCP client connections
 
 from __future__ import annotations
 
+import functools
+import inspect
 import json
 import logging
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.prompts.base import Message
 
+from ..auth.dependencies import (
+    _extract_key_from_headers,
+    validate_operator_credential,
+)
 from ..auth.key_store import ApiKeyStore
 from ..clients.mixpeek_client import MixpeekClient, MixpeekError
 from ..config.settings import Settings
@@ -57,6 +64,8 @@ from ..tools.deal_library.connectors import (
     MagniteConnector,  # noqa: F401
     PubMaticConnector,  # noqa: F401
 )
+
+F = TypeVar("F", bound=Callable[..., Any])
 
 logger = logging.getLogger(__name__)
 
@@ -170,14 +179,29 @@ def _mask_key(key: str) -> str:
     return "*" * (len(key) - 4) + key[-4:]
 
 
+_logged_media_kit_shim = False
+
+
 def _get_media_kit_client() -> MediaKitClient:
     """Get a MediaKitClient instance.
 
-    Uses the API key from settings for authenticated access.
+    Still reads the deprecated inbound ``API_KEY`` shim for outbound seller
+    auth. That coupling is removed next release; log once so operators can
+    move the credential onto ``MediaKitClient`` / a seller key before then.
     Returns a new instance each time so that test patches are reflected.
     """
+    global _logged_media_kit_shim
     settings = _get_settings()
-    return MediaKitClient(api_key=settings.api_key)
+    api_key = settings.api_key or None
+    if api_key and not _logged_media_kit_shim:
+        _logged_media_kit_shim = True
+        logger.warning(
+            "DEPRECATED: MediaKitClient is sending the inbound API_KEY env "
+            "value as outbound seller auth. Store a seller credential on the "
+            "client; the env shim is removed next release and these calls "
+            "will then go out unauthenticated."
+        )
+    return MediaKitClient(api_key=api_key)
 
 
 def _get_order_store() -> OrderStore:
@@ -192,12 +216,172 @@ def _get_order_store() -> OrderStore:
     return store
 
 
+# Set by mount_mcp(): this process serves MCP over HTTP, so every tool call
+# must be attributable to an HTTP request. Absent that attribution we deny
+# rather than assume trusted stdio (fail closed).
+_http_transport_mounted = False
+_logged_local_trust = False
+
+_AUTH_REQUIRED_DETAIL = (
+    "This tool requires an operator API key. Send it as "
+    "'Authorization: Bearer <key>' or 'X-Api-Key: <key>'. "
+    "Bootstrap the first key with: ad-buyer create-operator-key"
+)
+
+
+def _log_local_trust(reason: str) -> None:
+    """Record that the trusted (unauthenticated) local path was taken."""
+    global _logged_local_trust
+    if not _logged_local_trust:
+        _logged_local_trust = True
+        logger.info(
+            "MCP tools are running without operator-key enforcement (%s). "
+            "Enforcement applies to MCP over HTTP only.",
+            reason,
+        )
+    else:
+        logger.debug("MCP tool call trusted without operator key (%s)", reason)
+
+
+class _Transport:
+    """How the current tool call arrived."""
+
+    HTTP = "http"  # a readable HTTP request: enforce the operator key
+    IN_PROCESS = "in_process"  # direct Python call, no MCP request at all
+    STDIO = "stdio"  # MCP request with no HTTP request behind it
+    UNKNOWN = "unknown"  # could not classify: deny
+
+
+def _classify_transport() -> tuple[str, Any | None]:
+    """Classify the caller, returning ``(transport, request)``.
+
+    Only the MCP SDK's *documented* "no active request context" signals are
+    read as a local call: ``FastMCP.get_context()`` swallows the context-var
+    ``LookupError`` and ``Context.request_context`` then raises ``ValueError``.
+    Anything else — an unexpected exception, or a request object whose headers
+    we cannot read — is UNKNOWN so the caller fails closed instead of
+    silently un-gating every tool on an SDK behavior change.
+    """
+    try:
+        context = mcp.get_context()
+    except Exception:
+        logger.exception("Unexpected error obtaining MCP context; denying tool call")
+        return _Transport.UNKNOWN, None
+
+    try:
+        request = context.request_context.request
+    except (LookupError, ValueError) as exc:
+        # No MCP request is in flight: this is a direct in-process call
+        # (CLI, chat interface, tests), not a network caller.
+        logger.debug("No active MCP request context (%s: %s)", type(exc).__name__, exc)
+        return _Transport.IN_PROCESS, None
+    except Exception:
+        logger.exception("Unexpected error resolving MCP request context; denying tool call")
+        return _Transport.UNKNOWN, None
+
+    if request is None:
+        return _Transport.STDIO, None
+    if not hasattr(request, "headers"):
+        logger.error(
+            "MCP request context carries an unrecognized request object (%s); denying tool call",
+            type(request).__name__,
+        )
+        return _Transport.UNKNOWN, None
+    return _Transport.HTTP, request
+
+
+def _deny_unless_operator() -> str | None:
+    """Enforce operator-key auth on MCP tools over HTTP transports.
+
+    Returns None when authorized, otherwise an error JSON string.
+
+    - HTTP transports (Streamable HTTP / SSE): require an OPERATOR API key
+      via ``Authorization: Bearer`` or ``X-Api-Key``.
+    - stdio: trusted like the CLI, but only in a process that has not mounted
+      an MCP HTTP transport — a server process cannot be serving stdio.
+    - Direct in-process calls (CLI, chat, tests): trusted, and logged.
+    - Anything we cannot classify: denied.
+    """
+    transport, request = _classify_transport()
+
+    if transport == _Transport.UNKNOWN:
+        return json.dumps(
+            {
+                "error": "authentication_required",
+                "detail": (
+                    "Operator authentication could not be verified for this transport. "
+                    + _AUTH_REQUIRED_DETAIL
+                ),
+            }
+        )
+
+    if transport == _Transport.IN_PROCESS:
+        _log_local_trust("direct in-process call, no MCP request in flight")
+        return None
+
+    if transport == _Transport.STDIO:
+        if _http_transport_mounted:
+            logger.warning(
+                "MCP tool call claims stdio transport in a process serving MCP over "
+                "HTTP; denying. Send an operator key over /mcp."
+            )
+            return json.dumps({"error": "authentication_required", "detail": _AUTH_REQUIRED_DETAIL})
+        _log_local_trust("stdio transport, no MCP HTTP transport mounted in this process")
+        return None
+
+    headers = request.headers
+    raw_key = _extract_key_from_headers(
+        authorization=headers.get("authorization"),
+        x_api_key=headers.get("x-api-key"),
+    )
+    if not raw_key:
+        return json.dumps(
+            {
+                "error": "authentication_required",
+                "detail": _AUTH_REQUIRED_DETAIL,
+            }
+        )
+
+    try:
+        validate_operator_credential(raw_key)
+    except PermissionError as exc:
+        return json.dumps({"error": "operator_required", "detail": str(exc)})
+    except ValueError as exc:
+        return json.dumps({"error": "invalid_credential", "detail": str(exc)})
+    return None
+
+
+def _require_operator(fn: F) -> F:
+    """Decorator: deny non-operator HTTP callers; allow local stdio."""
+
+    if inspect.iscoroutinefunction(fn):
+
+        @functools.wraps(fn)
+        async def async_wrapper(*args: Any, **kwargs: Any):
+            denied = _deny_unless_operator()
+            if denied is not None:
+                return denied
+            return await fn(*args, **kwargs)
+
+        return async_wrapper  # type: ignore[return-value]
+
+    @functools.wraps(fn)
+    def sync_wrapper(*args: Any, **kwargs: Any):
+        denied = _deny_unless_operator()
+        if denied is not None:
+            return denied
+        return fn(*args, **kwargs)
+
+    return sync_wrapper  # type: ignore[return-value]
+
+
 # ---------------------------------------------------------------------------
 # Foundation Tools
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
+@_require_operator
 def get_setup_status() -> str:
     """Check the current setup and configuration state of the buyer agent.
 
@@ -215,8 +399,15 @@ def get_setup_status() -> str:
     # Check database accessibility (raw sqlite probe lives in the storage layer)
     checks["database_accessible"] = storage_health.database_accessible(settings.database_url)
 
-    # Check API key configuration
-    checks["api_key_configured"] = bool(settings.api_key)
+    # Check operator credential configuration (DB keys or deprecated env shim)
+    from ..auth.factory import get_operator_key_service
+
+    try:
+        has_db_keys = get_operator_key_service().has_active_operator_keys()
+    except Exception:
+        has_db_keys = False
+    checks["api_key_configured"] = has_db_keys or bool(settings.api_key)
+    checks["operator_key_configured"] = has_db_keys
 
     # Check LLM configuration
     checks["llm_configured"] = bool(settings.anthropic_api_key)
@@ -289,6 +480,7 @@ def health_check() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_config() -> str:
     """Get the current buyer agent configuration.
 
@@ -344,6 +536,7 @@ def _set_wizard(wizard: SetupWizard | None) -> None:
 
 
 @mcp.tool()
+@_require_operator
 def run_setup_wizard() -> str:
     """Run the setup wizard and get the current status of all steps.
 
@@ -365,6 +558,7 @@ def run_setup_wizard() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_wizard_step(step_number: int) -> str:
     """Get detailed information about a specific wizard step.
 
@@ -396,6 +590,7 @@ def get_wizard_step(step_number: int) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def complete_wizard_step(step_number: int, config: str = "{}") -> str:
     """Complete a wizard step with the given configuration.
 
@@ -435,6 +630,7 @@ def complete_wizard_step(step_number: int, config: str = "{}") -> str:
 
 
 @mcp.tool()
+@_require_operator
 def skip_wizard_step(step_number: int) -> str:
     """Skip a wizard step, applying its sensible defaults.
 
@@ -478,6 +674,7 @@ def skip_wizard_step(step_number: int) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_campaigns(status: str | None = None) -> str:
     """List all campaigns with optional status filter.
 
@@ -523,6 +720,7 @@ def list_campaigns(status: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_campaign_status(campaign_id: str) -> str:
     """Get detailed status of a specific campaign.
 
@@ -586,6 +784,7 @@ def get_campaign_status(campaign_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def check_pacing(campaign_id: str) -> str:
     """Check budget pacing for a campaign.
 
@@ -677,6 +876,7 @@ def check_pacing(campaign_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def review_budgets() -> str:
     """Review budget allocation and spend across all campaigns.
 
@@ -745,6 +945,7 @@ def review_budgets() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_deals(
     status: str | None = None,
     deal_type: str | None = None,
@@ -783,6 +984,7 @@ def list_deals(
 
 
 @mcp.tool()
+@_require_operator
 def search_deals(query: str) -> str:
     """Search deals in the portfolio by free-text query.
 
@@ -818,6 +1020,7 @@ def search_deals(query: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 async def discover_sellers(capability: str | None = None) -> str:
     """Discover available seller agents from the IAB AAMP registry.
 
@@ -839,6 +1042,7 @@ async def discover_sellers(capability: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 async def get_seller_media_kit(seller_url: str) -> str:
     """Fetch a specific seller's media kit with inventory and pricing.
 
@@ -861,6 +1065,7 @@ async def get_seller_media_kit(seller_url: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 async def compare_sellers(seller_urls: list[str]) -> str:
     """Compare pricing and capabilities across multiple sellers.
 
@@ -886,6 +1091,7 @@ async def compare_sellers(seller_urls: list[str]) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def start_negotiation(
     seller_url: str,
     product_id: str,
@@ -948,6 +1154,7 @@ def start_negotiation(
 
 
 @mcp.tool()
+@_require_operator
 def get_negotiation_status(deal_id: str) -> str:
     """Check the status of a specific negotiation.
 
@@ -1003,6 +1210,7 @@ def get_negotiation_status(deal_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def inspect_deal(deal_id: str) -> str:
     """Get detailed information on a specific deal.
 
@@ -1029,6 +1237,7 @@ def inspect_deal(deal_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def import_deals_csv(
     csv_data: str,
     default_seller_url: str = "",
@@ -1070,6 +1279,7 @@ def import_deals_csv(
 
 
 @mcp.tool()
+@_require_operator
 def create_deal_manual(
     display_name: str,
     seller_url: str,
@@ -1163,6 +1373,7 @@ def create_deal_manual(
 
 
 @mcp.tool()
+@_require_operator
 def get_portfolio_summary(
     top_sellers_count: int = 5,
     expiring_within_days: int = 30,
@@ -1200,6 +1411,7 @@ def get_portfolio_summary(
 
 
 @mcp.tool()
+@_require_operator
 def list_active_negotiations() -> str:
     """List all active/pending negotiations.
 
@@ -1248,6 +1460,7 @@ def list_active_negotiations() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_orders(status: str | None = None) -> str:
     """List all orders with optional status filter.
 
@@ -1278,6 +1491,7 @@ def list_orders(status: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_order_status(order_id: str) -> str:
     """Get detailed status of a specific order.
 
@@ -1304,6 +1518,7 @@ def get_order_status(order_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def transition_order(
     order_id: str,
     to_status: str,
@@ -1354,6 +1569,7 @@ def transition_order(
 
 
 @mcp.tool()
+@_require_operator
 def list_pending_approvals(campaign_id: str | None = None) -> str:
     """List approval requests that are awaiting a decision.
 
@@ -1402,6 +1618,7 @@ def list_pending_approvals(campaign_id: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def approve_or_reject(
     approval_request_id: str,
     decision: str,
@@ -1484,6 +1701,7 @@ def approve_or_reject(
 
 
 @mcp.tool()
+@_require_operator
 def list_api_keys() -> str:
     """List configured API keys for seller integrations.
 
@@ -1517,6 +1735,7 @@ def list_api_keys() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def create_api_key(seller_url: str, api_key: str) -> str:
     """Store or replace an API key for a seller integration.
 
@@ -1547,6 +1766,7 @@ def create_api_key(seller_url: str, api_key: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def revoke_api_key(seller_url: str) -> str:
     """Revoke (remove) an API key for a seller integration.
 
@@ -1579,6 +1799,7 @@ def revoke_api_key(seller_url: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def list_templates(template_type: str | None = None) -> str:
     """List available deal and supply path templates.
 
@@ -1641,6 +1862,7 @@ def list_templates(template_type: str | None = None) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def create_template(
     template_type: str | None = None,
     name: str | None = None,
@@ -1727,6 +1949,7 @@ def create_template(
 
 
 @mcp.tool()
+@_require_operator
 def instantiate_from_template(
     template_id: str | None = None,
     overrides: Any = None,
@@ -1819,6 +2042,7 @@ def instantiate_from_template(
 
 
 @mcp.tool()
+@_require_operator
 def get_deal_performance(deal_id: str) -> str:
     """Get performance metrics for a specific deal.
 
@@ -1863,6 +2087,7 @@ def get_deal_performance(deal_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_campaign_report(campaign_id: str) -> str:
     """Generate a campaign performance report.
 
@@ -1927,6 +2152,7 @@ def get_campaign_report(campaign_id: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def get_pacing_report(campaign_id: str) -> str:
     """Get budget pacing report for a campaign.
 
@@ -2053,6 +2279,7 @@ def _get_ssp_connector_class(name: str) -> type | None:
 
 
 @mcp.tool()
+@_require_operator
 def list_ssp_connectors() -> str:
     """List available SSP connectors and their configuration status.
 
@@ -2092,6 +2319,7 @@ def list_ssp_connectors() -> str:
 
 
 @mcp.tool()
+@_require_operator
 def import_deals_ssp(ssp_name: str) -> str:
     """Import deals from a specified SSP connector into the deal portfolio.
 
@@ -2154,6 +2382,7 @@ def import_deals_ssp(ssp_name: str) -> str:
 
 
 @mcp.tool()
+@_require_operator
 def test_ssp_connection(ssp_name: str) -> str:
     """Test connectivity to a specific SSP connector.
 
@@ -2391,6 +2620,7 @@ async def _discover_iab_retriever(client: MixpeekClient) -> str | None:
         "contextual targeting."
     ),
 )
+@_require_operator
 async def classify_content(
     text: str,
     retriever_id: str | None = None,
@@ -2444,6 +2674,7 @@ async def classify_content(
         "verdict, risk level (low/medium/high), and flagged categories."
     ),
 )
+@_require_operator
 async def check_brand_safety(
     text: str,
     retriever_id: str | None = None,
@@ -2482,6 +2713,7 @@ async def check_brand_safety(
         "with relevance scores and enriched metadata."
     ),
 )
+@_require_operator
 async def contextual_search(
     query: str,
     retriever_id: str,
@@ -2517,6 +2749,11 @@ def mount_mcp(app: FastAPI) -> None:
     Args:
         app: The FastAPI application to mount onto.
     """
+    global _http_transport_mounted
+
     app.mount("/mcp", mcp.streamable_http_app())
     app.mount("/mcp-sse", mcp.sse_app())
+    # Tools are now reachable over the network: _deny_unless_operator must
+    # stop treating unattributable calls as trusted stdio.
+    _http_transport_mounted = True
     logger.info("MCP server mounted: Streamable HTTP at /mcp, legacy SSE at /mcp-sse/sse")

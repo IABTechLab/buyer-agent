@@ -1,114 +1,89 @@
 # Author: Green Mountain Systems AI Inc.
 # Donated to IAB Tech Lab
 
-"""Tests for API key authentication middleware."""
+"""Tests for inbound operator API key authentication on REST routes."""
 
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
-from ad_buyer.config.settings import Settings
+from ad_buyer.auth.factory import get_operator_key_service, reset_operator_key_service
+from ad_buyer.config.settings import get_settings
 from ad_buyer.interfaces.api import main as api_module
+from ad_buyer.models.api_key import OperatorApiKeyCreateRequest
+
+
+@pytest.fixture
+def auth_db(tmp_path, monkeypatch):
+    db_url = f"sqlite:///{tmp_path / 'api_auth.db'}"
+    monkeypatch.setenv("DATABASE_URL", db_url)
+    monkeypatch.setenv("API_KEY", "")
+    get_settings.cache_clear()
+    reset_operator_key_service()
+    yield db_url
+    reset_operator_key_service()
+    get_settings.cache_clear()
 
 
 def _client() -> TestClient:
-    """Create a test client for the app."""
     return TestClient(api_module.app)
 
 
-def _make_settings(api_key: str = "") -> Settings:
-    """Create a Settings instance with the given api_key."""
-    return Settings.model_construct(
-        api_key=api_key,
-        anthropic_api_key="",
-        iab_server_url="http://localhost:8001",
-        seller_endpoints="",
-        opendirect_base_url="http://localhost:3000/api/v2.1",
-        opendirect_token=None,
-        opendirect_api_key=None,
-        default_llm_model="anthropic/claude-sonnet-4-5-20250929",
-        manager_llm_model="anthropic/claude-opus-4-8",
-        llm_temperature=0.3,
-        llm_max_tokens=4096,
-        database_url="sqlite:///./ad_buyer.db",
-        redis_url=None,
-        crew_memory_enabled=True,
-        crew_verbose=True,
-        crew_max_iterations=15,
-        cors_allowed_origins="",
-        environment="development",
-        log_level="INFO",
-    )
+def _mint_key(db_url: str) -> str:
+    svc = get_operator_key_service(db_url, force_new=True)
+    return svc.create_operator_key(OperatorApiKeyCreateRequest(label="test")).api_key
 
 
-def _patch_settings(api_key: str):
-    """Replace the settings object on the api module."""
-    return patch.object(api_module, "settings", _make_settings(api_key))
-
-
-class TestApiKeyAuthEnabled:
-    """Tests when api_key is configured (auth required)."""
-
-    def test_health_no_auth_required(self):
-        """Health endpoint should be accessible without API key."""
-        with _patch_settings("test-secret-key"):
-            response = _client().get("/health")
+class TestOperatorAuthRequired:
+    def test_health_no_auth_required(self, auth_db):
+        response = _client().get("/health")
         assert response.status_code == 200
 
-    def test_missing_api_key_returns_401(self):
-        """Requests without X-API-Key header should get 401."""
-        with _patch_settings("test-secret-key"):
-            response = _client().get("/bookings")
-        assert response.status_code == 401
-        assert "api key" in response.json()["detail"].lower()
-
-    def test_wrong_api_key_returns_401(self):
-        """Requests with wrong API key should get 401."""
-        with _patch_settings("test-secret-key"):
-            response = _client().get(
-                "/bookings",
-                headers={"X-API-Key": "wrong-key"},
-            )
+    def test_missing_api_key_returns_401(self, auth_db):
+        _mint_key(auth_db)
+        response = _client().get("/bookings")
         assert response.status_code == 401
 
-    def test_valid_api_key_succeeds(self):
-        """Requests with correct API key should succeed."""
-        with _patch_settings("test-secret-key"):
-            response = _client().get(
-                "/bookings",
-                headers={"X-API-Key": "test-secret-key"},
-            )
+    def test_wrong_api_key_returns_401(self, auth_db):
+        _mint_key(auth_db)
+        response = _client().get(
+            "/bookings",
+            headers={"X-Api-Key": "wrong-key"},
+        )
+        assert response.status_code == 401
+
+    def test_valid_operator_key_succeeds(self, auth_db):
+        raw = _mint_key(auth_db)
+        response = _client().get(
+            "/bookings",
+            headers={"X-Api-Key": raw},
+        )
         assert response.status_code == 200
 
-    def test_post_endpoint_requires_auth(self):
-        """POST endpoints also require API key."""
-        with _patch_settings("test-secret-key"):
-            response = _client().post("/products/search", json={"limit": 5})
+    def test_post_endpoint_requires_auth(self, auth_db):
+        _mint_key(auth_db)
+        response = _client().post("/products/search", json={"limit": 5})
         assert response.status_code == 401
 
-    def test_post_endpoint_with_valid_key(self):
-        """POST endpoints work with valid API key."""
-        with _patch_settings("test-secret-key"):
+    def test_post_endpoint_with_valid_key(self, auth_db):
+        raw = _mint_key(auth_db)
+        with patch.object(api_module, "ProductSearchTool", create=True):
             response = _client().post(
                 "/products/search",
                 json={"limit": 5},
-                headers={"X-API-Key": "test-secret-key"},
+                headers={"X-Api-Key": raw},
             )
-        # May fail due to missing backend, but should not be 401
         assert response.status_code != 401
 
 
-class TestApiKeyAuthDisabled:
-    """Tests when api_key is empty/not set (auth disabled)."""
+class TestNoCredentials:
+    def test_protected_route_requires_auth_even_without_env_key(self, auth_db):
+        """Empty API_KEY and no DB keys still require authentication."""
+        get_operator_key_service(auth_db, force_new=True)
+        response = _client().get("/bookings")
+        assert response.status_code == 401
 
-    def test_no_api_key_configured_allows_access(self):
-        """When api_key is empty, requests should succeed without header."""
-        with _patch_settings(""):
-            response = _client().get("/bookings")
-        assert response.status_code == 200
-
-    def test_health_still_works(self):
-        """Health endpoint works when auth is disabled."""
-        with _patch_settings(""):
-            response = _client().get("/health")
+    def test_health_still_works(self, auth_db):
+        response = _client().get("/health")
         assert response.status_code == 200

@@ -241,8 +241,10 @@ def _build_steps() -> list[WizardStep]:
             step_number=3,
             title="Generate Operator Credentials",
             description=(
-                "Create an operator API key for authenticating Claude Desktop "
-                "and other MCP clients, and generate connection configuration."
+                "Bootstrap an operator API key with the CLI "
+                "(ad-buyer create-operator-key) — not over HTTP — then "
+                "configure Claude Desktop / MCP clients to send that key "
+                "as Authorization: Bearer or X-Api-Key."
             ),
             phase=WizardPhase.DEVELOPER,
             config_fields=[

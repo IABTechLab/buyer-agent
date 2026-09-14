@@ -5,7 +5,11 @@ user would experience it.  This is the UAT gate for the Phase 3 epic.
 
 Usage:
     # Start the buyer server first:
-    #   uvicorn src.ad_buyer.interfaces.api.main:app --port 8000
+    #   uvicorn src.ad_buyer.interfaces.api.main:app --port 8001
+    #
+    # Mint an operator key against the server's DATABASE_URL — MCP tools over
+    # HTTP require one (only health_check is public):
+    #   export BUYER_OPERATOR_KEY="$(ad-buyer create-operator-key --label smoke --quiet)"
     #
     # Then run this test:
     #   pytest tests/smoke/test_mcp_e2e.py -v
@@ -13,7 +17,9 @@ Usage:
 This test is marked with @pytest.mark.smoke so it can be run independently:
     pytest tests/smoke/ -v -m smoke
 
-Note: Requires a running buyer server on port 8000.
+Note: Requires a running buyer server on port 8001 and BUYER_OPERATOR_KEY.
+Without the key these tests skip rather than assert anonymous access, which a
+correctly gated server refuses.
 """
 
 import asyncio
@@ -34,13 +40,21 @@ try:
 except ImportError:
     MCP_AVAILABLE = False
 
-SERVER_URL = os.environ.get("BUYER_MCP_URL", "http://127.0.0.1:8000/mcp/sse/sse")
+SERVER_URL = os.environ.get("BUYER_MCP_URL", "http://127.0.0.1:8001/mcp/sse/sse")
+OPERATOR_KEY = os.environ.get("BUYER_OPERATOR_KEY", "")
 
 pytestmark = [
     pytest.mark.smoke,
     pytest.mark.skipif(
         not MCP_AVAILABLE,
         reason="mcp package not available",
+    ),
+    pytest.mark.skipif(
+        not OPERATOR_KEY,
+        reason=(
+            "BUYER_OPERATOR_KEY not set — MCP tools over HTTP require an operator key. "
+            "Mint one with: ad-buyer create-operator-key --label smoke"
+        ),
     ),
 ]
 
@@ -75,9 +89,13 @@ def event_loop():
 
 @pytest_asyncio.fixture(scope="module")
 async def mcp_session():
-    """Connect to the MCP server and yield a ClientSession for the module."""
+    """Connect to the MCP server and yield a ClientSession for the module.
+
+    Carries the operator key: every tool here except health_check is gated.
+    """
+    headers = {"Authorization": f"Bearer {OPERATOR_KEY}"} if OPERATOR_KEY else {}
     try:
-        async with sse_client(SERVER_URL) as (read, write):
+        async with sse_client(SERVER_URL, headers=headers) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 yield session

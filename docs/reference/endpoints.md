@@ -6,12 +6,16 @@
 Routes registered on the FastAPI application
 (`ad_buyer.interfaces.api.main:app`), enumerated from the router table.
 
-**Total: 14 endpoints**
+**Total: 18 endpoints**
 
 | Method | Path | Handler |
 | --- | --- | --- |
 | `GET` | `/api/v1/buyer/orders` | `list_buyer_orders` |
 | `GET` | `/api/v1/buyer/orders/{order_id}/audit` | `get_order_audit` |
+| `GET` | `/auth/api-keys` | `list_api_keys` |
+| `POST` | `/auth/api-keys/operator` | `create_operator_api_key` |
+| `DELETE` | `/auth/api-keys/{key_id}` | `revoke_api_key` |
+| `GET` | `/auth/api-keys/{key_id}` | `get_api_key` |
 | `GET` | `/bookings` | `list_bookings` |
 | `POST` | `/bookings` | `create_booking` |
 | `GET` | `/bookings/{job_id}` | `get_booking_status` |

@@ -51,11 +51,12 @@ See [Protocol Overview](api/protocols.md) for detailed comparison.
 
 ## API Endpoints
 
-The buyer agent exposes 14 endpoints across 6 categories:
+The buyer agent exposes 18 endpoints across 7 categories:
 
 | Category | Endpoints |
 |----------|-----------|
 | **Health** | `GET /health` |
+| **Authentication** | `POST /auth/api-keys/operator`, `GET /auth/api-keys`, `GET /auth/api-keys/{key_id}`, `DELETE /auth/api-keys/{key_id}` |
 | **Bookings** | `POST /bookings`, `GET /bookings/{job_id}`, `POST /bookings/{job_id}/approve`, `POST /bookings/{job_id}/approve-all`, `GET /bookings` |
 | **Products** | `POST /products/search` |
 | **Events** | `GET /events`, `GET /events/{event_id}` |

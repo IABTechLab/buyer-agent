@@ -6,7 +6,7 @@ This guide walks you through the complete deal booking process --- from browsing
 
 Before you start, you need:
 
-- **A running seller agent** --- The seller's API must be reachable (e.g. `http://seller.example.com:8001`). See [Seller Agent Integration](../integration/seller-agent.md) for connection details.
+- **A running seller agent** --- The seller's API must be reachable (e.g. `http://seller.example.com:8000`). See [Seller Agent Integration](../integration/seller-agent.md) for connection details.
 - **An API key** --- Get one from the seller for authenticated access. Public browsing works without a key, but you need one to see exact pricing and book deals.
 - **Python 3.11+** with the `ad_buyer` package installed.
 
@@ -24,7 +24,7 @@ from ad_buyer.models.deals import QuoteRequest, DealBookingRequest
 
 async def book_a_deal():
     async with DealsClient(
-        seller_url="http://seller.example.com:8001",
+        seller_url="http://seller.example.com:8000",
         api_key="your-api-key",
     ) as client:
         # 1. Request a quote
@@ -68,7 +68,7 @@ Pass your key when creating the client:
 from ad_buyer.clients.deals_client import DealsClient
 
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     api_key="your-api-key",
 )
 ```
@@ -77,7 +77,7 @@ For bearer token auth instead:
 
 ```python
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     bearer_token="your-bearer-token",
 )
 ```
@@ -91,12 +91,12 @@ from ad_buyer.media_kit import MediaKitClient
 
 async with MediaKitClient(api_key="your-api-key") as mk:
     # Get the full catalog
-    kit = await mk.get_media_kit("http://seller.example.com:8001")
+    kit = await mk.get_media_kit("http://seller.example.com:8000")
     print(f"{kit.seller_name}: {kit.total_packages} packages")
 
     # Search for something specific
     results = await mk.search_packages(
-        "http://seller.example.com:8001",
+        "http://seller.example.com:8000",
         query="premium video sports",
     )
     for pkg in results:
@@ -166,7 +166,7 @@ strategy = SimpleThresholdStrategy(
 )
 
 result = await neg_client.auto_negotiate(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     proposal_id=quote.quote_id,  # Negotiate on the quote
     strategy=strategy,
 )
@@ -234,7 +234,7 @@ store.connect()
 
 # Attach to the client — quotes and deals auto-persist
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     api_key="your-api-key",
     deal_store=store,
 )
@@ -275,7 +275,7 @@ from ad_buyer.clients.opendirect_client import OpenDirectClient
 from ad_buyer.storage.deal_store import DealStore
 
 # Setup
-client = OpenDirectClient(base_url="http://seller.example.com:8001")
+client = OpenDirectClient(base_url="http://seller.example.com:8000")
 store = DealStore("sqlite:///./deals.db")
 store.connect()
 
@@ -378,7 +378,7 @@ The client automatically retries on **transient server errors** (502, 503, 504) 
 ```python
 # Customize retry and timeout behavior
 client = DealsClient(
-    seller_url="http://seller.example.com:8001",
+    seller_url="http://seller.example.com:8000",
     api_key="your-api-key",
     timeout=60.0,       # 60 seconds (default: 30)
     max_retries=5,      # 5 attempts (default: 3)
