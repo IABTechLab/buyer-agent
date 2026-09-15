@@ -4,12 +4,15 @@
 """Tests for client-side API key authentication (outbound to sellers)."""
 
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 
 from ad_buyer.auth.key_store import ApiKeyStore
 from ad_buyer.auth.middleware import AuthMiddleware
+from ad_buyer.clients.deals_client import DealsClient
+from ad_buyer.orchestration.multi_seller import MultiSellerOrchestrator
 
 # ---------------------------------------------------------------------------
 # ApiKeyStore tests
@@ -210,3 +213,80 @@ class TestAuthMiddleware401Handling:
         )
         result = middleware.handle_response(response)
         assert result.needs_reauth is False
+
+
+# ---------------------------------------------------------------------------
+# Booking-path credential wiring
+#
+# Regression coverage for the wiring gap where MultiSellerOrchestrator's
+# quote/negotiation/booking call sites constructed DealsClient via the
+# deals_client_factory with zero kwargs, so no ApiKeyStore credential ever
+# reached an outbound request regardless of what was staged in the store.
+# These exercise the SAME factory shape production uses
+# (`lambda seller_url, **kwargs: DealsClient(seller_url, **kwargs)`, as in
+# flows/deal_booking_flow.py::build_default_orchestrator and
+# interfaces/chat/main.py::ChatInterface._make_deals_client) so a
+# regression here fails for the same reason it would fail against a real
+# seller.
+# ---------------------------------------------------------------------------
+
+
+def _production_deals_client_factory(seller_url: str, **kwargs):
+    """Byte-identical in shape to the factory lambdas used in production."""
+    return DealsClient(seller_url, **kwargs)
+
+
+class TestBookingCredentialWiring:
+    """MultiSellerOrchestrator must attach a stored per-seller key to the
+    DealsClient used for quoting, negotiation, and booking."""
+
+    def test_seller_with_stored_key_sends_x_api_key_header(self, tmp_path: Path):
+        """A DealsClient built through the booking factory for a seller
+        WITH a stored key must send the seller's expected X-Api-Key header."""
+        store = ApiKeyStore(store_path=tmp_path / "keys.json")
+        store.add_key("http://ctv-seller:8101", "ask_live_abc123")
+        orchestrator = MultiSellerOrchestrator(
+            registry_client=AsyncMock(),
+            deals_client_factory=_production_deals_client_factory,
+            key_store=store,
+        )
+
+        client = orchestrator._client_for_booking("http://ctv-seller:8101")
+
+        assert client._client.headers.get("x-api-key") == "ask_live_abc123"
+
+    def test_seller_with_no_stored_key_still_constructs_uncredentialed(self, tmp_path: Path):
+        """A DealsClient built for a seller with NO stored key must still
+        construct successfully and carry no credential -- identical to
+        behavior before the credential wiring existed."""
+        store = ApiKeyStore(store_path=tmp_path / "keys.json")  # empty store
+        orchestrator = MultiSellerOrchestrator(
+            registry_client=AsyncMock(),
+            deals_client_factory=_production_deals_client_factory,
+            key_store=store,
+        )
+
+        client = orchestrator._client_for_booking("http://display-seller:8102")
+
+        assert "x-api-key" not in client._client.headers
+        assert "authorization" not in client._client.headers
+
+    def test_url_normalization_round_trips_through_booking_lookup(self, tmp_path: Path):
+        """A key stored under a seller URL must be found by the exact
+        lookup the booking path performs, including when the stored URL
+        and the URL the orchestrator looks up with differ only by a
+        trailing slash (the shape ApiKeyStore normalizes)."""
+        store = ApiKeyStore(store_path=tmp_path / "keys.json")
+        store.add_key("http://linear-seller:8103/", "ask_live_xyz789")
+        orchestrator = MultiSellerOrchestrator(
+            registry_client=AsyncMock(),
+            deals_client_factory=_production_deals_client_factory,
+            key_store=store,
+        )
+
+        # Seller URLs flowing through discovery/orchestration are used
+        # without a trailing slash (matching DealsClient.seller_url,
+        # which is itself rstrip("/")'d).
+        client = orchestrator._client_for_booking("http://linear-seller:8103")
+
+        assert client._client.headers.get("x-api-key") == "ask_live_xyz789"
