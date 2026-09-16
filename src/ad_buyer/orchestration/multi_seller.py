@@ -37,6 +37,7 @@ from typing import Any
 
 import httpx
 
+from ..auth.key_store import ApiKeyStore
 from ..booking.quote_normalizer import NormalizedQuote, QuoteNormalizer
 from ..clients.capability_client import (
     CapabilityClient,
@@ -474,6 +475,13 @@ class MultiSellerOrchestrator:
             quoting it -- a product ID is only ever sent to
             the seller it came from. When None, the legacy passthrough
             behavior is preserved (same product_id sent to every seller).
+        key_store: Optional ApiKeyStore used to attach a per-seller
+            credential to outbound quote/negotiation/booking requests.
+            Defaults to ``ApiKeyStore()`` (``~/.ad_buyer/seller_keys.json``)
+            when not injected, matching the lookup already used by the MCP
+            server's key-management tools. A seller with no stored key is
+            sent no credential -- unchanged from today's behavior -- but
+            that is logged so a resulting 401 is locally diagnosable.
         sgp_client: Optional SGP (IAB Diligence Platform) client used by
             the vendor-approval gate. Only consulted when ``sgp_enforce``
             is True; with enforcement off (the default) no SGP calls are
@@ -500,12 +508,14 @@ class MultiSellerOrchestrator:
         negotiation_client: Any | None = None,
         negotiation_config: NegotiationConfig | None = None,
         catalog_client_factory: Callable[..., Any] | None = None,
+        key_store: ApiKeyStore | None = None,
         sgp_client: Any | None = None,
         sgp_enforce: bool = False,
         sgp_unknown_policy: str = "block",
     ) -> None:
         self._registry = registry_client
         self._deals_client_factory = deals_client_factory
+        self._key_store = key_store if key_store is not None else ApiKeyStore()
         self._event_bus = event_bus
         self._normalizer = quote_normalizer or QuoteNormalizer()
         self._quote_timeout = quote_timeout
@@ -590,6 +600,32 @@ class MultiSellerOrchestrator:
             await self._event_bus.publish(event)
         except Exception as exc:  # noqa: BLE001 - event emission is fail-open by design
             logger.warning("Failed to emit event %s: %s", event_type, exc)
+
+    # ------------------------------------------------------------------
+    # Credentialed client construction
+    # ------------------------------------------------------------------
+
+    def _client_for_booking(self, seller_url: str) -> Any:
+        """Build a DealsClient for *seller_url*, attaching any stored key.
+
+        Looks up a per-seller API key from ``self._key_store`` and forwards
+        it to the deals-client factory (as ``api_key``) so outbound quote,
+        negotiation, and booking requests carry the credential the seller
+        expects. When no key is stored for this seller, the client is
+        built exactly as before the credential wiring existed -- no
+        credential attached -- but that is logged here so a resulting
+        401 from the seller has a local, immediate explanation instead of
+        being a bare surprise.
+        """
+        api_key = self._key_store.get_key(seller_url)
+        if api_key is None:
+            logger.info(
+                "No stored API key for seller %s; sending request without a "
+                "credential. If the seller requires one, this will surface "
+                "as a 401 from the seller.",
+                seller_url,
+            )
+        return self._deals_client_factory(seller_url, api_key=api_key)
 
     # ------------------------------------------------------------------
     # Stage 1: Discover sellers
@@ -1065,7 +1101,7 @@ class MultiSellerOrchestrator:
                 product_id = resolved_id
 
             try:
-                client = self._deals_client_factory(seller_url)
+                client = self._client_for_booking(seller_url)
 
                 quote_request = QuoteRequest(
                     product_id=product_id,
@@ -1485,7 +1521,7 @@ class MultiSellerOrchestrator:
 
         # ---- Re-quote at the agreed price; booking uses the fresh quote ----
         try:
-            deals_client = self._deals_client_factory(seller_url)
+            deals_client = self._client_for_booking(seller_url)
             requote = await asyncio.wait_for(
                 deals_client.request_quote(
                     QuoteRequest(
@@ -1694,7 +1730,7 @@ class MultiSellerOrchestrator:
                 continue
 
             try:
-                client = self._deals_client_factory(seller_url)
+                client = self._client_for_booking(seller_url)
                 if self._capability_client is not None and audience_plan is not None:
                     deal, deg_log = await self._book_with_preflight_then_retry(
                         client=client,
