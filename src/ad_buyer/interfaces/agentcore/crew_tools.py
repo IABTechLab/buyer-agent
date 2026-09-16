@@ -128,21 +128,42 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
     logger.info("Campaign brief: %s", json.dumps(brief, default=str))
 
     # Seller client selection:
-    #  - ARN (deployed seller AgentCore runtime): route through the
-    #    AgentCoreSellerProxy, which calls the seller MCP runtime by ARN via
-    #    InvokeAgentRuntime and returns structured products/avails. Prefer an
-    #    explicit SELLER_MCP_RUNTIME_ARN (the structured surface); otherwise
-    #    fall back to SELLER_AGENT_URL if it is itself an MCP runtime ARN.
+    #  - Seller advertises OAuth (AWS Bedrock AgentCore CUSTOM_JWT deployment
+    #    path): the seller runtime enforces a JWT authorizer, so SigV4/boto3 is
+    #    rejected. Route through the transport selector, which builds the HTTPS
+    #    invocations URL and attaches a client_credentials Bearer JWT
+    #    (SELLER_TOKEN_ENDPOINT + SELLER_INVOKE_SCOPE come from the discovered
+    #    registry record's `authentication` object; passed here via env for the
+    #    deployed runtime). Works for a seller given by ARN or by https:// URL.
+    #  - ARN without OAuth (same-account/dev deployed seller): the SigV4
+    #    AgentCoreSellerProxy over InvokeAgentRuntime.
     #  - Plain HTTP URL (local dev): the ordinary OpenDirectClient.
     seller_url = os.environ.get("SELLER_AGENT_URL", "http://localhost:8001")
     mcp_arn = os.environ.get("SELLER_MCP_RUNTIME_ARN", "")
-    if mcp_arn.startswith("arn:") or seller_url.startswith("arn:"):
+    seller_token_endpoint = os.environ.get("SELLER_TOKEN_ENDPOINT", "")
+    seller_scope = os.environ.get("SELLER_INVOKE_SCOPE", "")
+    seller_endpoint = mcp_arn or seller_url
+
+    if seller_token_endpoint:
+        # CUSTOM_JWT seller → JWT/HTTPS transport (arn: is converted to the
+        # HTTPS invocations URL inside the selector; https:// used as-is).
+        from ad_buyer.registry.transport_selector import select_seller_client
+
+        client = select_seller_client(
+            seller_endpoint,
+            authentication={
+                "token_endpoint": seller_token_endpoint,
+                "scope": seller_scope,
+            },
+            region=os.environ.get("AWS_REGION"),
+        )
+    elif seller_endpoint.startswith("arn:"):
         from ad_buyer.interfaces.agentcore.agentcore_seller_proxy import (
             AgentCoreSellerProxy,
         )
 
         client = AgentCoreSellerProxy(
-            runtime_arn=mcp_arn or seller_url,
+            runtime_arn=seller_endpoint,
             region=os.environ.get("AWS_REGION"),
         )
     else:

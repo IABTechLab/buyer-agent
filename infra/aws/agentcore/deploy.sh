@@ -215,12 +215,25 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   if [[ -n "${BEDROCK_API_KEY}" ]]; then
     _key_env=(--env "ANTHROPIC_COMPATIBLE_LLM_API_KEY=${BEDROCK_API_KEY}")
   fi
+  # AWS Bedrock AgentCore CUSTOM_JWT buyer->seller path: when the seller
+  # advertises an OAuth issuer, forward the seller's token endpoint + scope and
+  # the buyer's OWN client credentials so crew_tools routes through the JWT
+  # transport (see ad_buyer.registry.transport_selector). Each is forwarded only
+  # when set — never bake an empty value. The client_secret is passed only if
+  # present; prefer sourcing it from a secret store in production.
+  _oauth_env=()
+  [[ -n "${SELLER_MCP_RUNTIME_ARN:-}" ]] && _oauth_env+=(--env "SELLER_MCP_RUNTIME_ARN=${SELLER_MCP_RUNTIME_ARN}")
+  [[ -n "${SELLER_TOKEN_ENDPOINT:-}" ]] && _oauth_env+=(--env "SELLER_TOKEN_ENDPOINT=${SELLER_TOKEN_ENDPOINT}")
+  [[ -n "${SELLER_INVOKE_SCOPE:-}" ]] && _oauth_env+=(--env "SELLER_INVOKE_SCOPE=${SELLER_INVOKE_SCOPE}")
+  [[ -n "${BUYER_OAUTH_CLIENT_ID:-}" ]] && _oauth_env+=(--env "BUYER_OAUTH_CLIENT_ID=${BUYER_OAUTH_CLIENT_ID}")
+  [[ -n "${BUYER_OAUTH_CLIENT_SECRET:-}" ]] && _oauth_env+=(--env "BUYER_OAUTH_CLIENT_SECRET=${BUYER_OAUTH_CLIENT_SECRET}")
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
     --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
     --env "PYTHONPATH=/app/src" \
     --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
     "${_key_env[@]}" \
+    "${_oauth_env[@]}" \
     --env "STORAGE_TYPE=sqlite" \
     --env "DATABASE_URL=sqlite:///:memory:" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \

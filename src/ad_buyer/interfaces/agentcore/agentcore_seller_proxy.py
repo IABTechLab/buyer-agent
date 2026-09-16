@@ -34,8 +34,8 @@ import json
 import logging
 from typing import Any
 
-from ...models.opendirect import AvailsRequest, AvailsResponse, Product
 from ...clients.contract_mappers import from_wire_product
+from ...models.opendirect import AvailsRequest, AvailsResponse, Product
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,9 @@ class AgentCoreSellerProxy:
         region: str | None = None,
         session_id: str | None = None,
         client: Any = None,
+        token_provider: Any = None,
+        token_endpoint: str = "",
+        scope: str = "",
     ) -> None:
         self._arn = runtime_arn
         self._region = region
@@ -78,6 +81,15 @@ class AgentCoreSellerProxy:
         self._mcp_id = 0
         self._mcp_session_id: str | None = None
         self._initialized = False
+        # JWT/HTTPS transport mode (AWS Bedrock AgentCore CUSTOM_JWT path): when
+        # a token provider is supplied, the seller runtime enforces a JWT
+        # authorizer, so SigV4/boto3 is DISALLOWED — MCP JSON-RPC is sent over a
+        # raw HTTPS POST to the verified invocations URL with a Bearer token
+        # (re-minted once on a 401). Otherwise the legacy SigV4 boto3 path runs.
+        self._token_provider = token_provider
+        self._token_endpoint = token_endpoint
+        self._scope = scope
+        self._use_jwt = token_provider is not None
 
     # -- boto3 client (lazy) ---------------------------------------------------
 
@@ -106,13 +118,17 @@ class AgentCoreSellerProxy:
     _MCP_PROTOCOL_VERSION = "2025-03-26"
 
     def _invoke_mcp(self, payload: dict[str, Any], *, expect_body: bool = True) -> bytes:
-        """One SigV4 InvokeAgentRuntime call carrying an MCP JSON-RPC message.
+        """One InvokeAgentRuntime call carrying an MCP JSON-RPC message.
 
-        Sets the MCP-required headers, threads the runtime + MCP session ids for
-        microVM stickiness, and captures the platform-returned ``Mcp-Session-Id``
-        for reuse on subsequent calls. Returns the raw response body (empty for
-        notifications, which get no JSON-RPC reply).
+        SigV4/boto3 by default; a raw HTTPS POST with a Bearer JWT when the
+        runtime enforces CUSTOM_JWT (``_use_jwt``). Both set the MCP-required
+        headers, thread the runtime + MCP session ids for microVM stickiness,
+        and capture the platform ``Mcp-Session-Id`` for reuse. Returns the raw
+        response body (empty for notifications).
         """
+        if self._use_jwt:
+            return self._invoke_mcp_jwt(payload, expect_body=expect_body)
+
         kwargs: dict[str, Any] = {
             "agentRuntimeArn": self._arn,
             "payload": json.dumps(payload).encode("utf-8"),
@@ -142,6 +158,51 @@ class AgentCoreSellerProxy:
             return b""
         body = resp["response"]
         return body.read() if hasattr(body, "read") else bytes(body)
+
+    def _invoke_mcp_jwt(self, payload: dict[str, Any], *, expect_body: bool = True) -> bytes:
+        """MCP JSON-RPC over a raw HTTPS POST with a Bearer JWT (CUSTOM_JWT path).
+
+        boto3/SigV4 is DISALLOWED for OAuth runtimes (per the AgentCore docs), so
+        we POST directly to the verified invocations URL. A 401 triggers a single
+        reactive re-mint before failing.
+        """
+        import httpx
+
+        from ad_buyer.registry.transport_selector import agentcore_invocations_url
+
+        url = agentcore_invocations_url(self._arn) if self._arn.startswith("arn:") else self._arn
+
+        def _post(force_token: bool) -> httpx.Response:
+            token = self._token_provider.get_token(
+                self._token_endpoint, self._scope, force=force_token
+            )
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Accept": self._MCP_ACCEPT,
+                "Content-Type": self._MCP_CONTENT_TYPE,
+            }
+            if self._mcp_session_id:
+                headers["Mcp-Session-Id"] = self._mcp_session_id
+            with httpx.Client(timeout=120.0) as client:
+                return client.post(
+                    url,
+                    content=json.dumps(payload).encode("utf-8"),
+                    headers=headers,
+                )
+
+        resp = _post(force_token=False)
+        if resp.status_code == 401:
+            # Cached token rejected — drop it and re-mint once.
+            self._token_provider.invalidate(self._token_endpoint, self._scope)
+            resp = _post(force_token=True)
+
+        sid = resp.headers.get("mcp-session-id") or resp.headers.get("Mcp-Session-Id")
+        if sid:
+            self._mcp_session_id = sid
+
+        if not expect_body:
+            return b""
+        return resp.content
 
     def _do_initialize(self) -> None:
         """Run the MCP initialize + notifications/initialized handshake (sync)."""
@@ -248,7 +309,7 @@ class AgentCoreSellerProxy:
         """No persistent connection to close (boto3 client is stateless here)."""
         return None
 
-    async def __aenter__(self) -> "AgentCoreSellerProxy":
+    async def __aenter__(self) -> AgentCoreSellerProxy:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
