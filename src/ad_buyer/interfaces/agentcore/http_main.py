@@ -55,6 +55,15 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "not-used-with-bedrock")
 os.environ.setdefault("STORAGE_TYPE", "sqlite")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
+# Durable Bedrock auth: if the Anthropic-compatible base URL is a Bedrock
+# endpoint, mint a fresh bearer token from the runtime's execution role NOW
+# (at startup), authoritative over any baked/stale key. Avoids baking a
+# short-lived token into --env at deploy time (which expires and 403s every
+# crew call). See ad_buyer.llm.bedrock_token.
+from ad_buyer.llm.bedrock_token import ensure_bedrock_token  # noqa: E402
+
+ensure_bedrock_token()
+
 # Apply CrewAI patches BEFORE any CrewAI imports.
 #
 # The Bedrock *Converse* sanitizer (crewai_bedrock_fix) is only needed on the

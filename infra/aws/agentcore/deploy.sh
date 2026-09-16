@@ -208,12 +208,19 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   # Deploy
   echo ""
   echo ">>> Deploying to AgentCore..."
+  # Req 11: only bake a Bedrock key when one was explicitly supplied. Otherwise
+  # omit it so the runtime mints a fresh token from its execution role at startup
+  # (ad_buyer.llm.bedrock_token) — the CFN runtime role grants CallWithBearerToken.
+  _key_env=()
+  if [[ -n "${BEDROCK_API_KEY}" ]]; then
+    _key_env=(--env "ANTHROPIC_COMPATIBLE_LLM_API_KEY=${BEDROCK_API_KEY}")
+  fi
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
     --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
     --env "PYTHONPATH=/app/src" \
     --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
-    --env "ANTHROPIC_COMPATIBLE_LLM_API_KEY=${BEDROCK_API_KEY}" \
+    "${_key_env[@]}" \
     --env "STORAGE_TYPE=sqlite" \
     --env "DATABASE_URL=sqlite:///:memory:" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \

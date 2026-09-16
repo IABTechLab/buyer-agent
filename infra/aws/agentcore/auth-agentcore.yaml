@@ -151,6 +151,11 @@ Resources:
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
+                  # Req 11: the runtime mints a short-lived Bedrock bearer token
+                  # from THIS role at startup for the Anthropic Messages path
+                  # (x-api-key), which is authenticated via CallWithBearerToken
+                  # rather than SigV4 InvokeModel.
+                  - bedrock:CallWithBearerToken
                 Resource: "*"
         # -- SCOPED seller invoke (see NOTE at top of this file) --
         - PolicyName: SellerInvoke

@@ -30,6 +30,9 @@ sqlalchemy>=2.0.0
 aiosqlite>=0.20.0
 pyyaml>=6.0.0
 nest-asyncio>=1.6.0
+# Mints a short-lived Bedrock bearer token from the runtime execution role at
+# startup (ad_buyer.llm.bedrock_token) so no expiring token is baked into --env.
+aws-bedrock-token-generator>=1.0.0
 # NOTE: the AgentCore build image (astral uv slim) has no `git` binary, so a
 # `git+https://` source fails with "Git executable not found". Use the GitHub
 # archive tarball instead — a plain HTTPS download that needs no git. Keep this
