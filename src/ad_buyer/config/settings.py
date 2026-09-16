@@ -42,6 +42,19 @@ class Settings(BaseSettings):
     aamp_registry_url: str = ""
     aamp_registry_auth_token: str = ""
 
+    # Buyer's OWN OAuth2 client_credentials app-client (AWS Bedrock AgentCore
+    # deployment path only). Used to mint a JWT for a seller that is deployed as
+    # an AgentCore runtime behind a CUSTOM_JWT authorizer and ADVERTISES an OAuth
+    # token endpoint in its registry record's `authentication` object (Req 6.6).
+    # The token ENDPOINT + SCOPE come from that discovered record; the
+    # client_id/secret are the buyer's own identity and live HERE (never in the
+    # registry, never logged). Unset = the buyer cannot authenticate to a
+    # JWT-protected seller. The legacy API-key seller path (AuthMiddleware) and
+    # the arn: AgentCore SigV4 proxy path are unaffected — OAuth applies ONLY to
+    # a discovered seller that advertises an issuer.
+    buyer_oauth_client_id: str = ""
+    buyer_oauth_client_secret: str = ""
+
     # Seller Agent Endpoints (comma-separated list of MCP/A2A server URLs)
     # Each endpoint should implement IAB Tech Lab OpenDirect/AdCOM standards
     seller_endpoints: str = ""
