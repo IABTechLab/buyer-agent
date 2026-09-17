@@ -3,6 +3,11 @@
 
 """SQLite-backed creative asset persistence (v3 campaign automation).
 
+EXPERIMENTAL / NOT YET OPERATIONAL: this store provides CRUD only. No
+validator, trafficking, or ad-server client is wired to it anywhere
+in the live application, and no creative lifecycle events are
+emitted when its methods are called. Retained for future development.
+
 Extracted from ``DealStore`` as part of the EP-2.4 god-class
 split.  Operates on the ``creative_assets`` table, created by
 ``schema.initialize_schema`` during ``DealStore.connect()``.  Instances share

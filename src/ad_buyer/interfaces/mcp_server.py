@@ -788,6 +788,13 @@ def get_campaign_status(campaign_id: str) -> str:
 def check_pacing(campaign_id: str) -> str:
     """Check budget pacing for a campaign.
 
+    EXPERIMENTAL / NOT YET OPERATIONAL: nothing in the live application
+    ever writes a pacing snapshot, so this tool will report
+    pacing_status "no_data" for every real campaign. The pacing engine
+    that would populate this data is not wired into any live path;
+    treat this tool's output as a demonstration of the intended
+    response shape, not as live budget pacing data.
+
     Determines whether the campaign is on track, behind, or ahead
     of its expected spend based on the latest pacing snapshot.
 
@@ -806,6 +813,7 @@ def check_pacing(campaign_id: str) -> str:
     - deviation_pct: deviation from expected pacing
     - total_budget, total_spend, expected_spend
     - channel_pacing: per-channel pacing breakdown (if available)
+    - experimental: always true; this subsystem is not operational
     - error: present only if the campaign was not found
     """
     campaign_store = _get_campaign_store()
@@ -832,6 +840,7 @@ def check_pacing(campaign_id: str) -> str:
                 "deviation_pct": 0.0,
                 "channel_pacing": [],
                 "timestamp": datetime.now(UTC).isoformat(),
+                "experimental": True,
             }
             return json.dumps(result, indent=2)
 
@@ -868,6 +877,7 @@ def check_pacing(campaign_id: str) -> str:
             "deviation_pct": latest.deviation_pct,
             "channel_pacing": channel_pacing,
             "timestamp": datetime.now(UTC).isoformat(),
+            "experimental": True,
         }
         return json.dumps(result, indent=2)
     finally:
@@ -879,6 +889,12 @@ def check_pacing(campaign_id: str) -> str:
 @_require_operator
 def review_budgets() -> str:
     """Review budget allocation and spend across all campaigns.
+
+    NOTE: total_spend is sourced from pacing snapshots, and nothing in
+    the live application writes pacing snapshots. This field will
+    read 0.0 for every real campaign until the budget pacing engine
+    (ad_buyer.pacing.engine) is wired into a live path; do not treat
+    a zero here as a report that spend is actually zero.
 
     Provides an aggregate view of total budget and spend across all
     campaigns, plus per-campaign budget breakdowns with delivery
@@ -2091,6 +2107,15 @@ def get_deal_performance(deal_id: str) -> str:
 def get_campaign_report(campaign_id: str) -> str:
     """Generate a campaign performance report.
 
+    NOTE on the "pacing" field: it is experimental / not yet
+    operational. Nothing in the live application writes pacing
+    snapshots, so this field will read as no-data for every real
+    campaign until the budget pacing engine is wired into a live
+    path. NOTE on "creative_summary": counts reflect whatever was
+    manually stored via the creative asset CRUD layer; there is no
+    automated validator, so valid/invalid counts are not the result
+    of any IAB spec check running against the assets.
+
     Combines campaign status, pacing data, creative asset summary,
     and deal-level metrics into a single comprehensive report.
 
@@ -2100,8 +2125,8 @@ def get_campaign_report(campaign_id: str) -> str:
     Returns a JSON object with:
     - campaign_id, campaign_name, status
     - status_summary: campaign state and delivery metrics
-    - pacing: pacing dashboard data
-    - creative_summary: creative asset validation counts
+    - pacing: pacing dashboard data (experimental, see note above)
+    - creative_summary: creative asset validation counts (manual only)
     - deal_summary: deal-level metrics
     - error: present only if the campaign was not found
     """
@@ -2156,6 +2181,11 @@ def get_campaign_report(campaign_id: str) -> str:
 def get_pacing_report(campaign_id: str) -> str:
     """Get budget pacing report for a campaign.
 
+    EXPERIMENTAL / NOT YET OPERATIONAL: like check_pacing, this tool
+    reads from pacing snapshots that nothing in the live application
+    ever writes. Expect pacing_status "no_data" for every real
+    campaign until the budget pacing engine is wired into a live path.
+
     Provides detailed pacing data including expected vs actual spend,
     per-channel breakdown, deviation alerts, and pacing status.
 
@@ -2172,6 +2202,7 @@ def get_pacing_report(campaign_id: str) -> str:
     - pacing_pct, deviation_pct
     - channel_pacing: per-channel breakdown with eCPM and fill rate
     - alerts: list of pacing deviation alerts
+    - experimental: always true; this subsystem is not operational
     - error: present only if the campaign was not found
     """
     from ..reporting.campaign_report import CampaignReporter
@@ -2240,6 +2271,7 @@ def get_pacing_report(campaign_id: str) -> str:
             "alerts": alerts,
             "snapshot_timestamp": dashboard.snapshot_timestamp,
             "timestamp": datetime.now(UTC).isoformat(),
+            "experimental": True,
         }
         return json.dumps(result, indent=2)
     finally:
