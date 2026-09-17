@@ -47,6 +47,12 @@ class NegotiationSession(BaseModel):
     negotiation_id: str
     current_seller_price: float
     our_last_offer: float | None = None
+    #: The quote this negotiation concerns, when the buyer holds one. Sent on
+    #: every outbound NegotiationMessage as ``quote_id`` so the seller can
+    #: correlate the agreed price back to the quote that gets booked -- the
+    #: only correlation route the booking contract offers (DealBookingRequest
+    #: carries a quote_id and no negotiation_id).
+    quote_id: str | None = None
     rounds: list[NegotiationRound] = Field(default_factory=list)
     started_at: datetime = Field(default_factory=utc_now)
 

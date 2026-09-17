@@ -156,6 +156,7 @@ class NegotiationClient:
         initial_price: float,
         strategy: NegotiationStrategy,
         negotiation_enabled: bool = True,
+        quote_id: str | None = None,
     ) -> NegotiationSession:
         """Start a negotiation by sending the first counter-offer.
 
@@ -169,6 +170,11 @@ class NegotiationClient:
             strategy: The negotiation strategy (stored for reference).
             negotiation_enabled: Whether the seller's package allows
                 negotiation.  When False, raises ValueError.
+            quote_id: The quote this negotiation concerns, when the buyer
+                holds one. Sent on this and every subsequent message of the
+                negotiation so the seller can correlate the agreed price to
+                the quote that will be booked. Stored on the returned
+                session.
 
         Returns:
             A NegotiationSession tracking the negotiation state.
@@ -185,10 +191,15 @@ class NegotiationClient:
         url = f"{seller_url}{_NEGOTIATION_MESSAGES_PATH}"
         # Opening move: a shared NegotiationMessage with action="counter" and
         # negotiation_id=None (the seller mints the negotiation on open). Money
-        # crosses as the shared Money via buyer_price.
+        # crosses as the shared Money via buyer_price. quote_id rides along
+        # when known: the shared model requires AT LEAST one of
+        # negotiation_id/proposal_id/quote_id, so sending the quote id
+        # alongside proposal_id is valid and leaves the seller's
+        # proposal-first key derivation untouched.
         payload = to_wire_negotiation_message(
             action="counter",
             proposal_id=proposal_id,
+            quote_id=quote_id,
             buyer_price=initial_price,
         ).model_dump(mode="json", exclude_none=True)
 
@@ -203,6 +214,7 @@ class NegotiationClient:
             negotiation_id=data.get("negotiation_id", f"neg-{proposal_id}"),
             current_seller_price=data.get("seller_price", data.get("current_price", 0.0)),
             our_last_offer=initial_price,
+            quote_id=quote_id,
             rounds=[],
         )
 
@@ -244,6 +256,7 @@ class NegotiationClient:
             action="counter",
             proposal_id=session.proposal_id,
             negotiation_id=session.negotiation_id,
+            quote_id=session.quote_id,
             buyer_price=price,
         ).model_dump(mode="json", exclude_none=True)
 
@@ -293,6 +306,7 @@ class NegotiationClient:
             action="accept",
             proposal_id=session.proposal_id,
             negotiation_id=session.negotiation_id,
+            quote_id=session.quote_id,
             buyer_price=session.current_seller_price,
         ).model_dump(mode="json", exclude_none=True)
 
@@ -322,6 +336,7 @@ class NegotiationClient:
             action="reject",
             proposal_id=session.proposal_id,
             negotiation_id=session.negotiation_id,
+            quote_id=session.quote_id,
         ).model_dump(mode="json", exclude_none=True)
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -336,6 +351,7 @@ class NegotiationClient:
         proposal_id: str,
         strategy: NegotiationStrategy,
         negotiation_enabled: bool = True,
+        quote_id: str | None = None,
     ) -> NegotiationResult:
         """Run a full negotiation loop automatically using the strategy.
 
@@ -353,6 +369,8 @@ class NegotiationClient:
             strategy: The negotiation strategy to use.
             negotiation_enabled: Whether the seller's package allows
                 negotiation.  When False, returns DECLINED immediately.
+            quote_id: The quote this negotiation concerns, when the buyer
+                holds one; sent on every outbound message of the loop.
 
         Returns:
             NegotiationResult with the outcome and history.
@@ -385,6 +403,7 @@ class NegotiationClient:
             proposal_id=proposal_id,
             initial_price=initial_price,
             strategy=strategy,
+            quote_id=quote_id,
         )
 
         # Check if seller already accepted or if we should accept their counter
