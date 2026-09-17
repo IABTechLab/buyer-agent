@@ -35,7 +35,6 @@ from ..agents.level2.ctv_agent import create_ctv_agent
 from ..agents.level2.mobile_app_agent import create_mobile_app_agent
 from ..agents.level2.performance_agent import create_performance_agent
 from ..agents.level2.social_agent import create_social_agent
-from ..agents.level3.execution_agent import create_execution_agent
 from ..agents.level3.research_agent import create_research_agent
 from ..clients.opendirect_client import OpenDirectClient
 from ..config.settings import settings
@@ -289,12 +288,17 @@ def _build_channel_crew(
     """Shared constructor for the 4 channel crews."""
 
     research_tools = _create_research_tools(client)
-    execution_tools = _create_execution_tools(client)
 
     manager_agent = spec.manager_agent_factory()
     research_agent = create_research_agent(tools=research_tools)
-    execution_agent = create_execution_agent(tools=execution_tools)
-
+    # No execution_agent here by design: these are research/recommendation
+    # crews with no task ever assigned to an order-writing agent. In
+    # crewai's hierarchical process the manager LLM may delegate to any
+    # agent in `agents=[]`, so an idle agent carrying live OpenDirect
+    # order-writing tools (CreateOrderTool/CreateLineTool/ReserveLineTool/
+    # BookLineTool) would be one delegation away from writing a real order.
+    # All real booking stays on the deterministic DealBookingFlow path; see
+    # tests/unit/test_booking_path_llm_free.py.
     audience_context = _format_audience_context(audience_plan)
 
     research_task = Task(
@@ -318,7 +322,7 @@ def _build_channel_crew(
     )
 
     return Crew(
-        agents=[research_agent, execution_agent],
+        agents=[research_agent],
         tasks=[research_task, recommendation_task],
         process=Process.hierarchical,
         manager_agent=manager_agent,
@@ -646,8 +650,10 @@ def create_social_crew(
     meta_tool = MetaInventoryTool()
     manager_agent = create_social_agent()
     research_agent = create_research_agent(tools=[meta_tool])
-    execution_agent = create_execution_agent(tools=[])
-
+    # No execution_agent here by design: see the comment in
+    # `_build_channel_crew` above. This crew never assigned it a task, so it
+    # was an idle agent one hierarchical delegation away from being usable
+    # for booking even though it currently carries no tools.
     audience_context = _format_audience_context(audience_plan)
 
     research_task = Task(
@@ -670,7 +676,7 @@ def create_social_crew(
     )
 
     return Crew(
-        agents=[research_agent, execution_agent],
+        agents=[research_agent],
         tasks=[research_task, recommendation_task],
         process=Process.hierarchical,
         manager_agent=manager_agent,

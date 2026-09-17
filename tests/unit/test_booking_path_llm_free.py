@@ -25,16 +25,35 @@ This is asserted two ways, both mechanically (no runtime LLM needed):
    invokes a crew (``.kickoff()``) or constructs one (``create_*_crew``) --
    proving the booking half is disjoint from the LLM-driven research half.
 
+3. Crew tool-inventory check on the actually-built crews. (1) and (2) prove
+   booking is unreachable from deterministic code, but say nothing about
+   what a crew's own manager LLM can do at runtime: in crewai's hierarchical
+   process, the manager may delegate a task to ANY agent present in a
+   crew's ``agents=[]`` list, whether or not a task was ever assigned to
+   that agent. A research crew that also carried an idle agent wired with
+   live OpenDirect order-writing tools (``CreateOrderTool``,
+   ``CreateLineTool``, ``ReserveLineTool``, ``BookLineTool``) would be one
+   delegation away from writing a real order outside the booking path
+   proven LLM-free above. We build each production crew the way the app
+   does and assert no agent -- manager or otherwise -- carries one of
+   those tool classes.
+
 Part of EP-4.2.
 """
 
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
+from unittest.mock import MagicMock
 
 SRC_ROOT = Path(__file__).resolve().parents[2] / "src"
 AD_BUYER_ROOT = SRC_ROOT / "ad_buyer"
+
+# Agents validate their LLM client on creation; a dummy key is enough since
+# no crew in this file is ever kicked off.
+os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-for-ci")
 
 # Modules/packages that mean "an LLM is in reach".
 _LLM_PACKAGES = {"crewai", "litellm", "langchain", "openai", "anthropic"}
@@ -220,3 +239,121 @@ class TestDealBookingFlowBookingHalfIsLLMFree:
             "A crew-invoking method is reachable from the booking path: "
             f"{sorted(crew_users & booking_reachable)}"
         )
+
+
+class TestNoCrewAgentCarriesAnOrderWritingTool:
+    """No agent in any built crew may carry a live order-writing tool.
+
+    Import closure and call-graph checks above prove the booking path
+    cannot reach an LLM. They do not prove the converse: that an LLM-driven
+    crew cannot reach booking. In crewai's hierarchical process, the
+    manager LLM may delegate a task to any agent present in a crew's
+    ``agents=[]`` list -- including an agent that was never assigned a
+    task. A research/recommendation crew has no business holding an agent
+    wired with tools that write real OpenDirect orders (``CreateOrderTool``,
+    ``CreateLineTool``, ``ReserveLineTool``, ``BookLineTool``); all real
+    booking must go through the deterministic ``DealBookingFlow`` /
+    ``MultiSellerOrchestrator`` path proven LLM-free above.
+
+    This test builds every production crew the way the application does
+    (mocked OpenDirect client, no network calls at construction time) and
+    inspects every agent's tool list -- manager included -- for those four
+    tool classes. If someone re-attaches an execution agent, or any other
+    agent, with one of these tools to a research crew, this test fails.
+    """
+
+    @staticmethod
+    def _order_writing_tool_classes() -> tuple[type, ...]:
+        from ad_buyer.tools.execution.line_management import (
+            BookLineTool,
+            CreateLineTool,
+            ReserveLineTool,
+        )
+        from ad_buyer.tools.execution.order_management import CreateOrderTool
+
+        return (CreateOrderTool, CreateLineTool, ReserveLineTool, BookLineTool)
+
+    @staticmethod
+    def _built_crews() -> dict[str, object]:
+        """Build every production crew with a mocked OpenDirect client.
+
+        MagicMock is safe here: none of these factories dispatch a network
+        call at construction time, only at ``.kickoff()``, which this test
+        never calls.
+        """
+        from ad_buyer.crews.channel_crews import (
+            create_branding_crew,
+            create_ctv_crew,
+            create_mobile_crew,
+            create_performance_crew,
+            create_social_crew,
+        )
+        from ad_buyer.crews.portfolio_crew import create_portfolio_crew
+
+        client = MagicMock()
+        channel_brief = {
+            "budget": 10_000,
+            "start_date": "2025-03-01",
+            "end_date": "2025-03-31",
+            "target_audience": {"age": "25-54"},
+            "objectives": ["awareness"],
+            "kpis": {"cpa": 10},
+        }
+        campaign_brief = {
+            "name": "Test Campaign",
+            "objectives": ["awareness"],
+            "budget": 50_000,
+            "start_date": "2025-03-01",
+            "end_date": "2025-03-31",
+            "target_audience": {"age": "25-54"},
+            "kpis": {"viewability": 70},
+        }
+
+        return {
+            "branding": create_branding_crew(client, channel_brief),
+            "mobile": create_mobile_crew(client, channel_brief),
+            "ctv": create_ctv_crew(client, channel_brief),
+            "performance": create_performance_crew(client, channel_brief),
+            "social": create_social_crew(client, channel_brief),
+            "portfolio": create_portfolio_crew(client, campaign_brief),
+        }
+
+    def test_no_agent_in_any_built_crew_carries_an_order_writing_tool(self):
+        order_writing_tool_classes = self._order_writing_tool_classes()
+        crews = self._built_crews()
+
+        offenders: list[str] = []
+        for crew_name, crew in crews.items():
+            agents = list(crew.agents)
+            if crew.manager_agent is not None and crew.manager_agent not in agents:
+                agents.append(crew.manager_agent)
+            for agent in agents:
+                for tool in getattr(agent, "tools", None) or []:
+                    if isinstance(tool, order_writing_tool_classes):
+                        offenders.append(
+                            f"{crew_name} crew: agent role={agent.role!r} carries "
+                            f"{type(tool).__name__}"
+                        )
+
+        assert not offenders, (
+            "Found order-writing OpenDirect tools reachable from a crewai "
+            "hierarchical-process agent list. In that process the manager "
+            "LLM may delegate to ANY agent in `agents=[]`, whether or not a "
+            "task was ever assigned to it, so this is a live booking "
+            "loophole -- all order writes must go through the deterministic "
+            "DealBookingFlow path instead. Offending agents:\n  - " + "\n  - ".join(offenders)
+        )
+
+    def test_the_tool_classes_checked_are_the_real_execution_tool_bundle(self):
+        """Control: the checked classes are exactly `_create_execution_tools`'s.
+
+        Guards against the offender list silently going stale (e.g. a
+        renamed or added execution tool) by cross-checking against the
+        crew module's own execution-tool factory.
+        """
+        from ad_buyer.crews.channel_crews import _create_execution_tools
+
+        execution_tools = _create_execution_tools(MagicMock())
+        execution_tool_types = {type(t) for t in execution_tools}
+
+        assert execution_tool_types == set(self._order_writing_tool_classes())
