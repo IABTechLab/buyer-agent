@@ -55,6 +55,7 @@ ANTHROPIC_BASE_URL="${ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL:-https://bedrock-run
 BEDROCK_API_KEY="${ANTHROPIC_COMPATIBLE_LLM_API_KEY:-${AWS_BEARER_TOKEN_BEDROCK:-}}"
 SELLER_AGENT_URL="${SELLER_AGENT_URL:-}"
 DEPLOY_MODE="http"
+STORAGE_TYPE_ARG="sqlite"
 DO_TEST=false
 TEST_ONLY=false
 DO_CLEANUP=false
@@ -65,6 +66,7 @@ while [[ $# -gt 0 ]]; do
     --region)     REGION="$2"; shift 2 ;;
     --name)       AGENT_NAME="$2"; shift 2 ;;
     --mode)       DEPLOY_MODE="$2"; shift 2 ;;
+    --storage)    STORAGE_TYPE_ARG="$2"; shift 2 ;;
     --profile)    AWS_PROFILE="$2"; shift 2 ;;
     --seller-url) SELLER_AGENT_URL="$2"; shift 2 ;;
     --test)       DO_TEST=true; shift ;;
@@ -72,11 +74,17 @@ while [[ $# -gt 0 ]]; do
     --cleanup)    DO_CLEANUP=true; shift ;;
     --prompt)     PROMPT="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: $(basename "$0") [--region REGION] [--name NAME] [--mode MODE] [--profile PROFILE] [--seller-url URL] [--test] [--test-only] [--cleanup] [--prompt JSON]"
+      echo "Usage: $(basename "$0") [--region REGION] [--name NAME] [--mode MODE] [--storage sqlite|postgres] [--profile PROFILE] [--seller-url URL] [--test] [--test-only] [--cleanup] [--prompt JSON]"
       exit 0 ;;
     *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+# Validate storage backend
+if [[ "${STORAGE_TYPE_ARG}" != "sqlite" && "${STORAGE_TYPE_ARG}" != "postgres" ]]; then
+  echo "ERROR: --storage must be 'sqlite' (default, in-memory) or 'postgres' (Aurora Serverless v2 + Secrets Manager, CUSTOMER_VPC)" >&2
+  exit 1
+fi
 
 # Validate deploy mode (only http supported for now — MCP causes OOM, Issue 19)
 if [[ "${DEPLOY_MODE}" != "http" ]]; then
@@ -100,6 +108,104 @@ if [[ -n "${AWS_PROFILE}" ]]; then
 fi
 
 cd "${REPO_ROOT}"
+
+# =============================================================================
+# --storage postgres: deploy Aurora Serverless v2 + Redis + VPC endpoints via
+# main-agentcore.yaml, then export the connection facts. Sets (on success):
+#   VPC_SUBNET_1 / VPC_SUBNET_2 / VPC_SECURITY_GROUP  — CUSTOMER_VPC runtime cfg
+#   DB_SECRET_ARN / AURORA_ENDPOINT / AURORA_PORT / DB_NAME / REDIS_URL — env
+# NO plaintext password is ever read or forwarded — the app reads the
+# RDS-managed Secrets Manager secret at startup by ARN (Req 12.2/12.7).
+# =============================================================================
+VPC_SUBNET_1=""; VPC_SUBNET_2=""; VPC_SECURITY_GROUP=""
+DB_SECRET_ARN=""; AURORA_ENDPOINT=""; AURORA_PORT=""; DB_NAME=""; REDIS_URL=""
+
+deploy_postgres_infrastructure() {
+  local stack_name="ad-buyer-${ENVIRONMENT:-staging}-agentcore"
+  local account_id
+  account_id=$(aws sts get-caller-identity --query Account --output text --region "${REGION}")
+  local bucket="${TEMPLATE_BUCKET:-ad-buyer-cfn-${account_id}-${REGION}}"
+
+  echo "============================================="
+  echo "  Deploying buyer durable-storage infrastructure"
+  echo "  Stack : ${stack_name}"
+  echo "============================================="
+
+  if ! aws s3 ls "s3://${bucket}" --region "${REGION}" 2>/dev/null; then
+    echo ">>> Creating template bucket: ${bucket}"
+    aws s3api create-bucket --bucket "${bucket}" --region "${REGION}" \
+      --create-bucket-configuration LocationConstraint="${REGION}" 2>/dev/null \
+      || aws s3 mb "s3://${bucket}" --region "${REGION}"
+  fi
+
+  # Discover the private route table (network.yaml doesn't export it) for the
+  # S3 gateway endpoint; empty is fine (the endpoint is conditional).
+  local private_rt=""
+  private_rt=$(aws ec2 describe-route-tables --region "${REGION}" \
+    --filters "Name=tag:Project,Values=ad-buyer-system" \
+    --query "RouteTables[?Associations[?Main!=\`true\`]].RouteTableId | [0]" \
+    --output text 2>/dev/null || true)
+  [[ "${private_rt}" == "None" ]] && private_rt=""
+
+  echo ">>> Packaging templates (uploading nested stacks to S3)..."
+  local packaged="${REPO_ROOT}/.packaged-agentcore.yaml"
+  aws cloudformation package \
+    --template-file "${SCRIPT_DIR}/main-agentcore.yaml" \
+    --s3-bucket "${bucket}" \
+    --s3-prefix "ad-buyer-system/agentcore" \
+    --output-template-file "${packaged}" \
+    --region "${REGION}"
+
+  local overrides=("Environment=${ENVIRONMENT:-staging}" "TemplatesBucketName=${bucket}")
+  [[ -n "${private_rt}" ]] && overrides+=("PrivateRouteTableId=${private_rt}")
+
+  echo ">>> Deploying stack: ${stack_name}"
+  aws cloudformation deploy \
+    --template-file "${packaged}" \
+    --stack-name "${stack_name}" \
+    --parameter-overrides "${overrides[@]}" \
+    --capabilities CAPABILITY_IAM \
+    --region "${REGION}" \
+    --no-fail-on-empty-changeset
+
+  echo ">>> Reading stack outputs..."
+  local outputs
+  outputs=$(aws cloudformation describe-stacks --stack-name "${stack_name}" \
+    --region "${REGION}" --query "Stacks[0].Outputs" --output json)
+
+  _out() { echo "${outputs}" | python3 -c "import sys,json; print(next((o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='$1'),''))"; }
+  VPC_SECURITY_GROUP=$(_out AgentCoreSecurityGroupId)
+  VPC_SUBNET_1=$(_out PrivateSubnet1Id)
+  VPC_SUBNET_2=$(_out PrivateSubnet2Id)
+  DB_SECRET_ARN=$(_out AuroraSecretArn)
+  AURORA_ENDPOINT=$(_out AuroraEndpoint)
+  AURORA_PORT=$(_out AuroraPort)
+  DB_NAME=$(_out AuroraDatabaseName)
+  local redis_ep redis_port
+  redis_ep=$(_out RedisEndpoint); redis_port=$(_out RedisPort)
+  [[ -n "${redis_ep}" ]] && REDIS_URL="redis://${redis_ep}:${redis_port}/0"
+
+  echo "  SG       : ${VPC_SECURITY_GROUP}"
+  echo "  Subnets  : ${VPC_SUBNET_1}, ${VPC_SUBNET_2}"
+  echo "  DB secret: ${DB_SECRET_ARN}"
+  echo "  Aurora   : ${AURORA_ENDPOINT}:${AURORA_PORT}/${DB_NAME}"
+  echo "✅ Durable-storage infrastructure deployed"
+}
+
+# Grant the runtime execution role read access to the RDS-managed DB secret
+# (+ KMS decrypt). Best-effort + idempotent; a separately-named inline policy
+# the toolkit's execution-policy rewrite does not clobber. (Req 12.4)
+grant_secret_access() {
+  local role_arn="$1" secret_arn="$2"
+  [[ -z "${role_arn}" || -z "${secret_arn}" ]] && return 0
+  local role_name="${role_arn##*/}"
+  echo ">>> Granting ${role_name} secretsmanager:GetSecretValue on the DB secret"
+  aws iam put-role-policy \
+    --role-name "${role_name}" \
+    --policy-name "BuyerDbSecretAccess" \
+    --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"secretsmanager:GetSecretValue\"],\"Resource\":\"${secret_arn}\"},{\"Effect\":\"Allow\",\"Action\":[\"kms:Decrypt\"],\"Resource\":\"*\",\"Condition\":{\"StringEquals\":{\"kms:ViaService\":\"secretsmanager.${REGION}.amazonaws.com\"}}}]}" \
+    --region "${REGION}" 2>&1 || echo "  ⚠️  secret grant failed (non-fatal)"
+}
 
 # ── Cleanup (--cleanup) ────────────────────────────────────────────
 if [[ "${DO_CLEANUP}" == "true" ]]; then
@@ -192,9 +298,20 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     echo "  execution role: ${EXECUTION_ROLE_ARN:-<none>}"
   fi
 
+  # ── Durable storage (--storage postgres): deploy Aurora+Redis+VPC endpoints,
+  # then run the runtime in CUSTOMER_VPC mode. Default stays sqlite in-memory.
+  if [[ "${STORAGE_TYPE_ARG}" == "postgres" ]]; then
+    deploy_postgres_infrastructure
+  fi
+
   # Configure
   echo ""
   echo ">>> Configuring agent..."
+  _vpc_args=()
+  if [[ "${STORAGE_TYPE_ARG}" == "postgres" && -n "${VPC_SECURITY_GROUP}" ]]; then
+    _vpc_args=(--vpc --subnets "${VPC_SUBNET_1},${VPC_SUBNET_2}" --security-groups "${VPC_SECURITY_GROUP}")
+    echo "  VPC mode: SG=${VPC_SECURITY_GROUP}, Subnets=${VPC_SUBNET_1},${VPC_SUBNET_2}"
+  fi
   agentcore configure \
     -e src/ad_buyer/interfaces/agentcore/http_main.py \
     -n "${AGENT_NAME}" \
@@ -202,6 +319,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     -p HTTP \
     -r "${REGION}" \
     ${EXECUTION_ROLE_ARN:+--execution-role "${EXECUTION_ROLE_ARN}"} \
+    "${_vpc_args[@]+"${_vpc_args[@]}"}" \
     --non-interactive \
     --deployment-type container
 
@@ -227,15 +345,40 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   [[ -n "${SELLER_INVOKE_SCOPE:-}" ]] && _oauth_env+=(--env "SELLER_INVOKE_SCOPE=${SELLER_INVOKE_SCOPE}")
   [[ -n "${BUYER_OAUTH_CLIENT_ID:-}" ]] && _oauth_env+=(--env "BUYER_OAUTH_CLIENT_ID=${BUYER_OAUTH_CLIENT_ID}")
   [[ -n "${BUYER_OAUTH_CLIENT_SECRET:-}" ]] && _oauth_env+=(--env "BUYER_OAUTH_CLIENT_SECRET=${BUYER_OAUTH_CLIENT_SECRET}")
+  # Storage env: default sqlite in-memory (dev); postgres → hybrid with the
+  # RDS-managed secret ARN (NOT the password) + Aurora/Redis connection facts.
+  # The app reads the secret from Secrets Manager at startup (Req 12.7).
+  _storage_env=()
+  if [[ "${STORAGE_TYPE_ARG}" == "postgres" ]]; then
+    _storage_env=(
+      --env "STORAGE_TYPE=hybrid"
+      --env "DB_SECRET_ARN=${DB_SECRET_ARN}"
+      --env "AURORA_ENDPOINT=${AURORA_ENDPOINT}"
+      --env "AURORA_PORT=${AURORA_PORT}"
+      --env "DB_NAME=${DB_NAME}"
+      --env "REDIS_URL=${REDIS_URL}"
+    )
+    # Grant the runtime role read access to the DB secret now that configure
+    # has created/resolved it.
+    _role_arn="${EXECUTION_ROLE_ARN}"
+    if [[ -z "${_role_arn}" && -f .bedrock_agentcore.yaml ]]; then
+      _role_arn=$(grep "execution_role:" .bedrock_agentcore.yaml | head -1 | awk '{print $2}')
+    fi
+    grant_secret_access "${_role_arn}" "${DB_SECRET_ARN}"
+  else
+    _storage_env=(
+      --env "STORAGE_TYPE=sqlite"
+      --env "DATABASE_URL=sqlite:///:memory:"
+    )
+  fi
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
     --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
     --env "PYTHONPATH=/app/src" \
     --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
-    "${_key_env[@]}" \
-    "${_oauth_env[@]}" \
-    --env "STORAGE_TYPE=sqlite" \
-    --env "DATABASE_URL=sqlite:///:memory:" \
+    "${_key_env[@]+"${_key_env[@]}"}" \
+    "${_oauth_env[@]+"${_oauth_env[@]}"}" \
+    "${_storage_env[@]+"${_storage_env[@]}"}" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \
     --env "SELLER_AGENT_URL=${SELLER_AGENT_URL}" \
     --env "AWS_REGION=${REGION}" \
