@@ -10,6 +10,7 @@ no locally minted deal ids. The four former inline tools
 CreatePMPDealTool) are deleted and must stay dead.
 """
 
+import inspect
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -17,6 +18,7 @@ import pytest
 from ad_buyer.interfaces.chat import main as chat_main
 from ad_buyer.interfaces.chat.main import (
     BookDealsTool,
+    ChatInterface,
     RequestQuotesTool,
     SellerConnection,
     _ConfiguredSellersRegistry,
@@ -181,3 +183,23 @@ class TestRivalChatToolsStayDead:
                 f"{name} is a deleted rival booking path; "
                 "chat must book through the canonical orchestrator wrappers."
             )
+
+
+# ---------------------------------------------------------------------------
+# Per-turn prompt must only reference tools that still exist
+# ---------------------------------------------------------------------------
+
+
+class TestPerTurnPromptMatchesRealTools:
+    def test_prompt_does_not_reference_deleted_search_all_sellers_tool(self):
+        """search_all_sellers was deleted in July; the per-turn task prompt
+        must not instruct the LLM to use it. Guards against reintroduction."""
+        source = inspect.getsource(ChatInterface.process_message)
+
+        assert "search_all_sellers" not in source
+
+    def test_prompt_references_the_two_real_tools(self):
+        source = inspect.getsource(ChatInterface.process_message)
+
+        assert "request_quotes" in source
+        assert "book_deals" in source
