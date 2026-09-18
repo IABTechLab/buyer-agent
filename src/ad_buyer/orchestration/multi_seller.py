@@ -43,6 +43,7 @@ from ..clients.capability_client import (
     CapabilityClient,
     CapabilityDiscoveryResult,
 )
+from ..clients.contract_mappers import _money_from_float
 from ..clients.deals_client import DealsClientError
 from ..clients.sgp_client import SGPClient
 from ..events.models import Event, EventType
@@ -409,8 +410,8 @@ class OrchestrationResult:
             original quote, opening price, per-round history, outcome
             (``accepted`` / ``walked_away`` / ``rejected`` /
             ``unavailable`` / ``requote_failed`` /
-            ``requote_above_ceiling``), agreed CPM, and the fresh quote
-            id when re-quoted.
+            ``requote_above_ceiling`` / ``requote_price_mismatch``),
+            agreed CPM, and the fresh quote id when re-quoted.
     """
 
     discovered_sellers: list[AgentCard]
@@ -1337,9 +1338,14 @@ class MultiSellerOrchestrator:
            quote with ``target_cpm=P``. The seller's quote engine honors
            an acceptable target as the quote's ``final_cpm``, and booking
            strikes the deal at the fresh quote's price -- the only
-           contract-clean way to book a negotiated price today. The fresh
-           quote is verified <= ``max_cpm`` before it enters the ranked
-           list; the budget/spend-ceiling gates remain the final arbiter.
+           contract-clean way to book a negotiated price today. Before the
+           fresh quote enters the ranked list -- i.e. before anything can
+           book it -- it must clear TWO independent guards: it must be
+           <= ``max_cpm`` (never book above the ceiling), and its
+           ``final_cpm`` must EQUAL P (never book a price we did not agree
+           to), compared as integer micros -- the unit money is defined in
+           on the wire -- with no tolerance window. The budget/spend-ceiling
+           gates remain the final arbiter.
 
         Returns:
             (negotiated_result, record). ``negotiated_result`` is a
@@ -1434,6 +1440,11 @@ class MultiSellerOrchestrator:
             negotiation_id=str(counter_terms.get("negotiation_id") or proposal_id),
             current_seller_price=seller_price if seller_price is not None else 0.0,
             our_last_offer=open_price,
+            # Correlation: every message of this negotiation carries the quote
+            # it concerns, so the seller can resolve the agreed price from the
+            # quote that gets booked. DealBookingRequest has no negotiation_id,
+            # so the quote is the only correlation key the contract offers.
+            quote_id=quote.quote_id,
         )
 
         agreed: float | None = None
@@ -1562,6 +1573,64 @@ class MultiSellerOrchestrator:
                 agreed,
             )
             record["outcome"] = "requote_above_ceiling"
+            await self._emit_negotiation_concluded(record)
+            return None, record
+
+        # Money invariant, INDEPENDENT of the ceiling check above: the bookable
+        # quote must carry the price that was actually AGREED, not merely some
+        # price under the buyer's ceiling. The ceiling test alone passes for any
+        # price below the limit, including the seller's undiscounted list price,
+        # so a dropped negotiation books silently and logs as a success. This is
+        # the assertion that makes that class of defect loud.
+        #
+        # It is checked BEFORE the quote enters the ranked list -- i.e. before
+        # the booking call -- so a mismatch refuses to book rather than
+        # surfacing once the money is committed.
+        #
+        # The two guards are deliberately separate and separately reported. The
+        # ceiling breach is checked first because it is the more severe and more
+        # specific diagnosis ("the seller reneged and went above our limit"),
+        # and because it also disposes of the unpriced (`final_cpm is None`)
+        # case. Collapsing the two would lose that distinction; reordering them
+        # would require handling the unpriced case here instead.
+        #
+        # The comparison is on integer micros, NOT on floats with a tolerance
+        # window. Micros are the unit money is actually defined in on the wire
+        # (the shared `Money`), so quantizing both sides and comparing integers
+        # asks exactly the right question: "is this the same money?" There is no
+        # chosen fudge factor to widen, and no band in which a real pricing
+        # difference stays silent. It is also the only comparison that is robust
+        # for the right reason: a bit-exact `!=` on floats happens to be correct
+        # today only because both sides use the same two operations, and would
+        # refuse a perfectly good booking if `agreed` ever carried more than six
+        # decimal places, because the micros quantization then produces a real
+        # ~1e-7 delta. Quantizing first absorbs that -- the only delta this path
+        # can actually produce -- while still rejecting a difference of one
+        # micro and upward.
+        agreed_money = _money_from_float(agreed)
+        final_money = _money_from_float(final_cpm)
+        # Both inputs are non-None floats by the guards above, so neither
+        # conversion can return None. The None arms are spelled out anyway so
+        # the guard fails CLOSED rather than booking an unverifiable price.
+        if (
+            agreed_money is None
+            or final_money is None
+            or final_money.amount_micros != agreed_money.amount_micros
+        ):
+            logger.warning(
+                "Re-quote from seller %s came back at %.2f but the negotiated "
+                "price was %.2f; refusing to book a price we did not agree to "
+                "(ceiling %.2f)",
+                seller_id,
+                final_cpm,
+                agreed,
+                max_cpm,
+            )
+            record["outcome"] = "requote_price_mismatch"
+            record["error"] = (
+                f"re-quote priced at {final_cpm:.2f} but the agreed price was "
+                f"{agreed:.2f}; the negotiated price did not reach the bookable quote"
+            )
             await self._emit_negotiation_concluded(record)
             return None, record
 

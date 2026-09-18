@@ -481,8 +481,11 @@ def to_wire_negotiation_message(
     the same model. Money-mutating (FD-12): carries a required idempotency_key.
 
     Action rules enforced by the shared model: 'counter'/'final_offer' require
-    ``buyer_price``; 'reject' must omit it; 'accept' may echo it. Exactly one of
-    negotiation_id/proposal_id/quote_id must be present.
+    ``buyer_price``; 'reject' must omit it; 'accept' may echo it. AT LEAST one
+    of negotiation_id/proposal_id/quote_id must be present -- the shared
+    validator rejects only the all-None case, so they are NOT mutually
+    exclusive and a proposal-led negotiation can carry the ``quote_id`` it
+    concerns alongside ``proposal_id``/``negotiation_id``.
     """
     return WireNegotiationMessage(
         idempotency_key=idempotency_key or uuid4().hex,
