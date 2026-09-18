@@ -25,6 +25,12 @@ Two independent halves of the same defect:
    silently dropped therefore booked at list price and logged as a success.
    The buyer now also asserts the bookable quote's price EQUALS the agreed
    price, BEFORE the quote can be booked, and the two guards stay separate.
+
+   Equality is on integer micros -- the unit money is defined in on the wire
+   -- with no tolerance window. Two prices are equal if and only if they are
+   the same number of micros, so the only delta this path can produce (the
+   sub-micro quantization of a ragged float) is absorbed, while a real
+   difference of one micro and upward is refused.
 """
 
 import json
@@ -60,6 +66,18 @@ QUOTE_ID = "qt-original-001"
 CEILING = 12.0
 TARGET = 10.0
 AGREED = 11.5
+
+# A "ragged" agreed price: a float carrying more than six decimal places. The
+# micros quantization is the ONLY lossy step on the money path, so this is the
+# only delta the path can actually produce -- and it is sub-micro. 34/3 is
+# 11.333333333333334, which is 11_333_333 micros, so a seller that echoes the
+# target back through a micros round trip legitimately returns 11.333333.
+# These two are NOT equal as floats, and MUST compare equal as money.
+RAGGED_AGREED = 34 / 3
+RAGGED_ROUND_TRIPPED = 11.333333
+# The same price plus exactly one micro: 11_333_334. The smallest difference
+# money can actually express, and a real one, so it must be refused.
+RAGGED_PLUS_ONE_MICRO = 11.333334
 
 
 # ---------------------------------------------------------------------------
@@ -309,6 +327,18 @@ def _proposal_response(proposed_price: float | None = 13.0) -> dict:
     }
 
 
+def _agree_at(negotiation_client, price: float) -> None:
+    """Make the negotiation settle at exactly ``price``.
+
+    The seller's proposal response is round 1, and the orchestrator accepts the
+    first seller price at or below the ceiling, so putting ``price`` in
+    ``counter_terms.proposed_price`` makes it the agreed price verbatim -- the
+    orchestrator does ``float(raw_price)`` and no arithmetic, so a ragged float
+    survives into ``agreed`` bit for bit.
+    """
+    negotiation_client.submit_proposal.return_value = _proposal_response(proposed_price=price)
+
+
 @pytest.fixture
 def registry_client():
     client = AsyncMock()
@@ -480,25 +510,85 @@ class TestBookedPriceEqualsAgreedPrice:
         assert "qt-negotiated" not in [q.quote_id for q in result.ranked_quotes]
 
     @pytest.mark.asyncio
-    async def test_sub_cent_float_noise_is_not_a_mismatch(
+    async def test_ragged_agreed_price_round_tripped_through_micros_books(
         self, registry_client, deals_client_factory, event_bus, negotiation_client
     ):
-        """Money crosses as micros and returns as floats; noise must not trip.
+        """The one delta the money path can actually produce must still book.
 
-        A tenth of a cent apart is representation noise, not a pricing
-        difference, and must still book.
+        Money crosses the wire as integer micros, so an agreed price carrying
+        more than six decimal places comes back quantized. That is a genuine
+        representation difference, it is sub-micro, and it is the ONLY one this
+        path can create. Agreed 11.333333333333334, re-quoted 11.333333: not
+        equal as floats, the same money, so the deal books.
+        """
+        _agree_at(negotiation_client, RAGGED_AGREED)
+        client = deals_client_factory(SELLER_URL)
+        client.request_quote.side_effect = [
+            _quote(final_cpm=15.0),
+            _quote(quote_id="qt-negotiated", final_cpm=RAGGED_ROUND_TRIPPED),
+        ]
+        client.book_deal.return_value = _deal(
+            quote_id="qt-negotiated", final_cpm=RAGGED_ROUND_TRIPPED
+        )
+
+        result = await _run(registry_client, deals_client_factory, event_bus, negotiation_client)
+
+        # The premise: a bit-exact float `!=` WOULD have refused this booking.
+        assert RAGGED_AGREED != RAGGED_ROUND_TRIPPED
+        assert result.negotiations[0]["agreed_cpm"] == RAGGED_AGREED
+        assert len(result.selection.booked_deals) == 1
+        assert result.negotiations[0]["outcome"] == "accepted"
+
+    @pytest.mark.asyncio
+    async def test_one_micro_price_difference_is_a_mismatch(
+        self, registry_client, deals_client_factory, event_bus, negotiation_client
+    ):
+        """The smallest difference money can express is still a difference.
+
+        11_333_333 micros agreed, 11_333_334 micros re-quoted. One micro apart
+        is a real pricing difference, not representation noise, so it is
+        refused -- and it is well under the ceiling, so only the equality
+        assertion can catch it.
+        """
+        _agree_at(negotiation_client, RAGGED_AGREED)
+        client = deals_client_factory(SELLER_URL)
+        client.request_quote.side_effect = [
+            _quote(final_cpm=15.0),
+            _quote(quote_id="qt-negotiated", final_cpm=RAGGED_PLUS_ONE_MICRO),
+        ]
+
+        result = await _run(registry_client, deals_client_factory, event_bus, negotiation_client)
+
+        # Under the ceiling, so the ceiling guard alone would NOT have caught it.
+        assert RAGGED_PLUS_ONE_MICRO <= CEILING
+        assert result.selection.booked_deals == []
+        client.book_deal.assert_not_awaited()
+        assert result.negotiations[0]["outcome"] == "requote_price_mismatch"
+
+    @pytest.mark.asyncio
+    async def test_a_tenth_of_a_cent_difference_is_a_mismatch(
+        self, registry_client, deals_client_factory, event_bus, negotiation_client
+    ):
+        """A tenth of a cent is a PRICE difference, and is refused.
+
+        This input used to be accepted, on the theory that it was
+        representation noise. It is not: it is a thousand micros, two thousand
+        times the largest delta the money path can produce, and it moves real
+        money (cost is computed from the booked price, so $0.001 CPM is $1 per
+        million impressions). Under the micros rule it is a mismatch.
         """
         client = deals_client_factory(SELLER_URL)
         client.request_quote.side_effect = [
             _quote(final_cpm=15.0),
             _quote(quote_id="qt-negotiated", final_cpm=AGREED + 0.001),
         ]
-        client.book_deal.return_value = _deal(quote_id="qt-negotiated", final_cpm=AGREED + 0.001)
 
         result = await _run(registry_client, deals_client_factory, event_bus, negotiation_client)
 
-        assert len(result.selection.booked_deals) == 1
-        assert result.negotiations[0]["outcome"] == "accepted"
+        assert AGREED + 0.001 <= CEILING
+        assert result.selection.booked_deals == []
+        client.book_deal.assert_not_awaited()
+        assert result.negotiations[0]["outcome"] == "requote_price_mismatch"
 
 
 class TestCeilingGuardStaysIndependent:

@@ -43,6 +43,7 @@ from ..clients.capability_client import (
     CapabilityClient,
     CapabilityDiscoveryResult,
 )
+from ..clients.contract_mappers import _money_from_float
 from ..clients.deals_client import DealsClientError
 from ..clients.sgp_client import SGPClient
 from ..events.models import Event, EventType
@@ -101,15 +102,6 @@ def _failure_reason(
 # AudiencePlan carries parts the seller can't honor. Used by the retry-on-
 # rejection path in `select_and_book` to detect the structured rejection.
 _AUDIENCE_PLAN_UNSUPPORTED_CODE = "audience_plan_unsupported"
-
-
-# Tolerance for comparing two CPMs for equality, in dollars: half a cent per
-# mille. CPMs cross the wire as shared `Money` micros and come back as floats,
-# so a bit-exact `!=` would trip on representation noise rather than on a real
-# pricing difference. Half a cent is orders of magnitude below any genuine
-# discrepancy (the defect this guards against is list price vs negotiated
-# price, a difference measured in dollars), so the guard loses no teeth.
-_CPM_EQUALITY_TOLERANCE = 0.005
 
 
 class _SellerIncompatibleForCampaign(Exception):
@@ -1351,7 +1343,9 @@ class MultiSellerOrchestrator:
            book it -- it must clear TWO independent guards: it must be
            <= ``max_cpm`` (never book above the ceiling), and its
            ``final_cpm`` must EQUAL P (never book a price we did not agree
-           to). The budget/spend-ceiling gates remain the final arbiter.
+           to), compared as integer micros -- the unit money is defined in
+           on the wire -- with no tolerance window. The budget/spend-ceiling
+           gates remain the final arbiter.
 
         Returns:
             (negotiated_result, record). ``negotiated_result`` is a
@@ -1599,7 +1593,30 @@ class MultiSellerOrchestrator:
         # and because it also disposes of the unpriced (`final_cpm is None`)
         # case. Collapsing the two would lose that distinction; reordering them
         # would require handling the unpriced case here instead.
-        if abs(final_cpm - agreed) > _CPM_EQUALITY_TOLERANCE:
+        #
+        # The comparison is on integer micros, NOT on floats with a tolerance
+        # window. Micros are the unit money is actually defined in on the wire
+        # (the shared `Money`), so quantizing both sides and comparing integers
+        # asks exactly the right question: "is this the same money?" There is no
+        # chosen fudge factor to widen, and no band in which a real pricing
+        # difference stays silent. It is also the only comparison that is robust
+        # for the right reason: a bit-exact `!=` on floats happens to be correct
+        # today only because both sides use the same two operations, and would
+        # refuse a perfectly good booking if `agreed` ever carried more than six
+        # decimal places, because the micros quantization then produces a real
+        # ~1e-7 delta. Quantizing first absorbs that -- the only delta this path
+        # can actually produce -- while still rejecting a difference of one
+        # micro and upward.
+        agreed_money = _money_from_float(agreed)
+        final_money = _money_from_float(final_cpm)
+        # Both inputs are non-None floats by the guards above, so neither
+        # conversion can return None. The None arms are spelled out anyway so
+        # the guard fails CLOSED rather than booking an unverifiable price.
+        if (
+            agreed_money is None
+            or final_money is None
+            or final_money.amount_micros != agreed_money.amount_micros
+        ):
             logger.warning(
                 "Re-quote from seller %s came back at %.2f but the negotiated "
                 "price was %.2f; refusing to book a price we did not agree to "
