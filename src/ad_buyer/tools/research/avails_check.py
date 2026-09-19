@@ -96,11 +96,18 @@ Returns:
         budget: float | None = None,
     ) -> str:
         """Check availability for the specified product."""
+        # Parse dates first, in isolation, so a genuine date-format error is
+        # the ONLY thing reported as one. A Pydantic ValidationError from
+        # building AvailsResponse downstream is also a ValueError, so a single
+        # broad ``except ValueError`` here would mislabel a response-validation
+        # failure (e.g. a missing product_id) as "Error parsing dates".
         try:
-            # Parse dates
             start_dt = datetime.fromisoformat(start_date)
             end_dt = datetime.fromisoformat(end_date)
+        except ValueError as e:
+            return f"Error parsing dates: {e}. Please use YYYY-MM-DD format."
 
+        try:
             # Build request
             request = AvailsRequest(
                 product_id=product_id,
@@ -116,7 +123,9 @@ Returns:
             return self._format_results(product_id, start_date, end_date, avails)
 
         except ValueError as e:
-            return f"Error parsing dates: {e}. Please use YYYY-MM-DD format."
+            # Not a date error (dates already parsed above): a validation or
+            # value error from the avails request/response path.
+            return f"Error checking availability: {e}"
         except (httpx.HTTPError, OSError) as e:
             return f"Error checking availability: {e}"
 

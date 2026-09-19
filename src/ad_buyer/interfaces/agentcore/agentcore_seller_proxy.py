@@ -13,7 +13,7 @@ the ``OpenDirectClient`` surface (``list_products`` / ``search_products`` /
 method surface the flow needs, but under the hood calls the seller's **MCP**
 runtime by ARN via ``bedrock-agentcore:InvokeAgentRuntime``, issuing MCP
 ``tools/call`` requests (``list_products``, ``get_product_details``,
-``discover_inventory``) and mapping the STRUCTURED JSON tool results to the
+``get_pricing``) and mapping the STRUCTURED JSON tool results to the
 OpenDirect models at the boundary.
 
 Why MCP and not A2A for this path: the seller's MCP runtime returns structured
@@ -42,7 +42,8 @@ logger = logging.getLogger(__name__)
 # Seller MCP tool names (see seller-agent CREW_MCP_TOOLS / mcp_server).
 _TOOL_LIST_PRODUCTS = "list_products"
 _TOOL_GET_PRODUCT = "get_product_details"
-_TOOL_DISCOVER = "discover_inventory"
+_TOOL_GET_PRICING = "get_pricing"
+_TOOL_CHECK_AVAILS = "check_avails"
 
 
 class AgentCoreSellerProxy:
@@ -298,12 +299,38 @@ class AgentCoreSellerProxy:
         return _apply_filters(_extract_products(data), filters or {})
 
     async def check_avails(self, request: AvailsRequest) -> AvailsResponse:
+        # Prefer the real seller ``check_avails`` MCP tool (honest availability:
+        # available_impressions, estimated_cpm, total_cost via the seller's
+        # catalog avails policy — the same the REST /products/avails route uses).
+        # A seller runtime that predates that tool returns an error result; fall
+        # back to ``get_pricing`` (price only; requested volume echoed as
+        # available) so an older seller still yields a contract-valid response
+        # rather than raising on the missing tool.
         product_id = getattr(request, "product_id", None) or getattr(request, "productId", None)
+        requested = getattr(request, "requested_impressions", None) or 0
+        budget = getattr(request, "budget", None) or 0
+
         data = await self._call_tool(
-            _TOOL_DISCOVER,
-            {"product_id": product_id} if product_id else {},
+            _TOOL_CHECK_AVAILS,
+            {
+                "product_id": product_id,
+                "requested_impressions": int(requested),
+                "budget": float(budget),
+            }
+            if product_id
+            else {},
         )
-        return AvailsResponse.model_validate(_avails_payload(data))
+        if _is_real_avails(data):
+            return AvailsResponse.model_validate(data)
+
+        # Fallback: older seller MCP without check_avails -> use get_pricing.
+        data = await self._call_tool(
+            _TOOL_GET_PRICING,
+            {"product_id": product_id, "volume": int(requested)} if product_id else {},
+        )
+        return AvailsResponse.model_validate(
+            _avails_payload(data, product_id=product_id, requested_impressions=int(requested))
+        )
 
     async def close(self) -> None:  # noqa: D401 — parity with OpenDirectClient
         """No persistent connection to close (boto3 client is stateless here)."""
@@ -436,9 +463,64 @@ def _apply_filters(products: list[Product], filters: dict[str, Any]) -> list[Pro
     return out
 
 
-def _avails_payload(data: Any) -> dict[str, Any]:
-    """Normalize a discover_inventory result into an AvailsResponse dict."""
+def _is_real_avails(data: Any) -> bool:
+    """True when ``data`` looks like a genuine seller ``check_avails`` result.
+
+    The real tool returns the shared AvailsResponse shape (either snake_case
+    ``available_impressions`` or the aliased ``availableImpressions``). An error
+    result (``{"error": ...}``) or a pricing-only dict lacks it, signalling the
+    caller to fall back to the get_pricing stand-in.
+    """
+    if not isinstance(data, dict) or "error" in data:
+        return False
+    return "available_impressions" in data or "availableImpressions" in data
+
+
+def _avails_payload(
+    data: Any,
+    *,
+    product_id: str | None = None,
+    requested_impressions: int = 0,
+) -> dict[str, Any]:
+    """Map a ``get_pricing`` result into a contract-valid AvailsResponse dict.
+
+    ``AvailsResponse`` requires ``product_id``, ``available_impressions``,
+    ``estimated_cpm`` and ``total_cost``. The seller's ``get_pricing`` tool
+    returns ``product_id`` + ``base_cpm``/``final_cpm`` but no availability
+    volume (the seller MCP has no avails/forecast surface), so:
+
+    - ``estimated_cpm`` = ``final_cpm`` (the tiered/negotiated price the buyer
+      would pay), falling back to ``base_cpm``.
+    - ``available_impressions`` = the buyer's requested volume — honest on this
+      path, where the seller declares no cap. 0 when unknown.
+    - ``total_cost`` = available_impressions / 1000 * estimated_cpm.
+
+    A pre-existing ``{"available": ...}``-shaped dict (e.g. a future real avails
+    tool) is passed through untouched. An error/empty result yields a zero-cost
+    but still contract-valid response so the caller does not raise on a
+    missing-field ValidationError.
+    """
+    # Pass-through for an already-avails-shaped dict.
     if isinstance(data, dict) and "available" in data:
         return data
-    # Minimal shape when the discover tool returns a summary/list.
-    return {"available": True, "products": data if isinstance(data, list) else []}
+
+    pid = None
+    estimated_cpm = 0.0
+    if isinstance(data, dict):
+        pid = data.get("product_id") or data.get("productId")
+        cpm = data.get("final_cpm")
+        if cpm is None:
+            cpm = data.get("base_cpm")
+        if isinstance(cpm, (int, float)) and not isinstance(cpm, bool):
+            estimated_cpm = float(cpm)
+
+    pid = pid or product_id or ""
+    available = max(0, int(requested_impressions or 0))
+    total_cost = round(available / 1000 * estimated_cpm, 2)
+
+    return {
+        "product_id": pid,
+        "available_impressions": available,
+        "estimated_cpm": estimated_cpm,
+        "total_cost": total_cost,
+    }
