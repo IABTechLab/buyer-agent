@@ -55,6 +55,33 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "not-used-with-bedrock")
 os.environ.setdefault("STORAGE_TYPE", "sqlite")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
+# Durable Postgres opt-in (Scope 2 / Req 12.6-12.7): when the runtime was
+# deployed with --storage postgres, deploy.sh forwards NON-secret env
+# (DB_SECRET_ARN + AURORA_ENDPOINT + AURORA_PORT + DB_NAME) but never the
+# password. At startup we fetch the RDS-managed secret from Secrets Manager,
+# assemble the postgresql:// URL, and route the stores to Postgres. If the
+# secret is absent/unreadable, resolve_database_url() returns None and we keep
+# the SQLite default (fail-safe -- never crash startup on storage selection).
+from ad_buyer.storage.db_secret import resolve_database_url  # noqa: E402
+
+_pg_url = resolve_database_url()
+if _pg_url:
+    os.environ["DATABASE_URL"] = _pg_url
+    os.environ["STORAGE_TYPE"] = "hybrid"
+    # Never log _pg_url -- it carries the password.
+    print("[startup] Durable Postgres storage resolved from DB_SECRET_ARN.", flush=True)
+elif os.environ.get("DB_SECRET_ARN"):
+    # ARN was set but the secret could not be fetched (e.g. the execution role
+    # lacks secretsmanager:GetSecretValue) -- resolve_database_url already logged
+    # the specific cause at WARN. Make the fallback unambiguous here.
+    print(
+        "[startup] DB_SECRET_ARN is set but the Postgres secret could not be "
+        "resolved; FELL BACK to default storage (see db_secret WARN above).",
+        flush=True,
+    )
+else:
+    print("[startup] No DB_SECRET_ARN set; using default (SQLite) storage.", flush=True)
+
 # Durable Bedrock auth: if the Anthropic-compatible base URL is a Bedrock
 # endpoint, mint a fresh bearer token from the runtime's execution role NOW
 # (at startup), authoritative over any baked/stale key. Avoids baking a

@@ -28,6 +28,12 @@ uvicorn>=0.32.0
 rich>=13.0.0
 sqlalchemy>=2.0.0
 aiosqlite>=0.20.0
+# Durable Postgres backend (Scope 2 / Req 12.6-12.7). The PgConnection adapter
+# imports psycopg (synchronous v3); db_secret imports boto3 to fetch the
+# RDS-managed Secrets Manager credential at startup. Only exercised on the
+# --storage postgres path; harmless on the default SQLite path.
+psycopg[binary]>=3.1.0
+boto3>=1.34.0
 pyyaml>=6.0.0
 nest-asyncio>=1.6.0
 # Mints a short-lived Bedrock bearer token from the runtime execution role at

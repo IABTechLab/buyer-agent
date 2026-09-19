@@ -359,10 +359,30 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
       --env "REDIS_URL=${REDIS_URL}"
     )
     # Grant the runtime role read access to the DB secret now that configure
-    # has created/resolved it.
+    # has created/resolved it. Resolve the role for THIS agent specifically:
+    # .bedrock_agentcore.yaml holds every agent's config, so a bare
+    # `grep execution_role | head -1` picks the FIRST (often a different) agent's
+    # role and grants the wrong one. Prefer the live runtime's actual roleArn
+    # from AWS; fall back to the agent's own yaml block.
     _role_arn="${EXECUTION_ROLE_ARN}"
-    if [[ -z "${_role_arn}" && -f .bedrock_agentcore.yaml ]]; then
-      _role_arn=$(grep "execution_role:" .bedrock_agentcore.yaml | head -1 | awk '{print $2}')
+    if [[ -z "${_role_arn}" ]]; then
+      _rt_id=$(aws bedrock-agentcore-control list-agent-runtimes \
+        --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+        --query "agentRuntimes[?agentRuntimeName=='${AGENT_NAME}'].agentRuntimeId" \
+        --output text 2>/dev/null | head -1)
+      if [[ -n "${_rt_id}" ]]; then
+        _role_arn=$(aws bedrock-agentcore-control get-agent-runtime \
+          --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+          --agent-runtime-id "${_rt_id}" --query "roleArn" --output text 2>/dev/null)
+      fi
+    fi
+    if [[ -z "${_role_arn}" || "${_role_arn}" == "None" ]] && [[ -f .bedrock_agentcore.yaml ]]; then
+      # Fall back to the agent-specific block: find the AGENT_NAME key, then the
+      # first execution_role AFTER it (a Runtime role, not CodeBuild).
+      _role_arn=$(awk -v a="${AGENT_NAME}:" '
+        $1==a {found=1}
+        found && /execution_role:/ && /SDKRuntime/ {print $2; exit}
+      ' .bedrock_agentcore.yaml)
     fi
     grant_secret_access "${_role_arn}" "${DB_SECRET_ARN}"
   else

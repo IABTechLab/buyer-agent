@@ -48,6 +48,32 @@ checks against the configured database.
     file (e.g. `DesiredCount: 1` on ECS). Running multiple instances against the same
     file — including a shared network file system — risks corruption.
 
+## AgentCore deployment: storage is EPHEMERAL by design (v1)
+
+When the buyer runs as an AgentCore runtime, `infra/aws/agentcore/deploy.sh`
+deploys it with `STORAGE_TYPE=sqlite` and an **in-memory** `DATABASE_URL`
+(`sqlite:///:memory:`), in PUBLIC network mode. State written by the stores
+above therefore does **not** survive a container recycle in that deployment.
+
+This is deliberate for v1, and differs from the seller:
+
+- The buyer is a **client** — it discovers inventory, prices, and books deals
+  *against* the seller. It does not mint API keys or persist `VerifiedTrust`
+  records; that durable **authorization** state is seller-side. The buyer's own
+  records (deals/orders/negotiations) are re-derivable from the seller of record
+  and the campaign plan, so an ephemeral local store is acceptable for the
+  agentic planning/booking path.
+- Unlike the seller, the buyer's storage layer is a set of concrete SQLite store
+  classes with **no pluggable backend abstraction**, so there is no
+  `STORAGE_TYPE=hybrid`/Postgres switch to flip. Durable persistence under
+  AgentCore would require net-new work (a backend abstraction + an Aurora/VPC
+  stack like the seller's), which is **out of scope for v1** and deferred until
+  the buyer has a concrete need to persist state across recycles.
+
+If you need durable buyer state today, run the buyer on ECS with a persistent
+`DATABASE_URL` (single writer — see the warning above), not as an in-memory
+AgentCore runtime.
+
 ## Related
 
 - [Deal Store](deal-store.md) — full schema and API reference for the primary store
