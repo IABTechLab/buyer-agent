@@ -97,16 +97,21 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
     from ad_buyer.models.flow_state import BookingState
 
     # Override buyer settings to use the Bedrock-hosted model. Deploy.sh sets
-    # DEFAULT_LLM_MODEL plus ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL so this
-    # routes through the Anthropic Messages endpoint (no Converse patch). The
-    # fallback is a current-generation, Messages-supported Claude id.
+    # DEFAULT_LLM_MODEL (sub-agents) and MANAGER_LLM_MODEL (level-1 manager)
+    # plus ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL so this routes through the
+    # Anthropic Messages endpoint (no Converse patch). Sub-agents are the
+    # high-call-count fan-out, so they run on the (typically cheaper/faster)
+    # DEFAULT model while the single manager can stay on a stronger one via
+    # MANAGER_LLM_MODEL. The fallbacks are current-generation, Messages-
+    # supported Claude ids.
     bedrock_model = os.environ.get(
         "DEFAULT_LLM_MODEL",
         "us.anthropic.claude-sonnet-5-v1:0",
     )
+    manager_model = os.environ.get("MANAGER_LLM_MODEL", bedrock_model)
     from ad_buyer.config.settings import settings as buyer_settings
 
-    buyer_settings.manager_llm_model = bedrock_model
+    buyer_settings.manager_llm_model = manager_model
     buyer_settings.default_llm_model = bedrock_model
 
     # Use pre-extracted brief or parse one from the prompt

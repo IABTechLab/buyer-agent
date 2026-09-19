@@ -46,7 +46,13 @@ AWS_PROFILE="${AWS_PROFILE:-}"
 # Messages endpoint (see ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL below). This
 # replaces the retired Amazon Nova Pro default. The model id is the Bedrock
 # model / inference-profile id passed to the Anthropic provider.
-LLM_MODEL="${DEFAULT_LLM_MODEL:-us.anthropic.claude-sonnet-5}"
+LLM_MODEL="${DEFAULT_LLM_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
+# Manager (level-1 orchestrator) runs on a stronger model than the sub-agents.
+# Sub-agents (level2/3 research/execution/channel) are the ~165-call fan-out that
+# dominates latency, so they default to Haiku 4.5 (fast, temperature-accepting);
+# the single manager stays on Sonnet 5 for plan-quality. Override either via
+# DEFAULT_LLM_MODEL (sub-agents) / MANAGER_LLM_MODEL (manager) at deploy.
+MANAGER_MODEL="${MANAGER_LLM_MODEL:-us.anthropic.claude-sonnet-5}"
 MEMORY_MODEL="${MEMORY_LLM_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
 # Bedrock's Anthropic-compatible (Messages API) base URL + API key. Setting
 # these routes Claude through CrewAI's native Anthropic provider against
@@ -393,7 +399,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   fi
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
-    --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
+    --env "MANAGER_LLM_MODEL=${MANAGER_MODEL}" \
     --env "PYTHONPATH=/app/src" \
     --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
     "${_key_env[@]+"${_key_env[@]}"}" \
