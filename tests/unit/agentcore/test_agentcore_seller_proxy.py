@@ -278,3 +278,76 @@ class TestCheckAvails:
         assert avails.product_id == "nope"  # falls back to the requested id
         assert avails.estimated_cpm == 0.0
         assert avails.total_cost == 0.0
+
+
+def _wire_product_fmt(pid: str, ad_formats: list[str], name: str = "P") -> dict:
+    """A wire product declaring ad_formats (seller channel taxonomy)."""
+    item = _wire_product(pid, name)
+    item["ad_formats"] = ad_formats
+    return item
+
+
+@pytest.mark.asyncio
+class TestSearchFilters:
+    """The proxy delegates catalog filtering to the SHARED product_filter helper
+    (same one OpenDirectClient uses), filtering wire records BEFORE mapping.
+
+    Regression guard for the original proxy bug: a hand-rolled ``_apply_filters``
+    exact-matched ``channel`` against a non-existent ``inventory_type`` attribute,
+    zeroing out every channel-filtered search ("No products found") even though
+    the seller returned a full catalog.
+    """
+
+    async def test_channel_filter_does_not_zero_the_catalog(self):
+        # The crew almost always passes a free-text ``channel`` (e.g. "video").
+        # Channel is an intentionally IGNORED key — it must NOT exclude anything.
+        fake = _FakeBedrockAgentCore(
+            {
+                "products": [
+                    _wire_product_fmt("inv-ctv-1", ["ctv"], "CTV One"),
+                    _wire_product_fmt("inv-dig-1", ["display"], "Display One"),
+                ]
+            }
+        )
+        proxy = AgentCoreSellerProxy(ARN, region="us-west-2", client=fake)
+        products = await proxy.search_products({"channel": "video"})
+        # Both survive — channel does not filter. (The old bug returned []).
+        assert {p.name for p in products} == {"CTV One", "Display One"}
+
+    async def test_adformat_vocabulary_reconciles_banner_to_display(self):
+        # Buyer placement vocab "banner" must reconcile to the seller's "display"
+        # channel taxonomy via the shared normalizer — the display product is kept.
+        fake = _FakeBedrockAgentCore(
+            {
+                "products": [
+                    _wire_product_fmt("inv-dig-1", ["display"], "Display One"),
+                    _wire_product_fmt("inv-ctv-1", ["ctv"], "CTV One"),
+                ]
+            }
+        )
+        proxy = AgentCoreSellerProxy(ARN, client=fake)
+        products = await proxy.search_products({"adFormat": "banner"})
+        assert [p.name for p in products] == ["Display One"]
+
+    async def test_adformat_excludes_declared_mismatch_keeps_undeclared(self):
+        fake = _FakeBedrockAgentCore(
+            {
+                "products": [
+                    _wire_product_fmt("inv-vid-1", ["video"], "Video One"),
+                    _wire_product_fmt("inv-und-1", [], "Undeclared One"),
+                    _wire_product_fmt("inv-dig-1", ["display"], "Display One"),
+                ]
+            }
+        )
+        proxy = AgentCoreSellerProxy(ARN, client=fake)
+        products = await proxy.search_products({"adFormat": "video"})
+        # Declared-video kept; undeclared survives (do-not-exclude); display dropped.
+        assert {p.name for p in products} == {"Video One", "Undeclared One"}
+
+    async def test_no_filters_returns_full_catalog(self):
+        fake = _FakeBedrockAgentCore(
+            {"products": [_wire_product_fmt("inv-a", ["ctv"]), _wire_product_fmt("inv-b", ["display"])]}
+        )
+        proxy = AgentCoreSellerProxy(ARN, client=fake)
+        products = await proxy.search_products({})
+        assert len(products) == 2

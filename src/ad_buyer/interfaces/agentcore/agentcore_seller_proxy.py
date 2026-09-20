@@ -35,6 +35,13 @@ import logging
 from typing import Any
 
 from ...clients.contract_mappers import from_wire_product
+
+# Reuse the REST/ECS client's client-side catalog filter so the proxy applies
+# the SAME reconciled vocabulary (adFormat normalization, channel intentionally
+# ignored) rather than a hand-rolled copy that silently diverges. Imported as a
+# private symbol from the OpenDirect client by design — the two are peer
+# client-transport modules and this is the single filter implementation.
+from ...clients.opendirect_client import _filter_wire_products as filter_wire_products
 from ...models.opendirect import AvailsRequest, AvailsResponse, Product
 
 logger = logging.getLogger(__name__)
@@ -255,9 +262,9 @@ class AgentCoreSellerProxy:
 
     async def list_products(self, skip: int = 0, top: int = 50, **filters: Any) -> list[Product]:
         data = await self._call_tool(_TOOL_LIST_PRODUCTS, {"limit": top})
-        products = _extract_products(data)
-        if filters:
-            products = _apply_filters(products, filters)
+        raw_items = data.get("products", []) if isinstance(data, dict) else []
+        kept = _filter_raw_items(raw_items, filters)
+        products = _map_products(kept)
         return products[:top]
 
     async def list_products_tolerant(
@@ -271,9 +278,10 @@ class AgentCoreSellerProxy:
         """
         data = await self._call_tool(_TOOL_LIST_PRODUCTS, {"limit": top})
         raw_items = data.get("products", []) if isinstance(data, dict) else []
+        kept = _filter_raw_items(raw_items, filters)
         products: list[Product] = []
         rejects: list[dict[str, Any]] = []
-        for item in raw_items:
+        for item in kept:
             try:
                 products.append(_map_product(item))
             except Exception as exc:  # noqa: BLE001 — collect, don't fail the catalog
@@ -284,8 +292,6 @@ class AgentCoreSellerProxy:
                         "reason": str(exc),
                     }
                 )
-        if filters:
-            products = _apply_filters(products, filters)
         return products[:top], rejects
 
     async def get_product(self, product_id: str) -> Product:
@@ -296,7 +302,8 @@ class AgentCoreSellerProxy:
 
     async def search_products(self, filters: dict[str, Any]) -> list[Product]:
         data = await self._call_tool(_TOOL_LIST_PRODUCTS, {"limit": 500})
-        return _apply_filters(_extract_products(data), filters or {})
+        raw_items = data.get("products", []) if isinstance(data, dict) else []
+        return _map_products(_filter_raw_items(raw_items, filters or {}))
 
     async def check_avails(self, request: AvailsRequest) -> AvailsResponse:
         # Prefer the real seller ``check_avails`` MCP tool (honest availability:
@@ -428,6 +435,15 @@ def _parse_mcp_tool_result(raw: bytes) -> Any:
 
 def _extract_products(data: Any) -> list[Product]:
     items = data.get("products", []) if isinstance(data, dict) else []
+    return _map_products(items)
+
+
+def _map_products(items: list[Any]) -> list[Product]:
+    """Map a list of raw seller-MCP product dicts to OpenDirect ``Product``s.
+
+    Unmappable records are logged and skipped (non-tolerant path); the tolerant
+    caller (``list_products_tolerant``) maps items itself to collect rejects.
+    """
     out: list[Product] = []
     for item in items:
         try:
@@ -452,15 +468,41 @@ def _map_product(item: dict[str, Any]) -> Product:
     return from_wire_product(WireProduct.model_validate(item))
 
 
-def _apply_filters(products: list[Product], filters: dict[str, Any]) -> list[Product]:
-    """Client-side filtering (parity with OpenDirectClient's client-side filter)."""
+def _filter_raw_items(
+    raw_items: list[Any], filters: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Filter raw seller-MCP product dicts using the SHARED catalog filter.
+
+    The seller MCP emits ``iab_agentic_primitives`` wire ``Product`` dicts. We
+    validate each to a wire ``Product`` and delegate to the OpenDirect client's
+    ``_filter_wire_products`` — the SAME reconciled-vocabulary filter the
+    REST/ECS ``OpenDirectClient`` uses — then return the surviving raw dicts so
+    the caller's existing per-item mapping/reject-collection is unchanged.
+    Filtering on the wire record (not the mapped OpenDirect ``Product``) is
+    required: the mapped model carries neither ``ad_formats`` nor
+    ``seller_organization_id``, the fields the filter discriminates on.
+
+    An item that fails wire validation is kept (never silently dropped by the
+    filter) — mapping downstream decides its fate via the tolerant reject path.
+    """
     if not filters:
-        return products
-    out = products
-    inv = filters.get("inventory_type") or filters.get("channel")
-    if inv:
-        out = [p for p in out if getattr(p, "inventory_type", None) == inv]
-    return out
+        return [i for i in raw_items if isinstance(i, dict)]
+
+    from iab_agentic_primitives.primitives import Product as WireProduct
+
+    indexed: list[tuple[int, WireProduct]] = []
+    unvalidatable: list[int] = []
+    dicts: list[dict[str, Any]] = [i for i in raw_items if isinstance(i, dict)]
+    for idx, item in enumerate(dicts):
+        try:
+            indexed.append((idx, WireProduct.model_validate(item)))
+        except Exception:  # noqa: BLE001 — keep unvalidatable items for the mapper
+            unvalidatable.append(idx)
+
+    kept = filter_wire_products([wp for _, wp in indexed], filters)
+    kept_ids = {id(wp) for wp in kept}
+    keep_idx = {idx for idx, wp in indexed if id(wp) in kept_ids} | set(unvalidatable)
+    return [item for idx, item in enumerate(dicts) if idx in keep_idx]
 
 
 def _is_real_avails(data: Any) -> bool:
