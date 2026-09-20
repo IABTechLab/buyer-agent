@@ -213,6 +213,58 @@ grant_secret_access() {
     --region "${REGION}" 2>&1 || echo "  ⚠️  secret grant failed (non-fatal)"
 }
 
+# Resolve the execution role ARN for THIS agent's deployed runtime. Prefers an
+# explicit EXECUTION_ROLE_ARN, then the live runtime's actual roleArn from AWS,
+# then the agent-specific block in .bedrock_agentcore.yaml. Must resolve the
+# role for AGENT_NAME specifically — the yaml holds every agent's config, so a
+# bare `grep execution_role | head -1` picks the wrong (first) agent's role.
+_resolve_runtime_role_arn() {
+  local role_arn="${EXECUTION_ROLE_ARN:-}"
+  if [[ -z "${role_arn}" ]]; then
+    local rt_id
+    rt_id=$(aws bedrock-agentcore-control list-agent-runtimes \
+      --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+      --query "agentRuntimes[?agentRuntimeName=='${AGENT_NAME}'].agentRuntimeId" \
+      --output text 2>/dev/null | head -1)
+    if [[ -n "${rt_id}" ]]; then
+      role_arn=$(aws bedrock-agentcore-control get-agent-runtime \
+        --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+        --agent-runtime-id "${rt_id}" --query "roleArn" --output text 2>/dev/null)
+    fi
+  fi
+  if [[ -z "${role_arn}" || "${role_arn}" == "None" ]] && [[ -f .bedrock_agentcore.yaml ]]; then
+    role_arn=$(awk -v a="${AGENT_NAME}:" '
+      $1==a {found=1}
+      found && /execution_role:/ && /SDKRuntime/ {print $2; exit}
+    ' .bedrock_agentcore.yaml)
+  fi
+  [[ "${role_arn}" == "None" ]] && role_arn=""
+  printf '%s' "${role_arn}"
+}
+
+# Grant bedrock:CallWithBearerToken to the runtime's execution role (Req 11).
+# The runtime mints its own short-lived Bedrock bearer token from this role at
+# startup (ad_buyer.llm.bedrock_token) for the Anthropic Messages path. The
+# toolkit-created execution role does NOT get this by default (its managed
+# policy only has InvokeModel for the SigV4/Converse path), so a runtime on the
+# auto-created role 403s on 'bedrock:CallWithBearerToken'. Attached as a
+# SEPARATELY-NAMED inline policy so the toolkit's per-deploy execution-policy
+# rewrite does not clobber it. Best-effort + idempotent. Mirrors the seller's
+# _grant_bedrock_bearer_token_permission so both repos self-sustain identically.
+grant_bedrock_bearer_token() {
+  local role_arn="$1"
+  [[ -z "${role_arn}" ]] && { echo "  ⚠️  Could not resolve runtime role; skipping bedrock:CallWithBearerToken grant." >&2; return 0; }
+  local role_name="${role_arn##*/}"
+  echo ">>> Granting ${role_name} bedrock:CallWithBearerToken (self-sustaining Bedrock token)"
+  aws iam put-role-policy \
+    --role-name "${role_name}" \
+    --policy-name "BedrockCallWithBearerToken" \
+    --policy-document '{"Version":"2012-10-17","Statement":[{"Sid":"BedrockBearerTokenMessagesPath","Effect":"Allow","Action":"bedrock:CallWithBearerToken","Resource":"*"}]}' \
+    --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} 2>&1 \
+    && echo "  ✅ bedrock:CallWithBearerToken granted to ${role_name}" \
+    || echo "  ⚠️  Could not grant bedrock:CallWithBearerToken to ${role_name} (check IAM perms); runtime token mint may 403." >&2
+}
+
 # ── Cleanup (--cleanup) ────────────────────────────────────────────
 if [[ "${DO_CLEANUP}" == "true" ]]; then
   echo "============================================="
@@ -365,32 +417,9 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
       --env "REDIS_URL=${REDIS_URL}"
     )
     # Grant the runtime role read access to the DB secret now that configure
-    # has created/resolved it. Resolve the role for THIS agent specifically:
-    # .bedrock_agentcore.yaml holds every agent's config, so a bare
-    # `grep execution_role | head -1` picks the FIRST (often a different) agent's
-    # role and grants the wrong one. Prefer the live runtime's actual roleArn
-    # from AWS; fall back to the agent's own yaml block.
-    _role_arn="${EXECUTION_ROLE_ARN}"
-    if [[ -z "${_role_arn}" ]]; then
-      _rt_id=$(aws bedrock-agentcore-control list-agent-runtimes \
-        --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
-        --query "agentRuntimes[?agentRuntimeName=='${AGENT_NAME}'].agentRuntimeId" \
-        --output text 2>/dev/null | head -1)
-      if [[ -n "${_rt_id}" ]]; then
-        _role_arn=$(aws bedrock-agentcore-control get-agent-runtime \
-          --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
-          --agent-runtime-id "${_rt_id}" --query "roleArn" --output text 2>/dev/null)
-      fi
-    fi
-    if [[ -z "${_role_arn}" || "${_role_arn}" == "None" ]] && [[ -f .bedrock_agentcore.yaml ]]; then
-      # Fall back to the agent-specific block: find the AGENT_NAME key, then the
-      # first execution_role AFTER it (a Runtime role, not CodeBuild).
-      _role_arn=$(awk -v a="${AGENT_NAME}:" '
-        $1==a {found=1}
-        found && /execution_role:/ && /SDKRuntime/ {print $2; exit}
-      ' .bedrock_agentcore.yaml)
-    fi
-    grant_secret_access "${_role_arn}" "${DB_SECRET_ARN}"
+    # has created/resolved it. Reuse the shared resolver (finds THIS agent's
+    # role specifically, not the first agent's in the shared yaml).
+    grant_secret_access "$(_resolve_runtime_role_arn)" "${DB_SECRET_ARN}"
   else
     _storage_env=(
       --env "STORAGE_TYPE=sqlite"
@@ -415,6 +444,13 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
 
   echo ""
   echo "✅ Deploy complete"
+
+  # Req 11: grant bedrock:CallWithBearerToken to whatever role the runtime
+  # actually assumed (CFN-provided or toolkit auto-created). Unconditional —
+  # the runtime ALWAYS mints its own Bedrock token for the Messages path, so
+  # this must run on every deploy, not only when a seller ARN is wired. The
+  # role only exists after `agentcore deploy`, hence the grant happens here.
+  grant_bedrock_bearer_token "$(_resolve_runtime_role_arn)"
 fi
 
 # ── Test (--test or --test-only) ────────────────────────────────────
