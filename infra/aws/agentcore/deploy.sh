@@ -25,10 +25,34 @@
 
 set -euo pipefail
 
+# Load a gitignored .env at repo root if present, so local AWS credentials
+# (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN or AWS_PROFILE)
+# and the Bedrock endpoint config below can be supplied without exporting them
+# by hand. .env is listed in .gitignore and must never be committed.
+_SCRIPT_DIR_EARLY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT_EARLY="$(cd "${_SCRIPT_DIR_EARLY}/../../.." && pwd)"
+if [[ -f "${_REPO_ROOT_EARLY}/.env" ]]; then
+  echo ">>> Loading environment from ${_REPO_ROOT_EARLY}/.env"
+  set -a
+  # shellcheck disable=SC1091
+  source "${_REPO_ROOT_EARLY}/.env"
+  set +a
+fi
+
 REGION="${AWS_REGION:-us-west-2}"
 AGENT_NAME="${AGENT_NAME:-}"
 AWS_PROFILE="${AWS_PROFILE:-}"
-LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.amazon.nova-pro-v1:0}"
+# Default model: current-generation Claude on Bedrock via the Anthropic
+# Messages endpoint (see ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL below). This
+# replaces the retired Amazon Nova Pro default. The model id is the Bedrock
+# model / inference-profile id passed to the Anthropic provider.
+LLM_MODEL="${DEFAULT_LLM_MODEL:-us.anthropic.claude-sonnet-5}"
+MEMORY_MODEL="${MEMORY_LLM_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
+# Bedrock's Anthropic-compatible (Messages API) base URL + API key. Setting
+# these routes Claude through CrewAI's native Anthropic provider against
+# Bedrock, so the Converse toolUse/toolResult sanitizer is not applied.
+ANTHROPIC_BASE_URL="${ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL:-https://bedrock-runtime.${REGION}.amazonaws.com/anthropic}"
+BEDROCK_API_KEY="${ANTHROPIC_COMPATIBLE_LLM_API_KEY:-${AWS_BEARER_TOKEN_BEDROCK:-}}"
 SELLER_AGENT_URL="${SELLER_AGENT_URL:-}"
 DEPLOY_MODE="http"
 DO_TEST=false
@@ -143,6 +167,31 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     rm -f "${_GENERATED_DOCKERFILE}"
   fi
 
+  # ── Auth stack (opt-in): provision the buyer runtime execution role with a
+  # scoped grant to invoke the seller runtimes, and pass it to agentcore
+  # configure. Only when SELLER_AGENT_URL is an AgentCore ARN (buyer->seller
+  # over InvokeAgentRuntime). For a plain HTTP seller URL or no seller, the CLI
+  # auto-creates the default role as before. See auth-agentcore.yaml for the
+  # security model (same-account / trusted cross-account only; cross-org uses
+  # the gateway + CUSTOM_JWT path).
+  EXECUTION_ROLE_ARN=""
+  if [[ "${SELLER_AGENT_URL}" == arn:* ]]; then
+    AUTH_STACK="aamp-buyer-auth-${ENVIRONMENT:-staging}"
+    echo ""
+    echo ">>> Deploying auth stack (buyer runtime role + seller-invoke): ${AUTH_STACK}"
+    aws cloudformation deploy \
+      --stack-name "${AUTH_STACK}" \
+      --template-file infra/aws/agentcore/auth-agentcore.yaml \
+      --capabilities CAPABILITY_NAMED_IAM \
+      --parameter-overrides "Environment=${ENVIRONMENT:-staging}" \
+      --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"}
+    EXECUTION_ROLE_ARN=$(aws cloudformation describe-stacks \
+      --stack-name "${AUTH_STACK}" --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+      --query "Stacks[0].Outputs[?OutputKey=='BuyerRuntimeExecutionRoleArn'].OutputValue" \
+      --output text 2>/dev/null || true)
+    echo "  execution role: ${EXECUTION_ROLE_ARN:-<none>}"
+  fi
+
   # Configure
   echo ""
   echo ">>> Configuring agent..."
@@ -152,6 +201,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     -rf infra/aws/agentcore/requirements.txt \
     -p HTTP \
     -r "${REGION}" \
+    ${EXECUTION_ROLE_ARN:+--execution-role "${EXECUTION_ROLE_ARN}"} \
     --non-interactive \
     --deployment-type container
 
@@ -161,6 +211,9 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
     --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
+    --env "PYTHONPATH=/app/src" \
+    --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
+    --env "ANTHROPIC_COMPATIBLE_LLM_API_KEY=${BEDROCK_API_KEY}" \
     --env "STORAGE_TYPE=sqlite" \
     --env "DATABASE_URL=sqlite:///:memory:" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \
@@ -168,7 +221,7 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     --env "AWS_REGION=${REGION}" \
     --env "AWS_DEFAULT_REGION=${REGION}" \
     --env "CREW_MEMORY_ENABLED=true" \
-    --env "MEMORY_LLM_MODEL=bedrock/us.amazon.nova-lite-v1:0" \
+    --env "MEMORY_LLM_MODEL=${MEMORY_MODEL}" \
     --auto-update-on-conflict
 
   echo ""
