@@ -25,12 +25,43 @@
 
 set -euo pipefail
 
+# Load a gitignored .env at repo root if present, so local AWS credentials
+# (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN or AWS_PROFILE)
+# and the Bedrock endpoint config below can be supplied without exporting them
+# by hand. .env is listed in .gitignore and must never be committed.
+_SCRIPT_DIR_EARLY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPO_ROOT_EARLY="$(cd "${_SCRIPT_DIR_EARLY}/../../.." && pwd)"
+if [[ -f "${_REPO_ROOT_EARLY}/.env" ]]; then
+  echo ">>> Loading environment from ${_REPO_ROOT_EARLY}/.env"
+  set -a
+  # shellcheck disable=SC1091
+  source "${_REPO_ROOT_EARLY}/.env"
+  set +a
+fi
+
 REGION="${AWS_REGION:-us-west-2}"
 AGENT_NAME="${AGENT_NAME:-}"
 AWS_PROFILE="${AWS_PROFILE:-}"
-LLM_MODEL="${DEFAULT_LLM_MODEL:-bedrock/us.amazon.nova-pro-v1:0}"
+# Default model: current-generation Claude on Bedrock via the Anthropic
+# Messages endpoint (see ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL below). This
+# replaces the retired Amazon Nova Pro default. The model id is the Bedrock
+# model / inference-profile id passed to the Anthropic provider.
+LLM_MODEL="${DEFAULT_LLM_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
+# Manager (level-1 orchestrator) runs on a stronger model than the sub-agents.
+# Sub-agents (level2/3 research/execution/channel) are the ~165-call fan-out that
+# dominates latency, so they default to Haiku 4.5 (fast, temperature-accepting);
+# the single manager stays on Sonnet 5 for plan-quality. Override either via
+# DEFAULT_LLM_MODEL (sub-agents) / MANAGER_LLM_MODEL (manager) at deploy.
+MANAGER_MODEL="${MANAGER_LLM_MODEL:-us.anthropic.claude-sonnet-5}"
+MEMORY_MODEL="${MEMORY_LLM_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}"
+# Bedrock's Anthropic-compatible (Messages API) base URL + API key. Setting
+# these routes Claude through CrewAI's native Anthropic provider against
+# Bedrock, so the Converse toolUse/toolResult sanitizer is not applied.
+ANTHROPIC_BASE_URL="${ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL:-https://bedrock-runtime.${REGION}.amazonaws.com/anthropic}"
+BEDROCK_API_KEY="${ANTHROPIC_COMPATIBLE_LLM_API_KEY:-${AWS_BEARER_TOKEN_BEDROCK:-}}"
 SELLER_AGENT_URL="${SELLER_AGENT_URL:-}"
 DEPLOY_MODE="http"
+STORAGE_TYPE_ARG="sqlite"
 DO_TEST=false
 TEST_ONLY=false
 DO_CLEANUP=false
@@ -41,6 +72,7 @@ while [[ $# -gt 0 ]]; do
     --region)     REGION="$2"; shift 2 ;;
     --name)       AGENT_NAME="$2"; shift 2 ;;
     --mode)       DEPLOY_MODE="$2"; shift 2 ;;
+    --storage)    STORAGE_TYPE_ARG="$2"; shift 2 ;;
     --profile)    AWS_PROFILE="$2"; shift 2 ;;
     --seller-url) SELLER_AGENT_URL="$2"; shift 2 ;;
     --test)       DO_TEST=true; shift ;;
@@ -48,11 +80,17 @@ while [[ $# -gt 0 ]]; do
     --cleanup)    DO_CLEANUP=true; shift ;;
     --prompt)     PROMPT="$2"; shift 2 ;;
     -h|--help)
-      echo "Usage: $(basename "$0") [--region REGION] [--name NAME] [--mode MODE] [--profile PROFILE] [--seller-url URL] [--test] [--test-only] [--cleanup] [--prompt JSON]"
+      echo "Usage: $(basename "$0") [--region REGION] [--name NAME] [--mode MODE] [--storage sqlite|postgres] [--profile PROFILE] [--seller-url URL] [--test] [--test-only] [--cleanup] [--prompt JSON]"
       exit 0 ;;
     *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
   esac
 done
+
+# Validate storage backend
+if [[ "${STORAGE_TYPE_ARG}" != "sqlite" && "${STORAGE_TYPE_ARG}" != "postgres" ]]; then
+  echo "ERROR: --storage must be 'sqlite' (default, in-memory) or 'postgres' (Aurora Serverless v2 + Secrets Manager, CUSTOMER_VPC)" >&2
+  exit 1
+fi
 
 # Validate deploy mode (only http supported for now — MCP causes OOM, Issue 19)
 if [[ "${DEPLOY_MODE}" != "http" ]]; then
@@ -76,6 +114,156 @@ if [[ -n "${AWS_PROFILE}" ]]; then
 fi
 
 cd "${REPO_ROOT}"
+
+# =============================================================================
+# --storage postgres: deploy Aurora Serverless v2 + Redis + VPC endpoints via
+# main-agentcore.yaml, then export the connection facts. Sets (on success):
+#   VPC_SUBNET_1 / VPC_SUBNET_2 / VPC_SECURITY_GROUP  — CUSTOMER_VPC runtime cfg
+#   DB_SECRET_ARN / AURORA_ENDPOINT / AURORA_PORT / DB_NAME / REDIS_URL — env
+# NO plaintext password is ever read or forwarded — the app reads the
+# RDS-managed Secrets Manager secret at startup by ARN (Req 12.2/12.7).
+# =============================================================================
+VPC_SUBNET_1=""; VPC_SUBNET_2=""; VPC_SECURITY_GROUP=""
+DB_SECRET_ARN=""; AURORA_ENDPOINT=""; AURORA_PORT=""; DB_NAME=""; REDIS_URL=""
+
+deploy_postgres_infrastructure() {
+  local stack_name="ad-buyer-${ENVIRONMENT:-staging}-agentcore"
+  local account_id
+  account_id=$(aws sts get-caller-identity --query Account --output text --region "${REGION}")
+  local bucket="${TEMPLATE_BUCKET:-ad-buyer-cfn-${account_id}-${REGION}}"
+
+  echo "============================================="
+  echo "  Deploying buyer durable-storage infrastructure"
+  echo "  Stack : ${stack_name}"
+  echo "============================================="
+
+  if ! aws s3 ls "s3://${bucket}" --region "${REGION}" 2>/dev/null; then
+    echo ">>> Creating template bucket: ${bucket}"
+    aws s3api create-bucket --bucket "${bucket}" --region "${REGION}" \
+      --create-bucket-configuration LocationConstraint="${REGION}" 2>/dev/null \
+      || aws s3 mb "s3://${bucket}" --region "${REGION}"
+  fi
+
+  # Discover the private route table (network.yaml doesn't export it) for the
+  # S3 gateway endpoint; empty is fine (the endpoint is conditional).
+  local private_rt=""
+  private_rt=$(aws ec2 describe-route-tables --region "${REGION}" \
+    --filters "Name=tag:Project,Values=ad-buyer-system" \
+    --query "RouteTables[?Associations[?Main!=\`true\`]].RouteTableId | [0]" \
+    --output text 2>/dev/null || true)
+  [[ "${private_rt}" == "None" ]] && private_rt=""
+
+  echo ">>> Packaging templates (uploading nested stacks to S3)..."
+  local packaged="${REPO_ROOT}/.packaged-agentcore.yaml"
+  aws cloudformation package \
+    --template-file "${SCRIPT_DIR}/main-agentcore.yaml" \
+    --s3-bucket "${bucket}" \
+    --s3-prefix "ad-buyer-system/agentcore" \
+    --output-template-file "${packaged}" \
+    --region "${REGION}"
+
+  local overrides=("Environment=${ENVIRONMENT:-staging}" "TemplatesBucketName=${bucket}")
+  [[ -n "${private_rt}" ]] && overrides+=("PrivateRouteTableId=${private_rt}")
+
+  echo ">>> Deploying stack: ${stack_name}"
+  aws cloudformation deploy \
+    --template-file "${packaged}" \
+    --stack-name "${stack_name}" \
+    --parameter-overrides "${overrides[@]}" \
+    --capabilities CAPABILITY_IAM \
+    --region "${REGION}" \
+    --no-fail-on-empty-changeset
+
+  echo ">>> Reading stack outputs..."
+  local outputs
+  outputs=$(aws cloudformation describe-stacks --stack-name "${stack_name}" \
+    --region "${REGION}" --query "Stacks[0].Outputs" --output json)
+
+  _out() { echo "${outputs}" | python3 -c "import sys,json; print(next((o['OutputValue'] for o in json.load(sys.stdin) if o['OutputKey']=='$1'),''))"; }
+  VPC_SECURITY_GROUP=$(_out AgentCoreSecurityGroupId)
+  VPC_SUBNET_1=$(_out PrivateSubnet1Id)
+  VPC_SUBNET_2=$(_out PrivateSubnet2Id)
+  DB_SECRET_ARN=$(_out AuroraSecretArn)
+  AURORA_ENDPOINT=$(_out AuroraEndpoint)
+  AURORA_PORT=$(_out AuroraPort)
+  DB_NAME=$(_out AuroraDatabaseName)
+  local redis_ep redis_port
+  redis_ep=$(_out RedisEndpoint); redis_port=$(_out RedisPort)
+  [[ -n "${redis_ep}" ]] && REDIS_URL="redis://${redis_ep}:${redis_port}/0"
+
+  echo "  SG       : ${VPC_SECURITY_GROUP}"
+  echo "  Subnets  : ${VPC_SUBNET_1}, ${VPC_SUBNET_2}"
+  echo "  DB secret: ${DB_SECRET_ARN}"
+  echo "  Aurora   : ${AURORA_ENDPOINT}:${AURORA_PORT}/${DB_NAME}"
+  echo "✅ Durable-storage infrastructure deployed"
+}
+
+# Grant the runtime execution role read access to the RDS-managed DB secret
+# (+ KMS decrypt). Best-effort + idempotent; a separately-named inline policy
+# the toolkit's execution-policy rewrite does not clobber. (Req 12.4)
+grant_secret_access() {
+  local role_arn="$1" secret_arn="$2"
+  [[ -z "${role_arn}" || -z "${secret_arn}" ]] && return 0
+  local role_name="${role_arn##*/}"
+  echo ">>> Granting ${role_name} secretsmanager:GetSecretValue on the DB secret"
+  aws iam put-role-policy \
+    --role-name "${role_name}" \
+    --policy-name "BuyerDbSecretAccess" \
+    --policy-document "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"secretsmanager:GetSecretValue\"],\"Resource\":\"${secret_arn}\"},{\"Effect\":\"Allow\",\"Action\":[\"kms:Decrypt\"],\"Resource\":\"*\",\"Condition\":{\"StringEquals\":{\"kms:ViaService\":\"secretsmanager.${REGION}.amazonaws.com\"}}}]}" \
+    --region "${REGION}" 2>&1 || echo "  ⚠️  secret grant failed (non-fatal)"
+}
+
+# Resolve the execution role ARN for THIS agent's deployed runtime. Prefers an
+# explicit EXECUTION_ROLE_ARN, then the live runtime's actual roleArn from AWS,
+# then the agent-specific block in .bedrock_agentcore.yaml. Must resolve the
+# role for AGENT_NAME specifically — the yaml holds every agent's config, so a
+# bare `grep execution_role | head -1` picks the wrong (first) agent's role.
+_resolve_runtime_role_arn() {
+  local role_arn="${EXECUTION_ROLE_ARN:-}"
+  if [[ -z "${role_arn}" ]]; then
+    local rt_id
+    rt_id=$(aws bedrock-agentcore-control list-agent-runtimes \
+      --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+      --query "agentRuntimes[?agentRuntimeName=='${AGENT_NAME}'].agentRuntimeId" \
+      --output text 2>/dev/null | head -1)
+    if [[ -n "${rt_id}" ]]; then
+      role_arn=$(aws bedrock-agentcore-control get-agent-runtime \
+        --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+        --agent-runtime-id "${rt_id}" --query "roleArn" --output text 2>/dev/null)
+    fi
+  fi
+  if [[ -z "${role_arn}" || "${role_arn}" == "None" ]] && [[ -f .bedrock_agentcore.yaml ]]; then
+    role_arn=$(awk -v a="${AGENT_NAME}:" '
+      $1==a {found=1}
+      found && /execution_role:/ && /SDKRuntime/ {print $2; exit}
+    ' .bedrock_agentcore.yaml)
+  fi
+  [[ "${role_arn}" == "None" ]] && role_arn=""
+  printf '%s' "${role_arn}"
+}
+
+# Grant bedrock:CallWithBearerToken to the runtime's execution role (Req 11).
+# The runtime mints its own short-lived Bedrock bearer token from this role at
+# startup (ad_buyer.llm.bedrock_token) for the Anthropic Messages path. The
+# toolkit-created execution role does NOT get this by default (its managed
+# policy only has InvokeModel for the SigV4/Converse path), so a runtime on the
+# auto-created role 403s on 'bedrock:CallWithBearerToken'. Attached as a
+# SEPARATELY-NAMED inline policy so the toolkit's per-deploy execution-policy
+# rewrite does not clobber it. Best-effort + idempotent. Mirrors the seller's
+# _grant_bedrock_bearer_token_permission so both repos self-sustain identically.
+grant_bedrock_bearer_token() {
+  local role_arn="$1"
+  [[ -z "${role_arn}" ]] && { echo "  ⚠️  Could not resolve runtime role; skipping bedrock:CallWithBearerToken grant." >&2; return 0; }
+  local role_name="${role_arn##*/}"
+  echo ">>> Granting ${role_name} bedrock:CallWithBearerToken (self-sustaining Bedrock token)"
+  aws iam put-role-policy \
+    --role-name "${role_name}" \
+    --policy-name "BedrockCallWithBearerToken" \
+    --policy-document '{"Version":"2012-10-17","Statement":[{"Sid":"BedrockBearerTokenMessagesPath","Effect":"Allow","Action":"bedrock:CallWithBearerToken","Resource":"*"}]}' \
+    --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} 2>&1 \
+    && echo "  ✅ bedrock:CallWithBearerToken granted to ${role_name}" \
+    || echo "  ⚠️  Could not grant bedrock:CallWithBearerToken to ${role_name} (check IAM perms); runtime token mint may 403." >&2
+}
 
 # ── Cleanup (--cleanup) ────────────────────────────────────────────
 if [[ "${DO_CLEANUP}" == "true" ]]; then
@@ -143,36 +331,126 @@ if [[ "${TEST_ONLY}" == "false" ]]; then
     rm -f "${_GENERATED_DOCKERFILE}"
   fi
 
+  # ── Auth stack (opt-in): provision the buyer runtime execution role with a
+  # scoped grant to invoke the seller runtimes, and pass it to agentcore
+  # configure. Only when SELLER_AGENT_URL is an AgentCore ARN (buyer->seller
+  # over InvokeAgentRuntime). For a plain HTTP seller URL or no seller, the CLI
+  # auto-creates the default role as before. See auth-agentcore.yaml for the
+  # security model (same-account / trusted cross-account only; cross-org uses
+  # the gateway + CUSTOM_JWT path).
+  EXECUTION_ROLE_ARN=""
+  if [[ "${SELLER_AGENT_URL}" == arn:* ]]; then
+    AUTH_STACK="aamp-buyer-auth-${ENVIRONMENT:-staging}"
+    echo ""
+    echo ">>> Deploying auth stack (buyer runtime role + seller-invoke): ${AUTH_STACK}"
+    aws cloudformation deploy \
+      --stack-name "${AUTH_STACK}" \
+      --template-file infra/aws/agentcore/auth-agentcore.yaml \
+      --capabilities CAPABILITY_NAMED_IAM \
+      --parameter-overrides "Environment=${ENVIRONMENT:-staging}" \
+      --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"}
+    EXECUTION_ROLE_ARN=$(aws cloudformation describe-stacks \
+      --stack-name "${AUTH_STACK}" --region "${REGION}" ${AWS_PROFILE:+--profile "${AWS_PROFILE}"} \
+      --query "Stacks[0].Outputs[?OutputKey=='BuyerRuntimeExecutionRoleArn'].OutputValue" \
+      --output text 2>/dev/null || true)
+    echo "  execution role: ${EXECUTION_ROLE_ARN:-<none>}"
+  fi
+
+  # ── Durable storage (--storage postgres): deploy Aurora+Redis+VPC endpoints,
+  # then run the runtime in CUSTOMER_VPC mode. Default stays sqlite in-memory.
+  if [[ "${STORAGE_TYPE_ARG}" == "postgres" ]]; then
+    deploy_postgres_infrastructure
+  fi
+
   # Configure
   echo ""
   echo ">>> Configuring agent..."
+  _vpc_args=()
+  if [[ "${STORAGE_TYPE_ARG}" == "postgres" && -n "${VPC_SECURITY_GROUP}" ]]; then
+    _vpc_args=(--vpc --subnets "${VPC_SUBNET_1},${VPC_SUBNET_2}" --security-groups "${VPC_SECURITY_GROUP}")
+    echo "  VPC mode: SG=${VPC_SECURITY_GROUP}, Subnets=${VPC_SUBNET_1},${VPC_SUBNET_2}"
+  fi
   agentcore configure \
     -e src/ad_buyer/interfaces/agentcore/http_main.py \
     -n "${AGENT_NAME}" \
     -rf infra/aws/agentcore/requirements.txt \
     -p HTTP \
     -r "${REGION}" \
+    ${EXECUTION_ROLE_ARN:+--execution-role "${EXECUTION_ROLE_ARN}"} \
+    "${_vpc_args[@]+"${_vpc_args[@]}"}" \
     --non-interactive \
     --deployment-type container
 
   # Deploy
   echo ""
   echo ">>> Deploying to AgentCore..."
+  # Req 11: only bake a Bedrock key when one was explicitly supplied. Otherwise
+  # omit it so the runtime mints a fresh token from its execution role at startup
+  # (ad_buyer.llm.bedrock_token) — the CFN runtime role grants CallWithBearerToken.
+  _key_env=()
+  if [[ -n "${BEDROCK_API_KEY}" ]]; then
+    _key_env=(--env "ANTHROPIC_COMPATIBLE_LLM_API_KEY=${BEDROCK_API_KEY}")
+  fi
+  # AWS Bedrock AgentCore CUSTOM_JWT buyer->seller path: when the seller
+  # advertises an OAuth issuer, forward the seller's token endpoint + scope and
+  # the buyer's OWN client credentials so crew_tools routes through the JWT
+  # transport (see ad_buyer.registry.transport_selector). Each is forwarded only
+  # when set — never bake an empty value. The client_secret is passed only if
+  # present; prefer sourcing it from a secret store in production.
+  _oauth_env=()
+  [[ -n "${SELLER_MCP_RUNTIME_ARN:-}" ]] && _oauth_env+=(--env "SELLER_MCP_RUNTIME_ARN=${SELLER_MCP_RUNTIME_ARN}")
+  [[ -n "${SELLER_TOKEN_ENDPOINT:-}" ]] && _oauth_env+=(--env "SELLER_TOKEN_ENDPOINT=${SELLER_TOKEN_ENDPOINT}")
+  [[ -n "${SELLER_INVOKE_SCOPE:-}" ]] && _oauth_env+=(--env "SELLER_INVOKE_SCOPE=${SELLER_INVOKE_SCOPE}")
+  [[ -n "${BUYER_OAUTH_CLIENT_ID:-}" ]] && _oauth_env+=(--env "BUYER_OAUTH_CLIENT_ID=${BUYER_OAUTH_CLIENT_ID}")
+  [[ -n "${BUYER_OAUTH_CLIENT_SECRET:-}" ]] && _oauth_env+=(--env "BUYER_OAUTH_CLIENT_SECRET=${BUYER_OAUTH_CLIENT_SECRET}")
+  # Storage env: default sqlite in-memory (dev); postgres → hybrid with the
+  # RDS-managed secret ARN (NOT the password) + Aurora/Redis connection facts.
+  # The app reads the secret from Secrets Manager at startup (Req 12.7).
+  _storage_env=()
+  if [[ "${STORAGE_TYPE_ARG}" == "postgres" ]]; then
+    _storage_env=(
+      --env "STORAGE_TYPE=hybrid"
+      --env "DB_SECRET_ARN=${DB_SECRET_ARN}"
+      --env "AURORA_ENDPOINT=${AURORA_ENDPOINT}"
+      --env "AURORA_PORT=${AURORA_PORT}"
+      --env "DB_NAME=${DB_NAME}"
+      --env "REDIS_URL=${REDIS_URL}"
+    )
+    # Grant the runtime role read access to the DB secret now that configure
+    # has created/resolved it. Reuse the shared resolver (finds THIS agent's
+    # role specifically, not the first agent's in the shared yaml).
+    grant_secret_access "$(_resolve_runtime_role_arn)" "${DB_SECRET_ARN}"
+  else
+    _storage_env=(
+      --env "STORAGE_TYPE=sqlite"
+      --env "DATABASE_URL=sqlite:///:memory:"
+    )
+  fi
   agentcore deploy \
     --env "DEFAULT_LLM_MODEL=${LLM_MODEL}" \
-    --env "MANAGER_LLM_MODEL=${LLM_MODEL}" \
-    --env "STORAGE_TYPE=sqlite" \
-    --env "DATABASE_URL=sqlite:///:memory:" \
+    --env "MANAGER_LLM_MODEL=${MANAGER_MODEL}" \
+    --env "PYTHONPATH=/app/src" \
+    --env "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=${ANTHROPIC_BASE_URL}" \
+    "${_key_env[@]+"${_key_env[@]}"}" \
+    "${_oauth_env[@]+"${_oauth_env[@]}"}" \
+    "${_storage_env[@]+"${_storage_env[@]}"}" \
     --env "ANTHROPIC_API_KEY=not-used-with-bedrock" \
     --env "SELLER_AGENT_URL=${SELLER_AGENT_URL}" \
     --env "AWS_REGION=${REGION}" \
     --env "AWS_DEFAULT_REGION=${REGION}" \
     --env "CREW_MEMORY_ENABLED=true" \
-    --env "MEMORY_LLM_MODEL=bedrock/us.amazon.nova-lite-v1:0" \
+    --env "MEMORY_LLM_MODEL=${MEMORY_MODEL}" \
     --auto-update-on-conflict
 
   echo ""
   echo "✅ Deploy complete"
+
+  # Req 11: grant bedrock:CallWithBearerToken to whatever role the runtime
+  # actually assumed (CFN-provided or toolkit auto-created). Unconditional —
+  # the runtime ALWAYS mints its own Bedrock token for the Messages path, so
+  # this must run on every deploy, not only when a seller ARN is wired. The
+  # role only exists after `agentcore deploy`, hence the grant happens here.
+  grant_bedrock_bearer_token "$(_resolve_runtime_role_arn)"
 fi
 
 # ── Test (--test or --test-only) ────────────────────────────────────

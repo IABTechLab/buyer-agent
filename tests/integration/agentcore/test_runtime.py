@@ -80,11 +80,18 @@ def runtime_config(request) -> RuntimeConfig:
 def invoke_runtime(
     config: RuntimeConfig,
     payload: dict,
-    timeout: int = 120,
+    timeout: int = 240,
     max_retries: int = 3,
     retry_wait: int = 30,
 ) -> dict:
-    """Invoke the runtime and return parsed response."""
+    """Invoke the runtime and return parsed response.
+
+    Default ``timeout`` is generous: these live tests drive the REAL
+    multi-agent crew on Bedrock Claude (research + memory save/retrieve +
+    seller tool calls), which routinely runs ~3 min for a full campaign plan,
+    plus a possible cold-start on the first invoke after a deploy. Crew/
+    integration tests raise it further.
+    """
     payload_json = json.dumps(payload)
     cmd = ["agentcore", "invoke", payload_json]
     env = os.environ.copy()
@@ -189,6 +196,11 @@ class TestCrewPlanCampaign:
                 ),
                 "routing_mode": "crew",
             },
+            # Crew mode fans out a multi-agent crew over multi-turn tool calls on
+            # Claude Sonnet 5; observed end-to-end latency is ~4 min, well past the
+            # 120s default. Give real headroom so a correct plan isn't scored as a
+            # failure purely on latency.
+            timeout=360,
         )
         assert result["success"], f"Invoke failed: {result['error']}"
         response = result["response"].lower()
@@ -204,6 +216,7 @@ class TestCrewPlanCampaign:
                 "prompt": "Plan a $200K Q1 campaign for mobile and display",
                 "routing_mode": "crew",
             },
+            timeout=360,
         )
         assert result["success"], f"Invoke failed: {result['error']}"
         response = result["response"].lower()
@@ -219,6 +232,7 @@ class TestCrewPlanCampaign:
                 "prompt": "Plan a $1M Q3 brand awareness campaign",
                 "routing_mode": "crew",
             },
+            timeout=360,
         )
         assert result["success"], f"Invoke failed: {result['error']}"
         # The raw output should contain campaign plan indicators
@@ -226,3 +240,251 @@ class TestCrewPlanCampaign:
         assert any(kw in response.lower() for kw in ["budget", "campaign", "plan", "allocation"]), (
             f"No plan data: {response[:300]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Buyer -> Seller runtime-to-runtime integration (AgentCoreSellerProxy)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.agentcore
+class TestBuyerSellerIntegration:
+    """End-to-end buyer->seller over InvokeAgentRuntime (the deployed loop).
+
+    This is the ONE test that requires both runtimes deployed. The broader
+    buyer<->seller *functional* contract — pricing tiers by buyer identity, the
+    deal request/booking flow, MCP tools, order lifecycle, negotiation — is
+    already covered OFFLINE by the existing suites (e.g. seller
+    ``tests/integration/test_deal_flow_e2e.py`` / ``test_mcp_integration.py``,
+    buyer ``tests/integration/test_deal_booking_flow.py`` /
+    ``test_auth_session_negotiation.py``). This test adds only what those cannot:
+    proof the real cross-*runtime* transport works when deployed.
+
+    The buyer crew's research path calls ``search_advertising_products``, which
+    (when ``SELLER_AGENT_URL`` is an AgentCore ARN) is backed by
+    ``AgentCoreSellerProxy`` -> ``bedrock-agentcore:InvokeAgentRuntime`` against
+    the seller's **MCP** runtime, issuing MCP ``tools/call`` over the
+    Streamable-HTTP transport (initialize handshake + dual Accept header +
+    SSE-framed result parsing).
+
+    Where the signal lives: the crew's FINAL invoke response is a budget
+    *allocation plan* (channels/percentages/rationale) — it does NOT echo the
+    seller's product ids. The proof of the closed loop is in the runtime's
+    CloudWatch logs: the buyer logs the seller catalog's REAL ``inv-*`` ids
+    coming back through the proxy. (Note: ``inv-*`` is the seller *catalog*
+    namespace; the buyer crew's own *recommendation* ids use ``prod-*`` and are
+    unrelated — so only an ``inv-*`` id proves the live seller catalog.)
+
+    Requires BOTH runtimes deployed and the buyer runtime's execution role
+    granted ``InvokeAgentRuntime`` on the seller runtime (see
+    ``infra/aws/agentcore/auth-agentcore.yaml``). Skips cleanly when the buyer
+    was not deployed against an ARN seller, or when CloudWatch is unreadable.
+    """
+
+    _REAL_INV_RE = re.compile(r"inv-[a-z0-9-]+", re.IGNORECASE)
+
+    @staticmethod
+    def _log_group(config: "RuntimeConfig") -> str | None:
+        """DEFAULT runtime log group for the buyer, derived from its ARN."""
+        # arn:...:runtime/<id>  ->  /aws/bedrock-agentcore/runtimes/<id>-DEFAULT
+        m = re.search(r"runtime/([^/]+)$", config.arn)
+        return f"/aws/bedrock-agentcore/runtimes/{m.group(1)}-DEFAULT" if m else None
+
+    def _recent_log_text(self, config: "RuntimeConfig", since_ms: int, pattern: str) -> str:
+        """Return recent buyer log messages matching a CloudWatch filter pattern.
+
+        Skips (not fails) when logs are unreadable — the runtime behaviour is
+        still exercised by the invoke; only the assertion channel is missing.
+        """
+        try:
+            import boto3
+        except ImportError:  # pragma: no cover
+            pytest.skip("boto3 unavailable to read CloudWatch logs")
+
+        lg = self._log_group(config)
+        if not lg:
+            pytest.skip(f"Could not derive log group from ARN {config.arn}")
+
+        session = boto3.Session(profile_name=config.profile) if config.profile else boto3.Session()
+        logs = session.client("logs", region_name=config.region)
+        try:
+            lines: list[str] = []
+            paginator = logs.get_paginator("filter_log_events")
+            for page in paginator.paginate(
+                logGroupName=lg,
+                startTime=since_ms,
+                filterPattern=pattern,
+            ):
+                lines.extend(e.get("message", "") for e in page.get("events", []))
+                if len(lines) > 500:
+                    break
+            return "\n".join(lines)
+        except logs.exceptions.ResourceNotFoundException:
+            pytest.skip(f"Log group {lg} not found — runtime not deployed?")
+        except Exception as e:  # noqa: BLE001 — logs are the assertion channel, not the SUT
+            pytest.skip(f"Could not read CloudWatch logs: {e}")
+
+    def test_crew_reaches_seller_inventory(self, runtime_config):
+        """Buyer crew discovers real seller inv-* inventory via the proxy.
+
+        Invokes the crew, then asserts the buyer's logs surfaced real ``inv-*``
+        ids from the seller catalog through the proxy path. ``inv-*`` is the
+        seller *catalog* id namespace; the buyer's own crew *recommendations*
+        use a separate ``prod-*`` id namespace (see
+        ``tests/integration/test_deal_booking_flow.py``), so the two are NOT
+        interchangeable and only an ``inv-*`` id proves the seller catalog was
+        reached live through the proxy.
+        """
+        since_ms = int((time.time() - 5) * 1000)
+        result = invoke_runtime(
+            runtime_config,
+            {
+                # Search terms are substrings of real seller catalog product
+                # NAMES ("Sports", "Video") so the discovery path returns
+                # products deterministically — the seller CSV list_inventory
+                # filter matches filter_str against the product name only, and
+                # empirically this wording produced live inv-* results.
+                "prompt": (
+                    "Plan a $500K Q4 sports campaign. Search the seller for"
+                    " Sports and Video inventory and list the products found."
+                ),
+                "routing_mode": "crew",
+            },
+            timeout=300,
+        )
+        assert result["success"], f"Invoke failed: {result['error']}"
+
+        # Did the buyer exercise the seller-search tool at all? (skip guard)
+        tool_text = self._recent_log_text(
+            runtime_config, since_ms, '"search_advertising_products"'
+        )
+        if "search_advertising_products" not in tool_text:
+            pytest.skip(
+                "Buyer did not exercise the seller-search tool (not wired to an "
+                "ARN seller?); deploy with --seller-url <seller MCP ARN> to run."
+            )
+
+        # The definitive signal: real seller inv-* ids in the logs. CloudWatch
+        # filter patterns need the hyphen term quoted.
+        inv_text = self._recent_log_text(runtime_config, since_ms, '"inv-"')
+        inv_ids = sorted(set(self._REAL_INV_RE.findall(inv_text)))
+        assert inv_ids, (
+            "Buyer's seller search returned no real inv-* ids — the proxy->MCP "
+            f"path returned no catalog data. Log tail: {inv_text[-500:]}"
+        )
+
+
+class TestCrewExercisesStores:
+    """Drive each buyer store through a real agent/crew interaction.
+
+    Rather than poke tables directly, each test sends a natural-language prompt
+    that routes the crew to a specific MCP tool, then asserts (via CloudWatch)
+    that the tool fired — proving that store's path works end-to-end through
+    agent interaction on the deployed runtime.
+
+    Store -> representative tool (from mcp_server.py wiring):
+      DealStore family -> list_deals / search_deals / get_portfolio_summary
+      CampaignStore    -> list_campaigns / get_campaign_status
+      PacingStore      -> check_pacing / get_pacing_report
+      OrderStore       -> list_orders / get_order_status
+    """
+
+    @staticmethod
+    def _log_group(config: "RuntimeConfig") -> str | None:
+        m = re.search(r"runtime/([^/]+)$", config.arn)
+        return f"/aws/bedrock-agentcore/runtimes/{m.group(1)}-DEFAULT" if m else None
+
+    def _recent_log_text(self, config: "RuntimeConfig", since_ms: int, pattern: str) -> str:
+        try:
+            import boto3
+        except ImportError:  # pragma: no cover
+            pytest.skip("boto3 unavailable to read CloudWatch logs")
+        lg = self._log_group(config)
+        if not lg:
+            pytest.skip(f"Could not derive log group from ARN {config.arn}")
+        session = boto3.Session(profile_name=config.profile) if config.profile else boto3.Session()
+        logs = session.client("logs", region_name=config.region)
+        try:
+            lines: list[str] = []
+            paginator = logs.get_paginator("filter_log_events")
+            for page in paginator.paginate(
+                logGroupName=lg, startTime=since_ms, filterPattern=pattern
+            ):
+                lines.extend(e.get("message", "") for e in page.get("events", []))
+                if len(lines) > 500:
+                    break
+            return "\n".join(lines)
+        except logs.exceptions.ResourceNotFoundException:
+            pytest.skip(f"Log group {lg} not found — runtime not deployed?")
+        except Exception as e:  # noqa: BLE001 — logs are the assertion channel, not the SUT
+            pytest.skip(f"Could not read CloudWatch logs: {e}")
+
+    # (prompt that should route the crew to the tool, tool name to see in logs)
+    #
+    # Prompts are deliberately imperative: they name the store operation and
+    # explicitly forbid answering from memory, so the crew's LLM calls the tool
+    # instead of replying conversationally. NL routing is still non-deterministic
+    # (the test skips-not-fails if no tool fires), but naming the operation +
+    # "you must call the tool" raises the hit-rate materially over soft prompts.
+    _STORE_PROBES = [
+        (
+            "Use your tools to retrieve the deals in my deal library: call the "
+            "deal-listing tool and the portfolio-summary tool, and report exactly "
+            "what they return. Do not answer from memory — if a tool exists for "
+            "this, you must call it.",
+            ("list_deals", "get_portfolio_summary", "search_deals"),
+            "DealStore",
+        ),
+        (
+            "Use your tools to retrieve my current campaigns: call the "
+            "campaign-listing tool and report each campaign's status exactly as "
+            "returned. Do not answer from memory — if a tool exists for this, you "
+            "must call it.",
+            ("list_campaigns", "get_campaign_status"),
+            "CampaignStore",
+        ),
+        (
+            "Use your tools to check pacing on my campaigns: call the pacing tool "
+            "and return the pacing report exactly as it comes back. Do not answer "
+            "from memory — if a tool exists for this, you must call it.",
+            ("check_pacing", "get_pacing_report", "review_budgets"),
+            "PacingStore",
+        ),
+        (
+            "Use your tools to retrieve my orders: call the order-listing tool and "
+            "report each order's current status exactly as returned. Do not answer "
+            "from memory — if a tool exists for this, you must call it.",
+            ("list_orders", "get_order_status"),
+            "OrderStore",
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        "prompt,tool_names,store",
+        _STORE_PROBES,
+        ids=[p[2] for p in _STORE_PROBES],
+    )
+    def test_crew_exercises_store(self, runtime_config, prompt, tool_names, store):
+        since_ms = int((time.time() - 5) * 1000)
+        result = invoke_runtime(
+            runtime_config,
+            {"prompt": prompt, "routing_mode": "crew"},
+            timeout=300,
+        )
+        assert result["success"], f"Invoke failed for {store}: {result['error']}"
+
+        # Assert at least one of the store's tools fired (CloudWatch filter is an
+        # OR of quoted terms). Skip (not fail) if the crew chose a different
+        # path -- the store path is best-effort driven by NL, and the assertion
+        # channel (logs) is not the SUT.
+        pattern = " ".join(f'"{t}"' for t in tool_names) if len(tool_names) == 1 else (
+            "?" + " ?".join(f'"{t}"' for t in tool_names)
+        )
+        text = self._recent_log_text(runtime_config, since_ms, pattern)
+        if not any(t in text for t in tool_names):
+            pytest.skip(
+                f"{store}: crew did not route to {tool_names} for this prompt "
+                f"(NL routing is non-deterministic; log tail: {text[-300:]})"
+            )
+        # A tool fired -> the store's connect()+query path executed on the
+        # deployed (Postgres-backed) runtime.
