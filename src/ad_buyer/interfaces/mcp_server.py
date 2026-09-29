@@ -1393,15 +1393,24 @@ def create_deal_manual(
 def get_portfolio_summary(
     top_sellers_count: int = 5,
     expiring_within_days: int = 30,
+    seller_org: str | None = None,
+    seller_domain: str | None = None,
 ) -> str:
     """Get aggregate statistics and summary for the deal portfolio.
 
     Provides counts by status, deal type, media type, top sellers,
     total portfolio value, and deals expiring soon.
 
+    By default this summarizes every deal in the local deal library,
+    across all sellers and SSPs ever synced — not just one account. Pass
+    seller_org and/or seller_domain to scope the summary down to a single
+    seller for an apples-to-apples comparison against that seller's API.
+
     Args:
         top_sellers_count: Number of top sellers to include (default 5).
         expiring_within_days: Show deals expiring within N days (default 30).
+        seller_org: Restrict to deals from this seller_org (e.g. "Index Exchange").
+        seller_domain: Restrict to deals from this seller_domain.
 
     Returns a JSON object with:
     - total_deals: total number of deals
@@ -1419,6 +1428,8 @@ def get_portfolio_summary(
             store,
             top_sellers_count=top_sellers_count,
             expiring_within_days=expiring_within_days,
+            seller_org=seller_org,
+            seller_domain=seller_domain,
         )
         return json.dumps(result, indent=2)
     finally:
@@ -2352,7 +2363,7 @@ def list_ssp_connectors() -> str:
 
 @mcp.tool()
 @_require_operator
-def import_deals_ssp(ssp_name: str) -> str:
+def import_deals_ssp(ssp_name: str, filters: dict[str, Any] | None = None) -> str:
     """Import deals from a specified SSP connector into the deal portfolio.
 
     Instantiates the named SSP connector, calls its API to fetch deals,
@@ -2363,6 +2374,13 @@ def import_deals_ssp(ssp_name: str) -> str:
         ssp_name: Which SSP to import from.  One of:
             ``"pubmatic"``, ``"magnite"``, ``"index_exchange"``.
             Case-insensitive.
+        filters: Optional connector-specific fetch filters, passed straight
+            through as keyword arguments to that connector's fetch_deals().
+            Each SSP accepts different keys — for Index Exchange:
+            {"status": "active", "class_ids": [1, 4], "account_ids": [1470498],
+            "page_size": 100}. Without account_ids, a broadly-scoped
+            credential can page through every deal on the platform, not
+            just the caller's own account(s) — scope this whenever possible.
 
     Returns a JSON object with:
     - total_rows: total deals fetched from the SSP
@@ -2405,7 +2423,7 @@ def import_deals_ssp(ssp_name: str) -> str:
     # Fetch + persist normalised deals via the deal service
     store = _get_deal_store()
     try:
-        result = deal_service.import_deals_ssp(store, connector)
+        result = deal_service.import_deals_ssp(store, connector, filters=filters)
         result["ssp_name"] = key
         return json.dumps(result, indent=2)
     finally:

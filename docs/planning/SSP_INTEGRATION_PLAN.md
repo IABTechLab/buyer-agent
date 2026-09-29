@@ -335,38 +335,39 @@ class MagniteConnector(SSPConnector):
 
 ## 6. Index Exchange Connector (Priority 3)
 
-Index Exchange is the #1 US web SSP (19% share). Its deal model is strictly publisher-side: publishers create deals via IX's UI or API, specifying buyer seats. The buyer agent's IX connector discovers and imports deals that have been created by publishers and targeted to the buyer's seat.
+Index Exchange is the #1 US web SSP (19% share). Its deal model is strictly publisher-side: publishers create deals via Index's UI or API, specifying buyer seats. The buyer agent's Index connector discovers and imports deals that have been created by publishers and targeted to the buyer's seat.
 
 ### 6.1 API details
 
-- **Base URL:** `https://api.indexexchange.com`
-- **Authentication:** API key (login required via IX API portal to obtain)
+Confirmed against the Deals API, the service implementing these routes.
+
+- **Base URL:** `https://app.indexexchange.com/api/deals`
+- **Authentication:** `Authorization: Bearer <keycloak-jwt>` (not an API key header)
 - **Key endpoints:**
-  - `GET /deals` — list deals targeted to the buyer's seat
-  - `GET /deals/{deal_id}` — single deal detail
-- **Note:** The "Create deal" endpoint in IX's API docs is publisher-side. The buyer agent uses the GET endpoints only.
-- **Deal activation model:** IX uses "easy deal activation" — buyers can discover and activate deals created by publishers without manually entering deal IDs
+  - `GET /v3/deals` — list deals targeted to the buyer's seat
+  - `GET /v3/deals/{internalDealID}` — single deal detail
+- **Note:** The "Create deal" endpoint (`POST /v3/deals`) is publisher-side. The buyer agent uses the GET endpoints only.
+- **No seat ID parameter:** which deals are visible is determined server-side by the caller's authenticated identity — there's no client-supplied `seatId` on `GET /v3/deals`.
 
 ### 6.2 Data mapping (Index Exchange API response → DealStore)
 
-| IX Field | DealStore Field | Notes |
+| Index Field | DealStore Field | Notes |
 |----------|-----------------|-------|
-| `dealId` | `seller_deal_id` | |
+| `externalDealID` | `seller_deal_id` | The OpenRTB deal ID buyers reference in bid requests. |
+| `internalDealID` | `description` | No first-class DealStore field for this; preserved for future write ops. |
 | `name` | `display_name` | |
-| `status` | `status` | |
-| `dealType` | `deal_type` | Map: `PMP`→`PA`, `PG`→`PG`, `PD`→`PD` |
-| `floorPrice` | `bid_floor_cpm` | |
-| `price` | `fixed_price_cpm` | PG/PD |
-| `currency` | `currency` | |
-| `publisherDomain` | `seller_domain` | |
-| `adType` | `media_type` | Map: `video`→`CTV`, `display`→`DIGITAL` |
+| `status` | `status` | Map: `active`→`active`, `paused`/`expired`/`auto-paused`→`paused`. |
+| `classID` + `directConfigurations.programmaticGuaranteed` + `auctionType` | `deal_type` | Map: `classID=1,PG=true`→`PG`; `classID=1,PG=false,fixed`→`PD`; everything else (`classID` 1-first/3/4/5)→`PA`. There is no `PMP` DealStore type. |
+| `floor` | `fixed_price_cpm` / `bid_floor_cpm` | Single field; goes to `fixed_price_cpm` for PG deals, `bid_floor_cpm` otherwise. |
+| `targeting[].keyName` (geo keys only) | `geo_targets` | `targeting` is a structured array, not a flat dict — filter to known geo `keyName`s (`Country`, `region`, `continent`, `place`, `area`, `zipcode`, `domain`). |
 | `startDate` | `flight_start` | |
 | `endDate` | `flight_end` | |
-| `impressions` | `impressions` | |
-| `description` | `description` | |
+| `directConfigurations.impressionGoal` | `impressions` | PG deals only. |
+| (hardcoded) | `currency` | `"USD"` — not returned by the API. |
 | (hardcoded) | `seller_org` | `"Index Exchange"` |
 | (hardcoded) | `seller_type` | `"SSP"` |
-| (hardcoded) | `seller_url` | `"https://api.indexexchange.com"` |
+| (hardcoded) | `seller_url` | `"https://app.indexexchange.com/api/deals"` |
+| (always `None`) | `media_type`, `formats`, `seller_domain`, `content_categories`, `audience_segments` | No `adType`, `formats`, `publisherDomain` fields exist on this API; no confirmed standard targeting key for content/audience. |
 
 ### 6.3 Connector configuration
 
@@ -378,8 +379,7 @@ class IndexExchangeConnector(SSPConnector):
     imports deals that publishers have targeted to the buyer's seat.
 
     Credentials:
-        api_key: Index Exchange API key
-        seat_id: Buyer seat/member ID
+        api_key: Index Exchange Keycloak bearer token
     """
 ```
 
@@ -419,10 +419,10 @@ Returns a JSON list of available connectors, each with:
 - `page_size`: int, default 100
 - Returns: same structure as `import_deals_csv`
 
-**`import_deals_index_exchange(status, deal_type, page_size)`**
-- `status`: filter, default `"all"`
-- `deal_type`: filter, default `"all"`
-- `page_size`: int, default 100
+**`import_deals_index_exchange(status, class_ids, page_size)`**
+- `status`: filter — `"active"`, `"paused"`, `"expired"`, `"auto-paused"`, or `"all"` (default `"all"`)
+- `class_ids`: filter — list of Index `classID` ints (`1`, `3`, `4`, `5`); omitted means no filter. There is no `deal_type` filter param on this API.
+- `page_size`: int, default 100 (capped at 2000, the API maximum)
 - Returns: same structure as `import_deals_csv`
 
 ### 7.3 Credential management
@@ -440,8 +440,7 @@ MAGNITE_SECRET_KEY=<secret_key>
 MAGNITE_SEAT_ID=<seat_id>
 
 # Index Exchange
-IX_API_KEY=<api_key>
-IX_SEAT_ID=<seat_id>
+IX_API_KEY=<keycloak_bearer_token>
 ```
 
 If credentials for an SSP are not set, the corresponding MCP tool returns an informative error (rather than raising an exception) and `list_ssp_connectors` marks that connector as `configured: false`.
