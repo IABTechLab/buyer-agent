@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ad_buyer.clients.unified_client import UnifiedClient
+from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
 from ad_buyer.models.buyer_identity import (
     AccessTier,
     BuyerContext,
@@ -885,6 +885,72 @@ class TestDealResponseModel:
 
 class TestUnifiedClientBuyerDealMethods:
     """Test buyer deal-specific methods on UnifiedClient."""
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_searches_with_query_and_filters(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        expected_result = UnifiedResult(data=[{"id": "ctv-1"}])
+        client.call_tool = AsyncMock(return_value=expected_result)
+
+        result = await client.discover_inventory(
+            query="CTV inventory",
+            channel="ctv",
+            max_cpm=30,
+            min_impressions=1000,
+            targeting=["household"],
+            publisher="example.test",
+            protocol=Protocol.A2A,
+        )
+
+        assert result is expected_result
+        client.call_tool.assert_awaited_once_with(
+            "search_products",
+            {
+                "query": "CTV inventory",
+                "filters": {
+                    **agency_identity.to_context_dict(),
+                    "channel": "ctv",
+                    "maxPrice": 30,
+                    "minImpressions": 1000,
+                    "targeting": ["household"],
+                    "publisher": "example.test",
+                },
+            },
+            protocol=Protocol.A2A,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "filter_kwargs",
+        [
+            {"channel": "ctv"},
+            {"max_cpm": 30},
+            {"min_impressions": 1000},
+            {"targeting": ["household"]},
+            {"publisher": "example.test"},
+        ],
+    )
+    async def test_discover_inventory_rejects_filters_without_query(
+        self, agency_identity, filter_kwargs
+    ):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        client.call_tool = AsyncMock()
+
+        with pytest.raises(ValueError, match="Product filters require a query"):
+            await client.discover_inventory(**filter_kwargs)
+
+        client.call_tool.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_without_query_or_product_filters_lists_products(
+        self, agency_identity
+    ):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=[]))
+
+        await client.discover_inventory()
+
+        client.call_tool.assert_awaited_once_with("list_products", protocol=None)
 
     def test_set_buyer_identity(self, advertiser_identity):
         """set_buyer_identity should store the identity."""

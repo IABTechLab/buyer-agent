@@ -502,11 +502,17 @@ class UnifiedClient:
         if query:
             args["query"] = query
 
-        # Try search_products first, fall back to list_products
+        has_product_filters = any(
+            key in filters
+            for key in ("channel", "maxPrice", "minImpressions", "targeting", "publisher")
+        )
+        if has_product_filters and not query:
+            raise ValueError(
+                "Product filters require a query; list_products does not support filters"
+            )
         if query:
             return await self.call_tool("search_products", args, protocol=protocol)
-        else:
-            return await self.call_tool("list_products", protocol=protocol)
+        return await self.call_tool("list_products", protocol=protocol)
 
     async def get_pricing(
         self,
