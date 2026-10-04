@@ -9,11 +9,16 @@ Use this approach when you need lower-level control over the protocol clients.
 
 Usage:
     python examples/individual_clients.py
+
+Set SELLER_BASE_URL to use a server other than http://localhost:8000.
 """
 
 import asyncio
+import os
 
 from ad_buyer.clients import A2AClient, IABMCPClient
+
+SELLER_BASE_URL = os.getenv("SELLER_BASE_URL", "http://localhost:8000")
 
 
 async def mcp_example():
@@ -22,7 +27,7 @@ async def mcp_example():
     print("MCP Client - Direct Tool Access")
     print("=" * 50)
 
-    async with IABMCPClient() as client:
+    async with IABMCPClient(base_url=SELLER_BASE_URL) as client:
         # See all available tools
         print(f"Available tools: {len(client.tools)}")
         for tool in client.tools[:5]:  # Show first 5
@@ -42,7 +47,7 @@ async def a2a_example():
     print("A2A Client - Natural Language")
     print("=" * 50)
 
-    async with A2AClient() as client:
+    async with A2AClient(base_url=SELLER_BASE_URL) as client:
         # Send natural language messages
         response = await client.send_message("List available products")
         print(f"Response text: {response.text}")
