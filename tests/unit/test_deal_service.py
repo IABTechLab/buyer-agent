@@ -68,6 +68,11 @@ class TestListDeals:
         assert active["total"] == 1
         assert active["deals"][0]["display_name"] == "A"
 
+    def test_includes_seller_deal_id(self, store):
+        _seed(store, seller_deal_id="IX-123")
+        result = deal_service.list_deals(store)
+        assert result["deals"][0]["seller_deal_id"] == "IX-123"
+
 
 class TestSearchDeals:
     def test_empty_query_returns_error(self, store):
@@ -79,6 +84,11 @@ class TestSearchDeals:
         result = deal_service.search_deals(store, "espn")
         assert result["total"] == 1
         assert "seller organization" in result["deals"][0]["matched_in"]
+
+    def test_results_include_seller_deal_id(self, store):
+        _seed(store, display_name="X", seller_org="ESPN", seller_deal_id="IX-456")
+        result = deal_service.search_deals(store, "espn")
+        assert result["deals"][0]["seller_deal_id"] == "IX-456"
 
 
 class TestInspectDeal:
@@ -107,6 +117,25 @@ class TestPortfolioSummary:
         assert result["total_deals"] == 2
         assert result["by_status"]["active"] == 2
         assert result["top_sellers"][0]["seller"] == "ESPN"
+
+    def test_scoped_to_seller_org(self, store):
+        _seed(store, seller_org="Index Exchange", seller_deal_id="1")
+        _seed(store, seller_org="Index Exchange", seller_deal_id="2")
+        _seed(store, seller_org="PubMatic", seller_deal_id="3")
+        result = deal_service.portfolio_summary(store, seller_org="Index Exchange")
+        assert result["total_deals"] == 2
+        assert [s["seller"] for s in result["top_sellers"]] == ["Index Exchange"]
+
+    def test_scoped_to_seller_domain(self, store):
+        _seed(store, seller_domain="espn.com", seller_deal_id="1")
+        _seed(store, seller_domain="hulu.com", seller_deal_id="2")
+        result = deal_service.portfolio_summary(store, seller_domain="espn.com")
+        assert result["total_deals"] == 1
+
+    def test_scoped_to_unknown_seller_is_empty(self, store):
+        _seed(store, seller_org="ESPN", seller_deal_id="1")
+        result = deal_service.portfolio_summary(store, seller_org="Nobody")
+        assert result["total_deals"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -209,3 +238,43 @@ class TestImportDealsSsp:
         assert result["successful"] == 2
         assert len(result["deal_ids"]) == 2
         assert deal_service.list_deals(store)["total"] == 2
+
+    def test_filters_are_passed_to_connector_fetch_deals(self, store):
+        class _FakeFetchResult:
+            total_fetched = 0
+            successful = 0
+            failed = 0
+            skipped = 0
+            errors: list = []
+            deals: list = []
+
+        seen: dict = {}
+
+        class _FakeConnector:
+            import_source = "INDEX_EXCHANGE"
+
+            def fetch_deals(self, **kwargs):
+                seen.update(kwargs)
+                return _FakeFetchResult()
+
+        filters = {"status": "active", "account_ids": [1470498]}
+        deal_service.import_deals_ssp(store, _FakeConnector(), filters=filters)
+        assert seen == filters
+
+    def test_no_filters_calls_fetch_deals_without_kwargs(self, store):
+        class _FakeFetchResult:
+            total_fetched = 0
+            successful = 0
+            failed = 0
+            skipped = 0
+            errors: list = []
+            deals: list = []
+
+        class _FakeConnector:
+            import_source = "INDEX_EXCHANGE"
+
+            def fetch_deals(self, **kwargs):
+                assert kwargs == {}
+                return _FakeFetchResult()
+
+        deal_service.import_deals_ssp(store, _FakeConnector())

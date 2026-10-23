@@ -73,6 +73,10 @@ _STATUS_MAP: dict[str, str] = {
 
 _VALID_STATUS_FILTERS = {"active", "paused", "expired", "auto-paused", "all"}
 
+# Keyword filters fetch_deals() accepts. Anything else is rejected rather than
+# ignored, since a typo'd account_ids would silently become a platform-wide fetch.
+_VALID_FETCH_FILTERS = {"status", "class_ids", "account_ids", "page_size"}
+
 # Standard targeting keyNames that represent geographic targeting, per the
 # targeting key catalogue managed in supply-configuration-api.
 _GEO_TARGETING_KEYS = {"Country", "region", "continent", "place", "area", "zipcode", "domain"}
@@ -164,7 +168,8 @@ class IndexExchangeConnector(SSPConnector):
 
         Handles pagination automatically: iterates pages (0-indexed, via
         pageOffset) until the cumulative offset reaches the API's reported
-        totalCount, or a page comes back empty.
+        totalCount, or a page comes back empty. If a response omits
+        totalCount, it keeps paging until a page comes back short.
 
         Args:
             status: Filter by deal status. Pass "all" (default) to fetch
@@ -185,11 +190,18 @@ class IndexExchangeConnector(SSPConnector):
             SSPFetchResult with normalized deals ready for DealStore.
 
         Raises:
-            ValueError: If status is not a recognized filter value.
+            ValueError: If a filter key is not recognized, or status is not
+                a recognized filter value.
             SSPAuthError: HTTP 401 or 403 from Index API.
             SSPRateLimitError: HTTP 429 from Index API.
             SSPConnectionError: HTTP 5xx or network error.
         """
+        unknown_filters = sorted(set(kwargs) - _VALID_FETCH_FILTERS)
+        if unknown_filters:
+            raise ValueError(
+                f"Unknown Index Exchange filter(s) {unknown_filters}. "
+                f"Must be among: {sorted(_VALID_FETCH_FILTERS)}"
+            )
         status_filter: str = kwargs.get("status", "all")
         if status_filter.lower() not in _VALID_STATUS_FILTERS:
             raise ValueError(
@@ -240,7 +252,10 @@ class IndexExchangeConnector(SSPConnector):
                 result.successful += 1
 
             page_offset += 1
-            if (page_offset * page_size) >= total_count:
+            if total_count is None:
+                if len(raw_deals) < page_size:
+                    break
+            elif (page_offset * page_size) >= total_count:
                 break
 
         logger.info(
@@ -391,10 +406,15 @@ class IndexExchangeConnector(SSPConnector):
             "deal_type": normalized_deal_type,
             "media_type": None,  # not a field on this API — no adType
             "status": normalized_status,
-            # Pricing — a single "floor" field; fixed_price_cpm only makes
-            # sense for PG deals (a true guaranteed fixed rate).
-            "fixed_price_cpm": raw_deal.get("floor") if normalized_deal_type == "PG" else None,
-            "bid_floor_cpm": raw_deal.get("floor") if normalized_deal_type != "PG" else None,
+            # Pricing — a single "floor" field. PG and PD are both fixed-price
+            # deals (PD is classified by auctionType == "fixed"), so it is their
+            # fixed CPM; for auction deals it is the bid floor.
+            "fixed_price_cpm": raw_deal.get("floor")
+            if normalized_deal_type in ("PG", "PD")
+            else None,
+            "bid_floor_cpm": raw_deal.get("floor")
+            if normalized_deal_type not in ("PG", "PD")
+            else None,
             "currency": "USD",  # not returned by the API — always USD today
             # Inventory targeting
             "formats": None,  # not a field on this API — no formats array
@@ -448,7 +468,7 @@ class IndexExchangeConnector(SSPConnector):
         status_filter: str,
         class_ids: list[int],
         account_ids: list[int],
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int | None]:
         """Fetch a single page of deals from the Index API.
 
         Args:
@@ -460,7 +480,7 @@ class IndexExchangeConnector(SSPConnector):
 
         Returns:
             Tuple of (list of raw deal dicts, totalCount from the response
-            envelope).
+            envelope, or None if the envelope omitted it).
 
         Raises:
             SSPAuthError: HTTP 401 or 403.
@@ -511,4 +531,7 @@ class IndexExchangeConnector(SSPConnector):
             )
 
         data: dict[str, Any] = response.json()
-        return data.get("deals", []), int(data.get("totalCount", 0))
+        total_count = data.get("totalCount")
+        if total_count is None:
+            logger.warning("Index Exchange response had no totalCount; paging until a short page")
+        return data.get("deals", []), None if total_count is None else int(total_count)

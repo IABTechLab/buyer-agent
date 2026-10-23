@@ -358,7 +358,7 @@ Confirmed against the Deals API, the service implementing these routes.
 | `name` | `display_name` | |
 | `status` | `status` | Map: `active`→`active`, `paused`/`expired`/`auto-paused`→`paused`. |
 | `classID` + `directConfigurations.programmaticGuaranteed` + `auctionType` | `deal_type` | Map: `classID=1,PG=true`→`PG`; `classID=1,PG=false,fixed`→`PD`; everything else (`classID` 1-first/3/4/5)→`PA`. There is no `PMP` DealStore type. |
-| `floor` | `fixed_price_cpm` / `bid_floor_cpm` | Single field; goes to `fixed_price_cpm` for PG deals, `bid_floor_cpm` otherwise. |
+| `floor` | `fixed_price_cpm` / `bid_floor_cpm` | Single field; goes to `fixed_price_cpm` for PG and PD deals, `bid_floor_cpm` otherwise. |
 | `targeting[].keyName` (geo keys only) | `geo_targets` | `targeting` is a structured array, not a flat dict — filter to known geo `keyName`s (`Country`, `region`, `continent`, `place`, `area`, `zipcode`, `domain`). |
 | `startDate` | `flight_start` | |
 | `endDate` | `flight_end` | |

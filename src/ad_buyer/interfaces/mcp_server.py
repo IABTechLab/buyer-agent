@@ -2426,6 +2426,15 @@ def import_deals_ssp(ssp_name: str, filters: dict[str, Any] | None = None) -> st
         result = deal_service.import_deals_ssp(store, connector, filters=filters)
         result["ssp_name"] = key
         return json.dumps(result, indent=2)
+    except ValueError as exc:
+        return json.dumps(
+            {
+                "error": str(exc),
+                "ssp_name": key,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+            indent=2,
+        )
     finally:
         if _deal_store_override is None:
             store.disconnect()

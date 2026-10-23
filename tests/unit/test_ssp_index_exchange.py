@@ -309,17 +309,26 @@ class TestNormalizeDeal:
         normalized = self.connector._normalize_deal(raw)
         assert normalized["status"] == "paused"
 
-    # Pricing fields — single `floor`, split by PG vs non-PG
+    # Pricing fields — single `floor`, split by fixed-price (PG/PD) vs auction
     def test_floor_mapped_to_fixed_cpm_for_pg(self):
         """floor → fixed_price_cpm for PG deals; bid_floor_cpm is None."""
         normalized = self.connector._normalize_deal(self._pg_deal())
         assert normalized["fixed_price_cpm"] == 52.00
         assert normalized["bid_floor_cpm"] is None
 
-    def test_floor_mapped_to_bid_floor_for_non_pg(self):
-        """floor → bid_floor_cpm for non-PG deals; fixed_price_cpm is None."""
+    def test_floor_mapped_to_fixed_cpm_for_pd(self):
+        """floor → fixed_price_cpm for PD deals (auctionType 'fixed'); bid_floor_cpm is None."""
         normalized = self.connector._normalize_deal(self._pd_deal())
-        assert normalized["bid_floor_cpm"] == 14.00
+        assert normalized["deal_type"] == "PD"
+        assert normalized["fixed_price_cpm"] == 14.00
+        assert normalized["bid_floor_cpm"] is None
+
+    def test_floor_mapped_to_bid_floor_for_pa(self):
+        """floor → bid_floor_cpm for auction (PA) deals; fixed_price_cpm is None."""
+        raw = {**self._mp_deal(), "floor": 9.5}
+        normalized = self.connector._normalize_deal(raw)
+        assert normalized["deal_type"] == "PA"
+        assert normalized["bid_floor_cpm"] == 9.5
         assert normalized["fixed_price_cpm"] is None
 
     def test_null_floor_is_none(self):
@@ -657,6 +666,39 @@ class TestFetchDealsPagination:
         result = connector.fetch_deals(page_size=2)
         assert result.successful == 3
         assert len(result.deals) == 3
+
+    def test_missing_total_count_keeps_paging_until_short_page(self):
+        """A response without totalCount must not silently end pagination after page 1."""
+
+        def _deal(external_id: str) -> dict[str, Any]:
+            return {
+                "externalDealID": external_id,
+                "internalDealID": 1,
+                "name": f"Deal {external_id}",
+                "status": "active",
+                "classID": 1,
+                "floor": 10.0,
+                "account": {"accountID": 1},
+                "auctionType": "fixed",
+                "directConfigurations": {"dspID": 1, "programmaticGuaranteed": True},
+                "targeting": [],
+            }
+
+        transport = _MultiPageTransport(
+            _make_response(200, {"deals": [_deal("IX-001"), _deal("IX-002")]}),
+            _make_response(200, {"deals": [_deal("IX-003")]}),
+        )
+        connector = _connector_with_transport(transport)
+        result = connector.fetch_deals(page_size=2)
+        assert result.successful == 3
+
+    def test_unknown_filter_key_is_rejected(self):
+        """A typo'd filter must raise, not fall back to an unscoped platform-wide fetch."""
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))
+        connector = _connector_with_transport(transport)
+        with pytest.raises(ValueError, match="account_id"):
+            connector.fetch_deals(account_id=[123])
+        assert transport.last_request is None
 
     def test_page_size_capped_at_2000(self):
         """page_size above the API max (2000) is capped, not sent as-is."""

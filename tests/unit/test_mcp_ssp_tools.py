@@ -271,6 +271,48 @@ class TestImportDealsSSP:
         assert len(data["deal_ids"]) == 2
 
     @pytest.mark.asyncio
+    async def test_filters_are_passed_through_to_connector(self, monkeypatch):
+        """The MCP `filters` argument reaches the connector's fetch_deals() as kwargs."""
+        monkeypatch.setenv("IX_API_KEY", "test-token")
+        _set_deal_store(_make_deal_store())
+
+        with patch("ad_buyer.interfaces.mcp_server.IndexExchangeConnector") as MockConnector:
+            instance = MagicMock()
+            instance.is_configured.return_value = True
+            instance.fetch_deals.return_value = SSPFetchResult(ssp_name="Index Exchange")
+            instance.import_source = "INDEX_EXCHANGE"
+            MockConnector.return_value = instance
+
+            filters = {"status": "active", "class_ids": [1], "account_ids": [1470498]}
+            result = await mcp.call_tool(
+                "import_deals_ssp", {"ssp_name": "index_exchange", "filters": filters}
+            )
+            data = json.loads(_extract_text(result))
+
+        assert "error" not in data
+        instance.fetch_deals.assert_called_once_with(**filters)
+
+    @pytest.mark.asyncio
+    async def test_unknown_index_exchange_filter_returns_error_and_imports_nothing(
+        self, monkeypatch
+    ):
+        """A typo'd filter key comes back as an error, not an unscoped import."""
+        monkeypatch.setenv("IX_API_KEY", "test-token")
+        store = _make_deal_store()
+        _set_deal_store(store)
+
+        with patch("ad_buyer.tools.deal_library.connectors.index_exchange.httpx.Client") as client:
+            result = await mcp.call_tool(
+                "import_deals_ssp",
+                {"ssp_name": "index_exchange", "filters": {"account_id": [1470498]}},
+            )
+            data = json.loads(_extract_text(result))
+
+        assert "account_id" in data["error"]
+        client.return_value.get.assert_not_called()
+        assert store.list_deals(limit=10) == []
+
+    @pytest.mark.asyncio
     async def test_successful_magnite_import(self, monkeypatch):
         """A configured Magnite connector that returns deals should save them."""
         monkeypatch.setenv("MAGNITE_ACCESS_KEY", "test-key")
