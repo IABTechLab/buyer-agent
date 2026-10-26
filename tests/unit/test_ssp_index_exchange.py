@@ -634,6 +634,21 @@ class TestFetchDealsDeduplication:
 # ---------------------------------------------------------------------------
 
 
+def _paging_deal(external_id: str) -> dict[str, Any]:
+    return {
+        "externalDealID": external_id,
+        "internalDealID": 1,
+        "name": f"Deal {external_id}",
+        "status": "active",
+        "classID": 1,
+        "floor": 10.0,
+        "account": {"accountID": 1},
+        "auctionType": "fixed",
+        "directConfigurations": {"dspID": 1, "programmaticGuaranteed": True},
+        "targeting": [],
+    }
+
+
 class TestFetchDealsPagination:
     """Tests for multi-page fetch behavior, driven by totalCount."""
 
@@ -691,6 +706,55 @@ class TestFetchDealsPagination:
         connector = _connector_with_transport(transport)
         result = connector.fetch_deals(page_size=2)
         assert result.successful == 3
+
+    def test_repeated_full_pages_without_total_count_stop(self):
+        """An API that ignores pageOffset must not be paged forever."""
+        deals = [_paging_deal("IX-001"), _paging_deal("IX-002")]
+        transport = _RecordingTransport(_make_response(200, {"deals": deals}))
+        connector = _connector_with_transport(transport)
+        result = connector.fetch_deals(page_size=2)
+        assert result.successful == 2
+        assert result.skipped == 2
+        assert any("ignoring pageOffset" in e for e in result.errors)
+
+    def test_repeated_full_pages_with_total_count_stop(self):
+        deals = [_paging_deal("IX-001"), _paging_deal("IX-002")]
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 10**6, "deals": deals}))
+        connector = _connector_with_transport(transport)
+        result = connector.fetch_deals(page_size=2)
+        assert result.successful == 2
+        assert any("ignoring pageOffset" in e for e in result.errors)
+
+    def test_page_cap_stops_endless_distinct_pages(self, monkeypatch):
+        from ad_buyer.tools.deal_library.connectors import index_exchange
+
+        monkeypatch.setattr(index_exchange, "_MAX_PAGES", 3)
+
+        class _EndlessTransport(httpx.BaseTransport):
+            def handle_request(self, request: httpx.Request) -> httpx.Response:
+                offset = request.url.params["pageOffset"]
+                return _make_response(200, {"deals": [_paging_deal(f"IX-{offset}")]})
+
+        connector = _connector_with_transport(_EndlessTransport())
+        result = connector.fetch_deals(page_size=1)
+        assert result.successful == 3
+        assert any("after 3 pages" in e for e in result.errors)
+
+    @pytest.mark.parametrize("bad", [0, -5, "10", None, 1.5, True])
+    def test_invalid_page_size_is_rejected(self, bad):
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))
+        connector = _connector_with_transport(transport)
+        with pytest.raises(ValueError, match="page_size"):
+            connector.fetch_deals(page_size=bad)
+        assert transport.last_request is None
+
+    @pytest.mark.parametrize("bad", [["active"], 5, None])
+    def test_non_string_status_filter_raises_value_error(self, bad):
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))
+        connector = _connector_with_transport(transport)
+        with pytest.raises(ValueError, match="status"):
+            connector.fetch_deals(status=bad)
+        assert transport.last_request is None
 
     def test_unknown_filter_key_is_rejected(self):
         """A typo'd filter must raise, not fall back to an unscoped platform-wide fetch."""

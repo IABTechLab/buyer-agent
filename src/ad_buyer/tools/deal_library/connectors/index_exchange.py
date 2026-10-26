@@ -73,6 +73,10 @@ _STATUS_MAP: dict[str, str] = {
 
 _VALID_STATUS_FILTERS = {"active", "paused", "expired", "auto-paused", "all"}
 
+# Hard stop for fetch_deals() paging, so an API that ignores pageOffset (or never
+# reports a short page) cannot loop forever.
+_MAX_PAGES = 1000
+
 # Keyword filters fetch_deals() accepts. Anything else is rejected rather than
 # ignored, since a typo'd account_ids would silently become a platform-wide fetch.
 _VALID_FETCH_FILTERS = {"status", "class_ids", "account_ids", "page_size"}
@@ -202,15 +206,20 @@ class IndexExchangeConnector(SSPConnector):
                 f"Unknown Index Exchange filter(s) {unknown_filters}. "
                 f"Must be among: {sorted(_VALID_FETCH_FILTERS)}"
             )
-        status_filter: str = kwargs.get("status", "all")
-        if status_filter.lower() not in _VALID_STATUS_FILTERS:
+        status_filter = kwargs.get("status", "all")
+        if not isinstance(status_filter, str) or status_filter.lower() not in _VALID_STATUS_FILTERS:
             raise ValueError(
                 f"Invalid status filter '{status_filter}'. "
                 f"Must be one of: {sorted(_VALID_STATUS_FILTERS)}"
             )
         class_ids: list[int] = list(kwargs.get("class_ids") or [])
         account_ids: list[int] = list(kwargs.get("account_ids") or [])
-        page_size: int = min(int(kwargs.get("page_size", 100)), 2000)
+        raw_page_size = kwargs.get("page_size", 100)
+        if isinstance(raw_page_size, bool) or not isinstance(raw_page_size, int):
+            raise ValueError(f"page_size must be an integer >= 1, got {raw_page_size!r}")
+        if raw_page_size < 1:
+            raise ValueError(f"page_size must be an integer >= 1, got {raw_page_size!r}")
+        page_size: int = min(raw_page_size, 2000)
 
         result = SSPFetchResult(ssp_name=self.ssp_name)
         seen_deal_ids: set[str] = set()
@@ -229,6 +238,7 @@ class IndexExchangeConnector(SSPConnector):
                 break
 
             result.raw_response_count += len(raw_deals)
+            page_had_new_deal = False
 
             for raw in raw_deals:
                 result.total_fetched += 1
@@ -237,6 +247,7 @@ class IndexExchangeConnector(SSPConnector):
                 except (KeyError, ValueError) as exc:
                     result.errors.append(f"Deal normalization failed: {exc}")
                     result.failed += 1
+                    page_had_new_deal = True
                     continue
 
                 # Deduplicate by seller_deal_id
@@ -248,10 +259,20 @@ class IndexExchangeConnector(SSPConnector):
                 if deal_id:
                     seen_deal_ids.add(deal_id)
 
+                page_had_new_deal = True
                 result.deals.append(normalized)
                 result.successful += 1
 
             page_offset += 1
+            if not page_had_new_deal:
+                result.errors.append(
+                    f"Stopped paging at page {page_offset}: the page contained only deals "
+                    "already fetched, so the API appears to be ignoring pageOffset"
+                )
+                break
+            if page_offset >= _MAX_PAGES:
+                result.errors.append(f"Stopped paging after {_MAX_PAGES} pages")
+                break
             if total_count is None:
                 if len(raw_deals) < page_size:
                     break
