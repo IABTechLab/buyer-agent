@@ -756,6 +756,31 @@ class TestFetchDealsPagination:
             connector.fetch_deals(status=bad)
         assert transport.last_request is None
 
+    @pytest.mark.parametrize("key", ["account_ids", "class_ids"])
+    @pytest.mark.parametrize("bad", ["1470498", 1470498, [1, "2"], [True], [1.5], {"a": 1}])
+    def test_non_int_list_id_filters_are_rejected(self, key, bad):
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))
+        connector = _connector_with_transport(transport)
+        with pytest.raises(ValueError, match=key):
+            connector.fetch_deals(**{key: bad})
+        assert transport.last_request is None
+
+    def test_int_list_id_filters_are_sent(self):
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))
+        connector = _connector_with_transport(transport)
+        connector.fetch_deals(account_ids=[1470498, 7], class_ids=(1, 4))
+        url = str(transport.last_request.url)
+        assert "accountIDs=1470498" in url and "accountIDs=7" in url
+        assert "classIDs=1" in url and "classIDs=4" in url
+
+    @pytest.mark.parametrize("empty", [None, [], ()])
+    def test_empty_id_filters_mean_no_filter(self, empty):
+        transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))
+        connector = _connector_with_transport(transport)
+        connector.fetch_deals(account_ids=empty, class_ids=empty)
+        url = str(transport.last_request.url)
+        assert "accountIDs" not in url and "classIDs" not in url
+
     def test_unknown_filter_key_is_rejected(self):
         """A typo'd filter must raise, not fall back to an unscoped platform-wide fetch."""
         transport = _RecordingTransport(_make_response(200, {"totalCount": 0, "deals": []}))

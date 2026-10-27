@@ -73,6 +73,22 @@ _STATUS_MAP: dict[str, str] = {
 
 _VALID_STATUS_FILTERS = {"active", "paused", "expired", "auto-paused", "all"}
 
+
+def _validated_int_list(name: str, value: Any) -> list[int]:
+    """Return value as a list of ints; None/empty mean "no filter".
+
+    A bare string is rejected rather than iterated, since list("123") would
+    silently become the filter ["1", "2", "3"].
+    """
+    if value is None:
+        return []
+    if not isinstance(value, (list, tuple)) or any(
+        isinstance(v, bool) or not isinstance(v, int) for v in value
+    ):
+        raise ValueError(f"{name} must be a list of integers, got {value!r}")
+    return list(value)
+
+
 # Hard stop for fetch_deals() paging, so an API that ignores pageOffset (or never
 # reports a short page) cannot loop forever.
 _MAX_PAGES = 1000
@@ -212,8 +228,8 @@ class IndexExchangeConnector(SSPConnector):
                 f"Invalid status filter '{status_filter}'. "
                 f"Must be one of: {sorted(_VALID_STATUS_FILTERS)}"
             )
-        class_ids: list[int] = list(kwargs.get("class_ids") or [])
-        account_ids: list[int] = list(kwargs.get("account_ids") or [])
+        class_ids = _validated_int_list("class_ids", kwargs.get("class_ids"))
+        account_ids = _validated_int_list("account_ids", kwargs.get("account_ids"))
         raw_page_size = kwargs.get("page_size", 100)
         if isinstance(raw_page_size, bool) or not isinstance(raw_page_size, int):
             raise ValueError(f"page_size must be an integer >= 1, got {raw_page_size!r}")
