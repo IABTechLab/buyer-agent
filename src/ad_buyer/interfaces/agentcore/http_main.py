@@ -55,17 +55,52 @@ os.environ.setdefault("ANTHROPIC_API_KEY", "not-used-with-bedrock")
 os.environ.setdefault("STORAGE_TYPE", "sqlite")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
-# Apply CrewAI patches BEFORE any CrewAI imports
-try:
-    from patches.crewai_bedrock_fix import apply_patches as apply_bedrock_patches
+# Durable Bedrock auth: if the Anthropic-compatible base URL is a Bedrock
+# endpoint, mint a fresh bearer token from the runtime's execution role NOW
+# (at startup), authoritative over any baked/stale key. Avoids baking a
+# short-lived token into --env at deploy time (which expires and 403s every
+# crew call). See ad_buyer.llm.bedrock_token.
+from ad_buyer.llm.bedrock_token import ensure_bedrock_token  # noqa: E402
 
-    apply_bedrock_patches()
-except ImportError as _ie:
-    logging.getLogger(__name__).warning(
-        "crewai_bedrock_fix not found: %s (repo_root=%s)", _ie, _repo_root
-    )
-except Exception as _exc:
-    logging.getLogger(__name__).warning("crewai_bedrock_fix patch failed: %s", _exc)
+ensure_bedrock_token()
+
+# Apply CrewAI patches BEFORE any CrewAI imports.
+#
+# The Bedrock *Converse* sanitizer (crewai_bedrock_fix) is only needed on the
+# legacy Converse path (DEFAULT_LLM_MODEL="bedrock/..."). The recommended setup
+# routes Claude through Bedrock's Anthropic Messages endpoint by setting
+# ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL, which uses CrewAI's native Anthropic
+# provider (messages.create) and does NOT need Converse tool-block
+# sanitization. So we apply the Converse patch only when that base URL is unset
+# AND the model is a bedrock/ Converse model.
+_default_model = os.environ.get("DEFAULT_LLM_MODEL", "")
+_on_converse_path = not os.environ.get(
+    "ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL"
+) and _default_model.startswith("bedrock/")
+if _on_converse_path:
+    try:
+        from patches.crewai_bedrock_fix import apply_patches as apply_bedrock_patches
+
+        apply_bedrock_patches()
+    except ImportError as _ie:
+        logging.getLogger(__name__).warning(
+            "crewai_bedrock_fix not found: %s (repo_root=%s)", _ie, _repo_root
+        )
+    except Exception as _exc:
+        logging.getLogger(__name__).warning("crewai_bedrock_fix patch failed: %s", _exc)
+else:
+    # Anthropic Messages endpoint path: CrewAI (>=1.15) emits a ``strict`` tool
+    # field that Bedrock's Anthropic-compatible endpoint rejects. Strip it.
+    try:
+        from patches.crewai_bedrock_anthropic_fix import apply_patches as apply_anthropic_patches
+
+        apply_anthropic_patches()
+    except ImportError as _ie:
+        logging.getLogger(__name__).warning(
+            "crewai_bedrock_anthropic_fix not found: %s (repo_root=%s)", _ie, _repo_root
+        )
+    except Exception as _exc:
+        logging.getLogger(__name__).warning("crewai_bedrock_anthropic_fix patch failed: %s", _exc)
 
 try:
     from patches.crewai_agentcore_memory import apply_patches as apply_memory_patches
