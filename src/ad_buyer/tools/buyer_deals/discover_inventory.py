@@ -153,21 +153,27 @@ Returns:
     ) -> str:
         """Discover inventory with buyer identity context."""
         try:
-            # Build filters
-            filters = {}
+            # Product filters are separate from identity. list_products cannot apply them.
+            product_filters = {}
             if channel:
-                filters["channel"] = channel
+                product_filters["channel"] = channel
             if max_cpm is not None:
-                filters["maxPrice"] = max_cpm
+                product_filters["maxPrice"] = max_cpm
             if min_impressions is not None:
-                filters["minImpressions"] = min_impressions
+                product_filters["minImpressions"] = min_impressions
             if targeting:
-                filters["targeting"] = targeting
+                product_filters["targeting"] = targeting
             if publisher:
-                filters["publisher"] = publisher
+                product_filters["publisher"] = publisher
 
-            # Add identity context to filters
+            if product_filters and not query:
+                return (
+                    "Error discovering inventory: Product filters require a query; "
+                    "list_products does not support filters"
+                )
+
             identity_context = self._buyer_context.identity.to_context_dict()
+            filters = dict(product_filters)
             filters["buyer_context"] = identity_context
 
             # Execute search

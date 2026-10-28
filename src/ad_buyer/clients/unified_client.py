@@ -485,28 +485,30 @@ class UnifiedClient:
         Returns:
             UnifiedResult with discovered inventory
         """
-        # Build filters including identity context
-        filters = self._get_identity_context()
+        product_filters = {}
         if channel:
-            filters["channel"] = channel
+            product_filters["channel"] = channel
         if max_cpm is not None:
-            filters["maxPrice"] = max_cpm
+            product_filters["maxPrice"] = max_cpm
         if min_impressions is not None:
-            filters["minImpressions"] = min_impressions
+            product_filters["minImpressions"] = min_impressions
         if targeting:
-            filters["targeting"] = targeting
+            product_filters["targeting"] = targeting
         if publisher:
-            filters["publisher"] = publisher
+            product_filters["publisher"] = publisher
 
+        if product_filters and not query:
+            raise ValueError(
+                "Product filters require a query; list_products does not support filters"
+            )
+
+        filters = {**self._get_identity_context(), **product_filters}
         args = {"filters": filters}
         if query:
             args["query"] = query
-
-        # Try search_products first, fall back to list_products
         if query:
             return await self.call_tool("search_products", args, protocol=protocol)
-        else:
-            return await self.call_tool("list_products", protocol=protocol)
+        return await self.call_tool("list_products", protocol=protocol)
 
     async def get_pricing(
         self,
