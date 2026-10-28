@@ -198,6 +198,7 @@ async def demo_unified_client_dsp_methods():
         # Discover inventory
         print("\n--- Discovering Inventory ---")
         result = await client.discover_inventory(
+            query="display inventory",
             channel="display",
             max_cpm=25.0,
         )
