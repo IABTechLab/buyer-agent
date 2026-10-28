@@ -37,6 +37,25 @@ Parameters:
       - cache.t3.medium
       - cache.r6g.large
 
+  # --- Aurora Serverless v2 (durable Postgres, Req 12) ---
+  DatabaseSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security group for the Aurora cluster
+  DBMasterUsername:
+    Type: String
+    Default: buyer
+    Description: Aurora master username (password is RDS-managed in Secrets Manager)
+  MinACU:
+    Type: Number
+    Default: 0
+    Description: >
+      Minimum Aurora Serverless v2 capacity units. 0 = scale-to-zero (auto-pause
+      after inactivity, cold-resume on connect). Requires Aurora PG >= 16.3.
+  MaxACU:
+    Type: Number
+    Default: 4
+    Description: Maximum Aurora Serverless v2 capacity units
+
 # =============================================================================
 # Resources
 # =============================================================================
@@ -75,6 +94,61 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # ---------------------------------------------------------------------------
+  # Aurora Serverless v2 PostgreSQL (durable buyer store, Req 12)
+  # Password is RDS-managed in Secrets Manager (ManageMasterUserPassword) and
+  # auto-rotated — no plaintext password in CFN params, SSM, or runtime env.
+  # ---------------------------------------------------------------------------
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub "ad-buyer-${Environment} Aurora subnets"
+      SubnetIds:
+        - !Ref PrivateSubnet1Id
+        - !Ref PrivateSubnet2Id
+
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      Engine: aurora-postgresql
+      EngineVersion: "16.9"
+      DatabaseName: ad_buyer
+      MasterUsername: !Ref DBMasterUsername
+      # RDS creates + auto-rotates the master credential in Secrets Manager.
+      ManageMasterUserPassword: true
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VpcSecurityGroupIds:
+        - !Ref DatabaseSecurityGroupId
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref MinACU
+        MaxCapacity: !Ref MaxACU
+      StorageEncrypted: true
+      BackupRetentionPeriod: 7
+      EnableCloudwatchLogsExports:
+        - postgresql
+      Tags:
+        - Key: Name
+          Value: !Sub "ad-buyer-${Environment}-aurora"
+        - Key: Project
+          Value: ad-buyer-system
+        - Key: Environment
+          Value: !Ref Environment
+
+  AuroraInstance1:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBClusterIdentifier: !Ref AuroraCluster
+      DBInstanceClass: db.serverless
+      Engine: aurora-postgresql
+      PubliclyAccessible: false
+      Tags:
+        - Key: Project
+          Value: ad-buyer-system
+        - Key: Environment
+          Value: !Ref Environment
+
 # =============================================================================
 # Outputs
 # =============================================================================
@@ -90,3 +164,27 @@ Outputs:
     Value: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Port
     Export:
       Name: !Sub "${AWS::StackName}-RedisPort"
+
+  AuroraSecretArn:
+    Description: ARN of the RDS-managed Secrets Manager secret (master credential)
+    Value: !GetAtt AuroraCluster.MasterUserSecret.SecretArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraSecretArn"
+
+  AuroraEndpoint:
+    Description: Aurora cluster writer endpoint
+    Value: !GetAtt AuroraCluster.Endpoint.Address
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraEndpoint"
+
+  AuroraPort:
+    Description: Aurora cluster port
+    Value: !GetAtt AuroraCluster.Endpoint.Port
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraPort"
+
+  AuroraDatabaseName:
+    Description: Aurora database name
+    Value: ad_buyer
+    Export:
+      Name: !Sub "${AWS::StackName}-AuroraDatabaseName"

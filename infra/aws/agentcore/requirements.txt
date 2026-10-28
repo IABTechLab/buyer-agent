@@ -1,7 +1,22 @@
 # Requirements for AgentCore CLI deployment path.
-# Used by: agentcore configure --requirements-file requirements-agentcore.txt
+# Used by: agentcore configure --requirements-file infra/aws/agentcore/requirements.txt
+#
+# Kept in sync with pyproject.toml [project.dependencies]. The AgentCore
+# toolkit-generated Dockerfile installs THIS file (it does not `pip install`
+# the ad_buyer package), so every runtime import dependency must be listed
+# here — including the git-based shared contract library — or the container
+# fails at import with ModuleNotFoundError.
 bedrock-agentcore
-crewai[tools,anthropic,bedrock]==1.10.1
+# Shared IAB agentic contract catalog. The crew path, deals_client, and the
+# AgentCoreSellerProxy import iab_agentic_primitives, so it must be in the
+# AgentCore image. Git-free GitHub archive tarball (the CodeBuild image has no
+# git). Keep in sync with the seller agent's pin.
+iab-agentic-primitives[client] @ https://github.com/IABTechLab/iab-agentic-primitives/archive/refs/tags/v0.5.1.tar.gz
+# Pin crewai to match pyproject.toml (>=1.14.4). The Bedrock fix patch
+# (patches/crewai_bedrock_fix.py) targets 1.14.x and DealBookingFlow relies on
+# CrewAI >=1.14 Flow/state behaviors, so an older pin (the previous ==1.10.1)
+# would make the AgentCore image diverge from the ECS/source runtime.
+crewai[tools,anthropic,bedrock]>=1.14.4,<2.0.0
 anthropic>=0.40.0
 httpx>=0.27.0
 pydantic>=2.0.0
@@ -13,5 +28,19 @@ uvicorn>=0.32.0
 rich>=13.0.0
 sqlalchemy>=2.0.0
 aiosqlite>=0.20.0
+# Durable Postgres backend (Scope 2 / Req 12.6-12.7). The PgConnection adapter
+# imports psycopg (synchronous v3); db_secret imports boto3 to fetch the
+# RDS-managed Secrets Manager credential at startup. Only exercised on the
+# --storage postgres path; harmless on the default SQLite path.
+psycopg[binary]>=3.1.0
+boto3>=1.34.0
 pyyaml>=6.0.0
 nest-asyncio>=1.6.0
+# Mints a short-lived Bedrock bearer token from the runtime execution role at
+# startup (ad_buyer.llm.bedrock_token) so no expiring token is baked into --env.
+aws-bedrock-token-generator>=1.0.0
+# NOTE: the AgentCore build image (astral uv slim) has no `git` binary, so a
+# `git+https://` source fails with "Git executable not found". Use the GitHub
+# archive tarball instead — a plain HTTPS download that needs no git. Keep this
+# pinned to the same tag as pyproject.toml's git ref (v0.5.1).
+iab-agentic-primitives[client] @ https://github.com/IABTechLab/iab-agentic-primitives/archive/refs/tags/v0.5.1.tar.gz

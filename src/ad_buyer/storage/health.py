@@ -29,20 +29,24 @@ def _sqlite_path(database_url: str) -> str:
 def probe_database(database_url: str) -> tuple[bool, str | None]:
     """Attempt a lightweight connection + ``SELECT 1`` against the database.
 
+    Routes through the connection factory so a ``postgresql://`` URL is probed
+    via the psycopg adapter; SQLite behavior is unchanged.
+
     Args:
-        database_url: SQLite connection string (or plain path).
+        database_url: SQLite or PostgreSQL connection string (or plain path).
 
     Returns:
         ``(True, None)`` when the database is reachable, otherwise
         ``(False, error_message)``.
     """
-    db_path = _sqlite_path(database_url)
+    from .connection_factory import open_connection
+
     try:
-        conn = sqlite3.connect(db_path)
+        conn = open_connection(database_url)
         conn.execute("SELECT 1")
         conn.close()
         return True, None
-    except (sqlite3.Error, OSError) as exc:
+    except (sqlite3.Error, OSError, Exception) as exc:  # noqa: BLE001
         return False, str(exc)
 
 

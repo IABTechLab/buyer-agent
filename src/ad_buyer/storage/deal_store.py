@@ -40,7 +40,6 @@ from .job_store import JobStore
 from .negotiation_store import NegotiationStore
 from .performance_cache_store import PerformanceCacheStore
 from .portfolio_metadata_store import PortfolioMetadataStore
-from .schema import initialize_schema
 from .status_transition_store import StatusTransitionStore
 from .supply_path_template_store import SupplyPathTemplateStore
 
@@ -68,6 +67,7 @@ class DealStore:
     """
 
     def __init__(self, database_url: str) -> None:
+        self._database_url = database_url
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
@@ -93,12 +93,15 @@ class DealStore:
 
     def connect(self) -> None:
         """Open the database connection, set pragmas, and initialize schema."""
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row  # dict-like row access
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.execute("PRAGMA busy_timeout=5000")
-        initialize_schema(self._conn)
+        from .connection_factory import (
+            apply_sqlite_pragmas,
+            initialize_schema_for,
+            open_connection,
+        )
+
+        self._conn = open_connection(self._database_url, check_same_thread=False)
+        apply_sqlite_pragmas(self._conn, self._database_url)
+        initialize_schema_for(self._conn, self._database_url)
         self._wire_stores()
 
     def disconnect(self) -> None:

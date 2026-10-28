@@ -349,9 +349,65 @@ All errors are logged at `WARNING` or `DEBUG` level. The client never raises `ht
 !!! warning "Silent Failures"
     Because the client returns empty results on failure, always check the length of discovery results. An empty list could mean "no sellers match" or "the registry is down." Monitor logs for `WARNING`-level messages to distinguish the two.
 
-## Related
+## Connecting to a Seller over OAuth (AgentCore)
 
-- [Seller Agent Discovery](https://iabtechlab.github.io/seller-agent/api/agent-discovery/) — How seller agents register and expose their agent cards
+When a discovered seller runs on Amazon Bedrock AgentCore behind a CUSTOM_JWT
+authorizer, the registry record's `endpoint_url` is the runtime's OAuth HTTPS
+invocations URL (or its ARN) and its `authentication` block advertises the
+shared token endpoint + scope. The buyer authenticates with a short-lived
+`client_credentials` bearer token — **not** SigV4/boto3, which OAuth runtimes
+reject.
+
+### Minting the token: `OAuthTokenProvider`
+
+`ad_buyer.auth.oauth_token_provider.OAuthTokenProvider` reads the token endpoint
++ scope from the discovered record, holds the buyer's OWN `client_id`/`secret`
+from settings (`BUYER_OAUTH_CLIENT_ID` / `BUYER_OAUTH_CLIENT_SECRET` — never
+taken from the registry, never logged), and POSTs `client_credentials` over HTTP
+Basic. Tokens are cached by `(token_endpoint, scope)` and refreshed proactively
+before `expires_in` and reactively on a 401.
+
+### Transport selection: `select_seller_client`
+
+`ad_buyer.registry.transport_selector.select_seller_client(endpoint, authentication=..., region=..., token_provider=...)`
+picks the right client from the discovered record:
+
+| `endpoint_url` | Advertised OAuth? | Client |
+|----------------|-------------------|--------|
+| `arn:...` | No | `AgentCoreSellerProxy` (SigV4, same-account/dev) |
+| `arn:...` | Yes | JWT client — derives the HTTPS invocations URL from the ARN, Bearer over HTTPS |
+| `https://...` | Yes | JWT client on that URL |
+| `https://...` | No | plain unauthenticated `IABMCPClient` |
+
+The JWT path returns an `AgentCoreSellerProxy` in **JWT mode**: it preserves the
+OpenDirect method surface (`list_products`/`search_products`/`get_product`/
+`check_avails`) that `DealBookingFlow` expects, but frames MCP over a raw HTTPS
+POST with a `Authorization: Bearer <jwt>` header (with 401 re-mint) instead of
+SigV4.
+
+**Fail-closed:** if the seller advertises OAuth but the buyer has no client
+credentials configured, `select_seller_client` raises rather than silently
+connecting unauthenticated.
+
+```python
+from ad_buyer.registry import RegistryClient
+from ad_buyer.registry.transport_selector import select_seller_client
+
+registry = RegistryClient(registry_url="https://registry.aamp.iab.com/agent-registry")
+record = (await registry.discover_sellers(["ctv"]))[0]
+
+# The discovered record carries endpoint_url + authentication (token endpoint + scope).
+client = select_seller_client(
+    record.url,
+    authentication=getattr(record, "authentication", None),
+)
+# client now speaks the OpenDirect surface; the JWT is minted + refreshed under the hood.
+```
+
+`crew_tools.py` wires this automatically, routing on the discovered
+`SELLER_TOKEN_ENDPOINT`.
+
+## Related
 - [Media Kit Discovery](media-kit.md) — Browse seller inventory after discovering sellers
 - [Authentication](authentication.md) — API key setup for accessing seller endpoints
 - [A2A Client](a2a-client.md) — Agent-to-agent communication protocol

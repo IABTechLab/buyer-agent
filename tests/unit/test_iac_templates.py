@@ -120,6 +120,106 @@ class TestCloudFormationTemplates:
         assert "RedisPort" in params, "compute.yaml should accept RedisPort parameter"
 
 
+class TestBuyerDurablePostgres:
+    """Group 10 / Req 12 — buyer Aurora Serverless v2 + Secrets-Manager + VPC path."""
+
+    AGENTCORE_DIR = INFRA_ROOT / "aws" / "agentcore"
+
+    # -- storage.yaml: Aurora Serverless v2 + RDS-managed secret + scale-to-zero --
+    def test_storage_has_aurora_cluster(self):
+        t = load_cfn_yaml(CFN_DIR / "storage.yaml")
+        r = t["Resources"]
+        assert "AuroraCluster" in r and r["AuroraCluster"]["Type"] == "AWS::RDS::DBCluster"
+        assert "AuroraInstance1" in r and r["AuroraInstance1"]["Type"] == "AWS::RDS::DBInstance"
+        assert r["AuroraCluster"]["Properties"]["Engine"] == "aurora-postgresql"
+        # Redis must remain (additive change)
+        assert "RedisReplicationGroup" in r
+
+    def test_aurora_uses_rds_managed_secret_not_plaintext(self):
+        props = load_cfn_yaml(CFN_DIR / "storage.yaml")["Resources"]["AuroraCluster"]["Properties"]
+        assert props.get("ManageMasterUserPassword") is True, (
+            "Aurora must use RDS-managed Secrets Manager password (Req 12.2)"
+        )
+        # No plaintext MasterUserPassword field
+        assert "MasterUserPassword" not in props, "must not set a plaintext MasterUserPassword"
+
+    def test_aurora_serverless_v2_scale_to_zero_default(self):
+        params = load_cfn_yaml(CFN_DIR / "storage.yaml")["Parameters"]
+        assert params["MinACU"]["Default"] == 0, "MinACU default must be 0 (scale-to-zero)"
+        inst = load_cfn_yaml(CFN_DIR / "storage.yaml")["Resources"]["AuroraInstance1"]["Properties"]
+        assert inst["DBInstanceClass"] == "db.serverless"
+
+    def test_aurora_engine_supports_min_zero(self):
+        ver = load_cfn_yaml(CFN_DIR / "storage.yaml")["Resources"]["AuroraCluster"]["Properties"][
+            "EngineVersion"
+        ]
+        major, minor = (int(x) for x in str(ver).split(".")[:2])
+        # MinCapacity=0 needs Aurora PG >= 16.3 (or >=15.7 etc.)
+        assert (major, minor) >= (16, 3), f"engine {ver} does not support MinCapacity=0"
+
+    def test_storage_exports_secret_and_connection(self):
+        o = load_cfn_yaml(CFN_DIR / "storage.yaml")["Outputs"]
+        for k in ("AuroraSecretArn", "AuroraEndpoint", "AuroraPort", "AuroraDatabaseName"):
+            assert k in o, f"storage.yaml must export {k}"
+
+    # -- network-agentcore.yaml: endpoints + 443 self-ingress --
+    def test_agentcore_network_endpoints_and_self_ingress(self):
+        r = load_cfn_yaml(self.AGENTCORE_DIR / "network-agentcore.yaml")["Resources"]
+        wanted = {
+            "BedrockAgentCoreEndpoint": "bedrock-agentcore",
+            "BedrockRuntimeEndpoint": "bedrock-runtime",
+            "StsEndpoint": "sts",
+            "SecretsManagerEndpoint": "secretsmanager",
+        }
+        for lid, svc in wanted.items():
+            assert lid in r and r[lid]["Type"] == "AWS::EC2::VPCEndpoint"
+            assert svc in str(r[lid]["Properties"]["ServiceName"])
+        # the dark-container fix
+        assert "AgentCoreHttpsSelfIngress" in r, "443 self-ingress rule required"
+
+    # -- main-agentcore.yaml: orchestrator creates the Aurora SG in-stack --
+    def test_main_agentcore_creates_aurora_sg_option1(self):
+        r = load_cfn_yaml(self.AGENTCORE_DIR / "main-agentcore.yaml")["Resources"]
+        assert "DatabaseSecurityGroup" in r, (
+            "main-agentcore.yaml must create the Aurora SG in-stack (Option 1)"
+        )
+        for stack in ("NetworkStack", "StorageStack", "AgentCoreNetworkStack"):
+            assert stack in r
+
+
+class TestDeployPostgresPath:
+    """deploy.sh --storage postgres branch + secret grant wiring (Req 12.4)."""
+
+    DEPLOY = INFRA_ROOT / "aws" / "agentcore" / "deploy.sh"
+
+    @pytest.fixture
+    def script(self):
+        return self.DEPLOY.read_text()
+
+    def test_has_storage_arg(self, script):
+        assert "--storage)" in script and 'STORAGE_TYPE_ARG="sqlite"' in script
+
+    def test_postgres_deploys_infra(self, script):
+        assert "deploy_postgres_infrastructure" in script
+        assert "main-agentcore.yaml" in script
+
+    def test_postgres_uses_vpc_mode(self, script):
+        assert "--vpc" in script and "--security-groups" in script
+
+    def test_postgres_forwards_non_secret_env_only(self, script):
+        assert "STORAGE_TYPE=hybrid" in script
+        assert "DB_SECRET_ARN=" in script
+        # the password must NEVER be interpolated into env
+        assert "DB_PASSWORD" not in script
+
+    def test_grants_secret_read_to_runtime_role(self, script):
+        assert "grant_secret_access" in script
+        assert "secretsmanager:GetSecretValue" in script
+
+    def test_default_stays_sqlite(self, script):
+        assert "STORAGE_TYPE=sqlite" in script
+
+
 class TestTerraformModules:
     """Validate Terraform module structure."""
 
