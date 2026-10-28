@@ -842,6 +842,33 @@ class TestGetPortfolioSummary:
         assert len(data["top_sellers"]) >= 1
 
     @pytest.mark.asyncio
+    async def test_summary_scoped_by_seller_org(self):
+        """seller_org restricts the summary to that seller's deals."""
+        store = _make_deal_store()
+        _seed_deal(store, seller_org="Index Exchange", seller_deal_id="IX-1")
+        _seed_deal(store, seller_org="Index Exchange", seller_deal_id="IX-2")
+        _seed_deal(store, seller_org="PubMatic", seller_deal_id="PM-1")
+        _set_deal_store(store)
+
+        result = await mcp.call_tool("get_portfolio_summary", {"seller_org": "Index Exchange"})
+        data = json.loads(_extract_text(result))
+
+        assert data["total_deals"] == 2
+
+    @pytest.mark.asyncio
+    async def test_summary_scoped_by_seller_domain(self):
+        """seller_domain restricts the summary to that seller's deals."""
+        store = _make_deal_store()
+        _seed_deal(store, seller_domain="espn.com", seller_deal_id="E-1")
+        _seed_deal(store, seller_domain="cnn.com", seller_deal_id="C-1")
+        _set_deal_store(store)
+
+        result = await mcp.call_tool("get_portfolio_summary", {"seller_domain": "espn.com"})
+        data = json.loads(_extract_text(result))
+
+        assert data["total_deals"] == 1
+
+    @pytest.mark.asyncio
     async def test_summary_returns_valid_json(self):
         """get_portfolio_summary should return valid JSON."""
         store = _make_deal_store()

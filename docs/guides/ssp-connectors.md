@@ -119,22 +119,21 @@ The connector authenticates, fetches all deals targeted to your seat, and normal
 
 ## Index Exchange
 
-Index Exchange uses a simple API key header (`X-API-Key`). Deal creation in IX is publisher-side only -- this connector discovers deals that publishers have already targeted to your seat.
+Index Exchange uses bearer-token authentication (`Authorization: Bearer <token>`). Deal creation in Index is publisher-side only -- this connector discovers deals that publishers have already targeted to your seat. There's no seat ID to configure -- which deals you see is determined server-side by your authenticated identity.
 
 ### Credentials
 
 | Variable | Description |
 |----------|-------------|
-| `IX_API_KEY` | Your Index Exchange API key |
-| `IX_SEAT_ID` | Your IX buyer seat/member ID |
+| `IX_API_KEY` | Your Index Exchange Keycloak bearer token |
+| `IX_API_URL` | Optional. Overrides the API base URL. Defaults to production if not set. A staging token will not authenticate against production, or vice versa — get this wrong and every call fails with a connection/auth error unrelated to the credential itself. |
 
 Get these from your Index Exchange account team.
 
 ### Setup
 
 ```bash
-export IX_API_KEY="your-api-key"
-export IX_SEAT_ID="your-seat-id"
+export IX_API_KEY="your-bearer-token"
 ```
 
 ### Test Connectivity
@@ -186,7 +185,7 @@ One or more required environment variables is missing or empty. Run `list_ssp_co
 
 - **PubMatic**: The bearer token is invalid or expired. Regenerate it in the PubMatic API portal.
 - **Magnite**: The access key or secret key is wrong. Check for leading/trailing whitespace.
-- **Index Exchange**: The API key is invalid. Contact your IX account team.
+- **Index Exchange**: The API key is invalid. Contact your Index Exchange account team.
 
 ### Rate limit errors (429)
 
