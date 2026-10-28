@@ -248,3 +248,18 @@ class TestClose:
         with patch.object(client._client, "aclose", new_callable=AsyncMock) as mock_close:
             await client.close()
             mock_close.assert_called_once()
+
+
+def test_brand_unsafe_categories_are_content_taxonomy_3_1_names():
+    """Every entry must be an exact 3.1 name, or check_brand_safety can never flag it."""
+    import csv
+    from pathlib import Path
+
+    from ad_buyer.clients.mixpeek_client import BRAND_UNSAFE_CATEGORIES
+
+    tsv = next(Path(__file__).resolve().parents[2].rglob("Content Taxonomy 3.1.tsv"), None)
+    if tsv is None:
+        pytest.skip("Content Taxonomy 3.1 TSV not vendored")
+    rows = list(csv.reader(tsv.open(encoding="utf-8"), delimiter="\t"))
+    names = {r[2].strip() for r in rows[2:] if len(r) > 2 and r[0].strip()}
+    assert sorted(BRAND_UNSAFE_CATEGORIES - names) == []
