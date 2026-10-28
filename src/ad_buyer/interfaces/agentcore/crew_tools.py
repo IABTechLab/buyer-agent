@@ -96,10 +96,13 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
     from ad_buyer.flows.deal_booking_flow import DealBookingFlow
     from ad_buyer.models.flow_state import BookingState
 
-    # Override buyer settings to use Bedrock instead of Anthropic.
+    # Override buyer settings to use the Bedrock-hosted model. Deploy.sh sets
+    # DEFAULT_LLM_MODEL plus ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL so this
+    # routes through the Anthropic Messages endpoint (no Converse patch). The
+    # fallback is a current-generation, Messages-supported Claude id.
     bedrock_model = os.environ.get(
         "DEFAULT_LLM_MODEL",
-        "bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "us.anthropic.claude-sonnet-5-v1:0",
     )
     from ad_buyer.config.settings import settings as buyer_settings
 
@@ -124,10 +127,26 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
 
     logger.info("Campaign brief: %s", json.dumps(brief, default=str))
 
-    # Create client — dummy URL since seller is a separate AgentCore runtime
+    # Seller client selection:
+    #  - ARN (deployed seller AgentCore runtime): route through the
+    #    AgentCoreSellerProxy, which calls the seller MCP runtime by ARN via
+    #    InvokeAgentRuntime and returns structured products/avails. Prefer an
+    #    explicit SELLER_MCP_RUNTIME_ARN (the structured surface); otherwise
+    #    fall back to SELLER_AGENT_URL if it is itself an MCP runtime ARN.
+    #  - Plain HTTP URL (local dev): the ordinary OpenDirectClient.
     seller_url = os.environ.get("SELLER_AGENT_URL", "http://localhost:8001")
-    client_url = "http://localhost:9999" if seller_url.startswith("arn:") else seller_url
-    client = OpenDirectClient(base_url=client_url)
+    mcp_arn = os.environ.get("SELLER_MCP_RUNTIME_ARN", "")
+    if mcp_arn.startswith("arn:") or seller_url.startswith("arn:"):
+        from ad_buyer.interfaces.agentcore.agentcore_seller_proxy import (
+            AgentCoreSellerProxy,
+        )
+
+        client = AgentCoreSellerProxy(
+            runtime_arn=mcp_arn or seller_url,
+            region=os.environ.get("AWS_REGION"),
+        )
+    else:
+        client = OpenDirectClient(base_url=seller_url)
 
     flow = DealBookingFlow(client)
     try:
