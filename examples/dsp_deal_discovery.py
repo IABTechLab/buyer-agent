@@ -17,10 +17,15 @@ Usage:
     cd ad_buyer_system
     pip install -e .
     python examples/dsp_deal_discovery.py
+
+Set SELLER_BASE_URL to use a server other than http://localhost:8000.
 """
 
 import asyncio
+import os
 import sys
+
+SELLER_BASE_URL = os.getenv("SELLER_BASE_URL", "http://localhost:8000")
 
 try:
     from ad_buyer.clients.unified_client import UnifiedClient
@@ -110,7 +115,7 @@ async def demo_dsp_workflow():
     print(f"  Premium Access: {buyer_context.can_access_premium_inventory()}")
 
     # Connect to IAB Tech Lab server
-    async with UnifiedClient(buyer_identity=identity) as client:
+    async with UnifiedClient(base_url=SELLER_BASE_URL, buyer_identity=identity) as client:
         print("\n" + "-" * 40)
         print("Step 1: Discover Inventory")
         print("-" * 40)
@@ -192,7 +197,7 @@ async def demo_unified_client_dsp_methods():
     )
 
     # Create client with identity
-    async with UnifiedClient(buyer_identity=identity) as client:
+    async with UnifiedClient(base_url=SELLER_BASE_URL, buyer_identity=identity) as client:
         print(f"\nAccess Tier: {client.get_access_tier()}")
 
         # Discover inventory

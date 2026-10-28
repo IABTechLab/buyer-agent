@@ -9,15 +9,20 @@ Use MCP for fast, deterministic operations and A2A for natural language queries.
 
 Usage:
     python examples/protocol_switching.py
+
+Set SELLER_BASE_URL to use a server other than http://localhost:8000.
 """
 
 import asyncio
+import os
 
 from ad_buyer.clients import Protocol, UnifiedClient
 
+SELLER_BASE_URL = os.getenv("SELLER_BASE_URL", "http://localhost:8000")
+
 
 async def main():
-    async with UnifiedClient(protocol=Protocol.MCP) as client:
+    async with UnifiedClient(base_url=SELLER_BASE_URL, protocol=Protocol.MCP) as client:
         # Connect to both protocols
         await client.connect_both()
         print("Connected to both MCP and A2A protocols")

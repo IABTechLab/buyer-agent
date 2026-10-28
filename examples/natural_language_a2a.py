@@ -9,15 +9,20 @@ The A2A protocol allows conversational interaction with the IAB server.
 
 Usage:
     python examples/natural_language_a2a.py
+
+Set SELLER_BASE_URL to use a server other than http://localhost:8000.
 """
 
 import asyncio
+import os
 
 from ad_buyer.clients import Protocol, UnifiedClient
 
+SELLER_BASE_URL = os.getenv("SELLER_BASE_URL", "http://localhost:8000")
+
 
 async def main():
-    async with UnifiedClient(protocol=Protocol.A2A) as client:
+    async with UnifiedClient(base_url=SELLER_BASE_URL, protocol=Protocol.A2A) as client:
         # Natural language queries
         result = await client.send_natural_language(
             "Find CTV inventory with household targeting under $30 CPM"
