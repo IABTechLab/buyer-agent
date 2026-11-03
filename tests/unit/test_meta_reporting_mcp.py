@@ -101,3 +101,86 @@ class TestMetaReportingToolMCP:
             result = MetaReportingTool()._run(["camp_1", "camp_2"])
 
         assert result.count("Campaign: C") == 2
+
+
+class TestMetaReportingToolOverTransport:
+    """MetaReportingTool through the real MCP client and the live
+    ads_get_ad_entities response shape (rows as a JSON string, spend as
+    amount_spent, null ctr/cpm for undelivered campaigns)."""
+
+    @staticmethod
+    def _transport(result):
+        import json
+
+        import httpx
+
+        import ad_buyer.clients.meta_ads_mcp_client as mcp_module
+
+        def handler(request):
+            body = json.loads(request.content)
+            payload = {"tools": []} if body["method"] == "tools/list" else result
+            sse = "data: " + json.dumps({"jsonrpc": "2.0", "id": 1, "result": payload})
+            return httpx.Response(200, text=sse, headers={"content-type": "text/event-stream"})
+
+        real_client = httpx.AsyncClient
+        return patch.object(
+            mcp_module.httpx,
+            "AsyncClient",
+            lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw),
+        )
+
+    @staticmethod
+    def _entities(rows):
+        import json
+
+        text = json.dumps({"ad_entities": json.dumps(rows), "client_conversation_id": "c"})
+        return {"content": [{"type": "text", "text": text}], "isError": False}
+
+    def test_formats_live_shaped_rows(self):
+        row = {
+            "name": "Spring Promo",
+            "id": "camp_1",
+            "amount_spent": {"value": "12.50", "unit": "USD"},
+            "impressions": "1000",
+            "reach": "800",
+            "frequency": "1.25",
+            "clicks": "20",
+            "ctr": "2.0",
+            "cpm": "12.5",
+        }
+        with _mcp_configured(), self._transport(self._entities([row])):
+            result = MetaReportingTool()._run(["camp_1"])
+
+        assert "Campaign: Spring Promo" in result
+        assert "$12.50" in result
+        assert "1,000" in result
+        assert "Error" not in result
+
+    def test_undelivered_campaign_with_null_metrics_reports_zeros(self):
+        row = {
+            "name": "Paused",
+            "id": "camp_1",
+            "amount_spent": {"value": "0", "unit": "USD"},
+            "impressions": "0",
+            "reach": "0",
+            "frequency": "0",
+            "clicks": "0",
+            "ctr": None,
+            "cpm": None,
+        }
+        with _mcp_configured(), self._transport(self._entities([row])):
+            result = MetaReportingTool()._run(["camp_1"])
+
+        assert "Campaign: Paused" in result
+        assert "CPM:         $0.00" in result
+        assert "Error" not in result
+
+    def test_meta_tool_error_reported_per_campaign(self):
+        error = {
+            "content": [{"type": "text", "text": "Tool is not available on this server"}],
+            "isError": True,
+        }
+        with _mcp_configured(), self._transport(error):
+            result = MetaReportingTool()._run(["camp_1"])
+
+        assert "Campaign camp_1: Error — ads_get_ad_entities: Tool is not available" in result

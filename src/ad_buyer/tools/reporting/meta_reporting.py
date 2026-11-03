@@ -66,9 +66,7 @@ Args:
 
         return output
 
-    async def _run_via_mcp(
-        self, campaign_ids: list[str], date_preset: str, output: str
-    ) -> str:
+    async def _run_via_mcp(self, campaign_ids: list[str], date_preset: str, output: str) -> str:
         async with MetaAdsMCPClient(
             access_token=settings.meta_access_token,
             ad_account_id=settings.meta_ad_account_id,

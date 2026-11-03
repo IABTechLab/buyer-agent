@@ -17,7 +17,7 @@ import httpx
 import pytest
 
 from ad_buyer.clients.meta_ads_mcp_client import (
-    _REPORT_MAX_POLLS,
+    _INSIGHTS_MAX_PAGES,
     MetaAdsMCPClient,
     MetaAPIError,
     MetaAuthError,
@@ -39,12 +39,12 @@ def _client(**overrides) -> MetaAdsMCPClient:
 
 class TestInit:
     def test_strips_act_prefix_from_account_id(self):
-        client = _client(ad_account_id="act_4509330366054796")
-        assert client._ad_account_id == "4509330366054796"
+        client = _client(ad_account_id="act_123456789012345")
+        assert client._ad_account_id == "123456789012345"
 
     def test_leaves_bare_account_id_unchanged(self):
-        client = _client(ad_account_id="4509330366054796")
-        assert client._ad_account_id == "4509330366054796"
+        client = _client(ad_account_id="123456789012345")
+        assert client._ad_account_id == "123456789012345"
 
     def test_available_tools_empty_before_discovery(self):
         assert _client().available_tools == []
@@ -73,7 +73,9 @@ class TestLifecycle:
             client,
             "_call",
             new=AsyncMock(
-                return_value={"tools": [{"name": "ads_get_ad_accounts"}, {"name": "ads_create_campaign"}]}
+                return_value={
+                    "tools": [{"name": "ads_get_ad_accounts"}, {"name": "ads_create_campaign"}]
+                }
             ),
         ):
             async with client as c:
@@ -202,7 +204,9 @@ class TestCallTool:
         with patch.object(
             client,
             "_call",
-            new=AsyncMock(return_value={"content": [{"type": "text", "text": json.dumps({"id": "c1"})}]}),
+            new=AsyncMock(
+                return_value={"content": [{"type": "text", "text": json.dumps({"id": "c1"})}]}
+            ),
         ):
             result = await client._call_tool("ads_create_campaign", {})
         assert result == {"id": "c1"}
@@ -224,6 +228,49 @@ class TestCallTool:
         with patch.object(client, "_call", new=AsyncMock(return_value={"content": []})):
             result = await client._call_tool("ads_x", {})
         assert result == {"content": []}
+
+    @pytest.mark.asyncio
+    async def test_is_error_result_raises_api_error_with_meta_message(self):
+        client = _client()
+        client._client = AsyncMock(spec=httpx.AsyncClient)
+        sse_body = "data: " + json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "content": [{"type": "text", "text": "Objective OUTCOME_FOO is invalid"}],
+                    "isError": True,
+                },
+            }
+        )
+        client._client.post.return_value = _response(text=sse_body)
+
+        with pytest.raises(MetaAPIError, match="ads_create_campaign: Objective OUTCOME_FOO"):
+            await client.create_campaign("n", "OUTCOME_FOO", 100)
+
+    @pytest.mark.asyncio
+    async def test_is_error_without_text_still_raises(self):
+        client = _client()
+        with patch.object(
+            client, "_call", new=AsyncMock(return_value={"content": [], "isError": True})
+        ):
+            with pytest.raises(MetaAPIError, match="ads_update_entity"):
+                await client._call_tool("ads_update_entity", {})
+
+    @pytest.mark.asyncio
+    async def test_failed_pause_raises_instead_of_returning_error_text(self):
+        client = _client()
+        error = {"content": [{"type": "text", "text": "entity not found"}], "isError": True}
+        with patch.object(client, "_call", new=AsyncMock(return_value=error)):
+            with pytest.raises(MetaAPIError, match="entity not found"):
+                await client.pause("camp_1")
+
+    @pytest.mark.asyncio
+    async def test_is_error_false_returns_parsed_content(self):
+        client = _client()
+        ok = {"content": [{"type": "text", "text": json.dumps({"id": "c1"})}], "isError": False}
+        with patch.object(client, "_call", new=AsyncMock(return_value=ok)):
+            assert await client._call_tool("ads_x", {}) == {"id": "c1"}
 
 
 class TestCampaign:
@@ -352,7 +399,9 @@ class TestCreative:
         client = _client()
         mock_tool = AsyncMock(return_value={})
         with patch.object(client, "_call_tool", new=mock_tool):
-            await client.create_creative("name", "body", "title", "https://x", image_path="/tmp/a.png")
+            await client.create_creative(
+                "name", "body", "title", "https://x", image_path="/tmp/a.png"
+            )
         assert mock_tool.call_args.args[1]["image_url"] == "/tmp/a.png"
 
 
@@ -382,104 +431,142 @@ class TestNotImplementedTools:
             await _client().get_reach_estimate(targeting={}, daily_budget=10.0)
 
 
+def _entities_page(rows, next_cursor=None):
+    """ads_get_ad_entities result as the live server returns it: rows are a
+    JSON-encoded string, not a list."""
+    page = {"ad_entities": json.dumps(rows), "client_conversation_id": "conv"}
+    if next_cursor:
+        page["pagination"] = {"next_cursor": next_cursor}
+    return page
+
+
+_LIVE_ROW = {
+    "name": "Spring Promo",
+    "id": "camp_1",
+    "amount_spent": {"value": "12.50", "unit": "USD"},
+    "impressions": "1000",
+    "reach": "800",
+    "frequency": "1.25",
+    "clicks": "20",
+    "ctr": "2.0",
+    "cpm": "12.5",
+}
+
+
 class TestInsights:
     @pytest.mark.asyncio
-    async def test_raises_when_schedule_response_not_a_dict(self):
+    async def test_calls_ads_get_ad_entities_scoped_to_campaign(self):
+        client = _client(ad_account_id="act_1")
+        mock_tool = AsyncMock(return_value=_entities_page([]))
+        with patch.object(client, "_call_tool", new=mock_tool):
+            await client.get_insights("camp_1", date_preset="last_7d")
+
+        tool_name, body = mock_tool.call_args.args
+        assert tool_name == "ads_get_ad_entities"
+        assert body["ad_account_id"] == "1"
+        assert body["level"] == "campaign"
+        assert body["object_ids"] == ["camp_1"]
+        assert body["date_preset"] == "last_7d"
+        assert "amount_spent" in body["fields"]
+
+    @pytest.mark.asyncio
+    async def test_parses_json_string_entities_and_maps_amount_spent_to_spend(self):
+        client = _client()
+        with patch.object(
+            client, "_call_tool", new=AsyncMock(return_value=_entities_page([dict(_LIVE_ROW)]))
+        ):
+            rows = await client.get_insights("camp_1")
+
+        assert len(rows) == 1
+        assert rows[0]["spend"] == "12.50"
+        assert rows[0]["impressions"] == "1000"
+        assert rows[0]["campaign_name"] == "Spring Promo"
+
+    @pytest.mark.asyncio
+    async def test_accepts_entities_already_decoded_as_list(self):
+        client = _client()
+        page = {"ad_entities": [dict(_LIVE_ROW)]}
+        with patch.object(client, "_call_tool", new=AsyncMock(return_value=page)):
+            rows = await client.get_insights("camp_1")
+        assert rows[0]["spend"] == "12.50"
+
+    @pytest.mark.asyncio
+    async def test_null_metrics_for_undelivered_campaign_become_zero(self):
+        client = _client()
+        row = {
+            "name": "Paused",
+            "id": "camp_1",
+            "amount_spent": {"value": "0", "unit": "USD"},
+            "impressions": "0",
+            "reach": "0",
+            "frequency": "0",
+            "clicks": "0",
+            "ctr": None,
+            "cpm": None,
+        }
+        with patch.object(client, "_call_tool", new=AsyncMock(return_value=_entities_page([row]))):
+            rows = await client.get_insights("camp_1")
+        assert rows[0]["ctr"] == 0
+        assert rows[0]["cpm"] == 0
+
+    @pytest.mark.asyncio
+    async def test_unknown_campaign_returns_no_rows(self):
+        client = _client()
+        with patch.object(client, "_call_tool", new=AsyncMock(return_value=_entities_page([]))):
+            assert await client.get_insights("camp_x") == []
+
+    @pytest.mark.asyncio
+    async def test_raises_when_response_not_a_dict(self):
         client = _client()
         with patch.object(client, "_call_tool", new=AsyncMock(return_value="not-a-dict")):
-            with pytest.raises(MetaAPIError, match="ads_entity_schedule_report"):
-                await client.get_insights("camp_1")
-
-    @pytest.mark.asyncio
-    async def test_raises_when_schedule_has_no_report_run_id(self):
-        client = _client()
-        with patch.object(client, "_call_tool", new=AsyncMock(return_value={})):
-            with pytest.raises(MetaAPIError, match="no report_run_id"):
-                await client.get_insights("camp_1")
-
-    @pytest.mark.asyncio
-    async def test_raises_when_report_get_response_not_a_dict(self):
-        client = _client()
-        mock_tool = AsyncMock(side_effect=[{"report_run_id": "run_1"}, "not-a-dict"])
-        with patch.object(client, "_call_tool", new=mock_tool):
-            with pytest.raises(MetaAPIError, match="ads_entity_get_report"):
-                await client.get_insights("camp_1")
-
-    @pytest.mark.asyncio
-    async def test_raises_on_failed_report_status(self):
-        client = _client()
-        mock_tool = AsyncMock(side_effect=[{"report_run_id": "run_1"}, {"status": "FAILED"}])
-        with patch.object(client, "_call_tool", new=mock_tool):
-            with pytest.raises(MetaAPIError, match="report failed"):
+            with pytest.raises(MetaAPIError, match="ads_get_ad_entities"):
                 await client.get_insights("camp_1")
 
     @pytest.mark.asyncio
     async def test_paginates_across_cursor_and_stops_when_exhausted(self):
         client = _client()
-        page1 = {"data": [{"name": "c1", "spend": 1}], "pagination": {"next_cursor": "p2"}}
-        page2 = {"data": [{"name": "c1", "spend": 2}], "pagination": {}}
-        mock_tool = AsyncMock(side_effect=[{"report_run_id": "run_1"}, page1, page2])
+        page1 = _entities_page([{"name": "c1", "spend": 1}], next_cursor="p2")
+        page2 = _entities_page([{"name": "c1", "spend": 2}])
+        mock_tool = AsyncMock(side_effect=[page1, page2])
 
         with patch.object(client, "_call_tool", new=mock_tool):
             rows = await client.get_insights("camp_1")
 
-        assert len(rows) == 2
         assert [r["spend"] for r in rows] == [1, 2]
-        # third call (index 2) is the second get_report poll and must carry
-        # the cursor returned by the first page.
-        assert mock_tool.call_args_list[2].args[1]["cursor"] == "p2"
+        assert "cursor" not in mock_tool.call_args_list[0].args[1]
+        assert mock_tool.call_args_list[1].args[1]["cursor"] == "p2"
 
     @pytest.mark.asyncio
-    async def test_stops_after_max_polls_even_if_cursor_keeps_coming(self):
+    async def test_stops_after_max_pages_even_if_cursor_keeps_coming(self):
         client = _client()
-        page = {"data": [{"name": "c"}], "pagination": {"next_cursor": "keep-going"}}
-        mock_tool = AsyncMock(side_effect=[{"report_run_id": "run_1"}] + [page] * (_REPORT_MAX_POLLS + 5))
+        page = _entities_page([{"name": "c"}], next_cursor="keep-going")
+        mock_tool = AsyncMock(side_effect=[page] * (_INSIGHTS_MAX_PAGES + 5))
 
         with patch.object(client, "_call_tool", new=mock_tool):
             rows = await client.get_insights("camp_1")
 
-        assert len(rows) == _REPORT_MAX_POLLS
+        assert len(rows) == _INSIGHTS_MAX_PAGES
+        assert mock_tool.call_count == _INSIGHTS_MAX_PAGES
 
     @pytest.mark.asyncio
     async def test_defaults_campaign_name_when_row_has_no_name(self):
         client = _client()
-        mock_tool = AsyncMock(
-            side_effect=[{"report_run_id": "run_1"}, {"data": [{"spend": 1}], "pagination": {}}]
-        )
-        with patch.object(client, "_call_tool", new=mock_tool):
+        with patch.object(
+            client, "_call_tool", new=AsyncMock(return_value=_entities_page([{"spend": 1}]))
+        ):
             rows = await client.get_insights("camp_1")
         assert rows[0]["campaign_name"] == "camp_1"
 
     @pytest.mark.asyncio
-    async def test_uses_row_name_as_campaign_name_when_present(self):
+    async def test_tool_error_propagates_as_api_error(self):
         client = _client()
-        mock_tool = AsyncMock(
-            side_effect=[
-                {"report_run_id": "run_1"},
-                {"data": [{"name": "Real Name", "spend": 1}], "pagination": {}},
-            ]
-        )
-        with patch.object(client, "_call_tool", new=mock_tool):
-            rows = await client.get_insights("camp_1")
-        assert rows[0]["campaign_name"] == "Real Name"
-
-    @pytest.mark.asyncio
-    async def test_passes_report_run_id_and_default_fields_to_schedule_call(self):
-        client = _client(ad_account_id="act_1")
-        mock_tool = AsyncMock(
-            side_effect=[{"report_run_id": "run_1"}, {"data": [], "pagination": {}}]
-        )
-        with patch.object(client, "_call_tool", new=mock_tool):
-            await client.get_insights("camp_1", date_preset="last_7d")
-
-        schedule_tool_name, schedule_body = mock_tool.call_args_list[0].args
-        assert schedule_tool_name == "ads_entity_schedule_report"
-        assert schedule_body["ad_account_id"] == "1"
-        assert schedule_body["date_preset"] == "last_7d"
-        assert schedule_body["filtering"] == [
-            {"field": "campaign.id", "operator": "IN", "value": ["camp_1"]}
-        ]
-        assert "spend" in schedule_body["fields"]
+        error = {
+            "content": [{"type": "text", "text": "Tool is not available on this server"}],
+            "isError": True,
+        }
+        with patch.object(client, "_call", new=AsyncMock(return_value=error)):
+            with pytest.raises(MetaAPIError, match="ads_get_ad_entities: Tool is not available"):
+                await client.get_insights("camp_1")
 
 
 class TestAvailableTools:

@@ -425,3 +425,75 @@ class TestBookViaMetaMcp:
                     targeting_countries=["US"],
                 )
         mock_client.create_adset.assert_not_called()
+
+
+def _meta_mcp_transport(responder):
+    """Real MetaAdsMCPClient over a mocked HTTP layer that speaks the live
+    server's SSE framing; ``responder(tool_name)`` returns (payload, is_error)."""
+    import json
+
+    import httpx
+
+    import ad_buyer.clients.meta_ads_mcp_client as mcp_module
+
+    def handler(request):
+        body = json.loads(request.content)
+        if body["method"] == "tools/list":
+            result = {"tools": []}
+        else:
+            payload, is_error = responder(body["params"]["name"])
+            text = payload if isinstance(payload, str) else json.dumps(payload)
+            result = {"content": [{"type": "text", "text": text}], "isError": is_error}
+        sse = "data: " + json.dumps({"jsonrpc": "2.0", "id": 1, "result": result})
+        return httpx.Response(200, text=sse, headers={"content-type": "text/event-stream"})
+
+    real_client = httpx.AsyncClient
+    return patch.object(
+        mcp_module.httpx,
+        "AsyncClient",
+        lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw),
+    )
+
+
+class TestMetaMcpBookingOverTransport:
+    """_execute_bookings through the real MCP client, not a mocked client."""
+
+    @staticmethod
+    def _settings():
+        from ad_buyer.config.settings import settings
+
+        return patch.multiple(
+            settings,
+            meta_use_mcp=True,
+            meta_access_token="tok",
+            meta_ad_account_id="act_1",
+            meta_page_id="page_1",
+        )
+
+    def test_books_paused_campaign_and_adset(self):
+        def responder(tool):
+            if tool == "ads_create_campaign":
+                return {"campaign_id": "C1"}, False
+            return {"ad_set_id": "S1"}, False
+
+        flow = _flow_with_approved([_make_recommendation("soc-1", "social")])
+        with self._settings(), _meta_mcp_transport(responder):
+            result = flow._execute_bookings()
+
+        assert result["booked"] == 1
+        line = flow.state.booked_lines[0]
+        assert (line.deal_id, line.line_id, line.booking_status) == ("C1", "S1", "paused")
+
+    def test_meta_tool_error_surfaces_meta_message_in_booking_failure(self):
+        flow = _flow_with_approved([_make_recommendation("soc-1", "social")])
+        with (
+            self._settings(),
+            _meta_mcp_transport(lambda tool: ("Objective is invalid for this account", True)),
+        ):
+            flow._execute_bookings()
+
+        assert flow.state.booked_lines == []
+        assert any(
+            "ads_create_campaign: Objective is invalid for this account" in e
+            for e in flow.state.errors
+        )

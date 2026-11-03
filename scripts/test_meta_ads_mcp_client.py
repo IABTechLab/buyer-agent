@@ -4,7 +4,7 @@ against the real Meta Ads MCP server, plus the two crewAI tools that call it
 
 Usage:
     export META_MCP_TOKEN="<user access token>"   # or META_ACCESS_TOKEN
-    export META_AD_ACCOUNT_ID="act_4509330366054796"
+    export META_AD_ACCOUNT_ID="act_<your ad account id>"
     python3 scripts/test_meta_ads_mcp_client.py
 
     # Also exercise the write path (create_campaign/create_adset/activate/
@@ -13,12 +13,13 @@ Usage:
     # on an account with no payment method:
     export META_MCP_TEST_WRITES=true
 
-Known, confirmed-not-a-bug limitations (checked 2026-08-04, re-confirmed
-across two separate live runs on two different days):
-  - get_insights() hits Meta's own "ads_entity_schedule_report is still
-    gradually rolling out" gate for this ad account.
+Known, confirmed-not-a-bug limitations (re-checked 2026-11-03 against the
+99-tool catalog):
+  - get_insights() reads metrics via ads_get_ad_entities; Meta removed the
+    ads_entity_schedule_report / ads_entity_get_report tools.
   - get_reach_estimate() / list_campaigns() raise immediately -- no
-    equivalent tool exists in the real 97-tool catalog.
+    equivalent MCP tool exists. MetaInventoryTool uses the Graph API
+    (MetaAdsAPIClient) for reach estimates even when META_USE_MCP=true.
   - create_creative()/create_ad() can't be exercised: this ad account/token
     has zero linked Facebook Pages (ads_get_ad_account_pages and
     ads_get_user_pages both return empty).
@@ -166,7 +167,7 @@ async def check_crewai_flow() -> None:
         print("  skipped -- set META_USE_MCP=true to exercise the MCP path")
         return
 
-    print("\nMetaInventoryTool.run() (-> get_reach_estimate) ...")
+    print("\nMetaInventoryTool.run() (-> Graph API reach estimate) ...")
     print(" ", MetaInventoryTool().run(channel="social", budget=1500, geo_locations=["US"])[:200])
 
     print("\nMetaReportingTool.run() (-> get_insights) ...")

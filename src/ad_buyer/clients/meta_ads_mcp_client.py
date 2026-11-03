@@ -18,7 +18,19 @@ logger = logging.getLogger(__name__)
 
 MCP_URL = "https://mcp.facebook.com/ads"
 _TOOL_TIMEOUT = 30.0
-_REPORT_MAX_POLLS = 5
+_INSIGHTS_MAX_PAGES = 5
+_INSIGHTS_METRICS = ("spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpm")
+
+
+def _normalize_insight_row(row: dict[str, Any], campaign_id: str) -> dict[str, Any]:
+    amount_spent = row.get("amount_spent")
+    if "spend" not in row and isinstance(amount_spent, dict):
+        row["spend"] = amount_spent.get("value")
+    for metric in _INSIGHTS_METRICS:
+        if row.get(metric) is None:
+            row[metric] = 0
+    row.setdefault("campaign_name", row.get("name", campaign_id))
+    return row
 
 
 class MetaAuthError(Exception):
@@ -125,6 +137,11 @@ class MetaAdsMCPClient:
         result = await self._call("tools/call", {"name": tool_name, "arguments": arguments})
         # MCP tools/call returns content array
         content = result.get("content", [])
+        if result.get("isError"):
+            message = " ".join(
+                item.get("text", "") for item in content if item.get("type") == "text"
+            )
+            raise MetaAPIError(f"{tool_name}: {message or result}")
         for item in content:
             if item.get("type") == "text":
                 try:
@@ -281,54 +298,38 @@ class MetaAdsMCPClient:
         date_preset: str = "last_30d",
         fields: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Get performance insights for a campaign via the async report flow
-        (ads_entity_schedule_report -> ads_entity_get_report)."""
-        report_fields = fields or [
-            "name",
-            "spend",
-            "impressions",
-            "reach",
-            "frequency",
-            "clicks",
-            "ctr",
-            "cpm",
-        ]
-        schedule = await self._call_tool(
-            "ads_entity_schedule_report",
-            {
-                "ad_account_id": self._ad_account_id,
-                "level": "campaign",
-                "fields": report_fields,
-                "filtering": [
-                    {"field": "campaign.id", "operator": "IN", "value": [campaign_id]},
-                ],
-                "date_preset": date_preset,
-            },
-        )
-        if not isinstance(schedule, dict):
-            raise MetaAPIError(f"ads_entity_schedule_report: {schedule}")
-        report_run_id = schedule.get("report_run_id")
-        if not report_run_id:
-            raise MetaAPIError(f"ads_entity_schedule_report returned no report_run_id: {schedule}")
+        """Get performance metrics for a campaign via ads_get_ad_entities."""
+        args: dict[str, Any] = {
+            "ad_account_id": self._ad_account_id,
+            "level": "campaign",
+            "object_ids": [campaign_id],
+            "fields": fields
+            or [
+                "name",
+                "amount_spent",
+                "impressions",
+                "reach",
+                "frequency",
+                "clicks",
+                "ctr",
+                "cpm",
+            ],
+            "date_preset": date_preset,
+        }
 
         rows: list[dict[str, Any]] = []
-        cursor: str | None = None
-        for _ in range(_REPORT_MAX_POLLS):
-            params: dict[str, Any] = {"report_run_id": report_run_id}
-            if cursor:
-                params["cursor"] = cursor
-            result = await self._call_tool("ads_entity_get_report", params)
+        for _ in range(_INSIGHTS_MAX_PAGES):
+            result = await self._call_tool("ads_get_ad_entities", args)
             if not isinstance(result, dict):
-                raise MetaAPIError(f"ads_entity_get_report: {result}")
-            if result.get("status") in ("FAILED", "ERROR"):
-                raise MetaAPIError(f"Meta Ads report failed: {result}")
-            rows.extend(result.get("data", []))
+                raise MetaAPIError(f"ads_get_ad_entities: {result}")
+            entities = result.get("ad_entities", [])
+            if isinstance(entities, str):
+                entities = json.loads(entities)
+            rows.extend(_normalize_insight_row(row, campaign_id) for row in entities)
             cursor = (result.get("pagination") or {}).get("next_cursor")
             if not cursor:
                 break
-
-        for row in rows:
-            row.setdefault("campaign_name", row.get("name", campaign_id))
+            args = {**args, "cursor": cursor}
         return rows
 
     # ── Reach Estimate ────────────────────────────────────────────────────
