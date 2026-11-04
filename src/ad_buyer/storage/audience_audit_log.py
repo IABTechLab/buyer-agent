@@ -123,40 +123,52 @@ def _parse_url(database_url: str) -> str:
     return database_url
 
 
-def _ensure_table(conn: sqlite3.Connection) -> None:
+def _ensure_table(conn, is_postgres: bool = False) -> None:
     """Create `audience_audit_log` if it does not already exist.
 
     Used on first connection and as the migration safety-net for the test
-    that opens a DB created before this change landed.
+    that opens a DB created before this change landed. On Postgres the DDL is
+    translated via the shared ``schema_pg._to_postgres`` helper.
     """
 
+    table_ddl = AUDIENCE_AUDIT_LOG_TABLE
+    index_ddls = AUDIENCE_AUDIT_LOG_INDEXES
+    if is_postgres:
+        from .schema_pg import _to_postgres, _translate_all
+
+        table_ddl = _to_postgres(AUDIENCE_AUDIT_LOG_TABLE)
+        index_ddls = _translate_all(AUDIENCE_AUDIT_LOG_INDEXES)
     cursor = conn.cursor()
-    cursor.execute(AUDIENCE_AUDIT_LOG_TABLE)
-    for idx in AUDIENCE_AUDIT_LOG_INDEXES:
+    cursor.execute(table_ddl)
+    for idx in index_ddls:
         cursor.execute(idx)
     conn.commit()
 
 
-def _get_conn() -> sqlite3.Connection:
+def _get_conn():
     """Return the shared connection, opening it lazily on first call."""
 
     global _conn
     if _conn is None:
         with _conn_lock:
             if _conn is None:
-                path = _parse_url(_database_url)
-                conn = sqlite3.connect(path, check_same_thread=False)
-                conn.row_factory = sqlite3.Row
+                from .connection_factory import (
+                    apply_sqlite_pragmas,
+                    is_postgres_url,
+                    open_connection,
+                )
+
+                conn = open_connection(_database_url, check_same_thread=False)
                 # WAL is shared with the rest of the buyer DB so we don't fight
-                # the deal store on the same file.
+                # the deal store on the same file. apply_sqlite_pragmas no-ops
+                # on Postgres and tolerates WAL-rejecting SQLite backends.
                 try:
-                    conn.execute("PRAGMA journal_mode=WAL")
+                    apply_sqlite_pragmas(conn, _database_url)
                 except sqlite3.OperationalError:
                     # `:memory:` and some test backends reject WAL mode --
                     # fail-open, the table still works in journal mode.
                     pass
-                conn.execute("PRAGMA busy_timeout=5000")
-                _ensure_table(conn)
+                _ensure_table(conn, is_postgres=is_postgres_url(_database_url))
                 _conn = conn
     return _conn
 

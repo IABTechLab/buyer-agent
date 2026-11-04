@@ -48,6 +48,49 @@ checks against the configured database.
     file (e.g. `DesiredCount: 1` on ECS). Running multiple instances against the same
     file — including a shared network file system — risks corruption.
 
+## AgentCore deployment: SQLite in-memory by default, durable Postgres opt-in
+
+When the buyer runs as an AgentCore runtime, `infra/aws/agentcore/deploy.sh`
+defaults to `STORAGE_TYPE=sqlite` with an **in-memory** `DATABASE_URL`
+(`sqlite:///:memory:`), in PUBLIC network mode. State written by the stores
+above therefore does **not** survive a container recycle in that default
+deployment. This is the right default for same-account/dev and for the agentic
+planning/booking path, where the buyer's own records (deals/orders/negotiations)
+are re-derivable from the seller of record and the campaign plan.
+
+### Durable Postgres (opt-in): `--storage postgres`
+
+For enterprise/durable deployments the buyer now has a real backend seam and a
+`--storage postgres` path (mirrors the seller's group-6 work):
+
+- **Aurora Serverless v2** (`aurora-postgresql` 16.9, `db.serverless`) deployed
+  beside Redis in `infra/aws/cloudformation/storage.yaml`, with
+  `ServerlessV2ScalingConfiguration.MinCapacity: 0` (**scale-to-zero**, bounded
+  max) so it costs nothing when idle.
+- **RDS-managed credentials** — `ManageMasterUserPassword: true` puts the DB
+  password in an auto-rotating Secrets Manager secret. No plaintext password is
+  ever in CFN, env, or logs; the runtime reads the secret **by ARN** at startup
+  (`storage/db_secret.py`) and assembles the connection string in-process.
+- **CUSTOMER_VPC mode** — `network-agentcore.yaml` + `main-agentcore.yaml`
+  provide the VPC interface endpoints (`bedrock-agentcore`/`bedrock-runtime`,
+  `sts`, `secretsmanager`, ECR, Logs) and the **443 self-ingress** on the
+  runtime SG required for a private-subnet runtime to reach Aurora and those
+  endpoints (same reachability lesson as the seller).
+- **The backend seam** — `storage/connection_factory.py` selects on
+  `STORAGE_TYPE`; `storage/pg_connection.py` adapts the sqlite3 API to
+  psycopg, and `storage/schema_pg.py` derives Postgres DDL from the shared
+  schema. The 6 connection-owning stores route through the factory; the injected
+  sub-stores follow for free. `STORAGE_TYPE=hybrid` on the deployed runtime
+  puts KV state in Aurora with Redis alongside.
+
+The entrypoint uses `setdefault` semantics so a deploy-supplied `hybrid`/Postgres
+value wins while the dev default stays SQLite. As with the seller, product data
+is independent of the KV backend.
+
+If you need durable buyer state and do not want the Aurora path, you can still
+run the buyer on ECS with a persistent `DATABASE_URL` (single writer — see the
+warning above).
+
 ## Related
 
 - [Deal Store](deal-store.md) — full schema and API reference for the primary store

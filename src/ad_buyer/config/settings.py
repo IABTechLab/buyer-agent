@@ -42,6 +42,19 @@ class Settings(BaseSettings):
     aamp_registry_url: str = ""
     aamp_registry_auth_token: str = ""
 
+    # Buyer's OWN OAuth2 client_credentials app-client (AWS Bedrock AgentCore
+    # deployment path only). Used to mint a JWT for a seller that is deployed as
+    # an AgentCore runtime behind a CUSTOM_JWT authorizer and ADVERTISES an OAuth
+    # token endpoint in its registry record's `authentication` object (Req 6.6).
+    # The token ENDPOINT + SCOPE come from that discovered record; the
+    # client_id/secret are the buyer's own identity and live HERE (never in the
+    # registry, never logged). Unset = the buyer cannot authenticate to a
+    # JWT-protected seller. The legacy API-key seller path (AuthMiddleware) and
+    # the arn: AgentCore SigV4 proxy path are unaffected — OAuth applies ONLY to
+    # a discovered seller that advertises an issuer.
+    buyer_oauth_client_id: str = ""
+    buyer_oauth_client_secret: str = ""
+
     # Seller Agent Endpoints (comma-separated list of MCP/A2A server URLs)
     # Each endpoint should implement IAB Tech Lab OpenDirect/AdCOM standards
     seller_endpoints: str = ""
@@ -169,11 +182,17 @@ class Settings(BaseSettings):
     # LLM Settings
     # Supported providers: anthropic (default), openai, gemini, bedrock
     # Set DEFAULT_LLM_MODEL to switch provider, e.g.:
-    #   anthropic/claude-sonnet-4-5-20250929  (requires ANTHROPIC_API_KEY)
-    #   openai/gpt-4o                          (requires OPENAI_API_KEY)
-    #   gemini/gemini-2.5-flash                (requires GOOGLE_API_KEY)
-    #   bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0 (requires AWS creds)
-    default_llm_model: str = "anthropic/claude-sonnet-4-5-20250929"
+    #   anthropic/claude-sonnet-5                (requires ANTHROPIC_API_KEY)
+    #   openai/gpt-4o                            (requires OPENAI_API_KEY)
+    #   gemini/gemini-2.5-flash                  (requires GOOGLE_API_KEY)
+    #   bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0 (Converse; requires AWS creds)
+    # NOTE: to run Claude on Amazon Bedrock WITHOUT the Converse provider, do
+    # not use the ``bedrock/`` prefix; instead set
+    # ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL to Bedrock's /anthropic route (see
+    # below) with a Messages-supported model id. Only the current-generation
+    # Claude tiers are served on the Anthropic Messages API (Sonnet 5,
+    # Opus 4.7/4.8, Haiku 4.5); Sonnet 4.5 is Converse-only.
+    default_llm_model: str = "anthropic/claude-sonnet-5"
     manager_llm_model: str = "anthropic/claude-opus-4-8"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 4096
@@ -186,6 +205,17 @@ class Settings(BaseSettings):
     # endpoints like a local Ollama server that don't require one.
     openai_compatible_llm_api_key: str | None = None
     openai_compatible_llm_api_base_url: str | None = None
+
+    # Alternative: any Anthropic-Messages-wire-compatible endpoint. This is the
+    # recommended way to run Claude on Amazon Bedrock: set
+    #   ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL=https://bedrock-runtime.<region>.amazonaws.com/anthropic
+    #   ANTHROPIC_COMPATIBLE_LLM_API_KEY=<Bedrock API key / bearer token>
+    #   DEFAULT_LLM_MODEL / MANAGER_LLM_MODEL = the Bedrock model / inference-profile id
+    # CrewAI's native Anthropic provider then drives messages.create against
+    # Bedrock, so no Bedrock Converse toolUse/toolResult sanitization is needed.
+    # (Prefer bedrock-runtime over bedrock-mantle for new apps per AWS.)
+    anthropic_compatible_llm_api_key: str | None = None
+    anthropic_compatible_llm_api_base_url: str | None = None
 
     # Database / Storage Configuration
     database_url: str = "sqlite:///./ad_buyer.db"

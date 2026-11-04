@@ -73,6 +73,7 @@ class PacingStore:
     """
 
     def __init__(self, database_url: str) -> None:
+        self._database_url = database_url
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
@@ -93,12 +94,15 @@ class PacingStore:
 
     def connect(self) -> None:
         """Open the database connection, set pragmas, and create tables."""
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.execute("PRAGMA busy_timeout=5000")
-        self._create_tables()
+        from .connection_factory import (
+            apply_sqlite_pragmas,
+            is_postgres_url,
+            open_connection,
+        )
+
+        self._conn = open_connection(self._database_url, check_same_thread=False)
+        apply_sqlite_pragmas(self._conn, self._database_url)
+        self._create_tables(is_postgres=is_postgres_url(self._database_url))
 
     def disconnect(self) -> None:
         """Close the database connection."""
@@ -106,11 +110,22 @@ class PacingStore:
             self._conn.close()
             self._conn = None
 
-    def _create_tables(self) -> None:
-        """Create pacing snapshot tables and indexes if not present."""
+    def _create_tables(self, is_postgres: bool = False) -> None:
+        """Create pacing snapshot tables and indexes if not present.
+
+        On Postgres the inline SQLite DDL is translated via the shared
+        ``schema_pg._to_postgres`` helper (SQLite path unchanged).
+        """
+        table_ddl = PACING_SNAPSHOT_TABLE
+        index_ddls = PACING_SNAPSHOT_INDEXES
+        if is_postgres:
+            from .schema_pg import _to_postgres, _translate_all
+
+            table_ddl = _to_postgres(PACING_SNAPSHOT_TABLE)
+            index_ddls = _translate_all(PACING_SNAPSHOT_INDEXES)
         cursor = self._conn.cursor()
-        cursor.execute(PACING_SNAPSHOT_TABLE)
-        for idx in PACING_SNAPSHOT_INDEXES:
+        cursor.execute(table_ddl)
+        for idx in index_ddls:
             cursor.execute(idx)
         self._conn.commit()
 
