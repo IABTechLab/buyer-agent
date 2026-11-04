@@ -1,0 +1,198 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Auth stack for the AAMP buyer AgentCore deployment. Houses the IAM
+  execution role the buyer runtime assumes, including a SCOPED grant to
+  invoke seller AgentCore runtimes for buyer->seller (agent-to-agent) calls.
+  This "auth" stack is the home for auth-related infra (IAM today; Cognito +
+  gateway authorizer for the cross-org path live alongside it — see NOTE).
+
+# =============================================================================
+# NOTE — SECURITY MODEL / WHEN TO USE THIS
+# =============================================================================
+# The SellerInvoke permission below lets the buyer runtime call the seller's
+# AgentCore runtimes directly via bedrock-agentcore:InvokeAgentRuntime, gated
+# by AWS IAM. That is appropriate ONLY for:
+#
+#   * Same-account testing — buyer and seller deployed in one AWS account
+#     (the demo / integration-test setup), OR
+#   * Customers whose security standards explicitly ALLOW cross-account IAM
+#     access between the buyer's and seller's accounts (you would then extend
+#     the resource ARNs / add a cross-account role trust accordingly).
+#
+# It is NOT the recommended pattern for CROSS-ORGANIZATION buyer<->seller
+# interactions (different companies, no shared IAM trust). For that, front the
+# seller runtimes with an **AgentCore Gateway + CUSTOM_JWT authorizer backed by
+# Cognito** (or the customer's OIDC IdP): the external buyer authenticates with
+# a short-lived OAuth2 JWT bearer token at the gateway edge — no IAM in the
+# seller's account required. See the `enterprise-auth-gateway` spec.
+#
+# In short: IAM (this stack) = same-account / trusted cross-account.
+#           Gateway + CUSTOM_JWT/Cognito = cross-org, zero shared IAM.
+# =============================================================================
+
+# =============================================================================
+# Parameters
+# =============================================================================
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues: [staging, production]
+  SellerRuntimeNamePrefix:
+    Type: String
+    Default: "a4a_aamp_seller_"
+    Description: >
+      Name prefix of the seller AgentCore runtimes this buyer may invoke. The
+      SellerInvoke policy wildcards on runtime/<prefix>* so the buyer can reach
+      the seller's http/mcp/a2a runtimes without hardcoding the CLI-assigned
+      ARN suffixes (which differ per deploy). Keep this as tight as your naming
+      allows — it is scoped to this account + region + the seller name prefix,
+      NOT a blanket bedrock-agentcore:* on all runtimes. Match your seller
+      deploy --name base (e.g. a4a_aamp_seller_ for a4a_aamp_seller_*_mcp).
+  SellerAccountId:
+    Type: String
+    Default: ""
+    Description: >
+      Optional. AWS account id that hosts the seller runtimes. Defaults to THIS
+      account (same-account model). Set this ONLY for a trusted cross-account
+      setup your security standards permit; the SellerInvoke resource ARNs then
+      point at that account. (Cross-ORG should use the gateway path instead.)
+
+# =============================================================================
+# Conditions
+# =============================================================================
+Conditions:
+  # Use this account for the seller ARNs unless a (trusted) cross-account id is given.
+  UseThisAccountForSeller: !Equals [!Ref SellerAccountId, ""]
+
+# =============================================================================
+# Resources
+# =============================================================================
+Resources:
+
+  # ---------------------------------------------------------------------------
+  # Buyer AgentCore runtime execution role
+  #
+  # Provisioned here (declarative, least-privilege) instead of letting the
+  # agentcore CLI auto-create a role, so the seller-invoke grant is owned by
+  # IaC. Pass this role to `agentcore configure --execution-role <arn>`.
+  # ---------------------------------------------------------------------------
+  BuyerRuntimeExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "aamp-buyer-${Environment}-runtime-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock-agentcore.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        # -- Standard AgentCore runtime execution permissions --
+        # Mirrors the policy the `agentcore` CLI auto-creates for a runtime
+        # (ECR image pull, CloudWatch Logs + log-delivery, X-Ray tracing,
+        # CloudWatch metrics, and AgentCore memory/workload access), so a
+        # CFN-owned role is a drop-in for the CLI-created one.
+        - PolicyName: AgentCoreRuntimeExecution
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: EcrImagePull
+                Effect: Allow
+                Action:
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchCheckLayerAvailability
+                Resource: !Sub "arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/bedrock-agentcore-*"
+              - Sid: EcrAuth
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: "*"
+              - Sid: Logs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                  - logs:DescribeLogGroups
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock-agentcore/runtimes/*"
+              - Sid: XRayTracing
+                Effect: Allow
+                Action:
+                  - xray:PutTraceSegments
+                  - xray:PutTelemetryRecords
+                  - xray:GetSamplingRules
+                  - xray:GetSamplingTargets
+                Resource: "*"
+              - Sid: CloudWatchMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+              - Sid: AgentCoreMemory
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:GetEvent
+                  - bedrock-agentcore:GetMemory
+                  - bedrock-agentcore:GetMemoryRecord
+                  - bedrock-agentcore:ListActors
+                  - bedrock-agentcore:ListEvents
+                  - bedrock-agentcore:ListMemoryRecords
+                  - bedrock-agentcore:ListSessions
+                Resource: "*"
+        # -- Bedrock model access (Claude via the Anthropic Messages endpoint) --
+        - PolicyName: BedrockInvoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  # Req 11: the runtime mints a short-lived Bedrock bearer token
+                  # from THIS role at startup for the Anthropic Messages path
+                  # (x-api-key), which is authenticated via CallWithBearerToken
+                  # rather than SigV4 InvokeModel.
+                  - bedrock:CallWithBearerToken
+                Resource: "*"
+        # -- SCOPED seller invoke (see NOTE at top of this file) --
+        - PolicyName: SellerInvoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeSellerRuntimes
+                Effect: Allow
+                Action: bedrock-agentcore:InvokeAgentRuntime
+                # Wildcard on the seller name prefix + its endpoint children,
+                # scoped to a single account + region. Not bedrock-agentcore:*.
+                Resource:
+                  - !If
+                    - UseThisAccountForSeller
+                    - !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/${SellerRuntimeNamePrefix}*"
+                    - !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${SellerAccountId}:runtime/${SellerRuntimeNamePrefix}*"
+                  - !If
+                    - UseThisAccountForSeller
+                    - !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:runtime/${SellerRuntimeNamePrefix}*/*"
+                    - !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${SellerAccountId}:runtime/${SellerRuntimeNamePrefix}*/*"
+      Tags:
+        - Key: Name
+          Value: !Sub "aamp-buyer-${Environment}-runtime-role"
+        - Key: Project
+          Value: ad-buyer-system
+        - Key: Environment
+          Value: !Ref Environment
+
+# =============================================================================
+# Outputs
+# =============================================================================
+Outputs:
+  BuyerRuntimeExecutionRoleArn:
+    Description: >
+      Execution role ARN for the buyer AgentCore runtime. Pass to
+      `agentcore configure --execution-role <arn>` so the runtime can invoke
+      the seller runtimes (same-account / trusted cross-account only).
+    Value: !GetAtt BuyerRuntimeExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-BuyerRuntimeExecutionRoleArn"

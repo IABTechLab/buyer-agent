@@ -27,6 +27,11 @@ from ..config import get_settings
 # that speaks the OpenAI wire format (NVIDIA NIM, Ollama, HuggingFace TGI, ...).
 _OPENAI_COMPATIBLE_PROVIDER = "openai"
 
+# CrewAI's native Anthropic SDK client; with a base_url it drives any endpoint
+# that speaks the Anthropic Messages wire format (Amazon Bedrock's /anthropic
+# route, a self-hosted Anthropic-compatible gateway, ...).
+_ANTHROPIC_COMPATIBLE_PROVIDER = "anthropic"
+
 # Anthropic removed sampling parameters (temperature/top_p/top_k) starting
 # with Opus 4.7; sending temperature to these families returns
 # "400 invalid_request_error: 'temperature' is deprecated for this model."
@@ -50,6 +55,28 @@ def _model_accepts_temperature(model: str) -> bool:
     return not any(family in model_id for family in _TEMPERATURE_REJECTING_MODEL_FAMILIES)
 
 
+# OpenAI's newer models (GPT-5.x and the o-series reasoning models) reject the
+# legacy ``max_tokens`` parameter — sending it returns
+# "400 invalid_request_error: Unsupported parameter: 'max_tokens' is not
+# supported with this model." They take ``max_completion_tokens`` instead.
+# Matched as substrings so a Bedrock inference-profile id
+# ("us.openai.gpt-5.6-sol", ...) or a raw OpenAI id ("gpt-5", "o1", ...) is
+# covered. Other models (gpt-4o, gpt-oss, Claude, Nova, ...) keep ``max_tokens``.
+_MAX_COMPLETION_TOKENS_MODEL_FAMILIES = (
+    "gpt-5",
+    "gpt-6",
+    "o1",
+    "o3",
+    "o4",
+)
+
+
+def _model_uses_max_completion_tokens(model: str) -> bool:
+    """Return ``True`` if ``model`` needs ``max_completion_tokens`` (not ``max_tokens``)."""
+    model_id = model.lower()
+    return any(family in model_id for family in _MAX_COMPLETION_TOKENS_MODEL_FAMILIES)
+
+
 def build_llm(model: str, temperature: float, max_tokens: int) -> LLM:
     """Build an ``LLM`` for ``model``, honoring a custom base URL if configured.
 
@@ -59,9 +86,35 @@ def build_llm(model: str, temperature: float, max_tokens: int) -> LLM:
     """
     settings = get_settings()
 
-    kwargs: dict[str, Any] = {"model": model, "max_tokens": max_tokens}
+    kwargs: dict[str, Any] = {"model": model}
+    # GPT-5.x / o-series reject legacy ``max_tokens``; they take
+    # ``max_completion_tokens``. Everything else keeps ``max_tokens``.
+    if _model_uses_max_completion_tokens(model):
+        kwargs["max_completion_tokens"] = max_tokens
+    else:
+        kwargs["max_tokens"] = max_tokens
     if _model_accepts_temperature(model):
         kwargs["temperature"] = temperature
+
+    # Amazon Bedrock's Anthropic-compatible endpoint (and any other endpoint
+    # that speaks the Anthropic Messages wire format). Setting
+    # ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL routes Claude through CrewAI's
+    # native Anthropic provider (messages.create) against that base URL,
+    # instead of the Bedrock Converse provider. This is the path that lets us
+    # run Claude on Bedrock WITHOUT the Converse toolUse/toolResult sanitizer:
+    # the Messages API assembles tool turns itself, so the orphaned-block
+    # ValidationException class does not arise. Use a Messages-supported model
+    # id (e.g. Claude Sonnet 5 / Opus 4.7+ / Haiku 4.5) and a Bedrock API key.
+    # For bedrock-runtime, base_url is
+    #   https://bedrock-runtime.<region>.amazonaws.com/anthropic
+    # and the model id is the Bedrock model / inference-profile id.
+    if settings.anthropic_compatible_llm_api_base_url:
+        return LLM(
+            api_key=settings.anthropic_compatible_llm_api_key,
+            provider=_ANTHROPIC_COMPATIBLE_PROVIDER,
+            base_url=settings.anthropic_compatible_llm_api_base_url,
+            **kwargs,
+        )
 
     if settings.openai_compatible_llm_api_base_url:
         return LLM(

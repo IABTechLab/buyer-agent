@@ -16,13 +16,37 @@ import os
 import sys
 from unittest.mock import patch
 
+import pytest
+
+_SETTINGS_MOD = "ad_buyer.config.settings"
+
+
+@pytest.fixture(autouse=True)
+def _restore_settings_module():
+    """Restore the original settings module after each test in this file.
+
+    The tests below ``del sys.modules[...]`` and re-import the settings module
+    to exercise lazy init with an empty cache. Without restoration the rebuilt
+    module leaks into ``sys.modules``, so later tests in the full suite that do
+    ``from ad_buyer.config.settings import settings`` bind to a fresh lazy
+    proxy reading live env — which made
+    ``test_real_model_path_e2e::test_label_reflects_active_mode`` fail only in
+    suite order. Snapshot and restore the original module object here so the
+    reload stays contained to this file.
+    """
+    original = sys.modules.get(_SETTINGS_MOD)
+    try:
+        yield
+    finally:
+        if original is not None:
+            sys.modules[_SETTINGS_MOD] = original
+
 
 def _reload_settings_module():
     """Force a fresh import of the settings module so its lru_cache is empty."""
-    mod_name = "ad_buyer.config.settings"
-    if mod_name in sys.modules:
-        del sys.modules[mod_name]
-    return importlib.import_module(mod_name)
+    if _SETTINGS_MOD in sys.modules:
+        del sys.modules[_SETTINGS_MOD]
+    return importlib.import_module(_SETTINGS_MOD)
 
 
 def test_importing_settings_does_not_construct_eagerly():

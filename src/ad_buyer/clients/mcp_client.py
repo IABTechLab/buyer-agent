@@ -19,6 +19,21 @@ except ImportError:
     MCP_SDK_AVAILABLE = False
 
 
+def _is_unauthorized(exc: Exception) -> bool:
+    """True when an exception looks like an HTTP 401 from the MCP transport.
+
+    The MCP Streamable-HTTP transport surfaces auth failures as httpx errors or
+    generic exceptions whose message carries the status; we match either an
+    httpx 401 or a "401"/"Unauthorized" marker in the string form so a single
+    reactive re-mint can be attempted before giving up.
+    """
+    resp = getattr(exc, "response", None)
+    if resp is not None and getattr(resp, "status_code", None) == 401:
+        return True
+    text = str(exc).lower()
+    return "401" in text or "unauthorized" in text
+
+
 @dataclass
 class MCPToolResult:
     """Result from an MCP tool call."""
@@ -178,25 +193,85 @@ class IABMCPClient:
     def __init__(
         self,
         base_url: str,
+        *,
+        auth_token_provider: Any = None,
+        token_endpoint: str = "",
+        scope: str = "",
     ):
         """Initialize the MCP client.
 
         Args:
-            base_url: Base URL for the MCP server
+            base_url: Base URL for the MCP server.
+            auth_token_provider: Optional
+                :class:`ad_buyer.auth.oauth_token_provider.OAuthTokenProvider`.
+                When supplied (the AWS Bedrock AgentCore CUSTOM_JWT path, where a
+                discovered seller advertises an OAuth issuer), the client mints a
+                client_credentials JWT from ``token_endpoint``/``scope`` and
+                attaches ``Authorization: Bearer <JWT>`` to the MCP transport,
+                re-minting once on a 401. Omitted = no auth header (local dev /
+                unauthenticated servers).
+            token_endpoint: OAuth2 token endpoint (from the discovered record's
+                ``authentication`` object). Required when a provider is given.
+            scope: OAuth2 scope to request (e.g. ``seller-agent/invoke``).
         """
         self.base_url = base_url.rstrip("/")
-        self.mcp_url = f"{self.base_url}/mcp/sse"
+        # Endpoint shapes (verified against the AWS AgentCore MCP docs):
+        #  - An AgentCore CUSTOM_JWT runtime is invoked over HTTPS at
+        #    https://bedrock-agentcore.<region>.amazonaws.com/runtimes/<ENCODED_ARN>/invocations?qualifier=DEFAULT
+        #    (SDK/SigV4 is DISALLOWED for OAuth runtimes — a raw HTTPS request
+        #    with a Bearer token is required). That full URL is used AS-IS; the
+        #    Streamable-HTTP transport speaks MCP directly on it.
+        #  - The legacy IAB agentic-direct server exposes MCP at `<base>/mcp/sse`.
+        # Detect the AgentCore invocations URL and do NOT append `/mcp/sse`.
+        if "/invocations" in self.base_url or self.base_url.endswith("/invocations"):
+            self.mcp_url = self.base_url
+        else:
+            self.mcp_url = f"{self.base_url}/mcp/sse"
         self._tools: dict[str, dict] = {}
         self._session: ClientSession | None = None
         self._client_ctx = None
         self._read_stream = None
         self._write_stream = None
         self._get_session_id = None
+        self._auth_provider = auth_token_provider
+        self._token_endpoint = token_endpoint
+        self._scope = scope
+
+    def _auth_headers(self, *, force: bool = False) -> dict[str, str]:
+        """Bearer header for the AgentCore CUSTOM_JWT path, or {} when no auth.
+
+        ``force`` re-mints (used after a 401) rather than reusing the cached token.
+        """
+        if self._auth_provider is None:
+            return {}
+        token = self._auth_provider.get_token(self._token_endpoint, self._scope, force=force)
+        return {"Authorization": f"Bearer {token}"}
 
     async def connect(self) -> None:
-        """Connect to the MCP server and initialize session."""
-        # Create streamable HTTP client
-        self._client_ctx = streamablehttp_client(self.mcp_url)
+        """Connect to the MCP server and initialize session.
+
+        On the authenticated (AgentCore CUSTOM_JWT) path, a 401 during connect
+        triggers a single reactive re-mint (the cached token may have expired)
+        before failing.
+        """
+        try:
+            await self._connect_once(self._auth_headers())
+        except Exception as exc:  # noqa: BLE001 — reactively re-mint on a 401 only
+            if self._auth_provider is not None and _is_unauthorized(exc):
+                # Drop the cached token and retry once with a fresh JWT.
+                self._auth_provider.invalidate(self._token_endpoint, self._scope)
+                await self._connect_once(self._auth_headers(force=True))
+            else:
+                raise
+
+    async def _connect_once(self, headers: dict[str, str]) -> None:
+        # Create streamable HTTP client (headers carry the bearer JWT when auth
+        # is configured; empty otherwise).
+        self._client_ctx = (
+            streamablehttp_client(self.mcp_url, headers=headers)
+            if headers
+            else streamablehttp_client(self.mcp_url)
+        )
         streams = await self._client_ctx.__aenter__()
         self._read_stream, self._write_stream, self._get_session_id = streams
 
