@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ad_buyer.flows.deal_booking_flow import DealBookingFlow
+from ad_buyer.flows.deal_booking_flow import DealBookingFlow, _pick_optimization_goal
 from ad_buyer.models.deals import DealResponse, PricingInfo, ProductInfo, TermsInfo
 from ad_buyer.models.flow_state import ExecutionStatus, ProductRecommendation
 from ad_buyer.orchestration.multi_seller import (
@@ -425,6 +425,130 @@ class TestBookViaMetaMcp:
                     targeting_countries=["US"],
                 )
         mock_client.create_adset.assert_not_called()
+
+    async def _book(self, mock_client_cls, optimization_goal="LINK_CLICKS"):
+        flow = _flow_with_approved([_make_recommendation("meta:feed", "social")])
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch("ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient", mock_client_cls),
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+            return await flow._book_via_meta_mcp(
+                campaign_name="Test Campaign",
+                objective="OUTCOME_AWARENESS",
+                daily_budget_cents=500,
+                adset_name="Facebook Feed",
+                optimization_goal=optimization_goal,
+                targeting_countries=["US"],
+            )
+
+    @pytest.mark.asyncio
+    async def test_disallowed_goal_replaced_with_metas_recommended_goal(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={
+                "campaign_id": "c1",
+                "valid_optimization_goals": '["REACH","IMPRESSIONS"]',
+                "recommended_optimization_goal": "REACH",
+            },
+            create_adset_result={"ad_set_id": "s1"},
+        )
+
+        await self._book(mock_client_cls, optimization_goal="LINK_CLICKS")
+
+        assert mock_client.create_adset.call_args.kwargs["optimization_goal"] == "REACH"
+
+    @pytest.mark.asyncio
+    async def test_allowed_goal_kept(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={
+                "campaign_id": "c1",
+                "valid_optimization_goals": ["LINK_CLICKS", "REACH"],
+                "recommended_optimization_goal": "REACH",
+            },
+            create_adset_result={"ad_set_id": "s1"},
+        )
+
+        await self._book(mock_client_cls, optimization_goal="LINK_CLICKS")
+
+        assert mock_client.create_adset.call_args.kwargs["optimization_goal"] == "LINK_CLICKS"
+
+    @pytest.mark.asyncio
+    async def test_adset_failure_deletes_orphaned_campaign(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result=None,
+        )
+        mock_client.create_adset.side_effect = RuntimeError("ad set rejected")
+
+        with pytest.raises(RuntimeError, match="ad set rejected"):
+            await self._book(mock_client_cls)
+
+        mock_client.delete.assert_awaited_once_with("c1")
+
+    @pytest.mark.asyncio
+    async def test_adset_without_id_deletes_orphaned_campaign(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result={"status": "PAUSED"},
+        )
+
+        with pytest.raises(ValueError, match="Ad set creation failed"):
+            await self._book(mock_client_cls)
+
+        mock_client.delete.assert_awaited_once_with("c1")
+
+    @pytest.mark.asyncio
+    async def test_failed_cleanup_still_raises_original_error(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result=None,
+        )
+        mock_client.create_adset.side_effect = RuntimeError("ad set rejected")
+        mock_client.delete.side_effect = RuntimeError("delete failed")
+
+        with pytest.raises(RuntimeError, match="ad set rejected"):
+            await self._book(mock_client_cls)
+
+    @pytest.mark.asyncio
+    async def test_warns_when_meta_stores_a_different_goal(self, caplog):
+        _, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result={
+                "ad_set_id": "s1",
+                "created_ad_set": {"optimization_goal": "REACH"},
+            },
+        )
+
+        with caplog.at_level("WARNING", logger="ad_buyer.flows.deal_booking_flow"):
+            await self._book(mock_client_cls, optimization_goal="LINK_CLICKS")
+
+        assert "stored optimization_goal REACH" in caplog.text
+
+
+class TestPickOptimizationGoal:
+    def test_no_valid_list_keeps_requested(self):
+        assert _pick_optimization_goal("LINK_CLICKS", {}) == "LINK_CLICKS"
+
+    def test_valid_goals_as_json_string_like_live_meta(self):
+        campaign = {
+            "valid_optimization_goals": '["AD_RECALL_LIFT","IMPRESSIONS","REACH"]',
+            "recommended_optimization_goal": "REACH",
+        }
+        assert _pick_optimization_goal("LINK_CLICKS", campaign) == "REACH"
+        assert _pick_optimization_goal("IMPRESSIONS", campaign) == "IMPRESSIONS"
+
+    def test_unparseable_valid_goals_keeps_requested(self):
+        campaign = {
+            "valid_optimization_goals": "REACH",
+            "recommended_optimization_goal": "REACH",
+        }
+        assert _pick_optimization_goal("LINK_CLICKS", campaign) == "LINK_CLICKS"
+
+    def test_disallowed_without_recommendation_keeps_requested(self):
+        campaign = {"valid_optimization_goals": ["REACH"]}
+        assert _pick_optimization_goal("LINK_CLICKS", campaign) == "LINK_CLICKS"
 
 
 def _meta_mcp_transport(responder):

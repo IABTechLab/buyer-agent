@@ -178,6 +178,19 @@ def _make_catalog_client(seller_url: str, **kwargs: Any) -> Any:
     return OpenDirectClient(seller_url, **kwargs)
 
 
+def _pick_optimization_goal(requested: str, campaign: dict[str, Any]) -> str:
+    """Return ``requested`` if valid for the campaign's objective, else Meta's recommended goal."""
+    valid = campaign.get("valid_optimization_goals")
+    if isinstance(valid, str):
+        try:
+            valid = json.loads(valid)
+        except ValueError:
+            valid = None
+    if not isinstance(valid, list) or not valid or requested in valid:
+        return requested
+    return campaign.get("recommended_optimization_goal") or requested
+
+
 class DealBookingFlow(Flow[BookingState]):
     """Event-driven flow for end-to-end deal booking workflow.
 
@@ -1502,16 +1515,33 @@ class DealBookingFlow(Flow[BookingState]):
             if not campaign_id:
                 raise ValueError(f"Campaign creation failed — no id in response: {camp}")
 
-            adset = await client.create_adset(
-                campaign_id=campaign_id,
-                name=f"{adset_name} Ad Set",
-                optimization_goal=optimization_goal,
-                billing_event="IMPRESSIONS",
-                targeting_countries=targeting_countries,
-            )
-            ad_set_id = adset.get("ad_set_id") or adset.get("id", "")
-            if not ad_set_id:
-                raise ValueError(f"Ad set creation failed — no id in response: {adset}")
+            goal = _pick_optimization_goal(optimization_goal, camp)
+            try:
+                adset = await client.create_adset(
+                    campaign_id=campaign_id,
+                    name=f"{adset_name} Ad Set",
+                    optimization_goal=goal,
+                    billing_event="IMPRESSIONS",
+                    targeting_countries=targeting_countries,
+                )
+                ad_set_id = adset.get("ad_set_id") or adset.get("id", "")
+                if not ad_set_id:
+                    raise ValueError(f"Ad set creation failed — no id in response: {adset}")
+            except Exception:
+                try:
+                    await client.delete(campaign_id)
+                except Exception:
+                    logger.exception("Could not delete orphaned Meta campaign %s", campaign_id)
+                raise
+
+            stored_goal = (adset.get("created_ad_set") or {}).get("optimization_goal")
+            if stored_goal and stored_goal != goal:
+                logger.warning(
+                    "Meta stored optimization_goal %s for ad set %s (requested %s)",
+                    stored_goal,
+                    ad_set_id,
+                    goal,
+                )
 
             return campaign_id, ad_set_id, "meta"
 

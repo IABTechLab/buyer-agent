@@ -102,6 +102,19 @@ class TestMetaReportingToolMCP:
 
         assert result.count("Campaign: C") == 2
 
+    def test_campaign_with_no_rows_reported_as_not_found(self):
+        p1, p2 = _patched_transport(_FakeMCPClient(rows=[]))
+        with _mcp_configured(), p1, p2:
+            result = MetaReportingTool()._run(["camp_missing"])
+
+        assert "Campaign camp_missing: No data — not found in ad account act_1" in result
+
+    def test_invalid_date_preset_reported_per_campaign(self):
+        with _mcp_configured():
+            result = MetaReportingTool()._run(["camp_1"], date_preset="yesterdayy")
+
+        assert "Campaign camp_1: Error — invalid date_preset 'yesterdayy'" in result
+
 
 class TestMetaReportingToolOverTransport:
     """MetaReportingTool through the real MCP client and the live

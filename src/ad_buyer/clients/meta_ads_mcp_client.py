@@ -19,6 +19,30 @@ logger = logging.getLogger(__name__)
 MCP_URL = "https://mcp.facebook.com/ads"
 _TOOL_TIMEOUT = 30.0
 _INSIGHTS_MAX_PAGES = 5
+_DATE_PRESETS = frozenset(
+    {
+        "today",
+        "yesterday",
+        "this_month",
+        "last_month",
+        "this_quarter",
+        "maximum",
+        "data_maximum",
+        "last_3d",
+        "last_7d",
+        "last_14d",
+        "last_28d",
+        "last_30d",
+        "last_90d",
+        "last_week_mon_sun",
+        "last_week_sun_sat",
+        "last_quarter",
+        "last_year",
+        "this_week_mon_today",
+        "this_week_sun_today",
+        "this_year",
+    }
+)
 _INSIGHTS_METRICS = ("spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpm")
 
 
@@ -299,6 +323,8 @@ class MetaAdsMCPClient:
         fields: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Get performance metrics for a campaign via ads_get_ad_entities."""
+        if date_preset not in _DATE_PRESETS:
+            raise MetaAPIError(f"invalid date_preset {date_preset!r}")
         args: dict[str, Any] = {
             "ad_account_id": self._ad_account_id,
             "level": "campaign",

@@ -75,6 +75,12 @@ Args:
             for campaign_id in campaign_ids:
                 try:
                     rows = await client.get_insights(campaign_id, date_preset=date_preset)
+                    if not rows:
+                        output += (
+                            f"Campaign {campaign_id}: No data — not found in ad account "
+                            f"{settings.meta_ad_account_id}\n"
+                        )
+                        continue
                     output += self._format_rows(campaign_id, rows)
                 except MCPAuthError as e:
                     output += f"Campaign {campaign_id}: Auth error — {e}\n"

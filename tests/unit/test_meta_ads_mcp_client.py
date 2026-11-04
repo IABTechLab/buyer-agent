@@ -455,6 +455,16 @@ _LIVE_ROW = {
 
 class TestInsights:
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("preset", ["yesterdayy", "", "LAST_30D", "last_31d"])
+    async def test_invalid_date_preset_rejected_before_calling_meta(self, preset):
+        client = _client()
+        mock_tool = AsyncMock()
+        with patch.object(client, "_call_tool", new=mock_tool):
+            with pytest.raises(MetaAPIError, match="invalid date_preset"):
+                await client.get_insights("camp_1", date_preset=preset)
+        mock_tool.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_calls_ads_get_ad_entities_scoped_to_campaign(self):
         client = _client(ad_account_id="act_1")
         mock_tool = AsyncMock(return_value=_entities_page([]))
