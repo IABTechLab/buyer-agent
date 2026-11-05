@@ -725,7 +725,7 @@ async def run_demo(pdf_path: str | None = None):
                 "name": sample_product["name"],
                 "description": "Premium CTV inventory across major streaming platforms",
                 "currency": "USD",  # ISO-4217
-                "baseprice": sample_product["floor_cpm"],  # Base retail price
+                "baseprice": sample_product["base_cpm"],  # Base retail price
                 "ratetype": "CPM",  # CPM, CPMV, CPC, CPD, FlatRate
                 "deliverytype": "guaranteed",  # exclusive, guaranteed, non-guaranteed
                 "estdailyavails": "Millions",  # Estimated daily impressions range
