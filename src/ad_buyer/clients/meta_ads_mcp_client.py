@@ -46,6 +46,40 @@ _DATE_PRESETS = frozenset(
 _INSIGHTS_METRICS = ("spend", "impressions", "reach", "frequency", "clicks", "ctr", "cpm")
 
 
+def _parse_jsonrpc_response(text: str, request_id: Any) -> dict[str, Any]:
+    """Return the JSON-RPC response for ``request_id`` from a JSON or SSE body."""
+    body = text.strip()
+    if body.startswith("{"):
+        candidates = [body]
+    else:
+        candidates = []
+        for event in body.replace("\r\n", "\n").split("\n\n"):
+            data_lines = [
+                line[5:].lstrip() for line in event.splitlines() if line.startswith("data:")
+            ]
+            if data_lines:
+                candidates.append("\n".join(data_lines))
+
+    messages = []
+    for candidate in candidates:
+        try:
+            message = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(message, dict):
+            messages.append(message)
+
+    for message in messages:
+        if message.get("id") == request_id and ("result" in message or "error" in message):
+            return message
+    for message in messages:
+        if "result" in message or "error" in message:
+            return message
+    if messages:
+        return messages[-1]
+    raise MetaAPIError(f"Meta MCP returned an unparseable response: {body[:200]!r}")
+
+
 def _normalize_insight_row(row: dict[str, Any], campaign_id: str) -> dict[str, Any]:
     amount_spent = row.get("amount_spent")
     if "spend" not in row and isinstance(amount_spent, dict):
@@ -142,16 +176,7 @@ class MetaAdsMCPClient:
         if resp.status_code >= 400:
             raise MetaAPIError(f"Meta MCP HTTP {resp.status_code}: {resp.text}")
 
-        # Response may be SSE or JSON
-        body = resp.text.strip()
-        if body.startswith("data:"):
-            # SSE — extract first data line
-            for line in body.splitlines():
-                if line.startswith("data:"):
-                    body = line[5:].strip()
-                    break
-
-        data = json.loads(body)
+        data = _parse_jsonrpc_response(resp.text, payload["id"])
         if "error" in data:
             err = data["error"]
             raise MetaAPIError(f"Meta MCP error {err.get('code')}: {err.get('message')}")

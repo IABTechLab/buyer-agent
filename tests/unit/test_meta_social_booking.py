@@ -531,6 +531,25 @@ class TestPickOptimizationGoal:
     def test_no_valid_list_keeps_requested(self):
         assert _pick_optimization_goal("LINK_CLICKS", {}) == "LINK_CLICKS"
 
+    def test_swap_is_logged(self, caplog):
+        campaign = {
+            "campaign_id": "c1",
+            "valid_optimization_goals": '["REACH"]',
+            "recommended_optimization_goal": "REACH",
+        }
+        with caplog.at_level("WARNING", logger="ad_buyer.flows.deal_booking_flow"):
+            assert _pick_optimization_goal("LINK_CLICKS", campaign) == "REACH"
+
+        assert "optimization_goal LINK_CLICKS is not valid for campaign c1" in caplog.text
+        assert "using Meta's recommended REACH" in caplog.text
+
+    def test_no_swap_logs_nothing(self, caplog):
+        campaign = {"valid_optimization_goals": '["LINK_CLICKS"]'}
+        with caplog.at_level("WARNING", logger="ad_buyer.flows.deal_booking_flow"):
+            assert _pick_optimization_goal("LINK_CLICKS", campaign) == "LINK_CLICKS"
+
+        assert "is not valid for campaign" not in caplog.text
+
     def test_valid_goals_as_json_string_like_live_meta(self):
         campaign = {
             "valid_optimization_goals": '["AD_RECALL_LIFT","IMPRESSIONS","REACH"]',

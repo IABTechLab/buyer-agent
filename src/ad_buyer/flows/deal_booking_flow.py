@@ -188,7 +188,15 @@ def _pick_optimization_goal(requested: str, campaign: dict[str, Any]) -> str:
             valid = None
     if not isinstance(valid, list) or not valid or requested in valid:
         return requested
-    return campaign.get("recommended_optimization_goal") or requested
+    chosen = campaign.get("recommended_optimization_goal") or requested
+    if chosen != requested:
+        logger.warning(
+            "optimization_goal %s is not valid for campaign %s; using Meta's recommended %s",
+            requested,
+            campaign.get("campaign_id", ""),
+            chosen,
+        )
+    return chosen
 
 
 class DealBookingFlow(Flow[BookingState]):

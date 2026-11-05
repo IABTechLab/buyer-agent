@@ -174,9 +174,6 @@ class TestCall:
 
     @pytest.mark.asyncio
     async def test_parses_sse_formatted_response(self):
-        # The parser only recognizes SSE framing when the body itself starts
-        # with "data:" (no leading "event:" line) -- matches what the real
-        # server actually sends for this endpoint.
         client = _client()
         client._client = AsyncMock(spec=httpx.AsyncClient)
         sse_body = 'data: {"result": {"tools": []}}\n\n'
@@ -185,6 +182,53 @@ class TestCall:
         result = await client._call("tools/list", {})
 
         assert result == {"tools": []}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "body",
+        [
+            'event: message\ndata: {"jsonrpc": "2.0", "id": 1, "result": {"ok": true}}\n\n',
+            'event: message\r\ndata: {"jsonrpc": "2.0", "id": 1, "result": {"ok": true}}\r\n\r\n',
+            'data: {"jsonrpc": "2.0", "id": 1,\ndata:  "result": {"ok": true}}\n\n',
+            (
+                'event: message\ndata: {"jsonrpc": "2.0", "method": "notifications/progress"}\n\n'
+                'event: message\ndata: {"jsonrpc": "2.0", "id": 1, "result": {"ok": true}}\n\n'
+            ),
+            ': keep-alive\n\ndata: {"jsonrpc": "2.0", "id": 1, "result": {"ok": true}}\n\n',
+            (
+                'data: {"jsonrpc": "2.0", "id": 99, "result": {"ok": false}}\n\n'
+                'data: {"jsonrpc": "2.0", "id": 1, "result": {"ok": true}}\n\n'
+            ),
+        ],
+        ids=[
+            "event-line",
+            "crlf",
+            "multi-line-data",
+            "notification-first",
+            "comment-first",
+            "other-response-first",
+        ],
+    )
+    async def test_parses_spec_compliant_sse_shapes(self, body):
+        client = _client()
+        client._client = AsyncMock(spec=httpx.AsyncClient)
+        client._client.post.return_value = _response(text=body)
+
+        assert await client._call("tools/list", {}) == {"ok": True}
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "body",
+        ["<html>gateway error</html>", "data: not json\n\n", "", "event: message\n\n"],
+        ids=["html", "sse-not-json", "empty", "sse-no-data"],
+    )
+    async def test_unparseable_body_raises_api_error(self, body):
+        client = _client()
+        client._client = AsyncMock(spec=httpx.AsyncClient)
+        client._client.post.return_value = _response(text=body)
+
+        with pytest.raises(MetaAPIError, match="unparseable response"):
+            await client._call("tools/list", {})
 
 
 class TestCallTool:

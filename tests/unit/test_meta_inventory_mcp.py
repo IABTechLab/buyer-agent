@@ -8,7 +8,10 @@ this tool must keep using the Graph API (MetaAdsAPIClient) for real reach
 data instead of degrading to the budget-based heuristic.
 """
 
+import re
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from ad_buyer.clients.meta_ads_mcp_client import MetaAdsMCPClient
 from ad_buyer.config.settings import settings
@@ -70,8 +73,8 @@ class TestMetaInventoryToolMCP:
         assert "Found 4 Meta placements for social" in result
 
     def test_zero_reach_bounds_fall_back_to_budget_heuristic(self):
-        """(lower + upper) // 2 == 0 is falsy, so estimated_reach must fall
-        back to int(budget * 100), not report zero reach."""
+        """Zero bounds mean no usable audience size, so reach comes from the
+        budget at the benchmark CPM instead of being reported as zero."""
         graph = _graph_client(reach_data={"users_lower_bound": 0, "users_upper_bound": 0})
         with (
             _mcp_configured(),
@@ -80,4 +83,62 @@ class TestMetaInventoryToolMCP:
             result = MetaInventoryTool()._run(channel="social", budget=10)
 
         assert "estimated — API error" not in result
-        assert "Estimated Reach: 250 users" in result  # (10*100) // 4 placements
+        assert "Estimated Reach: 250 users" in result  # $10 / $4 CPM / 2.5 freq / 4 placements
+
+
+def _cpms(result):
+    return [float(m) for m in re.findall(r"Estimated CPM: \$([\d.]+)", result)]
+
+
+def _run_with_bounds(lower, upper, budget, channel="social"):
+    graph = _graph_client(reach_data={"users_lower_bound": lower, "users_upper_bound": upper})
+    with (
+        _mcp_configured(),
+        patch("ad_buyer.tools.research.meta_inventory.MetaAdsAPIClient", return_value=graph),
+    ):
+        return MetaInventoryTool()._run(channel=channel, budget=budget)
+
+
+class TestMetaInventoryEstimates:
+    def test_realistic_audience_keeps_cpm_at_benchmark(self):
+        result = _run_with_bounds(255_200_000, 300_200_000, budget=1500)
+
+        assert "Audience Size: 277,700,000 users" in result
+        assert _cpms(result) == [4.0, 4.0, 4.0, 4.0]
+        assert "Estimated Impressions: 93,750" in result
+        assert "Estimated Reach: 37,500 users" in result
+
+    @pytest.mark.parametrize("budget", [10, 1500, 50_000, 2_000_000])
+    def test_cpm_stays_plausible_across_budgets_at_1e8_scale(self, budget):
+        result = _run_with_bounds(100_000_000, 400_000_000, budget=budget)
+
+        assert all(1.0 <= cpm <= 50.0 for cpm in _cpms(result))
+
+    def test_small_audience_caps_delivery_not_cpm(self):
+        result = _run_with_bounds(1000, 3000, budget=1500)
+
+        assert "Audience Size: 2,000 users" in result
+        assert "Estimated Reach: 500 users" in result
+        assert "Estimated Impressions: 1,250" in result
+        assert "Estimated Cost: $5.00" in result
+        assert _cpms(result) == [4.0, 4.0, 4.0, 4.0]
+
+    def test_graph_error_matches_previous_placeholder_numbers(self):
+        graph = _graph_client(error=RuntimeError("graph down"))
+        with (
+            _mcp_configured(),
+            patch("ad_buyer.tools.research.meta_inventory.MetaAdsAPIClient", return_value=graph),
+        ):
+            result = MetaInventoryTool()._run(channel="social", budget=1500)
+
+        assert "Audience Size" not in result
+        assert "Estimated Reach: 37,500 users" in result
+        assert "Estimated Impressions: 93,750" in result
+        assert "Estimated Cost: $375.00" in result
+        assert _cpms(result) == [4.0, 4.0, 4.0, 4.0]
+
+    def test_zero_budget_reports_zero_delivery(self):
+        result = _run_with_bounds(255_200_000, 300_200_000, budget=0)
+
+        assert "Estimated Impressions: 0" in result
+        assert _cpms(result) == [4.0, 4.0, 4.0, 4.0]

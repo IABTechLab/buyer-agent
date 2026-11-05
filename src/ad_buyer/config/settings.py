@@ -241,9 +241,10 @@ class Settings(BaseSettings):
     # --------------------------------------------------------------------------
     # Meta Ads API integration
     # --------------------------------------------------------------------------
-    # User access token (from Graph API Explorer scoped to your Meta app).
-    # For MCP: must be a real user token (not system user) from an app with
-    # Advanced Access for ads_management and the Ads MCP use case enabled.
+    # Graph API path (META_USE_MCP=false): system user access token from
+    # Business Manager → System Users. MCP path (META_USE_MCP=true): a user
+    # access token (not system user) from an app with Advanced Access for
+    # ads_management and the Ads MCP use case enabled.
     meta_access_token: str = ""
     # Ad account ID (format: act_XXXXXXXXX)
     meta_ad_account_id: str = ""

@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 from ...clients.meta_ads_api_client import MetaAdsAPIClient
 from ...config.settings import settings
 
+_BENCHMARK_CPM = 4.0
+_FREQUENCY = 2.5
+
 _CHANNEL_PLACEMENTS: dict[str, list[str]] = {
     "social": ["FACEBOOK_FEED", "INSTAGRAM_FEED", "INSTAGRAM_REELS", "FACEBOOK_VIDEO_FEEDS"],
     "branding": ["FACEBOOK_VIDEO_FEEDS", "INSTAGRAM_REELS"],
@@ -81,29 +84,38 @@ Returns: Available Meta placements with reach estimates and CPM."""
             reach_data = client.get_reach_estimate(targeting=targeting)
             lower = reach_data.get("users_lower_bound", 0)
             upper = reach_data.get("users_upper_bound", 0)
-            estimated_reach = (lower + upper) // 2 or int(budget * 100)
+            audience_size = (lower + upper) // 2 or None
         except Exception as e:
-            estimated_reach = int(budget * 100)
             return self._format(
-                placements, channel, budget, estimated_reach, note=f"(estimated — API error: {e})"
+                placements, channel, budget, None, note=f"(estimated — API error: {e})"
             )
 
-        return self._format(placements, channel, budget, estimated_reach)
+        return self._format(placements, channel, budget, audience_size)
 
     def _format(
         self,
         placements: list[str],
         channel: str,
         budget: float,
-        estimated_reach: int,
+        audience_size: int | None,
         note: str = "",
     ) -> str:
-        estimated_impressions = int(estimated_reach * 2.5)
-        estimated_cpm = (budget / estimated_impressions * 1000) if estimated_impressions else 4.0
-        per_budget = budget / len(placements)
+        estimated_impressions = int(budget / _BENCHMARK_CPM * 1000)
+        estimated_reach = int(estimated_impressions / _FREQUENCY)
+        if audience_size and estimated_reach > audience_size:
+            estimated_reach = audience_size
+            estimated_impressions = int(audience_size * _FREQUENCY)
+        estimated_cpm = _BENCHMARK_CPM
+        estimated_cost = estimated_impressions / 1000 * estimated_cpm
+        per_budget = estimated_cost / len(placements)
         per_impressions = estimated_impressions // len(placements)
 
-        out = f"Found {len(placements)} Meta placements for {channel} {note}:\n\n"
+        out = f"Found {len(placements)} Meta placements for {channel} {note}:\n"
+        if audience_size:
+            out += (
+                f"Audience Size: {audience_size:,} users (Meta reach estimate for this targeting)\n"
+            )
+        out += "\n"
         for i, p in enumerate(placements, 1):
             pid = f"meta:{p.lower().replace('_', '-')}"
             fmt = "video" if "VIDEO" in p or "REELS" in p else "display"
