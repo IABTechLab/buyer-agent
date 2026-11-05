@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 from ...async_utils import run_async
 from ...booking.pricing import PricingCalculator
 from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
-from ...clients.unified_client import UnifiedClient
+from ...clients.unified_client import (
+    UnifiedClient,
+    apply_product_filters,
+    build_product_filters,
+)
 from ...models.buyer_identity import BuyerContext
 from ...models.sgp import ApprovalRecord, normalize_unknown_policy
 from ...security.prompt_sanitizer import sanitize_untrusted_text
@@ -33,17 +37,17 @@ class DiscoverInventoryInput(BaseModel):
     )
     max_cpm: float | None = Field(
         default=None,
-        description="Maximum CPM price filter",
+        description="Maximum listed CPM; products without a listed price are excluded",
         ge=0,
     )
     min_impressions: int | None = Field(
         default=None,
-        description="Minimum available impressions filter",
+        description="Minimum available impressions; 0 means no minimum",
         ge=0,
     )
     targeting: list[str] | None = Field(
         default=None,
-        description="Required targeting capabilities (e.g., ['household', 'geo', 'demographic'])",
+        description="Targeting capabilities a product must all list (e.g., ['household', 'geo'])",
     )
     publisher: str | None = Field(
         default=None,
@@ -67,13 +71,15 @@ class DiscoverInventoryTool(BaseTool):
     name: str = "discover_inventory"
     description: str = """Discover available advertising inventory from sellers.
 Presents buyer identity to unlock tiered pricing and premium access.
+Filters work with or without a query. They are applied to the products the seller
+returns, and a product that does not list a filtered field is excluded.
 
 Args:
     query: Natural language query (e.g., 'CTV inventory under $25 CPM')
     channel: Channel filter ('ctv', 'display', 'video', 'mobile')
-    max_cpm: Maximum CPM price
-    min_impressions: Minimum available impressions
-    targeting: Required targeting capabilities
+    max_cpm: Maximum listed CPM; unpriced products are excluded
+    min_impressions: Minimum available impressions; 0 means no minimum
+    targeting: Required targeting capabilities; a product must list all of them
     publisher: Specific publisher to search
 
 Returns:
@@ -153,31 +159,19 @@ Returns:
     ) -> str:
         """Discover inventory with buyer identity context."""
         try:
-            # Product filters are separate from identity. list_products cannot apply them.
-            product_filters = {}
-            if channel:
-                product_filters["channel"] = channel
-            if max_cpm is not None:
-                product_filters["maxPrice"] = max_cpm
-            if min_impressions is not None:
-                product_filters["minImpressions"] = min_impressions
-            if targeting:
-                product_filters["targeting"] = targeting
-            if publisher:
-                product_filters["publisher"] = publisher
-
-            if product_filters and not query:
-                return (
-                    "Error discovering inventory: Product filters require a query; "
-                    "list_products does not support filters"
-                )
-
+            product_filters = build_product_filters(
+                channel=channel,
+                max_cpm=max_cpm,
+                min_impressions=min_impressions,
+                targeting=targeting,
+                publisher=publisher,
+            )
             identity_context = self._buyer_context.identity.to_context_dict()
             filters = dict(product_filters)
             filters["buyer_context"] = identity_context
 
             # Execute search
-            if query:
+            if query and query.strip():
                 result = await self._client.search_products(
                     query=query,
                     filters=filters if filters else None,
@@ -188,9 +182,20 @@ Returns:
             if not result.success:
                 return f"Error discovering inventory: {result.error}"
 
-            approvals = await self._fetch_approvals(result.data)
-            filtered, filter_summary = self._apply_enforcement(result.data, approvals)
-            return self._format_results(filtered, identity_context, approvals, filter_summary)
+            products, excluded = result.data, 0
+            if product_filters:
+                # Sellers may ignore the filters, so apply them to what came back.
+                products, excluded = apply_product_filters(result.data, product_filters)
+
+            approvals = await self._fetch_approvals(products)
+            filtered, filter_summary = self._apply_enforcement(products, approvals)
+            output = self._format_results(filtered, identity_context, approvals, filter_summary)
+            if excluded:
+                output += (
+                    f"\nProduct filters excluded {excluded} product(s), "
+                    "including any that do not list a filtered field."
+                )
+            return output
 
         except SGPClientError as e:
             # Reached only when enforcement is on; _fetch_approvals swallows

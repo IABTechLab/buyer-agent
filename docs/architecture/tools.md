@@ -199,12 +199,24 @@ Queries sellers for available inventory with identity-based access and tiered pr
 |-----------|------|----------|-------------|
 | `query` | `str` | no | Natural language query (e.g., "CTV inventory under $25 CPM") |
 | `channel` | `str` | no | Channel filter: `ctv`, `display`, `video`, `mobile` |
-| `max_cpm` | `float` | no | Maximum CPM price |
-| `min_impressions` | `int` | no | Minimum available impressions |
+| `max_cpm` | `float` | no | Maximum listed CPM price |
+| `min_impressions` | `int` | no | Minimum available impressions; `0` means no minimum |
 | `targeting` | `list[str]` | no | Required targeting capabilities |
 | `publisher` | `str` | no | Specific publisher to search |
 
 **Returns:** List of products with tiered pricing based on buyer identity, availability, and targeting capabilities.
+
+A nonblank `query` calls the seller's `search_products`; otherwise the tool calls `list_products`. Sellers may ignore product filters, so the buyer applies them to the returned products in both cases (they are still forwarded to `search_products`). `UnifiedClient.discover_inventory()` does the same. A product passes a filter only if it lists a matching value, and a product that omits the field is excluded:
+
+| Filter | Product field read (first present) | Match |
+|--------|------------------------------------|-------|
+| `channel` | `channel`, `inventory_type` | equal, ignoring case |
+| `max_cpm` | `basePrice`, `price`, `base_cpm` | positive and at most `max_cpm`; listed price before tier discounts |
+| `min_impressions` | `availableImpressions`, `available_impressions` | at least `min_impressions` |
+| `targeting` | `targeting`, `availableTargeting` (a list, or a dict with `capabilities`) | lists every requested capability, ignoring case |
+| `publisher` | `publisherId`, `publisher` | equal, ignoring case |
+
+Blank strings and an empty `targeting` list are not filters. `max_cpm=0` is a cap, so it matches no priced product. The `{"products": [...]}` envelope that seller-agent's MCP `list_products` returns is read as a product list.
 
 ```python
 from ad_buyer.tools.buyer_deals import DiscoverInventoryTool
