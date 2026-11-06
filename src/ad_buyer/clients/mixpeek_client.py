@@ -20,20 +20,22 @@ _DEFAULT_TIMEOUT = 30.0
 # want to avoid or require explicit opt-in for.
 BRAND_UNSAFE_CATEGORIES = frozenset(
     {
+        # IAB Content Taxonomy 3.1 names. Matching is by exact name, so every
+        # entry must be a name that exists in the 3.1 file.
         "Poker and Professional Gambling",
         "Casinos & Gambling",
-        "Casino Games",
+        "Casino and Gambling Video Games",
         "Lotteries and Scratchcards",
         "Sensitive Topics",
-        "Adult Content",
-        "Illegal Content",
-        "Debated Sensitive Social Topics",
+        "Adult & Explicit Sexual Content",
+        "Adult Video Games",
+        "Debated Sensitive Social Issues",
         "Terrorism",
         "Crime",
-        "Drugs",
-        "Tobacco",
+        "Crime & Harmful Acts to Individuals, Society & Human Right Violations",
+        "Illegal Drugs, Tobacco, eCigarettes, Vaping, Alcohol",
         "Arms & Ammunition",
-        "Death & Grieving",
+        "Death, Injury, or Military Conflict",
     }
 )
 
