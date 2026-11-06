@@ -33,18 +33,17 @@ class MetaAdsAPIClient:
         self._base = f"https://graph.facebook.com/{api_version}"
 
     def _get(self, path: str, params: dict | None = None) -> dict:
-        all_params = {"access_token": self._token, **(params or {})}
-        r = httpx.get(f"{self._base}/{path}", params=all_params, timeout=30.0)
+        r = httpx.get(
+            f"{self._base}/{path}",
+            params=params or {},
+            headers={"Authorization": f"Bearer {self._token}"},
+            timeout=30.0,
+        )
         r.raise_for_status()
         return r.json()
 
-    def get_reach_estimate(
-        self,
-        targeting: dict,
-        daily_budget: float,
-        optimize_for: str = "REACH",
-    ) -> dict:
-        """Estimate reach for a targeting + daily budget combination.
+    def get_reach_estimate(self, targeting: dict) -> dict:
+        """Estimate audience reach for a targeting spec.
 
         Args:
             targeting: Graph API targeting spec:
@@ -52,21 +51,16 @@ class MetaAdsAPIClient:
                     "geo_locations": {"countries": ["US"]},
                     "age_min": 25, "age_max": 54
                 }
-            daily_budget: Daily budget in USD (converted to cents internally)
-            optimize_for: REACH | IMPRESSIONS | LINK_CLICKS
 
         Returns:
             { "users_lower_bound": int, "users_upper_bound": int,
               "estimate_ready": bool }
         """
-        return self._get(
+        result = self._get(
             f"{self._account_id}/reachestimate",
-            {
-                "targeting_spec": json.dumps(targeting),
-                "optimize_for": optimize_for,
-                "daily_budget": int(daily_budget * 100),
-            },
+            {"targeting_spec": json.dumps(targeting)},
         )
+        return result.get("data", result)
 
     def get_ad_account(self) -> dict:
         """Get ad account metadata — name, currency, timezone."""

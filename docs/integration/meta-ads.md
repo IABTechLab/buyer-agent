@@ -73,7 +73,7 @@ The `SocialCrew` uses `MetaInventoryTool` to call `GET /{account}/reachestimate`
 - Instagram Feed
 - Facebook Feed
 
-If the reach estimate API returns an error, the tool falls back to static estimates.
+`/reachestimate` returns the total addressable audience for the targeting, not what the budget will deliver, so the tool reports it as **Audience Size** only. Impressions and reach are derived from the budget at a benchmark CPM of $4.00 (frequency 2.5), capped by the audience size; when the audience caps delivery, the estimated cost drops below the budget instead of the CPM falling. If the reach estimate API returns an error, the same budget-based estimate is used without the audience cap.
 
 ### Booking Phase
 
@@ -86,6 +86,12 @@ After the user approves recommendations, the buyer agent creates two resources p
 
 !!! note "Creative step"
     Ad creative creation (step 3) requires an uploaded image asset. This step is skipped — campaign and ad set creation is sufficient to confirm booking.
+
+!!! warning "Budget and bidding differ between the Graph API and MCP paths"
+    - `META_USE_MCP=false` (Graph API): the campaign is created without a budget, and the ad set's `daily_budget` is set to the recommendation's CPM in cents (`bid_amount_cents`). No bid cap is set.
+    - `META_USE_MCP=true` (Ads MCP): the campaign uses campaign budget optimization (CBO) with a daily budget of the recommendation's cost / 30, and the ad set has no budget or bid cap, because CBO campaigns reject ad-set bid fields. The ad-set `optimization_goal` is taken from the goals Meta allows for the campaign objective, falling back to Meta's recommended goal.
+
+    Switching the flag therefore changes how spend is controlled, not just the transport.
 
 ### Objective Mapping
 

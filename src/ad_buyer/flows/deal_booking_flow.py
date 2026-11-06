@@ -178,6 +178,27 @@ def _make_catalog_client(seller_url: str, **kwargs: Any) -> Any:
     return OpenDirectClient(seller_url, **kwargs)
 
 
+def _pick_optimization_goal(requested: str, campaign: dict[str, Any]) -> str:
+    """Return ``requested`` if valid for the campaign's objective, else Meta's recommended goal."""
+    valid = campaign.get("valid_optimization_goals")
+    if isinstance(valid, str):
+        try:
+            valid = json.loads(valid)
+        except ValueError:
+            valid = None
+    if not isinstance(valid, list) or not valid or requested in valid:
+        return requested
+    chosen = campaign.get("recommended_optimization_goal") or requested
+    if chosen != requested:
+        logger.warning(
+            "optimization_goal %s is not valid for campaign %s; using Meta's recommended %s",
+            requested,
+            campaign.get("campaign_id", ""),
+            chosen,
+        )
+    return chosen
+
+
 class DealBookingFlow(Flow[BookingState]):
     """Event-driven flow for end-to-end deal booking workflow.
 
@@ -1427,6 +1448,19 @@ class DealBookingFlow(Flow[BookingState]):
         daily_budget_cents = max(int((rec.cost / 30) * 100), 100)
         bid_amount_cents = max(int((rec.cpm or 5.0) * 100), 1)
         campaign_name = f"{brief.get('name', 'Campaign')} — {rec.product_name}"
+        targeting_countries = geo_locations if isinstance(geo_locations, list) else ["US"]
+
+        if _settings.meta_use_mcp:
+            return run_async(
+                self._book_via_meta_mcp(
+                    campaign_name,
+                    meta_obj,
+                    daily_budget_cents,
+                    rec.product_name,
+                    optimization_goal,
+                    targeting_countries,
+                )
+            )
 
         client = MetaAdsClient(
             access_token=_settings.meta_access_token,
@@ -1450,13 +1484,74 @@ class DealBookingFlow(Flow[BookingState]):
             optimization_goal=optimization_goal,
             billing_event="IMPRESSIONS",
             bid_amount_cents=bid_amount_cents,
-            targeting_countries=geo_locations if isinstance(geo_locations, list) else ["US"],
+            targeting_countries=targeting_countries,
         )
         ad_set_id = adset.get("id") or adset.get("adset_id", "")
         if not ad_set_id:
             raise ValueError(f"Ad set creation failed — no id in response: {adset}")
 
         return campaign_id, ad_set_id, "meta"
+
+    async def _book_via_meta_mcp(
+        self,
+        campaign_name: str,
+        objective: str,
+        daily_budget_cents: int,
+        adset_name: str,
+        optimization_goal: str,
+        targeting_countries: list[str],
+    ) -> tuple[str, str, str]:
+        """MCP counterpart of ``_book_via_meta_api``.
+
+        create_adset() takes no bid_amount here: create_campaign() always
+        creates CBO campaigns, which reject ad-set-level bid fields.
+        """
+        from ..clients.meta_ads_mcp_client import MetaAdsMCPClient
+        from ..config.settings import settings as _settings
+
+        async with MetaAdsMCPClient(
+            access_token=_settings.meta_access_token,
+            ad_account_id=_settings.meta_ad_account_id,
+            page_id=_settings.meta_page_id,
+        ) as client:
+            camp = await client.create_campaign(
+                name=campaign_name,
+                objective=objective,
+                daily_budget_cents=daily_budget_cents,
+            )
+            campaign_id = camp.get("campaign_id") or camp.get("id", "")
+            if not campaign_id:
+                raise ValueError(f"Campaign creation failed — no id in response: {camp}")
+
+            goal = _pick_optimization_goal(optimization_goal, camp)
+            try:
+                adset = await client.create_adset(
+                    campaign_id=campaign_id,
+                    name=f"{adset_name} Ad Set",
+                    optimization_goal=goal,
+                    billing_event="IMPRESSIONS",
+                    targeting_countries=targeting_countries,
+                )
+                ad_set_id = adset.get("ad_set_id") or adset.get("id", "")
+                if not ad_set_id:
+                    raise ValueError(f"Ad set creation failed — no id in response: {adset}")
+            except Exception:
+                try:
+                    await client.delete(campaign_id)
+                except Exception:
+                    logger.exception("Could not delete orphaned Meta campaign %s", campaign_id)
+                raise
+
+            stored_goal = (adset.get("created_ad_set") or {}).get("optimization_goal")
+            if stored_goal and stored_goal != goal:
+                logger.warning(
+                    "Meta stored optimization_goal %s for ad set %s (requested %s)",
+                    stored_goal,
+                    ad_set_id,
+                    goal,
+                )
+
+            return campaign_id, ad_set_id, "meta"
 
     def get_status(self) -> dict[str, Any]:
         """Get current flow status.

@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ad_buyer.flows.deal_booking_flow import DealBookingFlow
+from ad_buyer.flows.deal_booking_flow import DealBookingFlow, _pick_optimization_goal
 from ad_buyer.models.deals import DealResponse, PricingInfo, ProductInfo, TermsInfo
 from ad_buyer.models.flow_state import ExecutionStatus, ProductRecommendation
 from ad_buyer.orchestration.multi_seller import (
@@ -305,6 +305,7 @@ class TestBookViaMetaApi:
             mock_settings.meta_ad_account_id = "act_1"
             mock_settings.meta_page_id = "page_1"
             mock_settings.meta_api_version = "v21.0"
+            mock_settings.meta_use_mcp = False
 
             campaign_id, ad_set_id, kind = flow._book_via_meta_api(rec)
 
@@ -316,3 +317,326 @@ class TestBookViaMetaApi:
         _, kwargs = client.create_campaign.call_args
         assert isinstance(kwargs["daily_budget_cents"], int)
         assert kwargs["daily_budget_cents"] >= 100
+
+    def test_meta_use_mcp_routes_to_mcp_booking(self):
+        """settings.meta_use_mcp=True must bypass the legacy client entirely."""
+        rec = _make_recommendation("meta:feed", "social")
+        flow = _flow_with_approved([rec])
+
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch.object(
+                flow,
+                "_book_via_meta_mcp",
+                new=AsyncMock(return_value=("mcp_camp_1", "mcp_adset_1", "meta")),
+            ) as mcp_mock,
+            patch("ad_buyer.clients.meta_ads_client.MetaAdsClient") as legacy_cls,
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+            mock_settings.meta_use_mcp = True
+
+            result = flow._book_via_meta_api(rec)
+
+        assert result == ("mcp_camp_1", "mcp_adset_1", "meta")
+        mcp_mock.assert_called_once()
+        legacy_cls.assert_not_called()
+
+
+class TestBookViaMetaMcp:
+    """The MCP counterpart of _book_via_meta_api's Graph API calls."""
+
+    @staticmethod
+    def _patch_mcp_client(create_campaign_result, create_adset_result):
+        mock_client = AsyncMock()
+        mock_client.create_campaign.return_value = create_campaign_result
+        mock_client.create_adset.return_value = create_adset_result
+
+        mock_client_cls = MagicMock()
+        mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+        return mock_client, mock_client_cls
+
+    @pytest.mark.asyncio
+    async def test_creates_paused_campaign_and_adset_without_bid_amount(self):
+        rec = _make_recommendation("meta:feed", "social")
+        flow = _flow_with_approved([rec])
+
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "mcp_camp_1", "status": "PAUSED"},
+            create_adset_result={"ad_set_id": "mcp_adset_1", "status": "PAUSED"},
+        )
+
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch("ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient", mock_client_cls),
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+
+            campaign_id, ad_set_id, kind = await flow._book_via_meta_mcp(
+                campaign_name="Test Campaign",
+                objective="OUTCOME_AWARENESS",
+                daily_budget_cents=500,
+                adset_name="Facebook Feed",
+                optimization_goal="REACH",
+                targeting_countries=["US"],
+            )
+
+        assert (campaign_id, ad_set_id, kind) == ("mcp_camp_1", "mcp_adset_1", "meta")
+        mock_client.create_campaign.assert_called_once_with(
+            name="Test Campaign",
+            objective="OUTCOME_AWARENESS",
+            daily_budget_cents=500,
+        )
+        # Regression guard: create_campaign() always creates CBO campaigns,
+        # which reject bid_amount on the ad set (confirmed live against the
+        # real Meta MCP server) — must never be forwarded here.
+        _, adset_kwargs = mock_client.create_adset.call_args
+        assert "bid_amount_cents" not in adset_kwargs
+
+    @pytest.mark.asyncio
+    async def test_missing_campaign_id_raises(self):
+        rec = _make_recommendation("meta:feed", "social")
+        flow = _flow_with_approved([rec])
+
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"error_message": "VALIDATION failure"},
+            create_adset_result={"ad_set_id": "unused"},
+        )
+
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch("ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient", mock_client_cls),
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+
+            with pytest.raises(ValueError, match="Campaign creation failed"):
+                await flow._book_via_meta_mcp(
+                    campaign_name="Test Campaign",
+                    objective="OUTCOME_AWARENESS",
+                    daily_budget_cents=500,
+                    adset_name="Facebook Feed",
+                    optimization_goal="REACH",
+                    targeting_countries=["US"],
+                )
+        mock_client.create_adset.assert_not_called()
+
+    async def _book(self, mock_client_cls, optimization_goal="LINK_CLICKS"):
+        flow = _flow_with_approved([_make_recommendation("meta:feed", "social")])
+        with (
+            patch("ad_buyer.config.settings.settings") as mock_settings,
+            patch("ad_buyer.clients.meta_ads_mcp_client.MetaAdsMCPClient", mock_client_cls),
+        ):
+            mock_settings.meta_access_token = "tok"
+            mock_settings.meta_ad_account_id = "act_1"
+            mock_settings.meta_page_id = "page_1"
+            return await flow._book_via_meta_mcp(
+                campaign_name="Test Campaign",
+                objective="OUTCOME_AWARENESS",
+                daily_budget_cents=500,
+                adset_name="Facebook Feed",
+                optimization_goal=optimization_goal,
+                targeting_countries=["US"],
+            )
+
+    @pytest.mark.asyncio
+    async def test_disallowed_goal_replaced_with_metas_recommended_goal(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={
+                "campaign_id": "c1",
+                "valid_optimization_goals": '["REACH","IMPRESSIONS"]',
+                "recommended_optimization_goal": "REACH",
+            },
+            create_adset_result={"ad_set_id": "s1"},
+        )
+
+        await self._book(mock_client_cls, optimization_goal="LINK_CLICKS")
+
+        assert mock_client.create_adset.call_args.kwargs["optimization_goal"] == "REACH"
+
+    @pytest.mark.asyncio
+    async def test_allowed_goal_kept(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={
+                "campaign_id": "c1",
+                "valid_optimization_goals": ["LINK_CLICKS", "REACH"],
+                "recommended_optimization_goal": "REACH",
+            },
+            create_adset_result={"ad_set_id": "s1"},
+        )
+
+        await self._book(mock_client_cls, optimization_goal="LINK_CLICKS")
+
+        assert mock_client.create_adset.call_args.kwargs["optimization_goal"] == "LINK_CLICKS"
+
+    @pytest.mark.asyncio
+    async def test_adset_failure_deletes_orphaned_campaign(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result=None,
+        )
+        mock_client.create_adset.side_effect = RuntimeError("ad set rejected")
+
+        with pytest.raises(RuntimeError, match="ad set rejected"):
+            await self._book(mock_client_cls)
+
+        mock_client.delete.assert_awaited_once_with("c1")
+
+    @pytest.mark.asyncio
+    async def test_adset_without_id_deletes_orphaned_campaign(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result={"status": "PAUSED"},
+        )
+
+        with pytest.raises(ValueError, match="Ad set creation failed"):
+            await self._book(mock_client_cls)
+
+        mock_client.delete.assert_awaited_once_with("c1")
+
+    @pytest.mark.asyncio
+    async def test_failed_cleanup_still_raises_original_error(self):
+        mock_client, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result=None,
+        )
+        mock_client.create_adset.side_effect = RuntimeError("ad set rejected")
+        mock_client.delete.side_effect = RuntimeError("delete failed")
+
+        with pytest.raises(RuntimeError, match="ad set rejected"):
+            await self._book(mock_client_cls)
+
+    @pytest.mark.asyncio
+    async def test_warns_when_meta_stores_a_different_goal(self, caplog):
+        _, mock_client_cls = self._patch_mcp_client(
+            create_campaign_result={"campaign_id": "c1"},
+            create_adset_result={
+                "ad_set_id": "s1",
+                "created_ad_set": {"optimization_goal": "REACH"},
+            },
+        )
+
+        with caplog.at_level("WARNING", logger="ad_buyer.flows.deal_booking_flow"):
+            await self._book(mock_client_cls, optimization_goal="LINK_CLICKS")
+
+        assert "stored optimization_goal REACH" in caplog.text
+
+
+class TestPickOptimizationGoal:
+    def test_no_valid_list_keeps_requested(self):
+        assert _pick_optimization_goal("LINK_CLICKS", {}) == "LINK_CLICKS"
+
+    def test_swap_is_logged(self, caplog):
+        campaign = {
+            "campaign_id": "c1",
+            "valid_optimization_goals": '["REACH"]',
+            "recommended_optimization_goal": "REACH",
+        }
+        with caplog.at_level("WARNING", logger="ad_buyer.flows.deal_booking_flow"):
+            assert _pick_optimization_goal("LINK_CLICKS", campaign) == "REACH"
+
+        assert "optimization_goal LINK_CLICKS is not valid for campaign c1" in caplog.text
+        assert "using Meta's recommended REACH" in caplog.text
+
+    def test_no_swap_logs_nothing(self, caplog):
+        campaign = {"valid_optimization_goals": '["LINK_CLICKS"]'}
+        with caplog.at_level("WARNING", logger="ad_buyer.flows.deal_booking_flow"):
+            assert _pick_optimization_goal("LINK_CLICKS", campaign) == "LINK_CLICKS"
+
+        assert "is not valid for campaign" not in caplog.text
+
+    def test_valid_goals_as_json_string_like_live_meta(self):
+        campaign = {
+            "valid_optimization_goals": '["AD_RECALL_LIFT","IMPRESSIONS","REACH"]',
+            "recommended_optimization_goal": "REACH",
+        }
+        assert _pick_optimization_goal("LINK_CLICKS", campaign) == "REACH"
+        assert _pick_optimization_goal("IMPRESSIONS", campaign) == "IMPRESSIONS"
+
+    def test_unparseable_valid_goals_keeps_requested(self):
+        campaign = {
+            "valid_optimization_goals": "REACH",
+            "recommended_optimization_goal": "REACH",
+        }
+        assert _pick_optimization_goal("LINK_CLICKS", campaign) == "LINK_CLICKS"
+
+    def test_disallowed_without_recommendation_keeps_requested(self):
+        campaign = {"valid_optimization_goals": ["REACH"]}
+        assert _pick_optimization_goal("LINK_CLICKS", campaign) == "LINK_CLICKS"
+
+
+def _meta_mcp_transport(responder):
+    """Real MetaAdsMCPClient over a mocked HTTP layer that speaks the live
+    server's SSE framing; ``responder(tool_name)`` returns (payload, is_error)."""
+    import json
+
+    import httpx
+
+    import ad_buyer.clients.meta_ads_mcp_client as mcp_module
+
+    def handler(request):
+        body = json.loads(request.content)
+        if body["method"] == "tools/list":
+            result = {"tools": []}
+        else:
+            payload, is_error = responder(body["params"]["name"])
+            text = payload if isinstance(payload, str) else json.dumps(payload)
+            result = {"content": [{"type": "text", "text": text}], "isError": is_error}
+        sse = "data: " + json.dumps({"jsonrpc": "2.0", "id": 1, "result": result})
+        return httpx.Response(200, text=sse, headers={"content-type": "text/event-stream"})
+
+    real_client = httpx.AsyncClient
+    return patch.object(
+        mcp_module.httpx,
+        "AsyncClient",
+        lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw),
+    )
+
+
+class TestMetaMcpBookingOverTransport:
+    """_execute_bookings through the real MCP client, not a mocked client."""
+
+    @staticmethod
+    def _settings():
+        from ad_buyer.config.settings import settings
+
+        return patch.multiple(
+            settings,
+            meta_use_mcp=True,
+            meta_access_token="tok",
+            meta_ad_account_id="act_1",
+            meta_page_id="page_1",
+        )
+
+    def test_books_paused_campaign_and_adset(self):
+        def responder(tool):
+            if tool == "ads_create_campaign":
+                return {"campaign_id": "C1"}, False
+            return {"ad_set_id": "S1"}, False
+
+        flow = _flow_with_approved([_make_recommendation("soc-1", "social")])
+        with self._settings(), _meta_mcp_transport(responder):
+            result = flow._execute_bookings()
+
+        assert result["booked"] == 1
+        line = flow.state.booked_lines[0]
+        assert (line.deal_id, line.line_id, line.booking_status) == ("C1", "S1", "paused")
+
+    def test_meta_tool_error_surfaces_meta_message_in_booking_failure(self):
+        flow = _flow_with_approved([_make_recommendation("soc-1", "social")])
+        with (
+            self._settings(),
+            _meta_mcp_transport(lambda tool: ("Objective is invalid for this account", True)),
+        ):
+            flow._execute_bookings()
+
+        assert flow.state.booked_lines == []
+        assert any(
+            "ads_create_campaign: Objective is invalid for this account" in e
+            for e in flow.state.errors
+        )
