@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ad_buyer.clients.unified_client import UnifiedClient
+from ad_buyer.clients.unified_client import Protocol, UnifiedClient, UnifiedResult
 from ad_buyer.models.buyer_identity import (
     AccessTier,
     BuyerContext,
@@ -119,6 +119,70 @@ def _product(product_id="prod_001", name="Test Product", base_price=20.00, **kwa
     return data
 
 
+# Each case: filter kwargs, fields of a product that matches, fields of one that
+# does not. _filter_case_products adds a third product with no filterable fields,
+# which every filter must exclude.
+PRODUCT_FILTER_CASES = [
+    pytest.param({"channel": "ctv"}, {"channel": "CTV"}, {"channel": "display"}, id="channel"),
+    pytest.param({"max_cpm": 20.0}, {"basePrice": 15.0}, {"basePrice": 25.0}, id="max_cpm"),
+    pytest.param(
+        {"min_impressions": 5_000_000},
+        {"availableImpressions": 6_000_000},
+        {"availableImpressions": 1_000_000},
+        id="min_impressions",
+    ),
+    pytest.param(
+        {"targeting": ["household", "geo"]},
+        {"targeting": ["Household", "geo", "demographic"]},
+        {"targeting": ["household"]},
+        id="targeting",
+    ),
+    pytest.param(
+        {"publisher": "hulu"}, {"publisherId": "hulu"}, {"publisherId": "espn"}, id="publisher"
+    ),
+]
+
+
+def _filter_case_products(match_fields, miss_fields):
+    return [
+        {"id": "match", "name": "Matching Product", **match_fields},
+        {"id": "miss", "name": "Other Product", **miss_fields},
+        {"id": "bare", "name": "Bare Product"},
+    ]
+
+
+# Shape of seller-agent's MCP list_products response (src/ad_seller/interfaces/mcp_server.py).
+SELLER_AGENT_LISTING = {
+    "products": [
+        {
+            "product_id": "ctv-premium",
+            "name": "CTV Premium",
+            "inventory_type": "ctv",
+            "base_cpm": 35.0,
+            "floor_cpm": 28.0,
+            "deal_types": ["preferreddeal"],
+        },
+        {
+            "product_id": "ctv-on-request",
+            "name": "CTV On Request",
+            "inventory_type": "ctv",
+            "base_cpm": None,
+            "floor_cpm": None,
+            "deal_types": ["programmaticguaranteed"],
+        },
+        {
+            "product_id": "display-run",
+            "name": "Display Run",
+            "inventory_type": "display",
+            "base_cpm": 12.0,
+            "floor_cpm": 8.0,
+            "deal_types": ["preferreddeal"],
+        },
+    ],
+    "count": 3,
+}
+
+
 # =============================================================================
 # DiscoverInventoryTool - Extended Tests
 # =============================================================================
@@ -196,6 +260,92 @@ class TestDiscoverInventoryFilters:
         filters = call_kwargs.kwargs.get("filters") or call_kwargs[1].get("filters")
         assert "buyer_context" in filters
         assert filters["buyer_context"]["access_tier"] == "advertiser"
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("filter_kwargs", "match", "miss"), PRODUCT_FILTER_CASES)
+    async def test_discover_applies_filters_to_listed_products(
+        self, mock_client, agency_context, filter_kwargs, match, miss
+    ):
+        """Without a query, the tool lists products and applies the filter to them."""
+        mock_client.list_products.return_value = MagicMock(
+            success=True, data=_filter_case_products(match, miss)
+        )
+        tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
+        result = await tool._arun(**filter_kwargs)
+
+        mock_client.list_products.assert_awaited_once_with()
+        mock_client.search_products.assert_not_called()
+        assert "Matching Product" in result
+        assert "Other Product" not in result
+        assert "Bare Product" not in result
+        assert "Total products found: 1" in result
+        assert "Product filters excluded 2 product(s)" in result
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("filter_kwargs", "match", "miss"), PRODUCT_FILTER_CASES)
+    async def test_discover_applies_filters_the_search_ignored(
+        self, mock_client, agency_context, filter_kwargs, match, miss
+    ):
+        """A seller's search_products may accept only the query (#140)."""
+        mock_client.search_products.return_value = MagicMock(
+            success=True, data=_filter_case_products(match, miss)
+        )
+        tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
+        result = await tool._arun(query="inventory", **filter_kwargs)
+
+        assert "Matching Product" in result
+        assert "Other Product" not in result
+        assert "Bare Product" not in result
+        assert "Total products found: 1" in result
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("query", [None, "", "   "])
+    async def test_discover_blank_query_lists_products(self, mock_client, agency_context, query):
+        mock_client.list_products.return_value = MagicMock(
+            success=True, data=[_product(name="CTV Product", channel="ctv")]
+        )
+        tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
+        result = await tool._arun(query=query, channel="ctv")
+
+        mock_client.list_products.assert_awaited_once_with()
+        mock_client.search_products.assert_not_called()
+        assert "CTV Product" in result
+
+    @pytest.mark.asyncio
+    async def test_discover_zero_min_impressions_is_no_minimum(self, mock_client, agency_context):
+        mock_client.list_products.return_value = MagicMock(
+            success=True, data=[{"id": "bare", "name": "Bare Product"}]
+        )
+        tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
+        result = await tool._arun(min_impressions=0)
+
+        assert "Bare Product" in result
+        assert "Product filters excluded" not in result
+
+    @pytest.mark.asyncio
+    async def test_discover_zero_max_cpm_is_a_cap(self, mock_client, agency_context):
+        mock_client.search_products.return_value = MagicMock(
+            success=True, data=[_product(name="Ten Dollar Product", base_price=10.0)]
+        )
+        tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
+        result = await tool._arun(query="inventory", max_cpm=0)
+
+        filters = mock_client.search_products.call_args.kwargs["filters"]
+        assert filters["maxPrice"] == 0
+        assert "Ten Dollar Product" not in result
+        assert "No inventory found" in result
+        assert "Product filters excluded 1 product(s)" in result
+
+    @pytest.mark.asyncio
+    async def test_discover_filters_seller_agent_listing(self, mock_client, agency_context):
+        mock_client.list_products.return_value = MagicMock(success=True, data=SELLER_AGENT_LISTING)
+        tool = DiscoverInventoryTool(client=mock_client, buyer_context=agency_context)
+        result = await tool._arun(channel="ctv", max_cpm=40.0)
+
+        assert "CTV Premium" in result
+        assert "CTV On Request" not in result
+        assert "Display Run" not in result
+        assert "Total products found: 1" in result
 
 
 class TestDiscoverInventoryFormatting:
@@ -885,6 +1035,178 @@ class TestDealResponseModel:
 
 class TestUnifiedClientBuyerDealMethods:
     """Test buyer deal-specific methods on UnifiedClient."""
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_searches_with_query_and_filters(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        matching = {
+            "id": "ctv-1",
+            "channel": "ctv",
+            "basePrice": 25.0,
+            "availableImpressions": 5000,
+            "targeting": ["household", "geo"],
+            "publisherId": "example.test",
+        }
+        too_expensive = {**matching, "id": "ctv-2", "basePrice": 45.0}
+        client.call_tool = AsyncMock(
+            return_value=UnifiedResult(data=[matching, too_expensive], protocol=Protocol.A2A)
+        )
+
+        result = await client.discover_inventory(
+            query="CTV inventory",
+            channel="ctv",
+            max_cpm=30,
+            min_impressions=1000,
+            targeting=["household"],
+            publisher="example.test",
+            protocol=Protocol.A2A,
+        )
+
+        assert result.success
+        assert result.protocol is Protocol.A2A
+        assert result.data == [matching]
+        client.call_tool.assert_awaited_once_with(
+            "search_products",
+            {
+                "query": "CTV inventory",
+                "filters": {
+                    **agency_identity.to_context_dict(),
+                    "channel": "ctv",
+                    "maxPrice": 30,
+                    "minImpressions": 1000,
+                    "targeting": ["household"],
+                    "publisher": "example.test",
+                },
+            },
+            protocol=Protocol.A2A,
+        )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("filter_kwargs", "match", "miss"), PRODUCT_FILTER_CASES)
+    async def test_discover_inventory_lists_and_filters_without_query(
+        self, agency_identity, filter_kwargs, match, miss
+    ):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        products = _filter_case_products(match, miss)
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=products))
+
+        result = await client.discover_inventory(**filter_kwargs)
+
+        client.call_tool.assert_awaited_once_with("list_products", protocol=None)
+        assert result.data == [products[0]]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("filter_kwargs", "match", "miss"), PRODUCT_FILTER_CASES)
+    async def test_discover_inventory_filters_what_search_returns(
+        self, agency_identity, filter_kwargs, match, miss
+    ):
+        """A seller's search_products may accept only the query (#140)."""
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        products = _filter_case_products(match, miss)
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=products))
+
+        result = await client.discover_inventory(query="inventory", **filter_kwargs)
+
+        assert client.call_tool.await_args.args[0] == "search_products"
+        assert result.data == [products[0]]
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_filters_a_single_product_response(self, agency_identity):
+        """The hosted agentic-direct server answers search_products with one product."""
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        product = {"id": "mock-1", "name": "Mock Product", "basePrice": 10.0}
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=product))
+
+        over_cap = await client.discover_inventory(query="inventory", max_cpm=1.0)
+        under_cap = await client.discover_inventory(query="inventory", max_cpm=20.0)
+
+        assert over_cap.data == []
+        assert under_cap.data == [product]
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_filters_seller_agent_listing(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=SELLER_AGENT_LISTING))
+
+        result = await client.discover_inventory(channel="ctv", max_cpm=40.0)
+
+        client.call_tool.assert_awaited_once_with("list_products", protocol=None)
+        assert [p["product_id"] for p in result.data] == ["ctv-premium"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("query", [None, "", "   "])
+    async def test_discover_inventory_blank_query_lists_products(self, agency_identity, query):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        product = {"id": "ctv-1", "channel": "ctv"}
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=[product]))
+
+        result = await client.discover_inventory(query=query, channel="ctv")
+
+        client.call_tool.assert_awaited_once_with("list_products", protocol=None)
+        assert result.data == [product]
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_zero_min_impressions_is_no_minimum(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        bare = {"id": "bare"}
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=[bare]))
+
+        listed = await client.discover_inventory(min_impressions=0)
+        await client.discover_inventory(query="inventory", min_impressions=0)
+
+        assert listed.data == [bare]
+        assert client.call_tool.await_args.args == (
+            "search_products",
+            {"query": "inventory", "filters": agency_identity.to_context_dict()},
+        )
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_zero_max_cpm_is_a_cap(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        client.call_tool = AsyncMock(
+            return_value=UnifiedResult(data=[{"id": "ten", "basePrice": 10.0}])
+        )
+
+        listed = await client.discover_inventory(max_cpm=0)
+        searched = await client.discover_inventory(query="inventory", max_cpm=0)
+
+        assert listed.data == []
+        assert searched.data == []
+        assert client.call_tool.await_args.args[1]["filters"]["maxPrice"] == 0
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_returns_a_failed_call_unchanged(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        failed = UnifiedResult(success=False, data="Unknown tool: search_products")
+        client.call_tool = AsyncMock(return_value=failed)
+
+        result = await client.discover_inventory(query="inventory", channel="ctv")
+
+        assert result is failed
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_query_without_product_filters_searches(self, agency_identity):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=[]))
+
+        await client.discover_inventory(query="CTV inventory")
+
+        client.call_tool.assert_awaited_once_with(
+            "search_products",
+            {"query": "CTV inventory", "filters": agency_identity.to_context_dict()},
+            protocol=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_discover_inventory_without_query_or_product_filters_lists_products(
+        self, agency_identity
+    ):
+        client = UnifiedClient(base_url="http://localhost:8080", buyer_identity=agency_identity)
+        client.call_tool = AsyncMock(return_value=UnifiedResult(data=[]))
+
+        await client.discover_inventory()
+
+        client.call_tool.assert_awaited_once_with("list_products", protocol=None)
 
     def test_set_buyer_identity(self, advertiser_identity):
         """set_buyer_identity should store the identity."""

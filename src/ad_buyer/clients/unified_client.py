@@ -3,7 +3,7 @@
 
 """Unified client for IAB agentic-direct server supporting both MCP and A2A protocols."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -58,6 +58,131 @@ class UnifiedResult:
             protocol=Protocol.A2A,
             raw=response.raw,
         )
+
+
+# Product fields the discovery filters read; the first key present wins, as in
+# DiscoverInventoryTool's display. inventory_type and base_cpm are what
+# seller-agent's MCP list_products returns.
+_CHANNEL_KEYS = ("channel", "inventory_type")
+_PRICE_KEYS = ("basePrice", "price", "base_cpm")
+_IMPRESSIONS_KEYS = ("availableImpressions", "available_impressions")
+_TARGETING_KEYS = ("targeting", "availableTargeting")
+_PUBLISHER_KEYS = ("publisherId", "publisher")
+
+
+def build_product_filters(
+    channel: str | None = None,
+    max_cpm: float | None = None,
+    min_impressions: int | None = None,
+    targeting: list[str] | None = None,
+    publisher: str | None = None,
+) -> dict[str, Any]:
+    """Collect the product filters that are set, keyed as sent to search_products.
+
+    Blank strings, an empty targeting list and min_impressions=0 (no minimum)
+    are not filters. max_cpm=0 is a filter.
+    """
+    if isinstance(channel, str):
+        channel = channel.strip()
+    if isinstance(publisher, str):
+        publisher = publisher.strip()
+
+    filters: dict[str, Any] = {}
+    if channel:
+        filters["channel"] = channel
+    if max_cpm is not None:
+        filters["maxPrice"] = max_cpm
+    if min_impressions:
+        filters["minImpressions"] = min_impressions
+    if targeting:
+        filters["targeting"] = targeting
+    if publisher:
+        filters["publisher"] = publisher
+    return filters
+
+
+def apply_product_filters(data: Any, filters: dict[str, Any]) -> tuple[list[Any], int]:
+    """Keep the products that satisfy every filter.
+
+    ``data`` is a product list, a single product dict, or seller-agent's
+    ``{"products": [...]}`` envelope. A product passes a filter only if it lists
+    a value that satisfies it, so products missing the field and entries that
+    are not dicts are excluded.
+
+    Returns:
+        The matching products and the number excluded.
+    """
+    if isinstance(data, dict) and isinstance(data.get("products"), list):
+        products = data["products"]
+    elif isinstance(data, list):
+        products = data
+    elif data:
+        products = [data]
+    else:
+        products = []
+
+    checks = [(_PRODUCT_FILTER_CHECKS[key], value) for key, value in filters.items()]
+    kept = [
+        product
+        for product in products
+        if isinstance(product, dict) and all(check(product, value) for check, value in checks)
+    ]
+    return kept, len(products) - len(kept)
+
+
+def _product_value(product: dict, keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in product:
+            return product[key]
+    return None
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _same_text(value: Any, wanted: Any) -> bool:
+    return isinstance(value, str) and value.strip().lower() == str(wanted).strip().lower()
+
+
+def _matches_channel(product: dict, channel: str) -> bool:
+    return _same_text(_product_value(product, _CHANNEL_KEYS), channel)
+
+
+def _within_max_cpm(product: dict, max_cpm: float) -> bool:
+    # Listed price, before tier discounts. A missing or non-positive price is
+    # "pricing unavailable", as DiscoverInventoryTool displays it.
+    price = _product_value(product, _PRICE_KEYS)
+    return _is_number(price) and 0 < price <= max_cpm
+
+
+def _meets_min_impressions(product: dict, min_impressions: int) -> bool:
+    available = _product_value(product, _IMPRESSIONS_KEYS)
+    return _is_number(available) and available >= min_impressions
+
+
+def _offers_targeting(product: dict, required: list[str]) -> bool:
+    offered = _product_value(product, _TARGETING_KEYS)
+    if isinstance(offered, dict):
+        # OpenDirect Product.targeting lists them under "capabilities".
+        offered = offered.get("capabilities")
+    if not isinstance(offered, list):
+        return False
+    available = {str(item).strip().lower() for item in offered}
+    return all(str(item).strip().lower() in available for item in required)
+
+
+def _matches_publisher(product: dict, publisher: str) -> bool:
+    return _same_text(_product_value(product, _PUBLISHER_KEYS), publisher)
+
+
+_PRODUCT_FILTER_CHECKS = {
+    "channel": _matches_channel,
+    "maxPrice": _within_max_cpm,
+    "minImpressions": _meets_min_impressions,
+    "targeting": _offers_targeting,
+    "publisher": _matches_publisher,
+}
 
 
 class UnifiedClient:
@@ -473,40 +598,44 @@ class UnifiedClient:
         Queries sellers for available inventory, presenting the buyer's
         identity to unlock tiered pricing and premium inventory access.
 
+        A nonblank query calls search_products; otherwise list_products. Product
+        filters are forwarded to search_products and also applied here to the
+        returned products, because sellers may ignore them. A product passes
+        only if it lists a matching value; products missing a filtered field
+        are excluded.
+
         Args:
             query: Natural language query (e.g., 'CTV inventory under $25 CPM')
             channel: Channel filter ('ctv', 'display', 'video', 'mobile')
-            max_cpm: Maximum CPM price filter
-            min_impressions: Minimum available impressions filter
-            targeting: Required targeting capabilities
+            max_cpm: Maximum listed CPM; unpriced products are excluded. 0 is a cap.
+            min_impressions: Minimum available impressions; 0 means no minimum
+            targeting: Required targeting capabilities; the product must list all
             publisher: Specific publisher to search
             protocol: Protocol to use for the request
 
         Returns:
-            UnifiedResult with discovered inventory
+            UnifiedResult with discovered inventory. With product filters set and
+            a successful call, ``data`` is the list of matching product dicts.
         """
-        # Build filters including identity context
-        filters = self._get_identity_context()
-        if channel:
-            filters["channel"] = channel
-        if max_cpm is not None:
-            filters["maxPrice"] = max_cpm
-        if min_impressions is not None:
-            filters["minImpressions"] = min_impressions
-        if targeting:
-            filters["targeting"] = targeting
-        if publisher:
-            filters["publisher"] = publisher
+        product_filters = build_product_filters(
+            channel=channel,
+            max_cpm=max_cpm,
+            min_impressions=min_impressions,
+            targeting=targeting,
+            publisher=publisher,
+        )
 
-        args = {"filters": filters}
-        if query:
-            args["query"] = query
-
-        # Try search_products first, fall back to list_products
-        if query:
-            return await self.call_tool("search_products", args, protocol=protocol)
+        if query and query.strip():
+            filters = {**self._get_identity_context(), **product_filters}
+            args = {"query": query, "filters": filters}
+            result = await self.call_tool("search_products", args, protocol=protocol)
         else:
-            return await self.call_tool("list_products", protocol=protocol)
+            result = await self.call_tool("list_products", protocol=protocol)
+
+        if not product_filters or not result.success:
+            return result
+        products, _ = apply_product_filters(result.data, product_filters)
+        return replace(result, data=products)
 
     async def get_pricing(
         self,
