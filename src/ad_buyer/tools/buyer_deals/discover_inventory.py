@@ -12,7 +12,11 @@ from pydantic import BaseModel, Field
 from ...async_utils import run_async
 from ...booking.pricing import PricingCalculator
 from ...clients.sgp_client import SGPClient, SGPClientError, extract_product_domain
-from ...clients.unified_client import UnifiedClient
+from ...clients.unified_client import (
+    UnifiedClient,
+    apply_product_filters,
+    build_product_filters,
+)
 from ...models.buyer_identity import BuyerContext
 from ...models.sgp import ApprovalRecord, normalize_unknown_policy
 from ...security.prompt_sanitizer import sanitize_untrusted_text
@@ -29,21 +33,21 @@ class DiscoverInventoryInput(BaseModel):
     )
     channel: str | None = Field(
         default=None,
-        description="Channel filter (e.g., 'ctv', 'display', 'video', 'mobile')",
+        description="Channel filter (e.g., 'ctv', 'display', 'video', 'mobile'/'mobile_app')",
     )
     max_cpm: float | None = Field(
         default=None,
-        description="Maximum CPM price filter",
+        description="Maximum listed CPM; products without a listed price are excluded",
         ge=0,
     )
     min_impressions: int | None = Field(
         default=None,
-        description="Minimum available impressions filter",
+        description="Minimum available impressions; 0 means no minimum",
         ge=0,
     )
     targeting: list[str] | None = Field(
         default=None,
-        description="Required targeting capabilities (e.g., ['household', 'geo', 'demographic'])",
+        description="Targeting capabilities a product must all list (e.g., ['household', 'geo'])",
     )
     publisher: str | None = Field(
         default=None,
@@ -67,13 +71,18 @@ class DiscoverInventoryTool(BaseTool):
     name: str = "discover_inventory"
     description: str = """Discover available advertising inventory from sellers.
 Presents buyer identity to unlock tiered pricing and premium access.
+Filters work with or without a query. They are applied to the products the seller
+returns, and a product that does not list a filtered field is excluded.
+The result reports how many products were excluded and could not be checked.
+Unsupported responses are reported as unfilterable. A query requires the seller
+to implement search_products; use a filter-only listing otherwise.
 
 Args:
     query: Natural language query (e.g., 'CTV inventory under $25 CPM')
     channel: Channel filter ('ctv', 'display', 'video', 'mobile')
-    max_cpm: Maximum CPM price
-    min_impressions: Minimum available impressions
-    targeting: Required targeting capabilities
+    max_cpm: Maximum listed CPM; unpriced products are excluded
+    min_impressions: Minimum available impressions; 0 means no minimum
+    targeting: Required targeting capabilities; a product must list all of them
     publisher: Specific publisher to search
 
 Returns:
@@ -153,25 +162,19 @@ Returns:
     ) -> str:
         """Discover inventory with buyer identity context."""
         try:
-            # Build filters
-            filters = {}
-            if channel:
-                filters["channel"] = channel
-            if max_cpm is not None:
-                filters["maxPrice"] = max_cpm
-            if min_impressions is not None:
-                filters["minImpressions"] = min_impressions
-            if targeting:
-                filters["targeting"] = targeting
-            if publisher:
-                filters["publisher"] = publisher
-
-            # Add identity context to filters
+            product_filters = build_product_filters(
+                channel=channel,
+                max_cpm=max_cpm,
+                min_impressions=min_impressions,
+                targeting=targeting,
+                publisher=publisher,
+            )
             identity_context = self._buyer_context.identity.to_context_dict()
+            filters = dict(product_filters)
             filters["buyer_context"] = identity_context
 
             # Execute search
-            if query:
+            if query and query.strip():
                 result = await self._client.search_products(
                     query=query,
                     filters=filters if filters else None,
@@ -182,9 +185,23 @@ Returns:
             if not result.success:
                 return f"Error discovering inventory: {result.error}"
 
-            approvals = await self._fetch_approvals(result.data)
-            filtered, filter_summary = self._apply_enforcement(result.data, approvals)
-            return self._format_results(filtered, identity_context, approvals, filter_summary)
+            products, summary = result.data, None
+            if product_filters:
+                # Sellers may ignore the filters, so apply them to what came back.
+                products, summary = apply_product_filters(result.data, product_filters)
+                if not summary.applied:
+                    return summary.note
+
+            approvals = await self._fetch_approvals(products)
+            filtered, filter_summary = self._apply_enforcement(products, approvals)
+            output = self._format_results(filtered, identity_context, approvals, filter_summary)
+            if summary and summary.excluded_count:
+                output += (
+                    f"\nProduct filters excluded {summary.excluded_count} product(s); "
+                    f"{summary.unchecked_count} could not be checked because a filtered "
+                    "field was missing or unusable."
+                )
+            return output
 
         except SGPClientError as e:
             # Reached only when enforcement is on; _fetch_approvals swallows
