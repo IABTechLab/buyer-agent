@@ -35,7 +35,6 @@ from ..models.state_machine import (
 from .schema import (
     APPROVAL_REQUESTS_INDEXES,
     APPROVAL_REQUESTS_TABLE,
-    initialize_schema,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,6 +57,7 @@ class CampaignStore:
     """
 
     def __init__(self, database_url: str) -> None:
+        self._database_url = database_url
         self._db_path = self._parse_url(database_url)
         self._lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
@@ -68,13 +68,17 @@ class CampaignStore:
 
     def connect(self) -> None:
         """Open the database connection, set pragmas, and initialize schema."""
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.execute("PRAGMA busy_timeout=5000")
-        initialize_schema(self._conn)
-        self._create_campaign_events_table()
+        from .connection_factory import (
+            apply_sqlite_pragmas,
+            initialize_schema_for,
+            is_postgres_url,
+            open_connection,
+        )
+
+        self._conn = open_connection(self._database_url, check_same_thread=False)
+        apply_sqlite_pragmas(self._conn, self._database_url)
+        initialize_schema_for(self._conn, self._database_url)
+        self._create_campaign_events_table(is_postgres=is_postgres_url(self._database_url))
 
     def disconnect(self) -> None:
         """Close the database connection."""
@@ -92,9 +96,13 @@ class CampaignStore:
             return url[len("sqlite:///") :]
         return url
 
-    def _create_campaign_events_table(self) -> None:
-        """Create the campaign_events table if it doesn't exist."""
-        self._conn.execute("""
+    def _create_campaign_events_table(self, is_postgres: bool = False) -> None:
+        """Create the campaign_events table if it doesn't exist.
+
+        On Postgres the inline SQLite DDL is translated via the shared
+        ``schema_pg._to_postgres`` helper (SQLite path unchanged).
+        """
+        table_ddl = """
             CREATE TABLE IF NOT EXISTS campaign_events (
                 event_id        TEXT PRIMARY KEY,
                 campaign_id     TEXT NOT NULL,
@@ -105,14 +113,21 @@ class CampaignStore:
                 payload         TEXT DEFAULT '{}',
                 FOREIGN KEY (campaign_id) REFERENCES campaigns(campaign_id)
             )
-        """)
-        self._conn.execute(
+        """
+        index_ddls = [
             "CREATE INDEX IF NOT EXISTS idx_campaign_events_campaign_id "
-            "ON campaign_events(campaign_id)"
-        )
-        self._conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_campaign_events_timestamp ON campaign_events(timestamp)"
-        )
+            "ON campaign_events(campaign_id)",
+            "CREATE INDEX IF NOT EXISTS idx_campaign_events_timestamp "
+            "ON campaign_events(timestamp)",
+        ]
+        if is_postgres:
+            from .schema_pg import _to_postgres, _translate_all
+
+            table_ddl = _to_postgres(table_ddl)
+            index_ddls = _translate_all(index_ddls)
+        self._conn.execute(table_ddl)
+        for idx in index_ddls:
+            self._conn.execute(idx)
         self._conn.commit()
 
     def _emit_event(
