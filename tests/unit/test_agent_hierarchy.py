@@ -43,6 +43,22 @@ from ad_buyer.crews.channel_crews import (
     _create_research_tools,
     _format_audience_context,
 )
+from ad_buyer.llm import _model_accepts_temperature
+
+
+def _expected_temp(tuned: float) -> float | None:
+    """Temperature an agent's LLM should carry for the configured model.
+
+    Agents pass a tuned temperature to ``build_llm``, but newer Claude families
+    (e.g. claude-sonnet-5, claude-opus-4-7+) REJECT sampling params, so
+    ``build_llm`` omits temperature for them and the resulting ``LLM`` reports
+    ``temperature is None``. These tests must therefore assert the tuned value
+    only when the *configured* model accepts temperature, and ``None`` when it
+    does not — otherwise they encode a pre-Bedrock-migration assumption and
+    fail on the default AgentCore model. Ties the assertion to the same
+    predicate the production factory uses.
+    """
+    return tuned if _model_accepts_temperature(settings.manager_llm_model) else None
 
 
 # Agent constructors now honor settings.crew_memory_enabled
@@ -51,6 +67,25 @@ from ad_buyer.crews.channel_crews import (
 @pytest.fixture(autouse=True)
 def _force_memory_enabled(monkeypatch):
     monkeypatch.setattr(settings, "crew_memory_enabled", True)
+
+
+# The default model is now Claude Sonnet 5, a tier on which Anthropic rejects
+# the `temperature` parameter (build_llm therefore omits it, leaving
+# llm.temperature is None). This module's assertions are about per-agent
+# temperature *wiring* and the L3<L2 ordering, not about the default model
+# choice, so pin a temperature-ACCEPTING model here to keep those assertions
+# meaningful. (See tests/unit/test_llm.py for the temperature-omission behavior
+# of the Sonnet 5 / Opus 4.7+ / Fable / Mythos families.)
+@pytest.fixture(autouse=True)
+def _pin_temperature_accepting_model(monkeypatch):
+    from ad_buyer.config import get_settings
+
+    accepting = "anthropic/claude-sonnet-4-5-20250929"
+    monkeypatch.setattr(settings, "default_llm_model", accepting)
+    monkeypatch.setattr(settings, "manager_llm_model", accepting)
+    cached = get_settings()
+    monkeypatch.setattr(cached, "default_llm_model", accepting, raising=False)
+    monkeypatch.setattr(cached, "manager_llm_model", accepting, raising=False)
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +255,7 @@ class TestPortfolioManagerAgent:
     def test_llm_temperature_conservative(self):
         """Manager agent uses conservative temperature for strategic decisions."""
         agent = create_portfolio_manager(verbose=False)
-        assert agent.llm.temperature == 0.3
+        assert agent.llm.temperature == _expected_temp(0.3)
 
 
 # ===========================================================================
@@ -263,7 +298,7 @@ class TestBrandingAgent:
 
     def test_llm_temperature(self):
         agent = create_branding_agent(verbose=False)
-        assert agent.llm.temperature == 0.5
+        assert agent.llm.temperature == _expected_temp(0.5)
 
 
 class TestCTVAgent:
@@ -293,7 +328,7 @@ class TestCTVAgent:
 
     def test_llm_temperature(self):
         agent = create_ctv_agent(verbose=False)
-        assert agent.llm.temperature == 0.5
+        assert agent.llm.temperature == _expected_temp(0.5)
 
 
 class TestMobileAppAgent:
@@ -319,7 +354,7 @@ class TestMobileAppAgent:
 
     def test_llm_temperature(self):
         agent = create_mobile_app_agent(verbose=False)
-        assert agent.llm.temperature == 0.5
+        assert agent.llm.temperature == _expected_temp(0.5)
 
 
 class TestPerformanceAgent:
@@ -345,7 +380,7 @@ class TestPerformanceAgent:
 
     def test_llm_temperature(self):
         agent = create_performance_agent(verbose=False)
-        assert agent.llm.temperature == 0.5
+        assert agent.llm.temperature == _expected_temp(0.5)
 
 
 class TestBuyerDealSpecialistAgent:
@@ -399,7 +434,7 @@ class TestBuyerDealSpecialistAgent:
 
     def test_llm_temperature(self):
         agent = create_buyer_deal_specialist_agent(verbose=False)
-        assert agent.llm.temperature == 0.5
+        assert agent.llm.temperature == _expected_temp(0.5)
 
 
 # ===========================================================================
@@ -432,7 +467,7 @@ class TestResearchAgent:
     def test_low_temperature(self):
         """Research agent uses low temperature for factual analysis."""
         agent = create_research_agent(verbose=False)
-        assert agent.llm.temperature == 0.2
+        assert agent.llm.temperature == _expected_temp(0.2)
 
     def test_tools_injection(self, mock_tools):
         agent = create_research_agent(tools=mock_tools, verbose=False)
@@ -467,7 +502,7 @@ class TestExecutionAgent:
     def test_very_low_temperature(self):
         """Execution agent uses very low temperature -- precision matters."""
         agent = create_execution_agent(verbose=False)
-        assert agent.llm.temperature == 0.1
+        assert agent.llm.temperature == _expected_temp(0.1)
 
     def test_backstory_mentions_booking_states(self):
         """Execution agent should know the booking lifecycle states."""
@@ -502,7 +537,7 @@ class TestReportingAgent:
 
     def test_low_temperature(self):
         agent = create_reporting_agent(verbose=False)
-        assert agent.llm.temperature == 0.2
+        assert agent.llm.temperature == _expected_temp(0.2)
 
     def test_backstory_mentions_key_metrics(self):
         """Should reference advertising KPIs."""
@@ -555,7 +590,7 @@ class TestAudiencePlannerAgent:
     def test_llm_temperature(self):
         """Balanced temperature for strategic audience recommendations."""
         agent = create_audience_planner_agent(verbose=False)
-        assert agent.llm.temperature == 0.3
+        assert agent.llm.temperature == _expected_temp(0.3)
 
     def test_default_no_tools(self):
         agent = create_audience_planner_agent(verbose=False)
@@ -665,6 +700,16 @@ class TestHierarchyInvariants:
         """L3 operational agents should generally use lower temperatures (more precise)."""
         l2_temps = [factory(verbose=False).llm.temperature for factory in self.L2_FACTORIES]
         l3_temps = [factory(verbose=False).llm.temperature for factory in self.L3_FACTORIES]
+        # On temperature-rejecting Claude families build_llm omits temperature
+        # (all None), so there is no ordering to assert — the tuned values are
+        # never sent. Only compare when the configured model carries them.
+        if any(t is None for t in l2_temps + l3_temps):
+            import pytest
+
+            pytest.skip(
+                f"Configured model {settings.manager_llm_model!r} rejects temperature; "
+                "no tuned values to order."
+            )
         avg_l2 = sum(l2_temps) / len(l2_temps)
         avg_l3 = sum(l3_temps) / len(l3_temps)
         assert avg_l3 <= avg_l2, f"L3 avg temp ({avg_l3}) should be <= L2 avg temp ({avg_l2})"

@@ -96,10 +96,13 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
     from ad_buyer.flows.deal_booking_flow import DealBookingFlow
     from ad_buyer.models.flow_state import BookingState
 
-    # Override buyer settings to use Bedrock instead of Anthropic.
+    # Override buyer settings to use the Bedrock-hosted model. Deploy.sh sets
+    # DEFAULT_LLM_MODEL plus ANTHROPIC_COMPATIBLE_LLM_API_BASE_URL so this
+    # routes through the Anthropic Messages endpoint (no Converse patch). The
+    # fallback is a current-generation, Messages-supported Claude id.
     bedrock_model = os.environ.get(
         "DEFAULT_LLM_MODEL",
-        "bedrock/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "us.anthropic.claude-sonnet-5-v1:0",
     )
     from ad_buyer.config.settings import settings as buyer_settings
 
@@ -124,10 +127,47 @@ def run_campaign_plan(prompt: str, brief: dict[str, Any] | None = None) -> dict[
 
     logger.info("Campaign brief: %s", json.dumps(brief, default=str))
 
-    # Create client — dummy URL since seller is a separate AgentCore runtime
+    # Seller client selection:
+    #  - Seller advertises OAuth (AWS Bedrock AgentCore CUSTOM_JWT deployment
+    #    path): the seller runtime enforces a JWT authorizer, so SigV4/boto3 is
+    #    rejected. Route through the transport selector, which builds the HTTPS
+    #    invocations URL and attaches a client_credentials Bearer JWT
+    #    (SELLER_TOKEN_ENDPOINT + SELLER_INVOKE_SCOPE come from the discovered
+    #    registry record's `authentication` object; passed here via env for the
+    #    deployed runtime). Works for a seller given by ARN or by https:// URL.
+    #  - ARN without OAuth (same-account/dev deployed seller): the SigV4
+    #    AgentCoreSellerProxy over InvokeAgentRuntime.
+    #  - Plain HTTP URL (local dev): the ordinary OpenDirectClient.
     seller_url = os.environ.get("SELLER_AGENT_URL", "http://localhost:8001")
-    client_url = "http://localhost:9999" if seller_url.startswith("arn:") else seller_url
-    client = OpenDirectClient(base_url=client_url)
+    mcp_arn = os.environ.get("SELLER_MCP_RUNTIME_ARN", "")
+    seller_token_endpoint = os.environ.get("SELLER_TOKEN_ENDPOINT", "")
+    seller_scope = os.environ.get("SELLER_INVOKE_SCOPE", "")
+    seller_endpoint = mcp_arn or seller_url
+
+    if seller_token_endpoint:
+        # CUSTOM_JWT seller → JWT/HTTPS transport (arn: is converted to the
+        # HTTPS invocations URL inside the selector; https:// used as-is).
+        from ad_buyer.registry.transport_selector import select_seller_client
+
+        client = select_seller_client(
+            seller_endpoint,
+            authentication={
+                "token_endpoint": seller_token_endpoint,
+                "scope": seller_scope,
+            },
+            region=os.environ.get("AWS_REGION"),
+        )
+    elif seller_endpoint.startswith("arn:"):
+        from ad_buyer.interfaces.agentcore.agentcore_seller_proxy import (
+            AgentCoreSellerProxy,
+        )
+
+        client = AgentCoreSellerProxy(
+            runtime_arn=seller_endpoint,
+            region=os.environ.get("AWS_REGION"),
+        )
+    else:
+        client = OpenDirectClient(base_url=seller_url)
 
     flow = DealBookingFlow(client)
     try:
