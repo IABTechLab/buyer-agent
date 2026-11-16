@@ -359,10 +359,10 @@ class TestNormalizeDeal:
         normalized = self.connector._normalize_deal(self._pg_deal())
         assert normalized["geo_targets"] == "US, CA"
 
-    def test_geo_targets_collected_from_domain_key(self):
-        """targeting[].keyName='domain' also counts as a geo key."""
+    def test_domain_key_not_treated_as_geo(self):
+        """targeting[].keyName='domain' is inventory targeting, not geography."""
         normalized = self.connector._normalize_deal(self._paused_deal())
-        assert normalized["geo_targets"] == "example.com"
+        assert normalized["geo_targets"] is None
 
     def test_empty_targeting_gives_none_geo_targets(self):
         """Empty targeting array → geo_targets is None."""
@@ -505,6 +505,13 @@ class TestFetchDealsRequestParams:
         """status kwarg is sent as ?status= query param."""
         connector, transport = self._recording_connector()
         connector.fetch_deals(status="active")
+        assert transport.last_request is not None
+        assert "status=active" in str(transport.last_request.url)
+
+    def test_status_filter_sent_lowercase(self):
+        """A mixed-case status kwarg is sent lowercase, as validated."""
+        connector, transport = self._recording_connector()
+        connector.fetch_deals(status="Active")
         assert transport.last_request is not None
         assert "status=active" in str(transport.last_request.url)
 
@@ -682,6 +689,31 @@ class TestFetchDealsPagination:
         assert result.successful == 3
         assert len(result.deals) == 3
 
+    def test_clamped_page_size_still_fetches_every_deal(self):
+        """A server that returns fewer deals per page than requested still pages to totalCount."""
+
+        class _SequenceTransport(httpx.BaseTransport):
+            def __init__(self, pages: list[dict[str, Any]]) -> None:
+                self._pages = pages
+                self.calls = 0
+
+            def handle_request(self, request: httpx.Request) -> httpx.Response:
+                page = self._pages[min(self.calls, len(self._pages) - 1)]
+                self.calls += 1
+                return _make_response(200, page)
+
+        transport = _SequenceTransport(
+            [
+                {"totalCount": 3, "deals": [_paging_deal("IX-001")]},
+                {"totalCount": 3, "deals": [_paging_deal("IX-002")]},
+                {"totalCount": 3, "deals": [_paging_deal("IX-003")]},
+            ]
+        )
+        connector = _connector_with_transport(transport)
+        result = connector.fetch_deals(page_size=2)
+        assert result.successful == 3
+        assert transport.calls == 3
+
     def test_missing_total_count_keeps_paging_until_short_page(self):
         """A response without totalCount must not silently end pagination after page 1."""
 
@@ -853,6 +885,26 @@ class TestFetchDealsErrorHandling:
         with pytest.raises(SSPConnectionError):
             connector.fetch_deals()
 
+    @pytest.mark.parametrize("status_code", [400, 404])
+    def test_unhandled_4xx_raises_ssp_connection_error(self, status_code):
+        """A 4xx without a dedicated branch raises instead of importing 0 deals."""
+        transport = _MockTransport(_make_response(status_code, {"error": "Bad Request"}))
+        connector = _connector_with_transport(transport)
+        with pytest.raises(SSPConnectionError) as exc_info:
+            connector.fetch_deals()
+        assert exc_info.value.status_code == status_code
+
+    def test_non_json_body_raises_ssp_connection_error(self):
+        """A 200 with a body that isn't JSON raises SSPConnectionError, not JSONDecodeError."""
+        transport = _MockTransport(
+            httpx.Response(
+                200, content=b"<html>gateway</html>", headers={"content-type": "text/html"}
+            )
+        )
+        connector = _connector_with_transport(transport)
+        with pytest.raises(SSPConnectionError):
+            connector.fetch_deals()
+
     def test_network_error_raises_ssp_connection_error(self):
         """Network-level errors are wrapped in SSPConnectionError."""
 
@@ -897,6 +949,22 @@ class TestTestConnection:
     def test_connection_auth_failure_returns_false(self):
         """test_connection() returns False (not raises) on 401."""
         transport = _MockTransport(_make_response(401, {"error": "Unauthorized"}))
+        connector = _connector_with_transport(transport)
+        assert connector.test_connection() is False
+
+    def test_connection_not_found_returns_false(self):
+        """test_connection() returns False (not raises) on 404."""
+        transport = _MockTransport(_make_response(404, {"error": "Not Found"}))
+        connector = _connector_with_transport(transport)
+        assert connector.test_connection() is False
+
+    def test_connection_non_json_body_returns_false(self):
+        """test_connection() returns False (not raises) on a non-JSON body."""
+        transport = _MockTransport(
+            httpx.Response(
+                200, content=b"<html>gateway</html>", headers={"content-type": "text/html"}
+            )
+        )
         connector = _connector_with_transport(transport)
         assert connector.test_connection() is False
 

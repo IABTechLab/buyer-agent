@@ -99,7 +99,7 @@ _VALID_FETCH_FILTERS = {"status", "class_ids", "account_ids", "page_size"}
 
 # Standard targeting keyNames that represent geographic targeting, per the
 # targeting key catalogue managed in supply-configuration-api.
-_GEO_TARGETING_KEYS = {"Country", "region", "continent", "place", "area", "zipcode", "domain"}
+_GEO_TARGETING_KEYS = {"Country", "region", "continent", "place", "area", "zipcode"}
 
 _IX_BASE_URL = "https://app.indexexchange.com/api/deals"
 _DEALS_ENDPOINT = "/v3/deals"
@@ -187,7 +187,7 @@ class IndexExchangeConnector(SSPConnector):
         """Fetch deals from Index Exchange that are targeted to the buyer seat.
 
         Handles pagination automatically: iterates pages (0-indexed, via
-        pageOffset) until the cumulative offset reaches the API's reported
+        pageOffset) until the deals received reach the API's reported
         totalCount, or a page comes back empty. If a response omits
         totalCount, it keeps paging until a page comes back short.
 
@@ -214,7 +214,8 @@ class IndexExchangeConnector(SSPConnector):
                 a recognized filter value.
             SSPAuthError: HTTP 401 or 403 from Index API.
             SSPRateLimitError: HTTP 429 from Index API.
-            SSPConnectionError: HTTP 5xx or network error.
+            SSPConnectionError: Any other HTTP error, a non-JSON body, or a
+                network error.
         """
         unknown_filters = sorted(set(kwargs) - _VALID_FETCH_FILTERS)
         if unknown_filters:
@@ -292,7 +293,7 @@ class IndexExchangeConnector(SSPConnector):
             if total_count is None:
                 if len(raw_deals) < page_size:
                     break
-            elif (page_offset * page_size) >= total_count:
+            elif result.raw_response_count >= total_count:
                 break
 
         logger.info(
@@ -490,7 +491,7 @@ class IndexExchangeConnector(SSPConnector):
         # Only add status/classIDs/accountIDs params when filtering — avoids
         # sending ?status=all which some APIs treat as a literal filter value.
         if status_filter and status_filter.lower() != "all":
-            params["status"] = status_filter
+            params["status"] = status_filter.lower()
         if class_ids:
             params["classIDs"] = class_ids
         if account_ids:
@@ -522,7 +523,8 @@ class IndexExchangeConnector(SSPConnector):
         Raises:
             SSPAuthError: HTTP 401 or 403.
             SSPRateLimitError: HTTP 429.
-            SSPConnectionError: HTTP 5xx or network error.
+            SSPConnectionError: Any other HTTP error, a non-JSON body, or a
+                network error.
         """
         url = f"{self._base_url}{_DEALS_ENDPOINT}"
         params = self._build_params(
@@ -567,7 +569,16 @@ class IndexExchangeConnector(SSPConnector):
                 status_code=response.status_code,
             )
 
-        data: dict[str, Any] = response.json()
+        if response.status_code >= 400:
+            raise SSPConnectionError(
+                f"Index Exchange API request failed (HTTP {response.status_code}): {response.text}",
+                status_code=response.status_code,
+            )
+
+        try:
+            data: dict[str, Any] = response.json()
+        except ValueError as exc:
+            raise SSPConnectionError(f"Index Exchange API returned a non-JSON body: {exc}") from exc
         total_count = data.get("totalCount")
         if total_count is None:
             logger.warning("Index Exchange response had no totalCount; paging until a short page")
