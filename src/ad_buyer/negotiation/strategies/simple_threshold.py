@@ -57,7 +57,7 @@ class SimpleThresholdStrategy(NegotiationStrategy):
         return min(next_price, self.max_cpm)
 
     def should_walk_away(self, seller_price: float, context: NegotiationContext) -> bool:
-        """Walk away if max rounds exceeded or seller isn't moving."""
+        """Walk away once max rounds are reached or if the seller isn't moving."""
         # Walk away after max_rounds
         if context.rounds_completed >= self.max_rounds:
             return True

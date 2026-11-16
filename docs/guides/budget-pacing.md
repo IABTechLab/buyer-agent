@@ -98,7 +98,7 @@ expected = engine.calculate_expected_spend(
     flight_end=datetime(2026, 9, 30, tzinfo=timezone.utc),
     current_time=datetime(2026, 8, 15, tzinfo=timezone.utc),
 )
-# expected ≈ 73,770 (about 49.2% of flight elapsed)
+# expected ≈ 74,176 (about 49.5% of flight elapsed)
 ```
 
 ### Pacing Percentage

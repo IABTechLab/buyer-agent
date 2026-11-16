@@ -58,7 +58,7 @@ strategy = SimpleThresholdStrategy(
 |----------|------|
 | **Accept** | Seller price ≤ `max_cpm` |
 | **Next offer** | Last offer + `concession_step` (capped at `max_cpm`) |
-| **Walk away** | Rounds exceeded `max_rounds` OR seller hasn't moved since last round |
+| **Walk away** | `max_rounds` reached OR seller hasn't moved since last round |
 
 **Behavior profiles:**
 
