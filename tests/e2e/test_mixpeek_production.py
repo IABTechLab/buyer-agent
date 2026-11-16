@@ -230,7 +230,6 @@ class TestBrandSafety:
             for cat in (
                 "Poker and Professional Gambling",
                 "Casinos & Gambling",
-                "Casino Games",
             )
         ), f"Expected gambling categories, got: {flagged_names}"
 
