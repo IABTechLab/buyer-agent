@@ -30,6 +30,8 @@ BRAND_UNSAFE_CATEGORIES = frozenset(
         "Adult & Explicit Sexual Content",
         "Adult Video Games",
         "Debated Sensitive Social Issues",
+        "Hate Speech and Acts of Aggression",
+        "Obscenity and Profanity",
         "Terrorism",
         "Crime",
         "Crime & Harmful Acts to Individuals, Society & Human Right Violations",

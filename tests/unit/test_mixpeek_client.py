@@ -175,6 +175,33 @@ class TestBrandSafety:
         assert isinstance(BRAND_UNSAFE_CATEGORIES, frozenset)
         assert "Casinos & Gambling" in BRAND_UNSAFE_CATEGORIES
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "category",
+        ["Hate Speech and Acts of Aggression", "Obscenity and Profanity"],
+    )
+    async def test_flags_sensitive_topics_children(self, client, category):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "documents": [
+                {
+                    "iab_category_name": category,
+                    "iab_path": ["Sensitive Topics", category],
+                    "iab_tier": 2,
+                    "score": 0.91,
+                },
+            ]
+        }
+
+        with patch.object(
+            client._client, "request", new_callable=AsyncMock, return_value=mock_resp
+        ):
+            result = await client.check_brand_safety(retriever_id="ret-123", text="sample text")
+
+        assert result["safe"] is False
+        assert [c["category"] for c in result["flagged_categories"]] == [category]
+
 
 class TestSearchContent:
     @pytest.mark.asyncio
@@ -257,9 +284,9 @@ def test_brand_unsafe_categories_are_content_taxonomy_3_1_names():
 
     from ad_buyer.clients.mixpeek_client import BRAND_UNSAFE_CATEGORIES
 
-    tsv = next(Path(__file__).resolve().parents[2].rglob("Content Taxonomy 3.1.tsv"), None)
-    if tsv is None:
-        pytest.skip("Content Taxonomy 3.1 TSV not vendored")
+    tsv = (
+        Path(__file__).resolve().parents[2] / "data/taxonomies/content-3.1/Content Taxonomy 3.1.tsv"
+    )
     rows = list(csv.reader(tsv.open(encoding="utf-8"), delimiter="\t"))
     names = {r[2].strip() for r in rows[2:] if len(r) > 2 and r[0].strip()}
     assert sorted(BRAND_UNSAFE_CATEGORIES - names) == []
